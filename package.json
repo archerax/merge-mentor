@@ -1,0 +1,32 @@
+{
+  "name": "pr-bot",
+  "version": "1.0.0",
+  "description": "Automated code review bot using GitHub Copilot CLI",
+  "main": "dist/cli.js",
+  "bin": {
+    "pr-bot": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "review": "node dist/cli.js",
+    "test": "vitest run --no-file-parallelism",
+    "test:watch": "vitest --no-file-parallelism",
+    "test:coverage": "vitest run --coverage --no-file-parallelism"
+  },
+  "keywords": ["code-review", "github", "azure-devops", "copilot"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@types/node": "^25.0.2",
+    "azure-devops-node-api": "^15.1.1",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.16",
+    "vitest": "^4.0.16"
+  }
+}
