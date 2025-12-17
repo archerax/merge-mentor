@@ -19,7 +19,7 @@ program
   .description('Review a pull request')
   .requiredOption('--pr <number>', 'Pull request number', parseInt)
   .option('--platform <platform>', 'Platform (github or azure)', 'github')
-  .option('--dry-run', 'Run without posting comments', false)
+  .option('--write', 'Post comments to PR (default is dry-run mode)', false)
   .option('--verbose', 'Enable verbose output', true)
   .option('--quiet', 'Disable verbose output', false)
   .action(async (options) => {
@@ -41,12 +41,14 @@ program
         adapter = new AzureDevOpsAdapter(config);
       }
 
+      const dryRun = !options.write;
       const engine = new ReviewEngine(adapter, config.botCommentIdentifier, {
-        dryRun: options.dryRun,
+        dryRun,
         verbose: !options.quiet,
       });
 
-      console.log(`\n🔍 Starting code review for PR #${options.pr} on ${platform}...\n`);
+      const modeLabel = dryRun ? '(dry-run)' : '';
+      console.log(`\n🔍 Starting code review for PR #${options.pr} on ${platform} ${modeLabel}...\n`);
 
       const result = await engine.reviewPR(options.pr);
 
@@ -60,9 +62,17 @@ program
       console.log(`Files Reviewed: ${result.filesReviewed}`);
       console.log(`Total Issues Found: ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)}`);
       console.log('');
-      console.log(`Comments Created: ${result.commentsCreated}`);
-      console.log(`Comments Updated: ${result.commentsUpdated}`);
-      console.log(`Comments Resolved: ${result.commentsResolved}`);
+      
+      if (dryRun) {
+        console.log('📝 Dry-run mode - showing what would be posted:');
+        console.log(`  Comments to Create: ${result.commentsCreated}`);
+        console.log(`  Comments to Update: ${result.commentsUpdated}`);
+        console.log(`  Comments to Resolve: ${result.commentsResolved}`);
+      } else {
+        console.log(`Comments Created: ${result.commentsCreated}`);
+        console.log(`Comments Updated: ${result.commentsUpdated}`);
+        console.log(`Comments Resolved: ${result.commentsResolved}`);
+      }
       console.log('='.repeat(60) + '\n');
 
       // Exit with error code if critical issues found

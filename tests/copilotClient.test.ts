@@ -1,25 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { CopilotClient } from '../src/copilot/client.js';
+import { CopilotClient, type CopilotResponse } from '../src/copilot/client.js';
+
+function createCopilotClient(): CopilotClient {
+  return new CopilotClient({ maxRetries: 1, timeoutMs: 5000 });
+}
+
+function createCopilotResponse(parsed: unknown): CopilotResponse {
+  return { raw: JSON.stringify(parsed), parsed };
+}
 
 describe('CopilotClient', () => {
-  const client = new CopilotClient({ maxRetries: 1, timeoutMs: 5000 });
-
   describe('parseFileReview', () => {
     it('should parse valid file review response', () => {
-      const response = {
-        raw: '{"findings": [{"line": 10, "severity": "high", "category": "bug", "message": "Potential null pointer", "suggestion": "Add null check"}]}',
-        parsed: {
-          findings: [
-            {
-              line: 10,
-              severity: 'high',
-              category: 'bug',
-              message: 'Potential null pointer',
-              suggestion: 'Add null check',
-            },
-          ],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [
+          {
+            line: 10,
+            severity: 'high',
+            category: 'bug',
+            message: 'Potential null pointer',
+            suggestion: 'Add null check',
+          },
+        ],
+      });
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -35,10 +39,8 @@ describe('CopilotClient', () => {
     });
 
     it('should handle empty findings', () => {
-      const response = {
-        raw: '{"findings": []}',
-        parsed: { findings: [] },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({ findings: [] });
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -47,10 +49,8 @@ describe('CopilotClient', () => {
     });
 
     it('should handle missing findings array', () => {
-      const response = {
-        raw: '{}',
-        parsed: {},
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({});
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -59,14 +59,12 @@ describe('CopilotClient', () => {
     });
 
     it('should use default severity for invalid values', () => {
-      const response = {
-        raw: '{}',
-        parsed: {
-          findings: [
-            { line: 1, severity: 'invalid', category: 'bug', message: 'test', suggestion: 'fix' },
-          ],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [
+          { line: 1, severity: 'invalid', category: 'bug', message: 'test', suggestion: 'fix' },
+        ],
+      });
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -74,14 +72,12 @@ describe('CopilotClient', () => {
     });
 
     it('should use default category for invalid values', () => {
-      const response = {
-        raw: '{}',
-        parsed: {
-          findings: [
-            { line: 1, severity: 'high', category: 'invalid', message: 'test', suggestion: 'fix' },
-          ],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [
+          { line: 1, severity: 'high', category: 'invalid', message: 'test', suggestion: 'fix' },
+        ],
+      });
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -89,14 +85,12 @@ describe('CopilotClient', () => {
     });
 
     it('should handle missing line number', () => {
-      const response = {
-        raw: '{}',
-        parsed: {
-          findings: [
-            { severity: 'high', category: 'bug', message: 'test', suggestion: 'fix' },
-          ],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [
+          { severity: 'high', category: 'bug', message: 'test', suggestion: 'fix' },
+        ],
+      });
 
       const result = client.parseFileReview('test.ts', response);
 
@@ -106,21 +100,19 @@ describe('CopilotClient', () => {
 
   describe('parseCrossFileReview', () => {
     it('should parse valid cross-file review response', () => {
-      const response = {
-        raw: '{}',
-        parsed: {
-          overall_assessment: 'Good PR overall',
-          findings: [
-            {
-              severity: 'medium',
-              category: 'architecture',
-              message: 'Consider separating concerns',
-              affected_files: ['src/a.ts', 'src/b.ts'],
-            },
-          ],
-          recommendations: ['Add more tests', 'Update docs'],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        overall_assessment: 'Good PR overall',
+        findings: [
+          {
+            severity: 'medium',
+            category: 'architecture',
+            message: 'Consider separating concerns',
+            affected_files: ['src/a.ts', 'src/b.ts'],
+          },
+        ],
+        recommendations: ['Add more tests', 'Update docs'],
+      });
 
       const result = client.parseCrossFileReview(response);
 
@@ -136,10 +128,8 @@ describe('CopilotClient', () => {
     });
 
     it('should handle empty response', () => {
-      const response = {
-        raw: '{}',
-        parsed: {},
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({});
 
       const result = client.parseCrossFileReview(response);
 
@@ -149,14 +139,12 @@ describe('CopilotClient', () => {
     });
 
     it('should handle missing affected_files', () => {
-      const response = {
-        raw: '{}',
-        parsed: {
-          findings: [
-            { severity: 'low', category: 'design', message: 'test' },
-          ],
-        },
-      };
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [
+          { severity: 'low', category: 'design', message: 'test' },
+        ],
+      });
 
       const result = client.parseCrossFileReview(response);
 

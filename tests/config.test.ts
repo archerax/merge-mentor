@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loadConfig, validateConfig, type Platform } from '../src/config.js';
+import { ConfigurationError } from '../src/errors/index.js';
 
 describe('Config', () => {
   beforeEach(() => {
     vi.resetModules();
-    // Clear environment variables
     delete process.env.DEFAULT_PLATFORM;
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_REPO_OWNER;
@@ -57,31 +57,28 @@ describe('Config', () => {
   });
 
   describe('validateConfig', () => {
-    it('should throw error when GitHub token is missing', () => {
+    it('should throw ConfigurationError when GitHub token is missing', () => {
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'github' as Platform)).toThrow(
-        'GITHUB_TOKEN is required'
-      );
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow('GITHUB_TOKEN');
     });
 
-    it('should throw error when GitHub owner is missing', () => {
+    it('should throw ConfigurationError when GitHub owner is missing', () => {
       process.env.GITHUB_TOKEN = 'token';
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'github' as Platform)).toThrow(
-        'GITHUB_REPO_OWNER is required'
-      );
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow('GITHUB_REPO_OWNER');
     });
 
-    it('should throw error when GitHub repo is missing', () => {
+    it('should throw ConfigurationError when GitHub repo is missing', () => {
       process.env.GITHUB_TOKEN = 'token';
       process.env.GITHUB_REPO_OWNER = 'owner';
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'github' as Platform)).toThrow(
-        'GITHUB_REPO_NAME is required'
-      );
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'github' as Platform)).toThrow('GITHUB_REPO_NAME');
     });
 
     it('should not throw when all GitHub config is provided', () => {
@@ -93,42 +90,38 @@ describe('Config', () => {
       expect(() => validateConfig(config, 'github' as Platform)).not.toThrow();
     });
 
-    it('should throw error when Azure DevOps token is missing', () => {
+    it('should throw ConfigurationError when Azure DevOps token is missing', () => {
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(
-        'AZURE_DEVOPS_TOKEN is required'
-      );
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow('AZURE_DEVOPS_TOKEN');
     });
 
-    it('should throw error when Azure DevOps org is missing', () => {
+    it('should throw ConfigurationError when Azure DevOps org is missing', () => {
       process.env.AZURE_DEVOPS_TOKEN = 'token';
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(
-        'AZURE_DEVOPS_ORG is required'
-      );
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow('AZURE_DEVOPS_ORG');
     });
 
-    it('should throw error when Azure DevOps project is missing', () => {
+    it('should throw ConfigurationError when Azure DevOps project is missing', () => {
       process.env.AZURE_DEVOPS_TOKEN = 'token';
       process.env.AZURE_DEVOPS_ORG = 'org';
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(
-        'AZURE_DEVOPS_PROJECT is required'
-      );
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow('AZURE_DEVOPS_PROJECT');
     });
 
-    it('should throw error when Azure DevOps repo is missing', () => {
+    it('should throw ConfigurationError when Azure DevOps repo is missing', () => {
       process.env.AZURE_DEVOPS_TOKEN = 'token';
       process.env.AZURE_DEVOPS_ORG = 'org';
       process.env.AZURE_DEVOPS_PROJECT = 'project';
       const config = loadConfig();
       
-      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(
-        'AZURE_DEVOPS_REPO is required'
-      );
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, 'azure' as Platform)).toThrow('AZURE_DEVOPS_REPO');
     });
 
     it('should not throw when all Azure DevOps config is provided', () => {

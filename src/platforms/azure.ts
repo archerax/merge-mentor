@@ -6,20 +6,41 @@ import type {
   PRDetails,
   PRFile,
   ExistingComment,
+  FileStatus,
 } from './types.js';
 
+/** Azure DevOps change type values. */
+const AzureChangeType = {
+  ADD: 1,
+  EDIT: 2,
+  RENAME: 8,
+  DELETE: 16,
+} as const;
+
+/** Azure DevOps thread status values. */
+const AzureThreadStatus = {
+  ACTIVE: 1,
+  FIXED: 2,
+} as const;
+
+/** Azure DevOps comment type values. */
+const AzureCommentType = {
+  TEXT: 1,
+} as const;
+
+/**
+ * Platform adapter for Azure DevOps pull requests.
+ */
 export class AzureDevOpsAdapter implements PlatformAdapter {
-  private connection: azdev.WebApi;
-  private org: string;
-  private project: string;
-  private repoName: string;
-  private botIdentifier: string;
+  private readonly connection: azdev.WebApi;
+  private readonly project: string;
+  private readonly repoName: string;
+  private readonly botIdentifier: string;
 
   constructor(config: Config) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
     const orgUrl = `https://dev.azure.com/${config.azure.org}`;
     this.connection = new azdev.WebApi(orgUrl, authHandler);
-    this.org = config.azure.org;
     this.project = config.azure.project;
     this.repoName = config.azure.repo;
     this.botIdentifier = config.botCommentIdentifier;
@@ -42,7 +63,6 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     const gitApi = await this.connection.getGitApi();
     
-    // Get the PR iterations to get file changes
     const iterations = await gitApi.getPullRequestIterations(this.repoName, prNumber, this.project);
     if (!iterations || iterations.length === 0) {
       return [];
@@ -63,23 +83,33 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const item = change.item;
       if (!item?.path) continue;
 
-      let status: PRFile['status'] = 'modified';
-      const changeType = change.changeType;
-      if (changeType === 1) status = 'added'; // Add
-      else if (changeType === 2) status = 'modified'; // Edit
-      else if (changeType === 16) status = 'deleted'; // Delete
-      else if (changeType === 8) status = 'renamed'; // Rename
+      const status = this.mapChangeTypeToStatus(change.changeType);
 
       files.push({
         filename: item.path.startsWith('/') ? item.path.slice(1) : item.path,
         status,
-        additions: 0, // Azure DevOps doesn't provide this directly
+        additions: 0,
         deletions: 0,
-        patch: undefined, // Would need additional API calls to get diff
+        patch: undefined,
       });
     }
 
     return files;
+  }
+
+  private mapChangeTypeToStatus(changeType: number | undefined): FileStatus {
+    switch (changeType) {
+      case AzureChangeType.ADD:
+        return 'added';
+      case AzureChangeType.EDIT:
+        return 'modified';
+      case AzureChangeType.DELETE:
+        return 'deleted';
+      case AzureChangeType.RENAME:
+        return 'renamed';
+      default:
+        return 'modified';
+    }
   }
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
@@ -95,7 +125,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           body: firstComment.content || '',
           path: thread.threadContext?.filePath,
           line: thread.threadContext?.rightFileStart?.line,
-          isResolved: thread.status === 2, // Fixed status
+          isResolved: thread.status === AzureThreadStatus.FIXED,
         });
       }
     }
@@ -115,7 +145,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       comments: [
         {
           content: `${this.botIdentifier}\n\n${body}`,
-          commentType: 1, // Text
+          commentType: AzureCommentType.TEXT,
         } as Comment,
       ],
       threadContext: {
@@ -123,7 +153,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         rightFileStart: { line, offset: 1 },
         rightFileEnd: { line, offset: 1 },
       },
-      status: 1, // Active
+      status: AzureThreadStatus.ACTIVE,
     };
 
     await gitApi.createThread(thread, this.repoName, prNumber, this.project);
@@ -136,10 +166,10 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       comments: [
         {
           content: `${this.botIdentifier}\n\n${body}`,
-          commentType: 1, // Text
+          commentType: AzureCommentType.TEXT,
         } as Comment,
       ],
-      status: 1, // Active
+      status: AzureThreadStatus.ACTIVE,
     };
 
     await gitApi.createThread(thread, this.repoName, prNumber, this.project);

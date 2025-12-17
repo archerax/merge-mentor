@@ -10,10 +10,12 @@ An automated code review bot that leverages GitHub Copilot CLI to perform compre
 - **Summary Reports**: Generates detailed summary comments with statistics
 - **Comment Management**: Updates/resolves existing bot comments as issues are addressed
 - **Cross-File Analysis**: Identifies architectural and design issues across the PR
+- **Dry-Run Mode**: Preview changes before posting (default behavior)
 
 ## Prerequisites
 
 - Node.js 18+
+- pnpm (recommended) or npm
 - GitHub Copilot CLI installed and accessible in PATH
 - Personal access tokens for GitHub and/or Azure DevOps
 
@@ -25,10 +27,10 @@ git clone <repository-url>
 cd pr-bot
 
 # Install dependencies
-npm install
+pnpm install
 
 # Build the project
-npm run build
+pnpm build
 ```
 
 ## Configuration
@@ -76,20 +78,17 @@ Your Azure DevOps PAT needs:
 ### Review a Pull Request
 
 ```bash
-# Review a GitHub PR (using default platform)
-npm run review -- --pr 123
+# Dry-run mode (default) - shows what would be posted
+pnpm review -- --pr 123
 
-# Review a GitHub PR explicitly
-npm run review -- --pr 123 --platform github
+# Actually post comments to the PR
+pnpm review -- --pr 123 --write
 
 # Review an Azure DevOps PR
-npm run review -- --pr 456 --platform azure
-
-# Dry run (don't post comments)
-npm run review -- --pr 123 --dry-run
+pnpm review -- --pr 456 --platform azure --write
 
 # Quiet mode (minimal output)
-npm run review -- --pr 123 --quiet
+pnpm review -- --pr 123 --quiet
 ```
 
 ### Command Options
@@ -98,7 +97,7 @@ npm run review -- --pr 123 --quiet
 |--------|-------------|---------|
 | `--pr <number>` | Pull request number (required) | - |
 | `--platform <github\|azure>` | Platform to use | From env or `github` |
-| `--dry-run` | Run without posting comments | `false` |
+| `--write` | Post comments to PR (otherwise dry-run) | `false` |
 | `--verbose` | Enable verbose output | `true` |
 | `--quiet` | Disable verbose output | `false` |
 
@@ -139,6 +138,8 @@ pr-bot/
 ├── src/
 │   ├── cli.ts              # Command-line interface
 │   ├── config.ts           # Configuration management
+│   ├── errors/             # Custom error classes
+│   │   └── index.ts
 │   ├── platforms/
 │   │   ├── types.ts        # Platform adapter interfaces
 │   │   ├── github.ts       # GitHub API adapter
@@ -151,6 +152,8 @@ pr-bot/
 │       └── commentManager.ts # Comment lifecycle management
 ├── tests/                  # Unit tests
 ├── .env.example           # Example environment configuration
+├── AGENTS.md              # AI agent instructions
+├── TASKS.md               # Code quality tasks
 ├── package.json
 ├── tsconfig.json
 └── vitest.config.ts
@@ -160,35 +163,26 @@ pr-bot/
 
 ```bash
 # Build the project
-npm run build
+pnpm build
 
 # Run tests
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm test:watch
 
 # Run tests with coverage
-npm run test:coverage
-```
-
-### Running Tests
-
-```bash
-npm test
+pnpm test:coverage
 ```
 
 ## Error Handling
 
-The bot handles various error scenarios:
+The bot uses specific error types for different failure scenarios:
 
-- Invalid PR numbers or platform selection
-- API authentication failures
-- Network errors during API calls
-- Copilot CLI not installed or accessible
-- Malformed JSON responses from Copilot
-- Rate limiting on API requests
-- Permission errors when posting comments
+- `ConfigurationError` - Missing or invalid configuration
+- `CopilotCliError` - Copilot CLI failures or unavailability
+- `JsonParseError` - Malformed JSON responses from Copilot
+- `ValidationError` - Invalid input parameters
 
 ## Exit Codes
 

@@ -1,5 +1,12 @@
 import type { PRDetails, PRFile, FileReviewResult } from '../platforms/types.js';
 
+/**
+ * Builds a prompt for reviewing a single file.
+ * 
+ * @param filename - Name of the file being reviewed
+ * @param patch - Git diff/patch content for the file
+ * @returns Formatted prompt for Copilot CLI
+ */
 export function buildFileReviewPrompt(filename: string, patch: string): string {
   return `You are an expert code reviewer. Analyze the following code changes and provide a detailed review.
 
@@ -32,10 +39,18 @@ Respond ONLY with valid JSON in this exact format:
 If there are no issues, return: {"findings": []}`;
 }
 
+/**
+ * Builds a prompt for cross-file analysis.
+ * 
+ * @param prDetails - Pull request metadata
+ * @param filesSummary - Summary of changed files
+ * @param fileReviewResults - Results from individual file reviews
+ * @returns Formatted prompt for Copilot CLI
+ */
 export function buildCrossFilePrompt(
   prDetails: PRDetails,
   filesSummary: string,
-  fileReviewResults: FileReviewResult[]
+  fileReviewResults: readonly FileReviewResult[]
 ): string {
   const findingsSummary = fileReviewResults
     .filter(r => r.findings.length > 0)
@@ -74,7 +89,13 @@ Respond ONLY with valid JSON in this exact format:
 }`;
 }
 
-export function buildFilesSummary(files: PRFile[]): string {
+/**
+ * Builds a summary of changed files for prompt context.
+ * 
+ * @param files - Array of PR files
+ * @returns Formatted file summary string
+ */
+export function buildFilesSummary(files: readonly PRFile[]): string {
   return files
     .map(f => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
     .join('\n');

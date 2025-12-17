@@ -1,19 +1,43 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, test } from 'vitest';
 import { CommentManager } from '../src/review/commentManager.js';
-import type { ExistingComment, FileReviewResult, CrossFileReviewResult } from '../src/platforms/types.js';
+import type { ExistingComment, FileReviewResult, CrossFileReviewResult, FileFinding } from '../src/platforms/types.js';
+
+function createCommentManager(): CommentManager {
+  return new CommentManager('[AI Code Review Bot]');
+}
+
+function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
+  return {
+    line: 10,
+    severity: 'high',
+    category: 'bug',
+    message: 'Test message',
+    suggestion: 'Test suggestion',
+    ...overrides,
+  };
+}
+
+function createCrossFileResult(overrides: Partial<CrossFileReviewResult> = {}): CrossFileReviewResult {
+  return {
+    overallAssessment: 'Test assessment',
+    findings: [],
+    recommendations: [],
+    ...overrides,
+  };
+}
 
 describe('CommentManager', () => {
-  const manager = new CommentManager('[AI Code Review Bot]');
-
   describe('formatInlineComment', () => {
     it('should format finding with correct severity emoji', () => {
-      const result = manager.formatInlineComment({
-        line: 10,
+      const manager = createCommentManager();
+      const finding = createFileFinding({
         severity: 'critical',
         category: 'security',
         message: 'SQL injection vulnerability',
         suggestion: 'Use parameterized queries',
       });
+
+      const result = manager.formatInlineComment(finding);
 
       expect(result).toContain('🔴');
       expect(result).toContain('**CRITICAL**');
@@ -22,35 +46,28 @@ describe('CommentManager', () => {
       expect(result).toContain('Use parameterized queries');
     });
 
-    it('should use correct emoji for each severity', () => {
-      const severities = [
-        { severity: 'critical', emoji: '🔴' },
-        { severity: 'high', emoji: '🟠' },
-        { severity: 'medium', emoji: '🟡' },
-        { severity: 'low', emoji: '🟢' },
-      ] as const;
+    test.each([
+      ['critical', '🔴'],
+      ['high', '🟠'],
+      ['medium', '🟡'],
+      ['low', '🟢'],
+    ] as const)('should use %s emoji for %s severity', (severity, emoji) => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ severity });
 
-      for (const { severity, emoji } of severities) {
-        const result = manager.formatInlineComment({
-          line: 1,
-          severity,
-          category: 'bug',
-          message: 'test',
-          suggestion: 'fix',
-        });
-        expect(result).toContain(emoji);
-      }
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain(emoji);
     });
   });
 
   describe('formatSummaryComment', () => {
     it('should include overview section', () => {
+      const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult: CrossFileReviewResult = {
+      const crossFileResult = createCrossFileResult({
         overallAssessment: 'This PR looks good',
-        findings: [],
-        recommendations: [],
-      };
+      });
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -60,26 +77,23 @@ describe('CommentManager', () => {
     });
 
     it('should include statistics', () => {
+      const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [
         {
           filename: 'file1.ts',
           findings: [
-            { line: 1, severity: 'critical', category: 'bug', message: 'bug1', suggestion: '' },
-            { line: 2, severity: 'high', category: 'security', message: 'sec1', suggestion: '' },
+            createFileFinding({ line: 1, severity: 'critical', category: 'bug' }),
+            createFileFinding({ line: 2, severity: 'high', category: 'security' }),
           ],
         },
         {
           filename: 'file2.ts',
           findings: [
-            { line: 5, severity: 'medium', category: 'performance', message: 'perf1', suggestion: '' },
+            createFileFinding({ line: 5, severity: 'medium', category: 'performance' }),
           ],
         },
       ];
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: 'Needs work',
-        findings: [],
-        recommendations: [],
-      };
+      const crossFileResult = createCrossFileResult({ overallAssessment: 'Needs work' });
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -88,23 +102,20 @@ describe('CommentManager', () => {
     });
 
     it('should count by severity correctly', () => {
+      const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [
         {
           filename: 'test.ts',
           findings: [
-            { line: 1, severity: 'critical', category: 'bug', message: '', suggestion: '' },
-            { line: 2, severity: 'critical', category: 'bug', message: '', suggestion: '' },
-            { line: 3, severity: 'high', category: 'bug', message: '', suggestion: '' },
-            { line: 4, severity: 'medium', category: 'bug', message: '', suggestion: '' },
-            { line: 5, severity: 'low', category: 'bug', message: '', suggestion: '' },
+            createFileFinding({ line: 1, severity: 'critical' }),
+            createFileFinding({ line: 2, severity: 'critical' }),
+            createFileFinding({ line: 3, severity: 'high' }),
+            createFileFinding({ line: 4, severity: 'medium' }),
+            createFileFinding({ line: 5, severity: 'low' }),
           ],
         },
       ];
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: '',
-        findings: [],
-        recommendations: [],
-      };
+      const crossFileResult = createCrossFileResult();
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -115,8 +126,9 @@ describe('CommentManager', () => {
     });
 
     it('should include cross-file findings when present', () => {
+      const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult: CrossFileReviewResult = {
+      const crossFileResult = createCrossFileResult({
         overallAssessment: 'Review complete',
         findings: [
           {
@@ -126,8 +138,7 @@ describe('CommentManager', () => {
             affectedFiles: ['a.ts', 'b.ts'],
           },
         ],
-        recommendations: [],
-      };
+      });
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -138,12 +149,11 @@ describe('CommentManager', () => {
     });
 
     it('should include recommendations when present', () => {
+      const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: 'Good',
-        findings: [],
+      const crossFileResult = createCrossFileResult({
         recommendations: ['Add unit tests', 'Update documentation'],
-      };
+      });
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -155,20 +165,15 @@ describe('CommentManager', () => {
 
   describe('determineActions', () => {
     it('should create new comments for new findings', () => {
+      const manager = createCommentManager();
       const existingComments: ExistingComment[] = [];
       const fileResults: FileReviewResult[] = [
         {
           filename: 'test.ts',
-          findings: [
-            { line: 10, severity: 'high', category: 'bug', message: 'Bug found', suggestion: 'Fix it' },
-          ],
+          findings: [createFileFinding({ line: 10, message: 'Bug found', suggestion: 'Fix it' })],
         },
       ];
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: 'Needs work',
-        findings: [],
-        recommendations: [],
-      };
+      const crossFileResult = createCrossFileResult({ overallAssessment: 'Needs work' });
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
@@ -179,15 +184,12 @@ describe('CommentManager', () => {
     });
 
     it('should resolve comments that are no longer relevant', () => {
+      const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
         { id: 1, body: '[AI Code Review Bot]\n\nbug issue', path: 'test.ts', line: 10 },
       ];
-      const fileResults: FileReviewResult[] = []; // No findings
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: 'All good',
-        findings: [],
-        recommendations: [],
-      };
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({ overallAssessment: 'All good' });
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
@@ -197,15 +199,12 @@ describe('CommentManager', () => {
     });
 
     it('should not resolve already resolved comments', () => {
+      const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
         { id: 1, body: '[AI Code Review Bot]\n\nbug issue', path: 'test.ts', line: 10, isResolved: true },
       ];
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult: CrossFileReviewResult = {
-        overallAssessment: 'Good',
-        findings: [],
-        recommendations: [],
-      };
+      const crossFileResult = createCrossFileResult();
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
@@ -214,11 +213,8 @@ describe('CommentManager', () => {
     });
 
     it('should always create a summary comment', () => {
-      const actions = manager.determineActions(
-        [],
-        [],
-        { overallAssessment: 'Good', findings: [], recommendations: [] }
-      );
+      const manager = createCommentManager();
+      const actions = manager.determineActions([], [], createCrossFileResult());
 
       const summaryActions = actions.filter(a => a.type === 'create' && !a.path);
       expect(summaryActions).toHaveLength(1);

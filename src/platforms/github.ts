@@ -5,13 +5,17 @@ import type {
   PRDetails,
   PRFile,
   ExistingComment,
+  FileStatus,
 } from './types.js';
 
+/**
+ * Platform adapter for GitHub pull requests.
+ */
 export class GitHubAdapter implements PlatformAdapter {
-  private octokit: Octokit;
-  private owner: string;
-  private repo: string;
-  private botIdentifier: string;
+  private readonly octokit: Octokit;
+  private readonly owner: string;
+  private readonly repo: string;
+  private readonly botIdentifier: string;
 
   constructor(config: Config) {
     this.octokit = new Octokit({ auth: config.github.token });
@@ -47,7 +51,7 @@ export class GitHubAdapter implements PlatformAdapter {
 
     return data.map((file) => ({
       filename: file.filename,
-      status: file.status as PRFile['status'],
+      status: file.status as FileStatus,
       additions: file.additions,
       deletions: file.deletions,
       patch: file.patch,
