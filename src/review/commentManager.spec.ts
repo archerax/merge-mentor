@@ -1,6 +1,6 @@
 import { describe, it, expect, test } from 'vitest';
-import { CommentManager } from '../src/review/commentManager.js';
-import type { ExistingComment, FileReviewResult, CrossFileReviewResult, FileFinding } from '../src/platforms/types.js';
+import { CommentManager } from './commentManager.js';
+import type { ExistingComment, FileReviewResult, CrossFileReviewResult, FileFinding } from '../platforms/types.js';
 
 function createCommentManager(): CommentManager {
   return new CommentManager('[AI Code Review Bot]');
@@ -58,6 +58,15 @@ describe('CommentManager', () => {
       const result = manager.formatInlineComment(finding);
 
       expect(result).toContain(emoji);
+    });
+
+    it('should use default emoji for unknown severity', () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ severity: 'unknown' as any });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain('⚪');
     });
   });
 
@@ -148,6 +157,25 @@ describe('CommentManager', () => {
       expect(result).toContain('a.ts, b.ts');
     });
 
+    it('should handle cross-file findings with empty affectedFiles', () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({
+        findings: [
+          {
+            severity: 'medium',
+            category: 'design',
+            message: 'Test finding',
+            affectedFiles: [],
+          },
+        ],
+      });
+
+      const result = manager.formatSummaryComment(fileResults, crossFileResult);
+
+      expect(result).toContain('**Affected Files:** Multiple files');
+    });
+
     it('should include recommendations when present', () => {
       const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
@@ -219,6 +247,91 @@ describe('CommentManager', () => {
       const summaryActions = actions.filter(a => a.type === 'create' && !a.path);
       expect(summaryActions).toHaveLength(1);
       expect(summaryActions[0].body).toContain('Code Review Summary');
+    });
+
+    it('should not resolve comments without path', () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: '[AI Code Review Bot]\n\nGeneral comment' },
+      ];
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const resolveActions = actions.filter(a => a.type === 'resolve');
+      expect(resolveActions).toHaveLength(0);
+    });
+
+    it('should match comments correctly by category and line', () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: '[AI Code Review Bot]\n\nbug at line 10', path: 'test.ts', line: 10 },
+        { id: 2, body: '[AI Code Review Bot]\n\nsecurity at line 20', path: 'test.ts', line: 20 },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: 'test.ts',
+          findings: [
+            createFileFinding({ line: 10, category: 'bug', message: 'Bug issue' }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const resolveActions = actions.filter(a => a.type === 'resolve');
+      expect(resolveActions).toHaveLength(1);
+      expect(resolveActions[0].existingCommentId).toBe(2);
+    });
+
+    it('should not update when existing comment matches new comment', () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ 
+        line: 10, 
+        severity: 'high',
+        category: 'bug', 
+        message: 'Test message',
+        suggestion: 'Test suggestion'
+      });
+      const existingBody = manager.formatInlineComment(finding);
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: existingBody, path: 'test.ts', line: 10 },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: 'test.ts',
+          findings: [finding],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const updateActions = actions.filter(a => a.type === 'update');
+      expect(updateActions).toHaveLength(0);
+    });
+  });
+
+  describe('formatSummaryComment cross-file findings', () => {
+    it('should show "Multiple files" when affectedFiles is empty', () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({
+        findings: [
+          {
+            severity: 'high',
+            category: 'architecture',
+            message: 'Design issue',
+            affectedFiles: [],
+          },
+        ],
+      });
+
+      const result = manager.formatSummaryComment(fileResults, crossFileResult);
+
+      expect(result).toContain('**Affected Files:** Multiple files');
     });
   });
 });

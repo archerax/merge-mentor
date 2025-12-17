@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadConfig, validateConfig, type Platform } from '../src/config.js';
-import { ConfigurationError } from '../src/errors/index.js';
+import { loadConfig, validateConfig, type Platform } from './config.js';
+import { ConfigurationError } from './errors/index.js';
 
 describe('Config', () => {
   beforeEach(() => {
@@ -132,6 +132,13 @@ describe('Config', () => {
       const config = loadConfig();
       
       expect(() => validateConfig(config, 'azure' as Platform)).not.toThrow();
+    });
+
+    it('should not throw for unknown platform (no validation)', () => {
+      const config = loadConfig();
+      const unknownPlatform = 'unknown' as unknown as Platform;
+      
+      expect(() => validateConfig(config, unknownPlatform)).not.toThrow();
     });
   });
 });

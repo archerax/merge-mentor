@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['src/**/*.spec.ts'],
     isolate: false,
     pool: 'threads',
     sequence: {
@@ -12,7 +12,14 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'lcov', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.spec.ts', 'src/cli.ts'],
+      all: true,
+      lines: 85,
+      functions: 85,
+      branches: 85,
+      statements: 85,
     },
   },
 });

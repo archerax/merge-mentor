@@ -3,8 +3,8 @@ import {
   buildFileReviewPrompt,
   buildCrossFilePrompt,
   buildFilesSummary,
-} from '../src/copilot/prompts.js';
-import type { PRDetails, PRFile, FileReviewResult } from '../src/platforms/types.js';
+} from './prompts.js';
+import type { PRDetails, PRFile, FileReviewResult } from '../platforms/types.js';
 
 describe('Copilot Prompts', () => {
   describe('buildFileReviewPrompt', () => {
