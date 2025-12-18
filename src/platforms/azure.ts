@@ -4,6 +4,7 @@ import type {
   GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import type { Config } from "../config.js";
+import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
 /** Azure DevOps change type values. */
@@ -45,7 +46,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
     const gitApi = await this.connection.getGitApi();
-    const pr = await gitApi.getPullRequestById(prNumber, this.project);
+    const pr = await withRateLimitHandling(() => gitApi.getPullRequestById(prNumber, this.project));
 
     return {
       number: pr.pullRequestId || prNumber,
@@ -60,7 +61,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     const gitApi = await this.connection.getGitApi();
 
-    const iterations = await gitApi.getPullRequestIterations(this.repoName, prNumber, this.project);
+    const iterations = await withRateLimitHandling(() =>
+      gitApi.getPullRequestIterations(this.repoName, prNumber, this.project)
+    );
     if (!iterations || iterations.length === 0) {
       return [];
     }
@@ -68,11 +71,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     const lastIteration = iterations[iterations.length - 1];
     const iterationId = lastIteration.id || 1;
 
-    const changes = await gitApi.getPullRequestIterationChanges(
-      this.repoName,
-      prNumber,
-      iterationId,
-      this.project
+    const changes = await withRateLimitHandling(() =>
+      gitApi.getPullRequestIterationChanges(this.repoName, prNumber, iterationId, this.project)
     );
 
     const files: PRFile[] = [];
@@ -111,7 +111,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
     const gitApi = await this.connection.getGitApi();
-    const threads = await gitApi.getThreads(this.repoName, prNumber, this.project);
+    const threads = await withRateLimitHandling(() =>
+      gitApi.getThreads(this.repoName, prNumber, this.project)
+    );
 
     const comments: ExistingComment[] = [];
     for (const thread of threads || []) {
@@ -153,7 +155,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       status: AzureThreadStatus.ACTIVE,
     };
 
-    await gitApi.createThread(thread, this.repoName, prNumber, this.project);
+    await withRateLimitHandling(() =>
+      gitApi.createThread(thread, this.repoName, prNumber, this.project)
+    );
   }
 
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
@@ -169,7 +173,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       status: AzureThreadStatus.ACTIVE,
     };
 
-    await gitApi.createThread(thread, this.repoName, prNumber, this.project);
+    await withRateLimitHandling(() =>
+      gitApi.createThread(thread, this.repoName, prNumber, this.project)
+    );
   }
 
   async updateComment(commentId: number | string, _body: string): Promise<void> {
