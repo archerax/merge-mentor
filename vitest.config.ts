@@ -14,7 +14,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts', 'src/cli.ts'],
+      exclude: ['src/**/*.spec.ts'],
       all: true,
       lines: 85,
       functions: 85,
