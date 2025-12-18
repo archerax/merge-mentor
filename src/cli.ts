@@ -44,6 +44,7 @@ program
       const engine = new ReviewEngine(adapter, config.botCommentIdentifier, {
         dryRun,
         verbose: options.verbose,
+        copilotModel: config.copilotModel,
       });
 
       const modeLabel = dryRun ? '(dry-run)' : '';

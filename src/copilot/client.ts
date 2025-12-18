@@ -17,6 +17,7 @@ export interface CopilotResponse {
 export interface CopilotClientOptions {
   readonly maxRetries?: number;
   readonly timeoutMs?: number;
+  readonly model?: string;
 }
 
 /** Raw finding structure from Copilot JSON response. */
@@ -55,10 +56,12 @@ interface RawCrossFileReviewResponse {
 export class CopilotClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
+  private readonly model?: string;
 
   constructor(options?: CopilotClientOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.model = options?.model;
   }
 
   /**
@@ -100,7 +103,12 @@ export class CopilotClient {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
 
-      const proc = spawn('copilot', ['-p', prompt], {
+      const args = ['-p', prompt];
+      if (this.model) {
+        args.push('--model', this.model);
+      }
+
+      const proc = spawn('copilot', args, {
         stdio: ['inherit', 'pipe', 'pipe'],
         timeout: this.timeoutMs,
       });

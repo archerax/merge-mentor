@@ -27,6 +27,7 @@ export interface Config {
   readonly github: GitHubConfig;
   readonly azure: AzureConfig;
   readonly botCommentIdentifier: string;
+  readonly copilotModel?: string;
 }
 
 /**
@@ -55,6 +56,7 @@ export function loadConfig(): Config {
       repo: process.env.AZURE_DEVOPS_REPO || '',
     },
     botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || '[AI Code Review Bot]',
+    copilotModel: process.env.COPILOT_MODEL,
   };
 }
 

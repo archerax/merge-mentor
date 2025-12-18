@@ -60,6 +60,9 @@ AZURE_DEVOPS_REPO=<repository_name>
 
 # Bot Configuration
 BOT_COMMENT_IDENTIFIER=[AI Code Review Bot]
+
+# Copilot Configuration
+COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
 ```
 
 ### GitHub Token Permissions
@@ -72,6 +75,17 @@ Your GitHub token needs the following scopes:
 Your Azure DevOps PAT needs:
 - Code: Read & Write
 - Pull Request Threads: Read & Write
+
+### Copilot Model Selection
+
+You can optionally configure which Copilot model to use by setting `COPILOT_MODEL` in your `.env` file. If not specified, Copilot CLI will use its default model. Supported models include:
+- `gpt-4o` - GPT-4 Optimized (recommended)
+- `gpt-4` - GPT-4
+- `claude-3.5-sonnet` - Claude 3.5 Sonnet
+- `o1-preview` - O1 Preview
+- `o1-mini` - O1 Mini
+
+Check your Copilot CLI documentation for the latest available models.
 
 ## Usage
 

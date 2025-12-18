@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc",
     "review": "node dist/cli.js",
+    "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

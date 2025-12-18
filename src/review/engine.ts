@@ -49,6 +49,7 @@ export interface ReviewResult {
 export interface ReviewEngineOptions {
   readonly verbose?: boolean;
   readonly dryRun?: boolean;
+  readonly copilotModel?: string;
 }
 
 /**
@@ -67,7 +68,7 @@ export class ReviewEngine {
     options?: ReviewEngineOptions
   ) {
     this.platform = platform;
-    this.copilot = new CopilotClient();
+    this.copilot = new CopilotClient({ model: options?.copilotModel });
     this.commentManager = new CommentManager(botIdentifier);
     this.options = options ?? {};
   }
