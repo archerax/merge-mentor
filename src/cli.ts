@@ -21,7 +21,6 @@ program
   .option('--platform <platform>', 'Platform (github or azure)', 'github')
   .option('--write', 'Post comments to PR (default is dry-run mode)', false)
   .option('--verbose', 'Enable verbose output', true)
-  .option('--quiet', 'Disable verbose output', false)
   .action(async (options) => {
     try {
       const config = loadConfig();
@@ -44,7 +43,7 @@ program
       const dryRun = !options.write;
       const engine = new ReviewEngine(adapter, config.botCommentIdentifier, {
         dryRun,
-        verbose: !options.quiet,
+        verbose: options.verbose,
       });
 
       const modeLabel = dryRun ? '(dry-run)' : '';
@@ -52,7 +51,7 @@ program
 
       const result = await engine.reviewPR(options.pr);
 
-      console.log('\n' + '='.repeat(60));
+      console.log('='.repeat(60));
       console.log('📊 Review Complete');
       console.log('='.repeat(60));
       console.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
@@ -72,6 +71,10 @@ program
         console.log(`Comments Created: ${result.commentsCreated}`);
         console.log(`Comments Updated: ${result.commentsUpdated}`);
         console.log(`Comments Resolved: ${result.commentsResolved}`);
+        if (result.commentErrors.length > 0) {
+          console.log(`\n⚠️  Comment Errors: ${result.commentErrors.length}`);
+          result.commentErrors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
+        }
       }
       console.log('='.repeat(60) + '\n');
 

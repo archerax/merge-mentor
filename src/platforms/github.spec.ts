@@ -26,7 +26,7 @@ vi.mock('@octokit/rest', () => ({
 
 function createTestConfig(): Config {
   return {
-    platform: 'github',
+    defaultPlatform: 'github',
     github: {
       token: 'test-token',
       owner: 'test-owner',
@@ -37,10 +37,6 @@ function createTestConfig(): Config {
       org: '',
       project: '',
       repo: '',
-    },
-    copilot: {
-      maxRetries: 3,
-      timeoutMs: 60000,
     },
     botCommentIdentifier: '<!-- PR-Bot -->',
   };

@@ -21,7 +21,7 @@ vi.mock('azure-devops-node-api', () => ({
 
 function createTestConfig(): Config {
   return {
-    platform: 'azure',
+    defaultPlatform: 'azure',
     github: {
       token: '',
       owner: '',
@@ -32,10 +32,6 @@ function createTestConfig(): Config {
       org: 'test-org',
       project: 'test-project',
       repo: 'test-repo',
-    },
-    copilot: {
-      maxRetries: 3,
-      timeoutMs: 60000,
     },
     botCommentIdentifier: '<!-- PR-Bot -->',
   };

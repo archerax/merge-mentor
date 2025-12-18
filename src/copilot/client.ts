@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import type { FileReviewResult, CrossFileReviewResult, FileFinding, CrossFileFinding } from '../platforms/types.js';
-import { CopilotCliError, JsonParseError } from '../errors/index.js';
+import { CopilotCliError, JsonParseError, ValidationError } from '../errors/index.js';
 
 /** Default configuration values for CopilotClient. */
 const DEFAULT_MAX_RETRIES = 3;
@@ -66,9 +66,14 @@ export class CopilotClient {
    * 
    * @param prompt - The prompt to send to Copilot
    * @returns Response containing raw output and parsed JSON
+   * @throws {ValidationError} When prompt is empty or invalid
    * @throws {CopilotCliError} When CLI execution fails after all retries
    */
   async executePrompt(prompt: string): Promise<CopilotResponse> {
+    if (!prompt || prompt.trim().length === 0) {
+      throw new ValidationError('prompt', 'Prompt cannot be empty');
+    }
+
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
@@ -147,6 +152,14 @@ export class CopilotClient {
    * @param filename - Name of the reviewed file
    * @param response - Raw Copilot response
    * @returns Structured file review result
+   * 
+   * @example
+   * ```typescript
+   * const client = new CopilotClient();
+   * const response = await client.executePrompt(prompt);
+   * const review = client.parseFileReview('src/app.ts', response);
+   * console.log(`Found ${review.findings.length} issues in ${review.filename}`);
+   * ```
    */
   parseFileReview(filename: string, response: CopilotResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
@@ -172,6 +185,15 @@ export class CopilotClient {
    * 
    * @param response - Raw Copilot response
    * @returns Structured cross-file review result
+   * 
+   * @example
+   * ```typescript
+   * const client = new CopilotClient();
+   * const response = await client.executePrompt(crossFilePrompt);
+   * const review = client.parseCrossFileReview(response);
+   * console.log(review.overallAssessment);
+   * console.log(`${review.recommendations.length} recommendations`);
+   * ```
    */
   parseCrossFileReview(response: CopilotResponse): CrossFileReviewResult {
     const data = response.parsed as RawCrossFileReviewResponse;

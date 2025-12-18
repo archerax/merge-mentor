@@ -25,8 +25,9 @@ function createMockProcess(options: {
   stderr?: string;
   exitCode?: number;
   error?: Error;
-}): Partial<ChildProcess> {
+}): ChildProcess {
   const mockProcess: any = {
+    stdin: null,
     stdout: {
       on: vi.fn((event: string, handler: (data: Buffer) => void) => {
         if (event === 'data' && options.stdout) {
@@ -49,7 +50,7 @@ function createMockProcess(options: {
       }
     }),
   };
-  return mockProcess;
+  return mockProcess as ChildProcess;
 }
 
 describe('CopilotClient', () => {
@@ -351,6 +352,18 @@ describe('CopilotClient', () => {
   });
 
   describe('executePrompt', () => {
+    it('should throw ValidationError when prompt is empty', async () => {
+      const client = createCopilotClient(1, 5000);
+
+      await expect(client.executePrompt('')).rejects.toThrow('Prompt cannot be empty');
+    });
+
+    it('should throw ValidationError when prompt is whitespace only', async () => {
+      const client = createCopilotClient(1, 5000);
+
+      await expect(client.executePrompt('   ')).rejects.toThrow('Prompt cannot be empty');
+    });
+
     it('should return parsed JSON response on success', async () => {
       const client = createCopilotClient(1, 5000);
       mockSpawn.mockReturnValue(createMockProcess({

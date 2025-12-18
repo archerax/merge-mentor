@@ -33,6 +33,17 @@ export class CommentManager {
    * @param fileResults - Results from file-by-file review
    * @param crossFileResult - Results from cross-file analysis
    * @returns Array of actions to perform (create, update, resolve)
+   * 
+   * @example
+   * ```typescript
+   * const manager = new CommentManager('[Bot]');
+   * const actions = manager.determineActions(
+   *   existingComments,
+   *   fileResults,
+   *   crossFileResult
+   * );
+   * console.log(`${actions.length} actions to perform`);
+   * ```
    */
   determineActions(
     existingComments: readonly ExistingComment[],

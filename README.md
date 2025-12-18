@@ -87,8 +87,8 @@ pnpm review -- --pr 123 --write
 # Review an Azure DevOps PR
 pnpm review -- --pr 456 --platform azure --write
 
-# Quiet mode (minimal output)
-pnpm review -- --pr 123 --quiet
+# Disable verbose output
+pnpm review -- --pr 123 --verbose false
 ```
 
 ### Command Options
@@ -99,7 +99,6 @@ pnpm review -- --pr 123 --quiet
 | `--platform <github\|azure>` | Platform to use | From env or `github` |
 | `--write` | Post comments to PR (otherwise dry-run) | `false` |
 | `--verbose` | Enable verbose output | `true` |
-| `--quiet` | Disable verbose output | `false` |
 
 ## How It Works
 

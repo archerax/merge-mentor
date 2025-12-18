@@ -75,7 +75,7 @@ export class GitHubAdapter implements PlatformAdapter {
           id: comment.id,
           body: comment.body,
           path: comment.path,
-          line: comment.line || undefined,
+          line: comment.line ?? undefined,
         });
       }
     }
@@ -136,15 +136,14 @@ export class GitHubAdapter implements PlatformAdapter {
     const id = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
     
     try {
-      // Try updating as a review comment first
       await this.octokit.pulls.updateReviewComment({
         owner: this.owner,
         repo: this.repo,
         comment_id: id,
         body: `${this.botIdentifier}\n\n${body}`,
       });
-    } catch {
-      // If that fails, try updating as an issue comment
+    } catch (error) {
+      console.warn(`Failed to update review comment ${id}, trying as issue comment:`, (error as Error).message);
       await this.octokit.issues.updateComment({
         owner: this.owner,
         repo: this.repo,
@@ -158,15 +157,14 @@ export class GitHubAdapter implements PlatformAdapter {
     const id = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
     
     try {
-      // GitHub doesn't have a direct "resolve" API for review comments
-      // We update the comment to indicate it's resolved
       await this.octokit.pulls.updateReviewComment({
         owner: this.owner,
         repo: this.repo,
         comment_id: id,
         body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
       });
-    } catch {
+    } catch (error) {
+      console.warn(`Failed to resolve review comment ${id}, trying as issue comment:`, (error as Error).message);
       await this.octokit.issues.updateComment({
         owner: this.owner,
         repo: this.repo,

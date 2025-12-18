@@ -42,6 +42,7 @@ export interface ReviewResult {
   readonly commentsCreated: number;
   readonly commentsUpdated: number;
   readonly commentsResolved: number;
+  readonly commentErrors: readonly string[];
 }
 
 /** Options for configuring the review engine. */
@@ -77,6 +78,14 @@ export class ReviewEngine {
    * @param prNumber - The PR number to review
    * @returns Complete review results including findings and comment stats
    * @throws {ValidationError} When prNumber is invalid
+   * 
+   * @example
+   * ```typescript
+   * const engine = new ReviewEngine(githubAdapter, '[Bot]', { dryRun: true });
+   * const result = await engine.reviewPR(123);
+   * console.log(`Reviewed ${result.filesReviewed} files`);
+   * console.log(`Found ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)} issues`);
+   * ```
    */
   async reviewPR(prNumber: number): Promise<ReviewResult> {
     if (prNumber <= 0 || !Number.isInteger(prNumber)) {
@@ -97,6 +106,10 @@ export class ReviewEngine {
     );
 
     const commentStats = await this.executeCommentActions(prNumber, actions);
+
+    if (commentStats.commentErrors.length > 0) {
+      this.log(`\n⚠️  ${commentStats.commentErrors.length} comment(s) failed to post`);
+    }
 
     return {
       prDetails,
@@ -167,10 +180,11 @@ export class ReviewEngine {
   private async executeCommentActions(
     prNumber: number,
     actions: CommentAction[]
-  ): Promise<{ commentsCreated: number; commentsUpdated: number; commentsResolved: number }> {
+  ): Promise<{ commentsCreated: number; commentsUpdated: number; commentsResolved: number; commentErrors: string[] }> {
     let commentsCreated = 0;
     let commentsUpdated = 0;
     let commentsResolved = 0;
+    const commentErrors: string[] = [];
 
     if (!this.options.dryRun) {
       for (const action of actions) {
@@ -180,7 +194,9 @@ export class ReviewEngine {
           else if (action.type === 'update') commentsUpdated++;
           else if (action.type === 'resolve') commentsResolved++;
         } catch (error) {
-          this.log(`Warning: Failed to ${action.type} comment: ${(error as Error).message}`);
+          const errorMsg = `Failed to ${action.type} comment: ${(error as Error).message}`;
+          this.log(`Warning: ${errorMsg}`);
+          commentErrors.push(errorMsg);
         }
       }
     } else {
@@ -190,7 +206,7 @@ export class ReviewEngine {
       commentsResolved = actions.filter(a => a.type === 'resolve').length;
     }
 
-    return { commentsCreated, commentsUpdated, commentsResolved };
+    return { commentsCreated, commentsUpdated, commentsResolved, commentErrors };
   }
 
   private async executeAction(prNumber: number, action: CommentAction): Promise<void> {

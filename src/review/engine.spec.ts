@@ -23,7 +23,6 @@ function createMockPlatform(): PlatformAdapter {
   return {
     getPRDetails: vi.fn(),
     getPRFiles: vi.fn(),
-    getFileDiff: vi.fn(),
     getExistingBotComments: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),

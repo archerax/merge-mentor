@@ -2,18 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loadConfig, validateConfig, type Platform } from './config.js';
 import { ConfigurationError } from './errors/index.js';
 
+function cleanEnv(): void {
+  delete process.env.DEFAULT_PLATFORM;
+  delete process.env.GITHUB_TOKEN;
+  delete process.env.GITHUB_REPO_OWNER;
+  delete process.env.GITHUB_REPO_NAME;
+  delete process.env.AZURE_DEVOPS_TOKEN;
+  delete process.env.AZURE_DEVOPS_ORG;
+  delete process.env.AZURE_DEVOPS_PROJECT;
+  delete process.env.AZURE_DEVOPS_REPO;
+  delete process.env.BOT_COMMENT_IDENTIFIER;
+}
+
+function setEnv(overrides: Record<string, string>): void {
+  Object.entries(overrides).forEach(([key, value]) => {
+    process.env[key] = value;
+  });
+}
+
 describe('Config', () => {
   beforeEach(() => {
     vi.resetModules();
-    delete process.env.DEFAULT_PLATFORM;
-    delete process.env.GITHUB_TOKEN;
-    delete process.env.GITHUB_REPO_OWNER;
-    delete process.env.GITHUB_REPO_NAME;
-    delete process.env.AZURE_DEVOPS_TOKEN;
-    delete process.env.AZURE_DEVOPS_ORG;
-    delete process.env.AZURE_DEVOPS_PROJECT;
-    delete process.env.AZURE_DEVOPS_REPO;
-    delete process.env.BOT_COMMENT_IDENTIFIER;
+    cleanEnv();
   });
 
   describe('loadConfig', () => {
@@ -32,15 +42,17 @@ describe('Config', () => {
     });
 
     it('should load values from environment variables', () => {
-      process.env.DEFAULT_PLATFORM = 'azure';
-      process.env.GITHUB_TOKEN = 'gh-token';
-      process.env.GITHUB_REPO_OWNER = 'owner';
-      process.env.GITHUB_REPO_NAME = 'repo';
-      process.env.AZURE_DEVOPS_TOKEN = 'az-token';
-      process.env.AZURE_DEVOPS_ORG = 'org';
-      process.env.AZURE_DEVOPS_PROJECT = 'project';
-      process.env.AZURE_DEVOPS_REPO = 'az-repo';
-      process.env.BOT_COMMENT_IDENTIFIER = '[Custom Bot]';
+      setEnv({
+        DEFAULT_PLATFORM: 'azure',
+        GITHUB_TOKEN: 'gh-token',
+        GITHUB_REPO_OWNER: 'owner',
+        GITHUB_REPO_NAME: 'repo',
+        AZURE_DEVOPS_TOKEN: 'az-token',
+        AZURE_DEVOPS_ORG: 'org',
+        AZURE_DEVOPS_PROJECT: 'project',
+        AZURE_DEVOPS_REPO: 'az-repo',
+        BOT_COMMENT_IDENTIFIER: '[Custom Bot]',
+      });
 
       const config = loadConfig();
 
