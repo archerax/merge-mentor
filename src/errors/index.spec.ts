@@ -14,7 +14,7 @@ describe("Error Classes", () => {
       const error = new PrBotError("Test error");
 
       expect(error.message).toBe("Test error");
-      expect(error.name).toBe("PrBotError");
+      expect(error.name).toBe("MergeMentorError");
       expect(error).toBeInstanceOf(Error);
     });
   });

@@ -10,7 +10,7 @@ import { ReviewEngine } from "./review/engine.js";
 const program = new Command();
 
 program
-  .name("pr-bot")
+  .name("mergementor")
   .description("Automated code review bot using GitHub Copilot CLI")
   .version("1.0.0");
 

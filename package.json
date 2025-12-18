@@ -1,10 +1,10 @@
 {
-  "name": "pr-bot",
+  "name": "mergementor",
   "version": "1.0.0",
   "description": "Automated code review bot using GitHub Copilot CLI",
   "main": "dist/cli.js",
   "bin": {
-    "pr-bot": "dist/cli.js"
+    "mergementor": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -26,8 +26,8 @@
     "azure-devops",
     "copilot"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "archerax",
+  "license": "UNLICENSED",
   "type": "module",
   "dependencies": {
     "@octokit/rest": "^22.0.1",

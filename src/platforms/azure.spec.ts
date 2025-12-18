@@ -33,7 +33,7 @@ function createTestConfig(): Config {
       project: "test-project",
       repo: "test-repo",
     },
-    botCommentIdentifier: "<!-- PR-Bot -->",
+    botCommentIdentifier: "<!-- MergeMentor -->",
   };
 }
 
@@ -228,7 +228,7 @@ describe("AzureDevOpsAdapter", () => {
       mockGitApiInstance.getThreads.mockResolvedValue([
         {
           id: 1,
-          comments: [{ content: "<!-- PR-Bot -->\nComment 1" }],
+          comments: [{ content: "<!-- MergeMentor -->\nComment 1" }],
           threadContext: {
             filePath: "/src/test.ts",
             rightFileStart: { line: 10 },
@@ -241,7 +241,7 @@ describe("AzureDevOpsAdapter", () => {
         },
         {
           id: 3,
-          comments: [{ content: "<!-- PR-Bot -->\nComment 2" }],
+          comments: [{ content: "<!-- MergeMentor -->\nComment 2" }],
           status: 2, // FIXED
         },
       ]);
@@ -251,14 +251,14 @@ describe("AzureDevOpsAdapter", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
         id: "1",
-        body: "<!-- PR-Bot -->\nComment 1",
+        body: "<!-- MergeMentor -->\nComment 1",
         path: "/src/test.ts",
         line: 10,
         isResolved: false,
       });
       expect(result[1]).toEqual({
         id: "3",
-        body: "<!-- PR-Bot -->\nComment 2",
+        body: "<!-- MergeMentor -->\nComment 2",
         path: undefined,
         line: undefined,
         isResolved: true,
@@ -279,7 +279,7 @@ describe("AzureDevOpsAdapter", () => {
       mockGitApiInstance.getThreads.mockResolvedValue([
         {
           id: null,
-          comments: [{ content: "<!-- PR-Bot -->\nComment" }],
+          comments: [{ content: "<!-- MergeMentor -->\nComment" }],
         },
       ]);
 
@@ -321,14 +321,14 @@ describe("AzureDevOpsAdapter", () => {
       mockGitApiInstance.getThreads.mockResolvedValue([
         {
           id: 1,
-          comments: [{ content: "<!-- PR-Bot -->" }],
+          comments: [{ content: "<!-- MergeMentor -->" }],
         },
       ]);
 
       const result = await adapter.getExistingBotComments(123);
 
       expect(result).toHaveLength(1);
-      expect(result[0].body).toBe("<!-- PR-Bot -->");
+      expect(result[0].body).toBe("<!-- MergeMentor -->");
     });
   });
 
@@ -343,7 +343,7 @@ describe("AzureDevOpsAdapter", () => {
         {
           comments: [
             {
-              content: "<!-- PR-Bot -->\n\nFix this",
+              content: "<!-- MergeMentor -->\n\nFix this",
               commentType: 1,
             },
           ],
@@ -382,7 +382,7 @@ describe("AzureDevOpsAdapter", () => {
         {
           comments: [
             {
-              content: "<!-- PR-Bot -->\n\nOverall feedback",
+              content: "<!-- MergeMentor -->\n\nOverall feedback",
               commentType: 1,
             },
           ],

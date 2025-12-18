@@ -71,7 +71,7 @@ AZURE_DEVOPS_PROJECT=<project_name>
 AZURE_DEVOPS_REPO=<repository_name>
 
 # Bot Configuration
-BOT_COMMENT_IDENTIFIER=[AI Code Review Bot]
+BOT_COMMENT_IDENTIFIER=[MergeMentor]
 ```
 
 ### Core Components

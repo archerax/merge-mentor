@@ -4,7 +4,7 @@ This file contains instructions for AI agents working on this codebase.
 
 ## Project Overview
 
-PR-Bot is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
+MergeMentor is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
 ## Architecture
 

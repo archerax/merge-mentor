@@ -1,4 +1,4 @@
-# PR Bot - Automated Code Review Bot
+# MergeMentor - Automated Code Review Bot
 
 [![Test Coverage](https://img.shields.io/badge/coverage-99.73%25-brightgreen.svg)](./coverage)
 [![Tests](https://img.shields.io/badge/tests-162%20passing-brightgreen.svg)](./src)
@@ -29,7 +29,7 @@ An automated code review bot that leverages GitHub Copilot CLI to perform compre
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd pr-bot
+cd mergementor
 
 # Install dependencies
 pnpm install
@@ -64,7 +64,7 @@ AZURE_DEVOPS_PROJECT=<project_name>
 AZURE_DEVOPS_REPO=<repository_name>
 
 # Bot Configuration
-BOT_COMMENT_IDENTIFIER=[AI Code Review Bot]
+BOT_COMMENT_IDENTIFIER=[MergeMentor]
 
 # Copilot Configuration
 COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
@@ -162,7 +162,7 @@ This project maintains high code quality standards:
 ### Project Structure
 
 ```
-pr-bot/
+mergementor/
 ├── src/
 │   ├── cli.ts              # Command-line interface
 │   ├── config.ts           # Configuration management

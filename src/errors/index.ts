@@ -1,11 +1,11 @@
 /**
- * Base error class for PR Bot errors.
+ * Base error class for MergeMentor errors.
  * All custom errors extend this class for consistent handling.
  */
 export class PrBotError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "PrBotError";
+    this.name = "MergeMentorError";
   }
 }
 
