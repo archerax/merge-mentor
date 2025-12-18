@@ -1,8 +1,8 @@
-import type { PRDetails, PRFile, FileReviewResult } from '../platforms/types.js';
+import type { FileReviewResult, PRDetails, PRFile } from "../platforms/types.js";
 
 /**
  * Builds a prompt for reviewing a single file.
- * 
+ *
  * @param filename - Name of the file being reviewed
  * @param patch - Git diff/patch content for the file
  * @returns Formatted prompt for Copilot CLI
@@ -41,7 +41,7 @@ If there are no issues, return: {"findings": []}`;
 
 /**
  * Builds a prompt for cross-file analysis.
- * 
+ *
  * @param prDetails - Pull request metadata
  * @param filesSummary - Summary of changed files
  * @param fileReviewResults - Results from individual file reviews
@@ -53,20 +53,20 @@ export function buildCrossFilePrompt(
   fileReviewResults: readonly FileReviewResult[]
 ): string {
   const findingsSummary = fileReviewResults
-    .filter(r => r.findings.length > 0)
-    .map(r => `${r.filename}: ${r.findings.length} finding(s)`)
-    .join('\n');
+    .filter((r) => r.findings.length > 0)
+    .map((r) => `${r.filename}: ${r.findings.length} finding(s)`)
+    .join("\n");
 
   return `You are an expert code reviewer performing a holistic analysis of a pull request.
 
 PR TITLE: ${prDetails.title}
-PR DESCRIPTION: ${prDetails.description || 'No description provided'}
+PR DESCRIPTION: ${prDetails.description || "No description provided"}
 
 CHANGED FILES SUMMARY:
 ${filesSummary}
 
 INDIVIDUAL FILE REVIEW FINDINGS:
-${findingsSummary || 'No individual issues found'}
+${findingsSummary || "No individual issues found"}
 
 Analyze the overall changes for:
 - Design and architectural issues
@@ -91,12 +91,12 @@ Respond ONLY with valid JSON in this exact format:
 
 /**
  * Builds a summary of changed files for prompt context.
- * 
+ *
  * @param files - Array of PR files
  * @returns Formatted file summary string
  */
 export function buildFilesSummary(files: readonly PRFile[]): string {
   return files
-    .map(f => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
-    .join('\n');
+    .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
+    .join("\n");
 }

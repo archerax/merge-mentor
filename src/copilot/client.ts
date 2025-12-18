@@ -1,11 +1,12 @@
-import { spawn } from 'child_process';
-import type { FileReviewResult, CrossFileReviewResult, FileFinding, CrossFileFinding } from '../platforms/types.js';
-import { CopilotCliError, JsonParseError, ValidationError } from '../errors/index.js';
-
-/** Default configuration values for CopilotClient. */
-const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 60000;
-const RETRY_DELAY_BASE_MS = 1000;
+import { spawn } from "node:child_process";
+import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../constants.js";
+import { CopilotCliError, JsonParseError, ValidationError } from "../errors/index.js";
+import type {
+  CrossFileFinding,
+  CrossFileReviewResult,
+  FileFinding,
+  FileReviewResult,
+} from "../platforms/types.js";
 
 /** Response from executing a Copilot prompt. */
 export interface CopilotResponse {
@@ -66,7 +67,7 @@ export class CopilotClient {
 
   /**
    * Executes a prompt via Copilot CLI with automatic retries.
-   * 
+   *
    * @param prompt - The prompt to send to Copilot
    * @returns Response containing raw output and parsed JSON
    * @throws {ValidationError} When prompt is empty or invalid
@@ -74,7 +75,7 @@ export class CopilotClient {
    */
   async executePrompt(prompt: string): Promise<CopilotResponse> {
     if (!prompt || prompt.trim().length === 0) {
-      throw new ValidationError('prompt', 'Prompt cannot be empty');
+      throw new ValidationError("prompt", "Prompt cannot be empty");
     }
 
     let lastError: Error | null = null;
@@ -103,30 +104,30 @@ export class CopilotClient {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
 
-      const args = ['-p', prompt];
+      const args = ["-p", prompt];
       if (this.model) {
-        args.push('--model', this.model);
+        args.push("--model", this.model);
       }
 
-      const proc = spawn('copilot', args, {
-        stdio: ['inherit', 'pipe', 'pipe'],
+      const proc = spawn("copilot", args, {
+        stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
       });
 
-      proc.stdout?.on('data', (data: Buffer) => chunks.push(data));
-      proc.stderr?.on('data', (data: Buffer) => errorChunks.push(data));
+      proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
+      proc.stderr?.on("data", (data: Buffer) => errorChunks.push(data));
 
-      proc.on('error', (error) => {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          reject(new CopilotCliError('Copilot CLI is not installed or not in PATH'));
+      proc.on("error", (error) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          reject(new CopilotCliError("Copilot CLI is not installed or not in PATH"));
         } else {
-          reject(new CopilotCliError('CLI execution failed', error));
+          reject(new CopilotCliError("CLI execution failed", error));
         }
       });
 
-      proc.on('close', (code) => {
-        const stdout = Buffer.concat(chunks).toString('utf-8');
-        const stderr = Buffer.concat(errorChunks).toString('utf-8');
+      proc.on("close", (code) => {
+        const stdout = Buffer.concat(chunks).toString("utf-8");
+        const stderr = Buffer.concat(errorChunks).toString("utf-8");
 
         if (code === 0) {
           resolve(stdout);
@@ -140,7 +141,7 @@ export class CopilotClient {
   private parseJsonResponse(raw: string): unknown {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new JsonParseError('No JSON object found in response', raw);
+      throw new JsonParseError("No JSON object found in response", raw);
     }
 
     try {
@@ -151,16 +152,16 @@ export class CopilotClient {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Parses a Copilot response into a file review result.
-   * 
+   *
    * @param filename - Name of the reviewed file
    * @param response - Raw Copilot response
    * @returns Structured file review result
-   * 
+   *
    * @example
    * ```typescript
    * const client = new CopilotClient();
@@ -176,11 +177,11 @@ export class CopilotClient {
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
         findings.push({
-          line: typeof finding.line === 'number' ? finding.line : 0,
+          line: typeof finding.line === "number" ? finding.line : 0,
           severity: this.validateSeverity(finding.severity),
           category: this.validateCategory(finding.category),
-          message: String(finding.message || ''),
-          suggestion: String(finding.suggestion || ''),
+          message: String(finding.message || ""),
+          suggestion: String(finding.suggestion || ""),
         });
       }
     }
@@ -190,10 +191,10 @@ export class CopilotClient {
 
   /**
    * Parses a Copilot response into a cross-file review result.
-   * 
+   *
    * @param response - Raw Copilot response
    * @returns Structured cross-file review result
-   * 
+   *
    * @example
    * ```typescript
    * const client = new CopilotClient();
@@ -212,7 +213,7 @@ export class CopilotClient {
         findings.push({
           severity: this.validateSeverity(finding.severity),
           category: this.validateCrossFileCategory(finding.category),
-          message: String(finding.message || ''),
+          message: String(finding.message || ""),
           affectedFiles: Array.isArray(finding.affected_files)
             ? finding.affected_files.map(String)
             : [],
@@ -221,35 +222,42 @@ export class CopilotClient {
     }
 
     return {
-      overallAssessment: String(data.overall_assessment || 'Review completed'),
+      overallAssessment: String(data.overall_assessment || "Review completed"),
       findings,
-      recommendations: Array.isArray(data.recommendations)
-        ? data.recommendations.map(String)
-        : [],
+      recommendations: Array.isArray(data.recommendations) ? data.recommendations.map(String) : [],
     };
   }
 
-  private validateSeverity(value: unknown): FileFinding['severity'] {
-    const validSeverities = ['critical', 'high', 'medium', 'low'] as const;
+  private validateSeverity(value: unknown): FileFinding["severity"] {
+    const validSeverities = ["critical", "high", "medium", "low"] as const;
     const stringValue = String(value);
-    return validSeverities.includes(stringValue as typeof validSeverities[number])
-      ? (stringValue as FileFinding['severity'])
-      : 'medium';
+    return validSeverities.includes(stringValue as (typeof validSeverities)[number])
+      ? (stringValue as FileFinding["severity"])
+      : "medium";
   }
 
-  private validateCategory(value: unknown): FileFinding['category'] {
-    const validCategories = ['bug', 'security', 'performance', 'quality', 'documentation'] as const;
+  private validateCategory(value: unknown): FileFinding["category"] {
+    const validCategories = ["bug", "security", "performance", "quality", "documentation"] as const;
     const stringValue = String(value);
-    return validCategories.includes(stringValue as typeof validCategories[number])
-      ? (stringValue as FileFinding['category'])
-      : 'quality';
+    return validCategories.includes(stringValue as (typeof validCategories)[number])
+      ? (stringValue as FileFinding["category"])
+      : "quality";
   }
 
-  private validateCrossFileCategory(value: unknown): CrossFileFinding['category'] {
-    const validCategories = ['architecture', 'design', 'testing', 'documentation', 'bug', 'security', 'performance', 'quality'] as const;
+  private validateCrossFileCategory(value: unknown): CrossFileFinding["category"] {
+    const validCategories = [
+      "architecture",
+      "design",
+      "testing",
+      "documentation",
+      "bug",
+      "security",
+      "performance",
+      "quality",
+    ] as const;
     const stringValue = String(value);
-    return validCategories.includes(stringValue as typeof validCategories[number])
-      ? (stringValue as CrossFileFinding['category'])
-      : 'design';
+    return validCategories.includes(stringValue as (typeof validCategories)[number])
+      ? (stringValue as CrossFileFinding["category"])
+      : "design";
   }
 }

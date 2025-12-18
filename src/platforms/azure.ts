@@ -1,13 +1,10 @@
-import * as azdev from 'azure-devops-node-api';
-import type { GitPullRequestCommentThread, Comment } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
-import type { Config } from '../config.js';
+import * as azdev from "azure-devops-node-api";
 import type {
-  PlatformAdapter,
-  PRDetails,
-  PRFile,
-  ExistingComment,
-  FileStatus,
-} from './types.js';
+  Comment,
+  GitPullRequestCommentThread,
+} from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import type { Config } from "../config.js";
+import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
 /** Azure DevOps change type values. */
 const AzureChangeType = {
@@ -52,17 +49,17 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
     return {
       number: pr.pullRequestId || prNumber,
-      title: pr.title || '',
-      description: pr.description || '',
-      author: pr.createdBy?.displayName || 'unknown',
-      baseBranch: pr.targetRefName?.replace('refs/heads/', '') || '',
-      headBranch: pr.sourceRefName?.replace('refs/heads/', '') || '',
+      title: pr.title || "",
+      description: pr.description || "",
+      author: pr.createdBy?.displayName || "unknown",
+      baseBranch: pr.targetRefName?.replace("refs/heads/", "") || "",
+      headBranch: pr.sourceRefName?.replace("refs/heads/", "") || "",
     };
   }
 
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     const gitApi = await this.connection.getGitApi();
-    
+
     const iterations = await gitApi.getPullRequestIterations(this.repoName, prNumber, this.project);
     if (!iterations || iterations.length === 0) {
       return [];
@@ -86,7 +83,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const status = this.mapChangeTypeToStatus(change.changeType);
 
       files.push({
-        filename: item.path.startsWith('/') ? item.path.slice(1) : item.path,
+        filename: item.path.startsWith("/") ? item.path.slice(1) : item.path,
         status,
         additions: 0,
         deletions: 0,
@@ -100,15 +97,15 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private mapChangeTypeToStatus(changeType: number | undefined): FileStatus {
     switch (changeType) {
       case AzureChangeType.ADD:
-        return 'added';
+        return "added";
       case AzureChangeType.EDIT:
-        return 'modified';
+        return "modified";
       case AzureChangeType.DELETE:
-        return 'deleted';
+        return "deleted";
       case AzureChangeType.RENAME:
-        return 'renamed';
+        return "renamed";
       default:
-        return 'modified';
+        return "modified";
     }
   }
 
@@ -121,8 +118,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const firstComment = thread.comments?.[0];
       if (firstComment?.content?.includes(this.botIdentifier)) {
         comments.push({
-          id: thread.id?.toString() || '',
-          body: firstComment.content || '',
+          id: thread.id?.toString() || "",
+          body: firstComment.content || "",
           path: thread.threadContext?.filePath,
           line: thread.threadContext?.rightFileStart?.line,
           isResolved: thread.status === AzureThreadStatus.FIXED,
@@ -149,7 +146,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         } as Comment,
       ],
       threadContext: {
-        filePath: path.startsWith('/') ? path : `/${path}`,
+        filePath: path.startsWith("/") ? path : `/${path}`,
         rightFileStart: { line, offset: 1 },
         rightFileEnd: { line, offset: 1 },
       },
@@ -176,7 +173,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   async updateComment(commentId: number | string, _body: string): Promise<void> {
-    const threadId = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
+    const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
 
     // For Azure DevOps, updating comments requires the PR number context
     // This is a simplified approach - the review engine tracks context
@@ -184,7 +181,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
-    const threadId = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
+    const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
 
     // Similar limitation as updateComment - we need the PR number
     console.log(`Note: Azure DevOps comment resolve requested for thread ${threadId}`);

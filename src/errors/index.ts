@@ -5,7 +5,7 @@
 export class PrBotError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'PrBotError';
+    this.name = "PrBotError";
   }
 }
 
@@ -18,7 +18,7 @@ export class CopilotCliError extends PrBotError {
     public readonly cause?: Error
   ) {
     super(message);
-    this.name = 'CopilotCliError';
+    this.name = "CopilotCliError";
   }
 }
 
@@ -31,7 +31,7 @@ export class ConfigurationError extends PrBotError {
     message: string
   ) {
     super(`Configuration error for ${field}: ${message}`);
-    this.name = 'ConfigurationError';
+    this.name = "ConfigurationError";
   }
 }
 
@@ -40,13 +40,13 @@ export class ConfigurationError extends PrBotError {
  */
 export class PlatformApiError extends PrBotError {
   constructor(
-    public readonly platform: 'github' | 'azure',
+    public readonly platform: "github" | "azure",
     public readonly operation: string,
     message: string,
     public readonly cause?: Error
   ) {
     super(`${platform} API error during ${operation}: ${message}`);
-    this.name = 'PlatformApiError';
+    this.name = "PlatformApiError";
   }
 }
 
@@ -59,7 +59,7 @@ export class JsonParseError extends PrBotError {
     public readonly rawContent?: string
   ) {
     super(`Failed to parse JSON: ${message}`);
-    this.name = 'JsonParseError';
+    this.name = "JsonParseError";
   }
 }
 
@@ -72,6 +72,6 @@ export class ValidationError extends PrBotError {
     message: string
   ) {
     super(`Validation failed for ${field}: ${message}`);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
   }
 }

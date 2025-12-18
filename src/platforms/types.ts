@@ -9,7 +9,7 @@ export interface PRDetails {
 }
 
 /** File status in a pull request. */
-export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed';
+export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 /** A file changed in a pull request. */
 export interface PRFile {
@@ -21,10 +21,18 @@ export interface PRFile {
 }
 
 /** Severity levels for code review findings. */
-export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type FindingSeverity = "critical" | "high" | "medium" | "low";
 
 /** Categories of code review findings. */
-export type FindingCategory = 'bug' | 'security' | 'performance' | 'quality' | 'documentation' | 'architecture' | 'design' | 'testing';
+export type FindingCategory =
+  | "bug"
+  | "security"
+  | "performance"
+  | "quality"
+  | "documentation"
+  | "architecture"
+  | "design"
+  | "testing";
 
 /** A finding from reviewing a specific file. */
 export interface FileFinding {
@@ -66,7 +74,7 @@ export interface ExistingComment {
 }
 
 /** Action types for comment management. */
-export type CommentActionType = 'create' | 'update' | 'resolve';
+export type CommentActionType = "create" | "update" | "resolve";
 
 /** An action to perform on a comment. */
 export interface CommentAction {

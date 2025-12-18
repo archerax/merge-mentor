@@ -12,9 +12,20 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint --write src",
+    "format": "biome format --write src",
+    "format:check": "biome format src",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && biome check src && npm run test"
   },
-  "keywords": ["code-review", "github", "azure-devops", "copilot"],
+  "keywords": [
+    "code-review",
+    "github",
+    "azure-devops",
+    "copilot"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
@@ -27,6 +38,7 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@vitest/coverage-v8": "^4.0.16",
     "vitest": "^4.0.16"
   }

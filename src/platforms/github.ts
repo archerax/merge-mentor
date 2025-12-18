@@ -1,12 +1,7 @@
-import { Octokit } from '@octokit/rest';
-import type { Config } from '../config.js';
-import type {
-  PlatformAdapter,
-  PRDetails,
-  PRFile,
-  ExistingComment,
-  FileStatus,
-} from './types.js';
+import { Octokit } from "@octokit/rest";
+import type { Config } from "../config.js";
+import { DEFAULT_PAGE_SIZE } from "../constants.js";
+import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
 /**
  * Platform adapter for GitHub pull requests.
@@ -34,8 +29,8 @@ export class GitHubAdapter implements PlatformAdapter {
     return {
       number: data.number,
       title: data.title,
-      description: data.body || '',
-      author: data.user?.login || 'unknown',
+      description: data.body || "",
+      author: data.user?.login || "unknown",
       baseBranch: data.base.ref,
       headBranch: data.head.ref,
     };
@@ -46,7 +41,7 @@ export class GitHubAdapter implements PlatformAdapter {
       owner: this.owner,
       repo: this.repo,
       pull_number: prNumber,
-      per_page: 100,
+      per_page: DEFAULT_PAGE_SIZE,
     });
 
     return data.map((file) => ({
@@ -66,7 +61,7 @@ export class GitHubAdapter implements PlatformAdapter {
       owner: this.owner,
       repo: this.repo,
       pull_number: prNumber,
-      per_page: 100,
+      per_page: DEFAULT_PAGE_SIZE,
     });
 
     for (const comment of reviewComments) {
@@ -85,11 +80,11 @@ export class GitHubAdapter implements PlatformAdapter {
       owner: this.owner,
       repo: this.repo,
       issue_number: prNumber,
-      per_page: 100,
+      per_page: DEFAULT_PAGE_SIZE,
     });
 
     for (const comment of issueComments) {
-      if (comment.body && comment.body.includes(this.botIdentifier)) {
+      if (comment.body?.includes(this.botIdentifier)) {
         comments.push({
           id: comment.id,
           body: comment.body,
@@ -133,8 +128,8 @@ export class GitHubAdapter implements PlatformAdapter {
   }
 
   async updateComment(commentId: number | string, body: string): Promise<void> {
-    const id = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
-    
+    const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+
     try {
       await this.octokit.pulls.updateReviewComment({
         owner: this.owner,
@@ -143,7 +138,10 @@ export class GitHubAdapter implements PlatformAdapter {
         body: `${this.botIdentifier}\n\n${body}`,
       });
     } catch (error) {
-      console.warn(`Failed to update review comment ${id}, trying as issue comment:`, (error as Error).message);
+      console.warn(
+        `Failed to update review comment ${id}, trying as issue comment:`,
+        (error as Error).message
+      );
       await this.octokit.issues.updateComment({
         owner: this.owner,
         repo: this.repo,
@@ -154,8 +152,8 @@ export class GitHubAdapter implements PlatformAdapter {
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
-    const id = typeof commentId === 'string' ? parseInt(commentId, 10) : commentId;
-    
+    const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+
     try {
       await this.octokit.pulls.updateReviewComment({
         owner: this.owner,
@@ -164,7 +162,10 @@ export class GitHubAdapter implements PlatformAdapter {
         body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
       });
     } catch (error) {
-      console.warn(`Failed to resolve review comment ${id}, trying as issue comment:`, (error as Error).message);
+      console.warn(
+        `Failed to resolve review comment ${id}, trying as issue comment:`,
+        (error as Error).message
+      );
       await this.octokit.issues.updateComment({
         owner: this.owner,
         repo: this.repo,

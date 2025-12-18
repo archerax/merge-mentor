@@ -1,19 +1,12 @@
+import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
 import type {
-  ExistingComment,
   CommentAction,
+  CrossFileReviewResult,
+  ExistingComment,
   FileFinding,
   FileReviewResult,
-  CrossFileReviewResult,
   FindingSeverity,
-} from '../platforms/types.js';
-
-/** Emoji mapping for severity levels. */
-const SEVERITY_EMOJI: Record<FindingSeverity, string> = {
-  critical: '🔴',
-  high: '🟠',
-  medium: '🟡',
-  low: '🟢',
-};
+} from "../platforms/types.js";
 
 /**
  * Manages PR comment lifecycle (create, update, resolve).
@@ -28,12 +21,12 @@ export class CommentManager {
 
   /**
    * Determines comment actions based on existing comments and new findings.
-   * 
+   *
    * @param existingComments - Bot comments already on the PR
    * @param fileResults - Results from file-by-file review
    * @param crossFileResult - Results from cross-file analysis
    * @returns Array of actions to perform (create, update, resolve)
-   * 
+   *
    * @example
    * ```typescript
    * const manager = new CommentManager('[Bot]');
@@ -68,7 +61,7 @@ export class CommentManager {
           const newBody = this.formatInlineComment(finding);
           if (!this.commentsMatch(existingComment.body, newBody)) {
             actions.push({
-              type: 'update',
+              type: "update",
               existingCommentId: existingComment.id,
               path: fileResult.filename,
               line: finding.line,
@@ -77,7 +70,7 @@ export class CommentManager {
           }
         } else {
           actions.push({
-            type: 'create',
+            type: "create",
             path: fileResult.filename,
             line: finding.line,
             body: this.formatInlineComment(finding),
@@ -90,16 +83,16 @@ export class CommentManager {
     for (const comment of existingComments) {
       if (!matchedExistingIds.has(comment.id) && !comment.isResolved && comment.path) {
         actions.push({
-          type: 'resolve',
+          type: "resolve",
           existingCommentId: comment.id,
-          body: 'This issue has been resolved.',
+          body: "This issue has been resolved.",
         });
       }
     }
 
     // Always create a new summary comment
     actions.push({
-      type: 'create',
+      type: "create",
       body: this.formatSummaryComment(fileResults, crossFileResult),
     });
 
@@ -122,14 +115,13 @@ export class CommentManager {
   }
 
   private commentsMatch(existingBody: string, newBody: string): boolean {
-    const stripIdentifier = (s: string) =>
-      s.replace(this.botIdentifier, '').trim();
+    const stripIdentifier = (s: string) => s.replace(this.botIdentifier, "").trim();
     return stripIdentifier(existingBody) === stripIdentifier(newBody);
   }
 
   /**
    * Formats a file finding as an inline comment.
-   * 
+   *
    * @param finding - The finding to format
    * @returns Formatted comment body
    */
@@ -144,7 +136,7 @@ ${finding.message}
 
   /**
    * Formats the complete review summary comment.
-   * 
+   *
    * @param fileResults - Results from all file reviews
    * @param crossFileResult - Results from cross-file analysis
    * @returns Formatted summary comment body
@@ -153,10 +145,7 @@ ${finding.message}
     fileResults: readonly FileReviewResult[],
     crossFileResult: CrossFileReviewResult
   ): string {
-    const totalFindings = fileResults.reduce(
-      (sum, r) => sum + r.findings.length,
-      0
-    );
+    const totalFindings = fileResults.reduce((sum, r) => sum + r.findings.length, 0);
     const filesReviewed = fileResults.length;
 
     const severityCounts = this.countBySeverity(fileResults);
@@ -204,17 +193,17 @@ ${crossFileResult.overallAssessment}
     return `### By Category
 | Category | Count |
 |----------|-------|
-| 🐛 Bug | ${counts.bug} |
-| 🔒 Security | ${counts.security} |
-| ⚡ Performance | ${counts.performance} |
-| 📝 Quality | ${counts.quality} |
-| 📚 Documentation | ${counts.documentation} |
+| ${CATEGORY_EMOJI.bug} Bug | ${counts.bug} |
+| ${CATEGORY_EMOJI.security} Security | ${counts.security} |
+| ${CATEGORY_EMOJI.performance} Performance | ${counts.performance} |
+| ${CATEGORY_EMOJI.quality} Quality | ${counts.quality} |
+| ${CATEGORY_EMOJI.documentation} Documentation | ${counts.documentation} |
 `;
   }
 
   private buildCrossFileFindingsSection(crossFileResult: CrossFileReviewResult): string {
     if (crossFileResult.findings.length === 0) {
-      return '';
+      return "";
     }
 
     let section = `
@@ -226,7 +215,7 @@ ${crossFileResult.overallAssessment}
 ### ${emoji} ${finding.category.toUpperCase()}
 ${finding.message}
 
-**Affected Files:** ${finding.affectedFiles.join(', ') || 'Multiple files'}
+**Affected Files:** ${finding.affectedFiles.join(", ") || "Multiple files"}
 `;
     }
 
@@ -235,7 +224,7 @@ ${finding.message}
 
   private buildRecommendationsSection(crossFileResult: CrossFileReviewResult): string {
     if (crossFileResult.recommendations.length === 0) {
-      return '';
+      return "";
     }
 
     let section = `
@@ -249,12 +238,10 @@ ${finding.message}
   }
 
   private getSeverityEmoji(severity: string): string {
-    return SEVERITY_EMOJI[severity as FindingSeverity] || '⚪';
+    return SEVERITY_EMOJI[severity as FindingSeverity] || "⚪";
   }
 
-  private countBySeverity(
-    results: readonly FileReviewResult[]
-  ): Record<FindingSeverity, number> {
+  private countBySeverity(results: readonly FileReviewResult[]): Record<FindingSeverity, number> {
     const counts: Record<FindingSeverity, number> = {
       critical: 0,
       high: 0,
@@ -271,9 +258,7 @@ ${finding.message}
     return counts;
   }
 
-  private countByCategory(
-    results: readonly FileReviewResult[]
-  ): Record<string, number> {
+  private countByCategory(results: readonly FileReviewResult[]): Record<string, number> {
     const counts: Record<string, number> = {
       bug: 0,
       security: 0,
