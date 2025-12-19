@@ -67,7 +67,7 @@ export function extractRetryAfter(error: unknown): number | undefined {
       const retryAfter = headers["retry-after"] || headers["Retry-After"];
       if (typeof retryAfter === "string") {
         const seconds = parseInt(retryAfter, 10);
-        if (!isNaN(seconds)) {
+        if (!Number.isNaN(seconds)) {
           return seconds * 1000; // Convert to milliseconds
         }
       }
@@ -79,7 +79,7 @@ export function extractRetryAfter(error: unknown): number | undefined {
       const rateLimitReset = headers["x-ratelimit-reset"] || headers["X-RateLimit-Reset"];
       if (typeof rateLimitReset === "string" || typeof rateLimitReset === "number") {
         const resetTime = parseInt(rateLimitReset.toString(), 10);
-        if (!isNaN(resetTime)) {
+        if (!Number.isNaN(resetTime)) {
           const now = Math.floor(Date.now() / 1000);
           const delaySeconds = Math.max(0, resetTime - now);
           return delaySeconds * 1000;
@@ -110,12 +110,8 @@ function getRateLimitInfo(error: unknown, options: RateLimitOptions): RateLimitI
 /**
  * Calculates exponential backoff delay with jitter.
  */
-function calculateBackoffDelay(
-  attempt: number,
-  baseDelayMs: number,
-  maxDelayMs: number
-): number {
-  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
+  const exponentialDelay = baseDelayMs * 2 ** attempt;
   const jitter = Math.random() * 0.3 * exponentialDelay; // 30% jitter
   const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
   return Math.floor(delay);

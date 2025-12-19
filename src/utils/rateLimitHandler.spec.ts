@@ -277,9 +277,9 @@ describe("rateLimitHandler", () => {
 
       // Advance timers and wait for completion
       const advancePromise = vi.advanceTimersByTimeAsync(10000);
-      
+
       await expect(Promise.all([promise, advancePromise])).rejects.toEqual(error);
-      
+
       expect(fn).toHaveBeenCalledTimes(3); // Initial + 2 retries
       expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
 
@@ -430,8 +430,7 @@ describe("rateLimitHandler", () => {
       const originalFn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("ok");
 
       const wrapped = withRateLimit(originalFn, {
-        isRateLimitError: (err) =>
-          typeof err === "object" && err !== null && "myRateLimit" in err,
+        isRateLimitError: (err) => typeof err === "object" && err !== null && "myRateLimit" in err,
         baseDelayMs: 100,
       });
 

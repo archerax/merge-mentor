@@ -48,12 +48,7 @@ import { loadConfig, validateConfig } from "./config.js";
 import { GitHubAdapter } from "./platforms/github.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { ReviewEngine } from "./review/engine.js";
-import {
-  type ReviewOptions,
-  displayResults,
-  executeReview,
-  hasCriticalIssues,
-} from "./cli.js";
+import { type ReviewOptions, displayResults, executeReview, hasCriticalIssues } from "./cli.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   return {
@@ -117,13 +112,13 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
 }
 
 describe("CLI", () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let _consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    _consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     vi.mocked(loadConfig).mockReturnValue(createMockConfig());
@@ -193,7 +188,9 @@ describe("CLI", () => {
     });
 
     it("uses config default platform when not specified", async () => {
-      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ defaultPlatform: "azure" as const }));
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({ defaultPlatform: "azure" as const })
+      );
 
       const options: ReviewOptions = {
         pr: 42,
@@ -344,9 +341,7 @@ describe("CLI", () => {
       displayResults(result, false);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comment Errors: 2"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to post comment")
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to post comment"));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Network error"));
     });
 

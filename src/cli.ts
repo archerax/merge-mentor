@@ -43,9 +43,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
-  console.log(
-    `\n🔍 Starting code review for PR #${options.pr} on ${platform} ${modeLabel}...\n`
-  );
+  console.log(`\n🔍 Starting code review for PR #${options.pr} on ${platform} ${modeLabel}...\n`);
 
   return await engine.reviewPR(options.pr);
 }
@@ -90,9 +88,7 @@ export function displayResults(result: ReviewResult, dryRun: boolean): void {
  * Check if review has critical issues.
  */
 export function hasCriticalIssues(result: ReviewResult): boolean {
-  return result.fileResults.some((r) =>
-    r.findings.some((f) => f.severity === "critical")
-  );
+  return result.fileResults.some((r) => r.findings.some((f) => f.severity === "critical"));
 }
 
 const program = new Command();
