@@ -9,18 +9,21 @@ const mockOctokitInstance = {
     listReviewComments: vi.fn(),
     createReviewComment: vi.fn(),
     updateReviewComment: vi.fn(),
+    getReviewComment: vi.fn(),
   },
   issues: {
     listComments: vi.fn(),
     createComment: vi.fn(),
     updateComment: vi.fn(),
   },
+  graphql: vi.fn(),
 };
 
 vi.mock("@octokit/rest", () => ({
   Octokit: class {
     pulls = mockOctokitInstance.pulls;
     issues = mockOctokitInstance.issues;
+    graphql = mockOctokitInstance.graphql;
   },
 }));
 
@@ -329,46 +332,74 @@ describe("GitHubAdapter", () => {
   });
 
   describe("resolveComment", () => {
-    it("resolves review comment successfully", async () => {
+    it("resolves review comment thread successfully", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockResolvedValue({});
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValue({
+        data: {
+          id: 456,
+          pull_request_review_id: 789,
+          body: "Test comment",
+          path: "test.ts",
+          line: 10,
+        },
+      });
+      mockOctokitInstance.graphql.mockResolvedValue({
+        resolveReviewThread: {
+          thread: {
+            id: "test-thread-id",
+            isResolved: true,
+          },
+        },
+      });
 
       await adapter.resolveComment(456);
 
-      expect(mockOctokitInstance.pulls.updateReviewComment).toHaveBeenCalledWith({
+      expect(mockOctokitInstance.pulls.getReviewComment).toHaveBeenCalledWith({
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 456,
-        body: "<!-- MergeMentor -->\n\n~~This issue has been resolved.~~",
       });
+      expect(mockOctokitInstance.graphql).toHaveBeenCalledWith(
+        expect.stringContaining("resolveReviewThread"),
+        expect.objectContaining({
+          threadId: expect.any(String),
+        })
+      );
     });
 
-    it("falls back to issue comment when review resolve fails", async () => {
+    it("handles comment without thread ID gracefully", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockRejectedValue(new Error("Not found"));
-      mockOctokitInstance.issues.updateComment.mockResolvedValue({});
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValue({
+        data: {
+          id: 456,
+          pull_request_review_id: null,
+          body: "Test comment",
+        },
+      });
 
       await adapter.resolveComment(456);
 
-      expect(mockOctokitInstance.issues.updateComment).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        comment_id: 456,
-        body: "<!-- MergeMentor -->\n\n~~This issue has been resolved.~~",
-      });
+      expect(mockOctokitInstance.pulls.getReviewComment).toHaveBeenCalled();
+      expect(mockOctokitInstance.graphql).not.toHaveBeenCalled();
     });
 
     it("handles string comment ID", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockResolvedValue({});
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValue({
+        data: {
+          id: 789,
+          pull_request_review_id: 123,
+          body: "Test comment",
+        },
+      });
+      mockOctokitInstance.graphql.mockResolvedValue({});
 
       await adapter.resolveComment("789");
 
-      expect(mockOctokitInstance.pulls.updateReviewComment).toHaveBeenCalledWith({
+      expect(mockOctokitInstance.pulls.getReviewComment).toHaveBeenCalledWith({
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 789,
-        body: "<!-- MergeMentor -->\n\n~~This issue has been resolved.~~",
       });
     });
   });

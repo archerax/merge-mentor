@@ -82,7 +82,7 @@ export interface CommentAction {
   readonly existingCommentId?: number | string;
   readonly path?: string;
   readonly line?: number;
-  readonly body: string;
+  readonly body?: string;
 }
 
 /**

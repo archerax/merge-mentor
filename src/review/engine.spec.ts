@@ -544,7 +544,9 @@ describe("ReviewEngine", () => {
 
       // Manually inject an invalid action (this tests defensive code)
       const engine_any = engine as any;
-      await engine_any.executeAction(123, { type: "update", body: "test" });
+      await expect(
+        engine_any.executeAction(123, { type: "update", body: "test" })
+      ).rejects.toThrow("Update action requires existingCommentId");
 
       expect(mockPlatform.updateComment).not.toHaveBeenCalled();
     });
@@ -553,7 +555,9 @@ describe("ReviewEngine", () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
       const engine_any = engine as any;
-      await engine_any.executeAction(123, { type: "resolve" });
+      await expect(
+        engine_any.executeAction(123, { type: "resolve" })
+      ).rejects.toThrow("Resolve action requires existingCommentId");
 
       expect(mockPlatform.resolveComment).not.toHaveBeenCalled();
     });

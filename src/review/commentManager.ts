@@ -86,7 +86,6 @@ export class CommentManager {
         actions.push({
           type: "resolve",
           existingCommentId: comment.id,
-          body: "This issue has been resolved.",
         });
       }
     }

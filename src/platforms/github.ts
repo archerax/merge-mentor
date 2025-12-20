@@ -200,33 +200,48 @@ export class GitHubAdapter implements PlatformAdapter {
     this.logger.debug({ commentId: id }, 'Resolving comment');
 
     try {
-      await withRateLimitHandling(() =>
-        this.octokit.pulls.updateReviewComment({
+      const { data: comment } = await withRateLimitHandling(() =>
+        this.octokit.pulls.getReviewComment({
           owner: this.owner,
           repo: this.repo,
           comment_id: id,
-          body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
         })
       );
-      this.logger.info({ commentId: id, type: 'review' }, 'Comment resolved successfully');
+
+      const threadId = comment.pull_request_review_id;
+      if (threadId) {
+        await withRateLimitHandling(() =>
+          this.octokit.graphql(
+            `mutation($threadId: ID!) {
+              resolveReviewThread(input: { threadId: $threadId }) {
+                thread {
+                  id
+                  isResolved
+                }
+              }
+            }`,
+            {
+              threadId: this.toGlobalId('PullRequestReviewThread', threadId),
+            }
+          )
+        );
+        this.logger.info({ commentId: id, threadId, type: 'review' }, 'Comment thread resolved successfully');
+      } else {
+        this.logger.warn({ commentId: id }, 'Review comment has no thread ID, cannot resolve');
+      }
     } catch (error) {
       this.logger.warn({
         commentId: id,
         error: (error as Error).message
-      }, 'Failed to resolve review comment, trying as issue comment');
+      }, 'Failed to resolve review comment thread');
       console.warn(
-        `Failed to resolve review comment ${id}, trying as issue comment:`,
+        `Failed to resolve review comment thread ${id}:`,
         (error as Error).message
       );
-      await withRateLimitHandling(() =>
-        this.octokit.issues.updateComment({
-          owner: this.owner,
-          repo: this.repo,
-          comment_id: id,
-          body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
-        })
-      );
-      this.logger.info({ commentId: id, type: 'issue' }, 'Comment resolved successfully');
     }
+  }
+
+  private toGlobalId(type: string, id: number): string {
+    return Buffer.from(`${type}:${id}`).toString('base64');
   }
 }

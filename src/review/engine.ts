@@ -247,6 +247,9 @@ export class ReviewEngine {
 
     switch (action.type) {
       case "create":
+        if (!action.body) {
+          throw new Error("Create action requires body");
+        }
         if (action.path && action.line) {
           await this.platform.postInlineComment(prNumber, action.path, action.line, action.body);
           this.logger.info({ prNumber, path: action.path, line: action.line }, 'Inline comment created');
@@ -257,17 +260,22 @@ export class ReviewEngine {
         break;
 
       case "update":
-        if (action.existingCommentId) {
-          await this.platform.updateComment(action.existingCommentId, action.body);
-          this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment updated');
+        if (!action.existingCommentId) {
+          throw new Error("Update action requires existingCommentId");
         }
+        if (!action.body) {
+          throw new Error("Update action requires body");
+        }
+        await this.platform.updateComment(action.existingCommentId, action.body);
+        this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment updated');
         break;
 
       case "resolve":
-        if (action.existingCommentId) {
-          await this.platform.resolveComment(action.existingCommentId);
-          this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment resolved');
+        if (!action.existingCommentId) {
+          throw new Error("Resolve action requires existingCommentId");
         }
+        await this.platform.resolveComment(action.existingCommentId);
+        this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment resolved');
         break;
     }
   }
@@ -302,7 +310,7 @@ export class ReviewEngine {
           this.log("[CREATE] General/Summary comment");
         }
         this.log(separator);
-        this.log(action.body);
+        this.log(action.body || "");
         this.log(`${separator}\n`);
         break;
 
@@ -312,7 +320,7 @@ export class ReviewEngine {
           this.log(`  File: ${action.path}:${action.line ?? "N/A"}`);
         }
         this.log(separator);
-        this.log(action.body);
+        this.log(action.body || "");
         this.log(`${separator}\n`);
         break;
 
