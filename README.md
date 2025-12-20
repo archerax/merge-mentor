@@ -68,6 +68,9 @@ BOT_COMMENT_IDENTIFIER=[MergeMentor]
 
 # Copilot Configuration
 COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
+
+# Logging Configuration
+LOG_LEVEL=info  # Optional: Set log level (debug, info, warn, error)
 ```
 
 ### GitHub Token Permissions
@@ -91,6 +94,73 @@ You can optionally configure which Copilot model to use by setting `COPILOT_MODE
 - `o1-mini` - O1 Mini
 
 Check your Copilot CLI documentation for the latest available models.
+
+## Logging
+
+MergeMentor includes comprehensive structured logging using Pino:
+
+- **Development**: Pretty-printed logs to stderr with colors and timestamps, plus JSON logs to file
+- **Production**: JSON-formatted logs to file for log aggregation systems
+- **Log Levels**: `debug`, `info`, `warn`, `error`
+- **Log File**: `logs/mergementor.log` in the project directory (auto-created)
+
+### Configure Logging
+
+Set the log level and output directory via environment variables:
+
+```bash
+# .env
+LOG_LEVEL=debug  # Set to debug, info, warn, or error
+LOG_DIR=/var/log/mergementor  # Optional: Custom log directory (defaults to ./logs)
+```
+
+### Log Files
+
+Logs are automatically written to `logs/mergementor.log` (or `$LOG_DIR/mergementor.log` if configured). The log directory is created automatically if it doesn't exist.
+
+**Note**: User-facing progress messages (via `console.log`) still appear in the terminal. Only framework logging goes to the file.
+
+### Viewing Logs
+
+```bash
+# View recent logs
+tail -f logs/mergementor.log
+
+# Pretty-print JSON logs
+tail logs/mergementor.log | jq
+
+# Filter by level
+grep '"level":"error"' logs/mergementor.log | jq
+
+# Filter by component
+grep '"component":"GitHubAdapter"' logs/mergementor.log | jq
+```
+
+### Log Output
+
+Logs include contextual information to help debug issues:
+
+```json
+{
+  "level": "error",
+  "time": "2025-12-20T05:52:10.102Z",
+  "component": "GitHubAdapter",
+  "prNumber": 123,
+  "path": "src/file.ts",
+  "line": 42,
+  "commitSha": "abc123",
+  "error": "Validation Failed: {\"resource\":\"PullRequestReviewComment\",\"code\":\"custom\",\"field\":\"pull_request_review_thread.line\",\"message\":\"could not be resolved\"}",
+  "msg": "Failed to post inline comment"
+}
+```
+
+This detailed logging helps identify issues like:
+- Invalid line numbers in comment requests
+- Rate limiting problems
+- API validation failures
+- Network timeouts
+
+For detailed debugging instructions, see [DEBUGGING.md](./DEBUGGING.md).
 
 ## Usage
 
@@ -166,6 +236,7 @@ mergementor/
 ├── src/
 │   ├── cli.ts              # Command-line interface
 │   ├── config.ts           # Configuration management
+│   ├── logger.ts           # Logging framework (Pino)
 │   ├── errors/             # Custom error classes
 │   │   └── index.ts
 │   ├── platforms/

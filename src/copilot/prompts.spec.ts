@@ -12,6 +12,21 @@ describe("Copilot Prompts", () => {
       expect(prompt).toContain('console.log("test")');
     });
 
+    it("should include all files context when provided", () => {
+      const filesContext = "- package.json (modified, +2/-1)\n- pnpm-lock.yaml (modified, +15/-10)";
+      const prompt = buildFileReviewPrompt("src/test.ts", "diff", filesContext);
+
+      expect(prompt).toContain("FILES CHANGED IN THIS PR:");
+      expect(prompt).toContain("package.json");
+      expect(prompt).toContain("pnpm-lock.yaml");
+    });
+
+    it("should not include files context section when not provided", () => {
+      const prompt = buildFileReviewPrompt("src/test.ts", "diff");
+
+      expect(prompt).not.toContain("FILES CHANGED IN THIS PR:");
+    });
+
     it("should include review criteria", () => {
       const prompt = buildFileReviewPrompt("test.ts", "diff");
 

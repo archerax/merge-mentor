@@ -6,6 +6,7 @@ import {
   buildFilesSummary,
 } from "../copilot/prompts.js";
 import { ValidationError } from "../errors/index.js";
+import { createChildLogger } from "../logger.js";
 import type {
   CommentAction,
   CrossFileReviewResult,
@@ -44,12 +45,14 @@ export class ReviewEngine {
   private readonly copilot: CopilotClient;
   private readonly commentManager: CommentManager;
   private readonly options: ReviewEngineOptions;
+  private readonly logger = createChildLogger({ component: 'ReviewEngine' });
 
   constructor(platform: PlatformAdapter, botIdentifier: string, options?: ReviewEngineOptions) {
     this.platform = platform;
     this.copilot = new CopilotClient({ model: options?.copilotModel });
     this.commentManager = new CommentManager(botIdentifier);
     this.options = options ?? {};
+    this.logger.info({ copilotModel: options?.copilotModel, dryRun: options?.dryRun }, 'ReviewEngine initialized');
   }
 
   /**
@@ -69,9 +72,11 @@ export class ReviewEngine {
    */
   async reviewPR(prNumber: number): Promise<ReviewResult> {
     if (prNumber <= 0 || !Number.isInteger(prNumber)) {
+      this.logger.error({ prNumber }, 'Invalid PR number');
       throw new ValidationError("prNumber", "Must be a positive integer");
     }
 
+    this.logger.info({ prNumber }, 'Starting PR review');
     this.log(`Starting review of PR #${prNumber}...`);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
@@ -88,8 +93,22 @@ export class ReviewEngine {
     const commentStats = await this.executeCommentActions(prNumber, actions);
 
     if (commentStats.commentErrors.length > 0) {
+      this.logger.warn({ 
+        errorCount: commentStats.commentErrors.length,
+        errors: commentStats.commentErrors 
+      }, 'Some comments failed to post');
       this.log(`\n⚠️  ${commentStats.commentErrors.length} comment(s) failed to post`);
     }
+
+    this.logger.info({
+      prNumber,
+      filesReviewed: fileResults.length,
+      totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
+      commentsCreated: commentStats.commentsCreated,
+      commentsUpdated: commentStats.commentsUpdated,
+      commentsResolved: commentStats.commentsResolved,
+      commentErrors: commentStats.commentErrors.length
+    }, 'PR review completed');
 
     return {
       prDetails,
@@ -102,21 +121,34 @@ export class ReviewEngine {
 
   private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {
     this.log("Fetching PR details...");
+    this.logger.debug({ prNumber }, 'Fetching PR data');
     const prDetails = await this.platform.getPRDetails(prNumber);
     const files = await this.platform.getPRFiles(prNumber);
+    this.logger.info({ 
+      prNumber, 
+      filesCount: files.length,
+      title: prDetails.title,
+      author: prDetails.author
+    }, 'PR data fetched');
     this.log(`Found ${files.length} changed files`);
     return { prDetails, files };
   }
 
   private async fetchExistingComments(prNumber: number) {
     this.log("Fetching existing bot comments...");
+    this.logger.debug({ prNumber }, 'Fetching existing comments');
     const existingComments = await this.platform.getExistingBotComments(prNumber);
+    this.logger.info({ 
+      prNumber, 
+      commentCount: existingComments.length 
+    }, 'Existing comments fetched');
     this.log(`Found ${existingComments.length} existing bot comments`);
     return existingComments;
   }
 
   private async reviewFiles(files: PRFile[]): Promise<FileReviewResult[]> {
     const fileResults: FileReviewResult[] = [];
+    const filesContext = buildFilesSummary(files);
 
     for (const file of files) {
       if (this.shouldSkipFile(file)) {
@@ -125,7 +157,7 @@ export class ReviewEngine {
       }
 
       this.log(`Reviewing ${file.filename}...`);
-      const result = await this.reviewFile(file);
+      const result = await this.reviewFile(file, filesContext);
       fileResults.push(result);
       this.log(`  Found ${result.findings.length} issues`);
     }
@@ -133,12 +165,12 @@ export class ReviewEngine {
     return fileResults;
   }
 
-  private async reviewFile(file: PRFile): Promise<FileReviewResult> {
+  private async reviewFile(file: PRFile, filesContext: string): Promise<FileReviewResult> {
     if (!file.patch) {
       return { filename: file.filename, findings: [] };
     }
 
-    const prompt = buildFileReviewPrompt(file.filename, file.patch);
+    const prompt = buildFileReviewPrompt(file.filename, file.patch, filesContext);
     const response = await this.copilot.executePrompt(prompt);
     return this.copilot.parseFileReview(file.filename, response);
   }
@@ -179,7 +211,17 @@ export class ReviewEngine {
           else if (action.type === "update") commentsUpdated++;
           else if (action.type === "resolve") commentsResolved++;
         } catch (error) {
-          const errorMsg = `Failed to ${action.type} comment: ${(error as Error).message}`;
+          const err = error as Error;
+          const errorMsg = `Failed to ${action.type} comment: ${err.message}`;
+          this.logger.error({
+            prNumber,
+            actionType: action.type,
+            path: action.path,
+            line: action.line,
+            commentId: action.existingCommentId,
+            error: err.message,
+            errorStack: err.stack
+          }, 'Comment action failed');
           this.log(`Warning: ${errorMsg}`);
           commentErrors.push(errorMsg);
         }
@@ -195,24 +237,36 @@ export class ReviewEngine {
   }
 
   private async executeAction(prNumber: number, action: CommentAction): Promise<void> {
+    this.logger.debug({ 
+      prNumber, 
+      actionType: action.type,
+      path: action.path,
+      line: action.line,
+      commentId: action.existingCommentId
+    }, 'Executing comment action');
+
     switch (action.type) {
       case "create":
         if (action.path && action.line) {
           await this.platform.postInlineComment(prNumber, action.path, action.line, action.body);
+          this.logger.info({ prNumber, path: action.path, line: action.line }, 'Inline comment created');
         } else {
           await this.platform.postGeneralComment(prNumber, action.body);
+          this.logger.info({ prNumber }, 'General comment created');
         }
         break;
 
       case "update":
         if (action.existingCommentId) {
           await this.platform.updateComment(action.existingCommentId, action.body);
+          this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment updated');
         }
         break;
 
       case "resolve":
         if (action.existingCommentId) {
           await this.platform.resolveComment(action.existingCommentId);
+          this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment resolved');
         }
         break;
     }

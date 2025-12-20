@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import { ConfigurationError } from "./errors/index.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";

@@ -5,11 +5,16 @@ import type { FileReviewResult, PRDetails, PRFile } from "../platforms/types.js"
  *
  * @param filename - Name of the file being reviewed
  * @param patch - Git diff/patch content for the file
+ * @param allFilesContext - Optional summary of all files changed in the PR for context
  * @returns Formatted prompt for Copilot CLI
  */
-export function buildFileReviewPrompt(filename: string, patch: string): string {
-  return `You are an expert code reviewer. Analyze the following code changes and provide a detailed review.
+export function buildFileReviewPrompt(filename: string, patch: string, allFilesContext?: string): string {
+  const contextSection = allFilesContext 
+    ? `\nFILES CHANGED IN THIS PR:\n${allFilesContext}\n`
+    : '';
 
+  return `You are an expert code reviewer. Analyze the following code changes and provide a detailed review.
+${contextSection}
 FILE: ${filename}
 DIFF:
 ${patch}

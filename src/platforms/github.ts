@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
+import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
@@ -12,12 +13,14 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly owner: string;
   private readonly repo: string;
   private readonly botIdentifier: string;
+  private readonly logger = createChildLogger({ component: 'GitHubAdapter' });
 
   constructor(config: Config) {
     this.octokit = new Octokit({ auth: config.github.token });
     this.owner = config.github.owner;
     this.repo = config.github.repo;
     this.botIdentifier = config.botCommentIdentifier;
+    this.logger.info({ owner: this.owner, repo: this.repo }, 'GitHubAdapter initialized');
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
@@ -110,6 +113,8 @@ export class GitHubAdapter implements PlatformAdapter {
     line: number,
     body: string
   ): Promise<void> {
+    this.logger.debug({ prNumber, path, line }, 'Posting inline comment');
+    
     const { data: pr } = await withRateLimitHandling(() =>
       this.octokit.pulls.get({
         owner: this.owner,
@@ -118,17 +123,30 @@ export class GitHubAdapter implements PlatformAdapter {
       })
     );
 
-    await withRateLimitHandling(() =>
-      this.octokit.pulls.createReviewComment({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: prNumber,
-        body: `${this.botIdentifier}\n\n${body}`,
-        commit_id: pr.head.sha,
+    try {
+      await withRateLimitHandling(() =>
+        this.octokit.pulls.createReviewComment({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+          body: `${this.botIdentifier}\n\n${body}`,
+          commit_id: pr.head.sha,
+          path,
+          line,
+        })
+      );
+      this.logger.info({ prNumber, path, line }, 'Inline comment posted successfully');
+    } catch (error) {
+      this.logger.error({
+        prNumber,
         path,
         line,
-      })
-    );
+        commitSha: pr.head.sha,
+        error: (error as Error).message,
+        errorDetails: error
+      }, 'Failed to post inline comment');
+      throw error;
+    }
   }
 
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
@@ -144,6 +162,7 @@ export class GitHubAdapter implements PlatformAdapter {
 
   async updateComment(commentId: number | string, body: string): Promise<void> {
     const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+    this.logger.debug({ commentId: id }, 'Updating comment');
 
     try {
       await withRateLimitHandling(() =>
@@ -154,7 +173,12 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n${body}`,
         })
       );
+      this.logger.info({ commentId: id, type: 'review' }, 'Comment updated successfully');
     } catch (error) {
+      this.logger.warn({
+        commentId: id,
+        error: (error as Error).message
+      }, 'Failed to update review comment, trying as issue comment');
       console.warn(
         `Failed to update review comment ${id}, trying as issue comment:`,
         (error as Error).message
@@ -167,11 +191,13 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n${body}`,
         })
       );
+      this.logger.info({ commentId: id, type: 'issue' }, 'Comment updated successfully');
     }
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
     const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+    this.logger.debug({ commentId: id }, 'Resolving comment');
 
     try {
       await withRateLimitHandling(() =>
@@ -182,7 +208,12 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
         })
       );
+      this.logger.info({ commentId: id, type: 'review' }, 'Comment resolved successfully');
     } catch (error) {
+      this.logger.warn({
+        commentId: id,
+        error: (error as Error).message
+      }, 'Failed to resolve review comment, trying as issue comment');
       console.warn(
         `Failed to resolve review comment ${id}, trying as issue comment:`,
         (error as Error).message
@@ -195,6 +226,7 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n~~This issue has been resolved.~~`,
         })
       );
+      this.logger.info({ commentId: id, type: 'issue' }, 'Comment resolved successfully');
     }
   }
 }
