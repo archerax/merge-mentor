@@ -14,6 +14,7 @@ import type {
  */
 export class CommentManager {
   private readonly botIdentifier: string;
+  private readonly summaryMarker = "<!-- AI_CODE_REVIEW_SUMMARY -->";
 
   constructor(botIdentifier: string) {
     this.botIdentifier = botIdentifier;
@@ -90,11 +91,25 @@ export class CommentManager {
       }
     }
 
-    // Always create a new summary comment
-    actions.push({
-      type: "create",
-      body: this.formatSummaryComment(fileResults, crossFileResult),
-    });
+    // Create or update summary comment
+    const existingSummary = this.findExistingSummaryComment(existingComments);
+    const newSummaryBody = this.formatSummaryComment(fileResults, crossFileResult);
+
+    if (existingSummary) {
+      matchedExistingIds.add(existingSummary.id);
+      if (!this.commentsMatch(existingSummary.body, newSummaryBody)) {
+        actions.push({
+          type: "update",
+          existingCommentId: existingSummary.id,
+          body: newSummaryBody,
+        });
+      }
+    } else {
+      actions.push({
+        type: "create",
+        body: newSummaryBody,
+      });
+    }
 
     return actions;
   }
@@ -112,6 +127,12 @@ export class CommentManager {
         c.line === finding.line &&
         c.body.includes(finding.category)
     );
+  }
+
+  private findExistingSummaryComment(
+    existingComments: readonly ExistingComment[]
+  ): ExistingComment | undefined {
+    return existingComments.find((c) => c.body.includes(this.summaryMarker));
   }
 
   private commentsMatch(existingBody: string, newBody: string): boolean {
@@ -165,7 +186,8 @@ ${finding.message}
     filesReviewed: number,
     totalFindings: number
   ): string {
-    return `# 📋 Code Review Summary
+    return `${this.summaryMarker}
+# 📋 Code Review Summary
 
 ## Overview
 ${crossFileResult.overallAssessment}

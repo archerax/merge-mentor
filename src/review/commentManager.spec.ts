@@ -251,13 +251,58 @@ describe("CommentManager", () => {
       expect(resolveActions).toHaveLength(0);
     });
 
-    it("should always create a summary comment", () => {
+    it("should create a summary comment when none exists", () => {
       const manager = createCommentManager();
       const actions = manager.determineActions([], [], createCrossFileResult());
 
       const summaryActions = actions.filter((a) => a.type === "create" && !a.path);
       expect(summaryActions).toHaveLength(1);
       expect(summaryActions[0].body).toContain("Code Review Summary");
+      expect(summaryActions[0].body).toContain("<!-- AI_CODE_REVIEW_SUMMARY -->");
+    });
+
+    it("should update existing summary comment when it already exists", () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        {
+          id: 999,
+          body: "<!-- AI_CODE_REVIEW_SUMMARY -->\n# 📋 Code Review Summary\n\nOld content",
+        },
+      ];
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({ overallAssessment: "New assessment" });
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && !a.path);
+      const updateActions = actions.filter((a) => a.type === "update");
+
+      expect(createActions).toHaveLength(0); // No new summary created
+      expect(updateActions).toHaveLength(1); // Existing summary updated
+      expect(updateActions[0].existingCommentId).toBe(999);
+      expect(updateActions[0].body).toContain("New assessment");
+    });
+
+    it("should not update summary comment when content is unchanged", () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({ overallAssessment: "Test assessment" });
+      const summaryBody = manager.formatSummaryComment(fileResults, crossFileResult);
+
+      const existingComments: ExistingComment[] = [
+        {
+          id: 999,
+          body: summaryBody,
+        },
+      ];
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && !a.path);
+      const updateActions = actions.filter((a) => a.type === "update");
+
+      expect(createActions).toHaveLength(0);
+      expect(updateActions).toHaveLength(0);
     });
 
     it("should not resolve comments without path", () => {
