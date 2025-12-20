@@ -48,7 +48,11 @@ function createPRFile(overrides: Partial<PRFile> = {}): PRFile {
     status: "modified",
     additions: 10,
     deletions: 5,
-    patch: '@@ -1,3 +1,4 @@\n+console.log("test");',
+    patch: `@@ -1,3 +1,4 @@
+ context line 1
++console.log("test");
+ context line 2
+ context line 3`,
     ...overrides,
   };
 }
@@ -217,7 +221,7 @@ describe("ReviewEngine", () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: true });
       const prDetails = createPRDetails();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\nOld comment", path: "test.ts", line: 10 },
+        { id: 1, body: "[Bot]\nOld comment", path: "test.ts", line: 2 },
       ];
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -269,7 +273,7 @@ describe("ReviewEngine", () => {
         filename: "test.ts",
         findings: [
           {
-            line: 10,
+            line: 2,
             severity: "high",
             category: "bug",
             message: "Test issue",
@@ -286,7 +290,7 @@ describe("ReviewEngine", () => {
       await engine.reviewPR(123);
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("[CREATE]"));
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("test.ts:10"));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("test.ts:2"));
       consoleSpy.mockRestore();
     });
 
@@ -299,7 +303,7 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [createPRFile()];
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message", path: "test.ts", line: 10 },
+        { id: 1, body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message", path: "test.ts", line: 2 },
       ];
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -310,7 +314,7 @@ describe("ReviewEngine", () => {
         filename: "test.ts",
         findings: [
           {
-            line: 10,
+            line: 2,
             severity: "high",
             category: "bug",
             message: "Updated issue",
@@ -338,7 +342,7 @@ describe("ReviewEngine", () => {
       });
       const prDetails = createPRDetails();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\nbug\nOld", path: "test.ts", line: 10 },
+        { id: 1, body: "[Bot]\n\nbug\nOld", path: "test.ts", line: 2 },
       ];
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -368,7 +372,7 @@ describe("ReviewEngine", () => {
           id: 1,
           body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix",
           path: "test.ts",
-          line: 10,
+          line: 2,
         },
       ];
 
@@ -380,7 +384,7 @@ describe("ReviewEngine", () => {
         filename: "test.ts",
         findings: [
           {
-            line: 10,
+            line: 2,
             severity: "high",
             category: "bug",
             message: "New message",
@@ -404,7 +408,7 @@ describe("ReviewEngine", () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
       const prDetails = createPRDetails();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\nbug\nOld", path: "test.ts", line: 10 },
+        { id: 1, body: "[Bot]\n\nbug\nOld", path: "test.ts", line: 2 },
       ];
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -457,7 +461,7 @@ describe("ReviewEngine", () => {
         filename: "test.ts",
         findings: [
           {
-            line: 10,
+            line: 2,
             severity: "high",
             category: "bug",
             message: "Test issue",
@@ -476,7 +480,7 @@ describe("ReviewEngine", () => {
       expect(mockPlatform.postInlineComment).toHaveBeenCalledWith(
         123,
         "test.ts",
-        10,
+        2,
         expect.any(String)
       );
       expect(result.commentsCreated).toBe(2); // 1 inline + 1 summary
@@ -495,7 +499,7 @@ describe("ReviewEngine", () => {
           id: 1,
           body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix",
           path: "test.ts",
-          line: 10,
+          line: 2,
         },
       ];
 
@@ -507,7 +511,7 @@ describe("ReviewEngine", () => {
         filename: "test.ts",
         findings: [
           {
-            line: 10,
+            line: 2,
             severity: "high",
             category: "bug",
             message: "New message",
@@ -528,7 +532,7 @@ describe("ReviewEngine", () => {
       );
       expect(updateCalls.length).toBeGreaterThan(0);
       const pathCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] && String(call[0]).includes("test.ts:10")
+        (call) => call[0] && String(call[0]).includes("test.ts:2")
       );
       expect(pathCalls.length).toBeGreaterThan(0);
       consoleSpy.mockRestore();

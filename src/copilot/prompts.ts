@@ -28,6 +28,12 @@ Review the code for:
 - Test coverage and adequacy
 - Documentation and comments
 
+IMPORTANT: The "line" field must reference a line number that appears in the diff above.
+- For added lines (starting with +), use the NEW line number (right side of the diff)
+- For context lines (no prefix), use the NEW line number
+- For removed lines (starting with -), do NOT create findings - focus on what was added/changed
+- Line numbers should match the @@ hunk headers in the diff (e.g., @@ -10,5 +15,7 @@ means new lines start at 15)
+
 Respond ONLY with valid JSON in this exact format:
 {
   "findings": [

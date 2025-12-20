@@ -16,6 +16,7 @@ import type {
   PRFile,
 } from "../platforms/types.js";
 import { CommentManager } from "./commentManager.js";
+import { getValidDiffLines, findNearestValidLine } from "../utils/diffParser.js";
 
 /** Result of a complete PR review. */
 export interface ReviewResult {
@@ -82,11 +83,15 @@ export class ReviewEngine {
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
     const fileResults = await this.reviewFiles(files);
-    const crossFileResult = await this.performCrossFileAnalysis(prDetails, files, fileResults);
+    
+    // Validate line numbers against actual diff content
+    const validatedResults = this.validateLineNumbers(fileResults, files);
+    
+    const crossFileResult = await this.performCrossFileAnalysis(prDetails, files, validatedResults);
 
     const actions = this.commentManager.determineActions(
       existingComments,
-      fileResults,
+      validatedResults,
       crossFileResult
     );
 
@@ -102,8 +107,8 @@ export class ReviewEngine {
 
     this.logger.info({
       prNumber,
-      filesReviewed: fileResults.length,
-      totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
+      filesReviewed: validatedResults.length,
+      totalFindings: validatedResults.reduce((sum, r) => sum + r.findings.length, 0),
       commentsCreated: commentStats.commentsCreated,
       commentsUpdated: commentStats.commentsUpdated,
       commentsResolved: commentStats.commentsResolved,
@@ -112,8 +117,8 @@ export class ReviewEngine {
 
     return {
       prDetails,
-      filesReviewed: fileResults.length,
-      fileResults,
+      filesReviewed: validatedResults.length,
+      fileResults: validatedResults,
       crossFileResult,
       ...commentStats,
     };
@@ -173,6 +178,84 @@ export class ReviewEngine {
     const prompt = buildFileReviewPrompt(file.filename, file.patch, filesContext);
     const response = await this.copilot.executePrompt(prompt);
     return this.copilot.parseFileReview(file.filename, response);
+  }
+
+  /**
+   * Validates and adjusts line numbers in findings to match actual diff lines.
+   * Filters out findings with invalid line numbers that can't be mapped.
+   */
+  private validateLineNumbers(
+    fileResults: FileReviewResult[],
+    files: PRFile[]
+  ): FileReviewResult[] {
+    // Create a map of filename to valid line numbers
+    const validLinesMap = new Map<string, Set<number>>();
+    for (const file of files) {
+      validLinesMap.set(file.filename, getValidDiffLines(file.patch));
+    }
+
+    const validatedResults: FileReviewResult[] = [];
+
+    for (const result of fileResults) {
+      const validLines = validLinesMap.get(result.filename);
+      if (!validLines || validLines.size === 0) {
+        this.logger.warn({ 
+          filename: result.filename,
+          findingsCount: result.findings.length 
+        }, 'No valid diff lines found for file, skipping inline comments');
+        continue;
+      }
+
+      const validatedFindings = result.findings
+        .map(finding => {
+          if (validLines.has(finding.line)) {
+            return finding;
+          }
+
+          // Try to find nearest valid line
+          const nearestLine = findNearestValidLine(finding.line, validLines);
+          if (nearestLine !== undefined) {
+            this.logger.info({
+              filename: result.filename,
+              requestedLine: finding.line,
+              adjustedLine: nearestLine,
+              severity: finding.severity,
+              category: finding.category
+            }, 'Adjusted finding line number to nearest valid diff line');
+
+            return {
+              ...finding,
+              line: nearestLine
+            };
+          }
+
+          // No valid line found, log and filter out
+          this.logger.warn({
+            filename: result.filename,
+            invalidLine: finding.line,
+            severity: finding.severity,
+            category: finding.category,
+            message: finding.message.slice(0, 100)
+          }, 'Cannot find valid diff line for finding, skipping inline comment');
+
+          return null;
+        })
+        .filter((f): f is NonNullable<typeof f> => f !== null);
+
+      if (validatedFindings.length > 0) {
+        validatedResults.push({
+          filename: result.filename,
+          findings: validatedFindings
+        });
+      } else if (result.findings.length > 0) {
+        this.logger.warn({
+          filename: result.filename,
+          originalFindingsCount: result.findings.length
+        }, 'All findings filtered out due to invalid line numbers');
+      }
+    }
+
+    return validatedResults;
   }
 
   private async performCrossFileAnalysis(
