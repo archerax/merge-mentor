@@ -3,13 +3,6 @@
  * GitHub API only allows comments on lines that are part of the diff.
  */
 
-interface DiffLineInfo {
-  /** Line number in the new version of the file */
-  readonly lineNumber: number;
-  /** Whether this line was added or modified (can be commented on) */
-  readonly isCommentable: boolean;
-}
-
 /**
  * Extracts valid line numbers from a git diff patch.
  *

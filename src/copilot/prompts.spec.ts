@@ -30,13 +30,11 @@ describe("Copilot Prompts", () => {
     it("should include review criteria", () => {
       const prompt = buildFileReviewPrompt("test.ts", "diff");
 
-      expect(prompt).toContain("Code quality and readability");
-      expect(prompt).toContain("Adherence to coding standards");
-      expect(prompt).toContain("Potential bugs or logical errors");
-      expect(prompt).toContain("Performance considerations");
+      expect(prompt).toContain("FOCUS ON SUBSTANTIVE ISSUES");
+      expect(prompt).toContain("Actual bugs");
       expect(prompt).toContain("Security vulnerabilities");
-      expect(prompt).toContain("Test coverage");
-      expect(prompt).toContain("Documentation");
+      expect(prompt).toContain("Performance problems");
+      expect(prompt).toContain("Breaking changes");
     });
 
     it("should include JSON response format instructions", () => {
@@ -115,10 +113,10 @@ describe("Copilot Prompts", () => {
     it("should include cross-file analysis criteria", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
-      expect(prompt).toContain("Design and architectural issues");
-      expect(prompt).toContain("Cross-file dependencies");
-      expect(prompt).toContain("Missing tests");
-      expect(prompt).toContain("code organization");
+      expect(prompt).toContain("FOCUS ON HIGH-LEVEL SUBSTANTIVE ISSUES");
+      expect(prompt).toContain("Architectural problems");
+      expect(prompt).toContain("System-level concerns");
+      expect(prompt).toContain("Cross-cutting issues");
     });
   });
 

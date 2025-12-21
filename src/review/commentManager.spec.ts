@@ -47,10 +47,13 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(finding);
 
       expect(result).toContain("🔴");
-      expect(result).toContain("**CRITICAL**");
-      expect(result).toContain("security");
+      expect(result).toContain("Critical");
+      expect(result).toContain("🔒");
+      expect(result).toContain("Security Issue");
       expect(result).toContain("SQL injection vulnerability");
       expect(result).toContain("Use parameterized queries");
+      expect(result).toContain("```suggestion");
+      expect(result).toContain("[AI Code Review Bot]");
     });
 
     test.each([
@@ -74,6 +77,52 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(finding);
 
       expect(result).toContain("⚪");
+    });
+
+    it("should include line number in formatted comment", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ line: 42 });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain("**Line**: 42");
+    });
+
+    it("should format suggestion in code block", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        suggestion: "Fix this code",
+      });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain("```suggestion");
+      expect(result).toContain("Fix this code");
+      expect(result).toContain("```");
+    });
+
+    test.each([
+      ["bug", "🐛"],
+      ["security", "🔒"],
+      ["performance", "⚡"],
+      ["quality", "📝"],
+      ["documentation", "📚"],
+    ] as const)("should use correct emoji for %s category", (category, emoji) => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ category });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain(emoji);
+    });
+
+    it("should capitalize category name in header", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ category: "security" });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain("Security Issue");
     });
   });
 

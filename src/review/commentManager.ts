@@ -143,15 +143,26 @@ export class CommentManager {
    * Formats a file finding as an inline comment.
    *
    * @param finding - The finding to format
-   * @returns Formatted comment body
+   * @returns Formatted comment body with enhanced markdown formatting
    */
   formatInlineComment(finding: FileFinding): string {
     const severityEmoji = this.getSeverityEmoji(finding.severity);
-    return `${severityEmoji} **${finding.severity.toUpperCase()}** - ${finding.category}
+    const categoryEmoji = this.getCategoryEmoji(finding.category);
 
-${finding.message}
+    return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
-**Suggestion:** ${finding.suggestion}`;
+**Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}  
+**Line**: ${finding.line}
+
+**Issue**: ${finding.message}
+
+**Suggestion**:
+\`\`\`suggestion
+${finding.suggestion}
+\`\`\`
+
+---
+*${this.botIdentifier} Code Review*`;
   }
 
   /**
@@ -260,6 +271,10 @@ ${finding.message}
 
   private getSeverityEmoji(severity: string): string {
     return SEVERITY_EMOJI[severity as FindingSeverity] || "⚪";
+  }
+
+  private getCategoryEmoji(category: string): string {
+    return CATEGORY_EMOJI[category as keyof typeof CATEGORY_EMOJI] || "📋";
   }
 
   private countBySeverity(results: readonly FileReviewResult[]): Record<FindingSeverity, number> {
