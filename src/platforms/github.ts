@@ -58,6 +58,7 @@ export class GitHubAdapter implements PlatformAdapter {
       additions: file.additions,
       deletions: file.deletions,
       patch: file.patch,
+      sha: file.sha ?? undefined,
     }));
   }
 

@@ -23,6 +23,37 @@ MergeMentor is an exceptionally well-crafted automated code review bot. The code
 
 ---
 
+## Recent Improvements ✨
+
+### Incremental Review Caching (December 2024)
+
+**Feature**: Automatic caching of review results to skip re-reviewing unchanged files.
+
+**Benefits**:
+- ⚡ **Faster re-reviews**: Only analyzes files that changed since last review
+- 💰 **Cost savings**: Reduces API calls to Copilot CLI by skipping unchanged files
+- 🎯 **Focused feedback**: Developers see only issues in newly modified code
+
+**Implementation Details**:
+- File content hashes (SHAs) tracked from GitHub/Azure DevOps APIs
+- Review state stored in `.mergementor-cache/` directory (JSON format)
+- Per-PR caching with automatic cache updates
+- Zero configuration required - works out of the box
+- Cache can be cleared by deleting `.mergementor-cache/` directory
+
+**Example Impact**:
+- PR with 20 files, 3 files changed → Reviews only 3 files on re-review (85% reduction)
+- Large refactoring → Initial review is comprehensive, subsequent reviews are incremental
+- Multiple review iterations → Each iteration only analyzes new changes
+
+**Technical Components**:
+- `ReviewStateCache` class manages cache lifecycle
+- `PRFile` interface extended with `sha` field
+- `ReviewEngine` checks cache before reviewing files
+- Automatic state persistence after each review
+
+---
+
 ## What Looks Good ✅
 
 ### 1. **Code Quality (10/10)**
@@ -187,10 +218,10 @@ const results = await Promise.all(
    - File/pattern exclusions
    - Review templates
 
-3. **Review Caching**
-   - Skip re-reviewing unchanged files
-   - Store review state
-   - Incremental reviews
+3. ~~**Review Caching**~~ ✅ **IMPLEMENTED**
+   - ~~Skip re-reviewing unchanged files~~
+   - ~~Store review state~~
+   - ~~Incremental reviews~~
 
 4. **Parallel Processing**
    - Review files in parallel
@@ -228,11 +259,12 @@ const results = await Promise.all(
 ### Short Term (2-4 Weeks)
 3. **Publish to npm** - Make globally installable
 4. **Add configuration file support** - `.mergementor.yml`
-5. **Implement parallel file processing** - Performance improvement
+5. ~~**Implement review caching**~~ - ✅ **COMPLETED**
+6. **Implement parallel file processing** - Performance improvement
 
 ### Medium Term (1-2 Months)
 6. **GitHub Actions workflow** - Automated PR reviews
-7. **Add caching layer** - Skip unchanged files
+7. ~~**Add caching layer**~~ - ✅ **COMPLETED**
 8. **Rich markdown formatting** - Better comment presentation
 9. **Docker image** - Containerized deployment
 
@@ -287,11 +319,12 @@ const results = await Promise.all(
 - [ ] Publish to npm registry
 - [ ] Add integration tests
 - [ ] Add configuration file support
+- [x] **Review caching with incremental reviews** ✅
 - [ ] Parallel file processing
 
 ### P2 (Medium - Next Month)
 - [ ] GitHub Actions workflow for auto-reviews
-- [ ] Review caching mechanism
+- [x] **Review caching mechanism** ✅
 - [ ] Rich markdown formatting
 - [ ] Docker containerization
 - [ ] Logging framework (pino/winston)

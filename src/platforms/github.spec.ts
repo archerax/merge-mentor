@@ -129,6 +129,7 @@ describe("GitHubAdapter", () => {
             additions: 10,
             deletions: 5,
             patch: "@@ -1,3 +1,4 @@",
+            sha: "abc123",
           },
           {
             filename: "README.md",
@@ -136,6 +137,7 @@ describe("GitHubAdapter", () => {
             additions: 20,
             deletions: 0,
             patch: "@@ -0,0 +1,20 @@",
+            sha: "def456",
           },
         ],
       });
@@ -149,6 +151,7 @@ describe("GitHubAdapter", () => {
         additions: 10,
         deletions: 5,
         patch: "@@ -1,3 +1,4 @@",
+        sha: "abc123",
       });
       expect(result[1]).toEqual({
         filename: "README.md",
@@ -156,6 +159,7 @@ describe("GitHubAdapter", () => {
         additions: 20,
         deletions: 0,
         patch: "@@ -0,0 +1,20 @@",
+        sha: "def456",
       });
     });
 

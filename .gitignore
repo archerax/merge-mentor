@@ -36,3 +36,6 @@ package-lock.json
 *.tmp
 *.temp
 .cache/
+
+# Review state cache
+.mergementor-cache/

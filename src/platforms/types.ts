@@ -18,6 +18,7 @@ export interface PRFile {
   readonly additions: number;
   readonly deletions: number;
   readonly patch?: string;
+  readonly sha?: string;
 }
 
 /** Severity levels for code review findings. */

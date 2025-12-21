@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { ReviewEngine } from "./engine.js";
@@ -53,6 +54,7 @@ function createPRFile(overrides: Partial<PRFile> = {}): PRFile {
 +console.log("test");
  context line 2
  context line 3`,
+    sha: "abc123def456",
     ...overrides,
   };
 }
@@ -70,6 +72,15 @@ describe("ReviewEngine", () => {
       findings: [],
       recommendations: [],
     });
+  });
+
+  afterEach(async () => {
+    // Clean up cache directory between tests
+    try {
+      await fs.rm(".mergementor-cache", { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   describe("constructor", () => {
@@ -133,6 +144,7 @@ describe("ReviewEngine", () => {
       const result = await engine.reviewPR(123);
 
       expect(result.filesReviewed).toBe(0);
+      expect(result.filesSkipped).toBe(0);
     });
 
     it("skips binary and generated files", async () => {
@@ -151,6 +163,7 @@ describe("ReviewEngine", () => {
       const result = await engine.reviewPR(123);
 
       expect(result.filesReviewed).toBe(0);
+      expect(result.filesSkipped).toBe(0);
     });
 
     it("returns result with PR details", async () => {
@@ -165,6 +178,7 @@ describe("ReviewEngine", () => {
 
       expect(result.prDetails).toEqual(prDetails);
       expect(result.filesReviewed).toBe(0);
+      expect(result.filesSkipped).toBe(0);
     });
 
     it("handles dry run mode", async () => {
@@ -536,6 +550,123 @@ describe("ReviewEngine", () => {
       );
       expect(pathCalls.length).toBeGreaterThan(0);
       consoleSpy.mockRestore();
+    });
+
+    it("reuses cached cross-file analysis when all files unchanged", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: true });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
+
+      // First review - perform full analysis
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockReturnValue({
+        filename: "test.ts",
+        findings: [],
+      });
+      const originalCrossFileResult = {
+        overallAssessment: "Original assessment",
+        findings: [],
+        recommendations: ["Original recommendation"],
+      };
+      mockParseCrossFileReview.mockReturnValue(originalCrossFileResult);
+
+      await engine.reviewPR(123);
+      
+      // Reset mocks for second review
+      mockExecutePrompt.mockClear();
+      mockParseCrossFileReview.mockClear();
+
+      // Second review - file unchanged, should skip cross-file analysis
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const result = await engine.reviewPR(123);
+
+      // Verify file review was cached (not called again)
+      expect(mockExecutePrompt).not.toHaveBeenCalled();
+      expect(mockParseCrossFileReview).not.toHaveBeenCalled();
+      
+      // Verify cached cross-file result was used
+      expect(result.crossFileResult.overallAssessment).toBe("Original assessment");
+      expect(result.crossFileResult.recommendations).toEqual(["Original recommendation"]);
+      expect(result.filesSkipped).toBe(1);
+      
+      // Verify log message about using cached cross-file analysis
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("using cached cross-file analysis")
+      );
+      
+      consoleSpy.mockRestore();
+    });
+
+    it("performs new cross-file analysis when some files changed", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const prDetails = createPRDetails();
+      const files = [
+        createPRFile({ filename: "unchanged.ts", sha: "same-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+        createPRFile({ filename: "changed.ts", sha: "old-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+      ];
+
+      // First review
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockImplementation((filename) => ({
+        filename: filename,
+        findings: [],
+      }));
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "First review",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+      
+      // Clear mock call counts but keep implementation
+      mockExecutePrompt.mockClear();
+      mockParseFileReview.mockClear();
+      mockParseCrossFileReview.mockClear();
+
+      // Second review with one changed file
+      const updatedFiles = [
+        createPRFile({ filename: "unchanged.ts", sha: "same-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+        createPRFile({ filename: "changed.ts", sha: "new-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+      ];
+      
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(updatedFiles);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockImplementation((filename) => ({
+        filename: filename,
+        findings: [],
+      }));
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Updated review",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      // Should perform new cross-file analysis because a file changed
+      expect(mockParseCrossFileReview).toHaveBeenCalled();
+      expect(result.crossFileResult.overallAssessment).toBe("Updated review");
+      
+      // One file was cached, one was reviewed
+      expect(result.filesSkipped).toBe(1);
+      expect(result.filesReviewed).toBe(1);
+      
+      // Should have reviewed only the changed file
+      expect(mockParseFileReview).toHaveBeenCalledTimes(1);
+      expect(mockParseFileReview).toHaveBeenCalledWith("changed.ts", expect.any(Object));
     });
 
     it("handles action with no existingCommentId for update", async () => {

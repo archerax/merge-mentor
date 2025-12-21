@@ -107,6 +107,7 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
     commentsUpdated: 1,
     commentsResolved: 0,
     commentErrors: [],
+    filesSkipped: 0,
     ...overrides,
   };
 }

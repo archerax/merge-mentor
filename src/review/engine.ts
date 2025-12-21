@@ -16,12 +16,14 @@ import type {
   PRFile,
 } from "../platforms/types.js";
 import { CommentManager } from "./commentManager.js";
+import { ReviewStateCache } from "./reviewStateCache.js";
 import { getValidDiffLines, findNearestValidLine } from "../utils/diffParser.js";
 
 /** Result of a complete PR review. */
 export interface ReviewResult {
   readonly prDetails: PRDetails;
   readonly filesReviewed: number;
+  readonly filesSkipped: number;
   readonly fileResults: readonly FileReviewResult[];
   readonly crossFileResult: CrossFileReviewResult;
   readonly commentsCreated: number;
@@ -45,6 +47,7 @@ export class ReviewEngine {
   private readonly platform: PlatformAdapter;
   private readonly copilot: CopilotClient;
   private readonly commentManager: CommentManager;
+  private readonly stateCache: ReviewStateCache;
   private readonly options: ReviewEngineOptions;
   private readonly logger = createChildLogger({ component: 'ReviewEngine' });
 
@@ -52,6 +55,7 @@ export class ReviewEngine {
     this.platform = platform;
     this.copilot = new CopilotClient({ model: options?.copilotModel });
     this.commentManager = new CommentManager(botIdentifier);
+    this.stateCache = new ReviewStateCache();
     this.options = options ?? {};
     this.logger.info({ copilotModel: options?.copilotModel, dryRun: options?.dryRun }, 'ReviewEngine initialized');
   }
@@ -68,6 +72,7 @@ export class ReviewEngine {
    * const engine = new ReviewEngine(githubAdapter, '[Bot]', { dryRun: true });
    * const result = await engine.reviewPR(123);
    * console.log(`Reviewed ${result.filesReviewed} files`);
+   * console.log(`Skipped ${result.filesSkipped} unchanged files`);
    * console.log(`Found ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)} issues`);
    * ```
    */
@@ -82,12 +87,22 @@ export class ReviewEngine {
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
-    const fileResults = await this.reviewFiles(files);
+    const cachedState = await this.stateCache.getState(prNumber);
+    
+    const { fileResults, filesSkipped } = await this.reviewFiles(files, cachedState);
     
     // Validate line numbers against actual diff content
     const validatedResults = this.validateLineNumbers(fileResults, files);
     
-    const crossFileResult = await this.performCrossFileAnalysis(prDetails, files, validatedResults);
+    // Skip cross-file analysis if all files were cached (no files changed)
+    let crossFileResult: CrossFileReviewResult;
+    if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
+      this.log("All files unchanged - using cached cross-file analysis");
+      this.logger.info({ prNumber }, "Reusing cached cross-file analysis");
+      crossFileResult = cachedState.crossFileResult;
+    } else {
+      crossFileResult = await this.performCrossFileAnalysis(prDetails, files, validatedResults);
+    }
 
     const actions = this.commentManager.determineActions(
       existingComments,
@@ -96,6 +111,10 @@ export class ReviewEngine {
     );
 
     const commentStats = await this.executeCommentActions(prNumber, actions);
+
+    // Save state for future re-reviews
+    const fileShaMap = this.buildFileShaMap(files);
+    await this.stateCache.saveState(prNumber, validatedResults, fileShaMap, crossFileResult);
 
     if (commentStats.commentErrors.length > 0) {
       this.logger.warn({ 
@@ -108,6 +127,7 @@ export class ReviewEngine {
     this.logger.info({
       prNumber,
       filesReviewed: validatedResults.length,
+      filesSkipped,
       totalFindings: validatedResults.reduce((sum, r) => sum + r.findings.length, 0),
       commentsCreated: commentStats.commentsCreated,
       commentsUpdated: commentStats.commentsUpdated,
@@ -117,7 +137,8 @@ export class ReviewEngine {
 
     return {
       prDetails,
-      filesReviewed: validatedResults.length,
+      filesReviewed: validatedResults.length - filesSkipped,
+      filesSkipped,
       fileResults: validatedResults,
       crossFileResult,
       ...commentStats,
@@ -151,14 +172,26 @@ export class ReviewEngine {
     return existingComments;
   }
 
-  private async reviewFiles(files: PRFile[]): Promise<FileReviewResult[]> {
+  private async reviewFiles(files: PRFile[], cachedState?: Awaited<ReturnType<ReviewStateCache['getState']>>): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     const fileResults: FileReviewResult[] = [];
     const filesContext = buildFilesSummary(files);
+    let filesSkipped = 0;
 
     for (const file of files) {
       if (this.shouldSkipFile(file)) {
         this.log(`Skipping ${file.filename} (${file.status})`);
         continue;
+      }
+
+      // Check if file is unchanged and has cached review
+      if (file.sha && cachedState) {
+        const cachedReview = this.stateCache.getCachedFileReview(file.filename, file.sha, cachedState);
+        if (cachedReview) {
+          this.log(`Using cached review for ${file.filename} (unchanged)`);
+          fileResults.push(cachedReview);
+          filesSkipped++;
+          continue;
+        }
       }
 
       this.log(`Reviewing ${file.filename}...`);
@@ -167,7 +200,11 @@ export class ReviewEngine {
       this.log(`  Found ${result.findings.length} issues`);
     }
 
-    return fileResults;
+    if (filesSkipped > 0) {
+      this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review`);
+    }
+
+    return { fileResults, filesSkipped };
   }
 
   private async reviewFile(file: PRFile, filesContext: string): Promise<FileReviewResult> {
@@ -242,7 +279,8 @@ export class ReviewEngine {
         })
         .filter((f): f is NonNullable<typeof f> => f !== null);
 
-      if (validatedFindings.length > 0) {
+      if (validatedFindings.length > 0 || result.findings.length === 0) {
+        // Include files with validated findings OR files with no findings at all
         validatedResults.push({
           filename: result.filename,
           findings: validatedFindings
@@ -367,6 +405,16 @@ export class ReviewEngine {
     if (file.status === "deleted") return true;
     if (!file.patch) return true;
     return SKIP_EXTENSIONS.some((ext) => file.filename.endsWith(ext));
+  }
+
+  private buildFileShaMap(files: PRFile[]): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const file of files) {
+      if (file.sha) {
+        map.set(file.filename, file.sha);
+      }
+    }
+    return map;
   }
 
   private log(message: string): void {

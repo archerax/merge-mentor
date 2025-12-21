@@ -97,11 +97,11 @@ describe("AzureDevOpsAdapter", () => {
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
         changeEntries: [
           {
-            item: { path: "/src/test.ts" },
+            item: { path: "/src/test.ts", objectId: "obj123" },
             changeType: 2, // EDIT
           },
           {
-            item: { path: "README.md" },
+            item: { path: "README.md", objectId: "obj456" },
             changeType: 1, // ADD
           },
         ],
@@ -116,6 +116,7 @@ describe("AzureDevOpsAdapter", () => {
         additions: 0,
         deletions: 0,
         patch: undefined,
+        sha: "obj123",
       });
       expect(result[1]).toEqual({
         filename: "README.md",
@@ -123,6 +124,7 @@ describe("AzureDevOpsAdapter", () => {
         additions: 0,
         deletions: 0,
         patch: undefined,
+        sha: "obj456",
       });
     });
 

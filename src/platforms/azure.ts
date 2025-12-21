@@ -88,6 +88,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         additions: 0,
         deletions: 0,
         patch: undefined,
+        sha: item.objectId,
       });
     }
 

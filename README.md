@@ -15,6 +15,7 @@ An automated code review bot that leverages GitHub Copilot CLI to perform compre
 - **Summary Reports**: Generates detailed summary comments with statistics
 - **Comment Management**: Updates/resolves existing bot comments as issues are addressed
 - **Cross-File Analysis**: Identifies architectural and design issues across the PR
+- **Incremental Reviews**: Automatically skips re-reviewing unchanged files to reduce costs and improve speed
 - **Dry-Run Mode**: Preview changes before posting (default behavior)
 
 ## Prerequisites
@@ -193,10 +194,12 @@ pnpm review -- --pr 123 --verbose false
 
 1. **Initialization**: Authenticates with the selected platform API
 2. **PR Retrieval**: Fetches PR metadata and changed files
-3. **File-by-File Review**: Analyzes each file using Copilot CLI with specialized prompts
-4. **Cross-File Analysis**: Performs holistic analysis of all changes together
-5. **Comment Management**: Compares findings with existing bot comments
-6. **Feedback Delivery**: Posts inline comments and a summary report
+3. **Cache Check**: Loads previous review state to identify unchanged files
+4. **File-by-File Review**: Analyzes each changed file using Copilot CLI with specialized prompts
+5. **Cross-File Analysis**: Performs holistic analysis of all changes (skipped if all files cached)
+6. **Comment Management**: Compares findings with existing bot comments
+7. **Feedback Delivery**: Posts inline comments and a summary report
+8. **State Caching**: Saves review results and cross-file analysis for future incremental reviews
 
 ## Review Categories
 
@@ -216,6 +219,29 @@ The bot analyzes code for:
 | High | 🟠 | Important issues that should be addressed |
 | Medium | 🟡 | Moderate concerns worth reviewing |
 | Low | 🟢 | Minor suggestions for improvement |
+
+## Incremental Reviews
+
+MergeMentor automatically caches review results to enable incremental reviews. When you re-review a PR:
+
+- **Unchanged files are skipped**: Files with the same content SHA are not re-reviewed
+- **Cross-file analysis is cached**: When no files changed, cross-file analysis is skipped entirely
+- **Only changed files are analyzed**: Saves time and API costs on large PRs
+- **Cache is automatic**: Stored in `.mergementor-cache/` directory (excluded from git)
+- **Per-PR caching**: Each PR maintains its own review state
+
+This means subsequent reviews after pushing new commits will only analyze the files that actually changed, making re-reviews much faster and more cost-effective.
+
+### How It Works
+
+1. After each review, file content hashes (SHAs), review results, and cross-file analysis are saved
+2. On re-review, the current file SHAs are compared with cached SHAs
+3. Files with matching SHAs reuse cached review results
+4. If all files are unchanged, the cross-file analysis is also reused (no Copilot calls)
+5. If any files changed, only those files are sent to Copilot for analysis and cross-file analysis is re-run
+6. The cache is updated with new results after each review
+
+**Note**: The cache directory (`.mergementor-cache/`) can be safely deleted to force a full re-review of all files.
 
 ## Development
 
@@ -248,9 +274,11 @@ mergementor/
 │   │   └── prompts.ts      # Review prompt templates
 │   └── review/
 │       ├── engine.ts       # Review orchestration
-│       └── commentManager.ts # Comment lifecycle management
+│       ├── commentManager.ts # Comment lifecycle management
+│       └── reviewStateCache.ts # Review state caching
 ├── tests/                  # Unit tests
 ├── .env.example           # Example environment configuration
+├── .mergementor-cache/    # Cached review state (gitignored)
 ├── AGENTS.md              # AI agent instructions
 ├── TASKS.md               # Code quality tasks
 ├── package.json
