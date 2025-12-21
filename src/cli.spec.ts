@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewResult } from "./review/engine.js";
 import type { Config } from "./config.js";
+import type { ReviewResult } from "./review/engine.js";
 
 const mockReviewPR = vi.fn();
 const mockAdapter = {
@@ -43,12 +43,12 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
+import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./cli.js";
 // Import after mocks are set up
 import { loadConfig, validateConfig } from "./config.js";
-import { GitHubAdapter } from "./platforms/github.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
+import { GitHubAdapter } from "./platforms/github.js";
 import { ReviewEngine } from "./review/engine.js";
-import { type ReviewOptions, displayResults, executeReview, hasCriticalIssues } from "./cli.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   return {

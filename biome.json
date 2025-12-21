@@ -1,38 +1,38 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
-	"vcs": { 
-		"enabled": true, 
-		"clientKind": "git", 
-		"useIgnoreFile": true 
-	},
-	"formatter": {
-		"enabled": true,
-		"indentStyle": "space",
-		"indentWidth": 2,
-		"lineWidth": 100
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": true,
-			"correctness": { 
-				"noUnusedVariables": "error" 
-			},
-			"suspicious": { 
-				"noConsole": "off", 
-				"noExplicitAny": "off" 
-			},
-			"style": {
-				"noNonNullAssertion": "off"
-			}
-		}
-	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "double",
-			"semicolons": "always",
-			"trailingCommas": "es5",
-			"arrowParentheses": "always"
-		}
-	}
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noExplicitAny": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "es5",
+      "arrowParentheses": "always"
+    }
+  }
 }

@@ -12,14 +12,14 @@ interface DiffLineInfo {
 
 /**
  * Extracts valid line numbers from a git diff patch.
- * 
+ *
  * GitHub allows inline comments only on:
  * - Lines that were added (+)
  * - Lines that were modified (contextual lines near changes)
- * 
+ *
  * @param patch - Unified diff patch string
  * @returns Set of valid line numbers that can be commented on
- * 
+ *
  * @example
  * ```typescript
  * const patch = `@@ -10,5 +10,6 @@ function example() {
@@ -32,12 +32,12 @@ interface DiffLineInfo {
  */
 export function getValidDiffLines(patch: string | undefined): Set<number> {
   const validLines = new Set<number>();
-  
+
   if (!patch) {
     return validLines;
   }
 
-  const lines = patch.split('\n');
+  const lines = patch.split("\n");
   let currentLine = 0;
 
   for (const line of lines) {
@@ -54,20 +54,16 @@ export function getValidDiffLines(patch: string | undefined): Set<number> {
     }
 
     // Process diff content lines
-    if (line.startsWith('+')) {
+    if (line.startsWith("+")) {
       // Added line - commentable
       validLines.add(currentLine);
       currentLine++;
-    } else if (line.startsWith('-')) {
-      // Deleted line - not commentable, don't increment line number
-      continue;
-    } else if (line.startsWith(' ')) {
+    } else if (line.startsWith("-")) {
+    } else if (line.startsWith(" ")) {
       // Context line - commentable in some cases, but safer to include
       validLines.add(currentLine);
       currentLine++;
-    } else if (line.startsWith('\\')) {
-      // "\ No newline at end of file" - skip
-      continue;
+    } else if (line.startsWith("\\")) {
     }
   }
 
@@ -77,7 +73,7 @@ export function getValidDiffLines(patch: string | undefined): Set<number> {
 /**
  * Finds the nearest valid line number for commenting.
  * If the requested line is invalid, finds the closest valid line.
- * 
+ *
  * @param requestedLine - The line number requested by the AI
  * @param validLines - Set of valid line numbers from the diff
  * @returns Nearest valid line number, or undefined if no valid lines exist
@@ -97,7 +93,7 @@ export function findNearestValidLine(
 
   // Find nearest valid line
   const sortedLines = Array.from(validLines).sort((a, b) => a - b);
-  
+
   let nearest = sortedLines[0];
   let minDistance = Math.abs(requestedLine - nearest);
 
@@ -114,7 +110,7 @@ export function findNearestValidLine(
 
 /**
  * Checks if a line number is valid for commenting on a diff.
- * 
+ *
  * @param line - Line number to check
  * @param validLines - Set of valid line numbers
  * @returns True if the line can be commented on

@@ -8,10 +8,12 @@ import type { FileReviewResult, PRDetails, PRFile } from "../platforms/types.js"
  * @param allFilesContext - Optional summary of all files changed in the PR for context
  * @returns Formatted prompt for Copilot CLI
  */
-export function buildFileReviewPrompt(filename: string, patch: string, allFilesContext?: string): string {
-  const contextSection = allFilesContext 
-    ? `\nFILES CHANGED IN THIS PR:\n${allFilesContext}\n`
-    : '';
+export function buildFileReviewPrompt(
+  filename: string,
+  patch: string,
+  allFilesContext?: string
+): string {
+  const contextSection = allFilesContext ? `\nFILES CHANGED IN THIS PR:\n${allFilesContext}\n` : "";
 
   return `You are an expert code reviewer. Analyze the following code changes and provide a detailed review.
 ${contextSection}

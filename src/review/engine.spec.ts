@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { ReviewEngine } from "./engine.js";
@@ -575,7 +575,7 @@ describe("ReviewEngine", () => {
       mockParseCrossFileReview.mockReturnValue(originalCrossFileResult);
 
       await engine.reviewPR(123);
-      
+
       // Reset mocks for second review
       mockExecutePrompt.mockClear();
       mockParseCrossFileReview.mockClear();
@@ -590,17 +590,17 @@ describe("ReviewEngine", () => {
       // Verify file review was cached (not called again)
       expect(mockExecutePrompt).not.toHaveBeenCalled();
       expect(mockParseCrossFileReview).not.toHaveBeenCalled();
-      
+
       // Verify cached cross-file result was used
       expect(result.crossFileResult.overallAssessment).toBe("Original assessment");
       expect(result.crossFileResult.recommendations).toEqual(["Original recommendation"]);
       expect(result.filesSkipped).toBe(1);
-      
+
       // Verify log message about using cached cross-file analysis
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("using cached cross-file analysis")
       );
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -608,7 +608,11 @@ describe("ReviewEngine", () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
       const prDetails = createPRDetails();
       const files = [
-        createPRFile({ filename: "unchanged.ts", sha: "same-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+        createPRFile({
+          filename: "unchanged.ts",
+          sha: "same-sha",
+          patch: "@@ -1,3 +1,3 @@\n line",
+        }),
         createPRFile({ filename: "changed.ts", sha: "old-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
       ];
 
@@ -628,7 +632,7 @@ describe("ReviewEngine", () => {
       });
 
       await engine.reviewPR(123);
-      
+
       // Clear mock call counts but keep implementation
       mockExecutePrompt.mockClear();
       mockParseFileReview.mockClear();
@@ -636,10 +640,14 @@ describe("ReviewEngine", () => {
 
       // Second review with one changed file
       const updatedFiles = [
-        createPRFile({ filename: "unchanged.ts", sha: "same-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
+        createPRFile({
+          filename: "unchanged.ts",
+          sha: "same-sha",
+          patch: "@@ -1,3 +1,3 @@\n line",
+        }),
         createPRFile({ filename: "changed.ts", sha: "new-sha", patch: "@@ -1,3 +1,3 @@\n line" }),
       ];
-      
+
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(updatedFiles);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
@@ -659,11 +667,11 @@ describe("ReviewEngine", () => {
       // Should perform new cross-file analysis because a file changed
       expect(mockParseCrossFileReview).toHaveBeenCalled();
       expect(result.crossFileResult.overallAssessment).toBe("Updated review");
-      
+
       // One file was cached, one was reviewed
       expect(result.filesSkipped).toBe(1);
       expect(result.filesReviewed).toBe(1);
-      
+
       // Should have reviewed only the changed file
       expect(mockParseFileReview).toHaveBeenCalledTimes(1);
       expect(mockParseFileReview).toHaveBeenCalledWith("changed.ts", expect.any(Object));
@@ -679,9 +687,9 @@ describe("ReviewEngine", () => {
 
       // Manually inject an invalid action (this tests defensive code)
       const engine_any = engine as any;
-      await expect(
-        engine_any.executeAction(123, { type: "update", body: "test" })
-      ).rejects.toThrow("Update action requires existingCommentId");
+      await expect(engine_any.executeAction(123, { type: "update", body: "test" })).rejects.toThrow(
+        "Update action requires existingCommentId"
+      );
 
       expect(mockPlatform.updateComment).not.toHaveBeenCalled();
     });
@@ -690,9 +698,9 @@ describe("ReviewEngine", () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
       const engine_any = engine as any;
-      await expect(
-        engine_any.executeAction(123, { type: "resolve" })
-      ).rejects.toThrow("Resolve action requires existingCommentId");
+      await expect(engine_any.executeAction(123, { type: "resolve" })).rejects.toThrow(
+        "Resolve action requires existingCommentId"
+      );
 
       expect(mockPlatform.resolveComment).not.toHaveBeenCalled();
     });

@@ -20,13 +20,16 @@ export interface ReviewOptions {
  * Extracted for testability.
  */
 export async function executeReview(options: ReviewOptions): Promise<ReviewResult> {
-  logger.info({ pr: options.pr, platform: options.platform, write: options.write }, 'Review command initiated');
-  
+  logger.info(
+    { pr: options.pr, platform: options.platform, write: options.write },
+    "Review command initiated"
+  );
+
   const config = loadConfig();
   const platform = (options.platform || config.defaultPlatform) as Platform;
 
   if (!["github", "azure"].includes(platform)) {
-    logger.error({ platform }, 'Invalid platform specified');
+    logger.error({ platform }, "Invalid platform specified");
     throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
   }
 
@@ -115,21 +118,27 @@ program
       displayResults(result, !options.write);
 
       const exitCode = hasCriticalIssues(result) ? 1 : 0;
-      logger.info({ 
-        pr: options.pr, 
-        exitCode,
-        hasCriticalIssues: exitCode === 1,
-        filesReviewed: result.filesReviewed,
-        totalFindings: result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)
-      }, 'Review completed');
+      logger.info(
+        {
+          pr: options.pr,
+          exitCode,
+          hasCriticalIssues: exitCode === 1,
+          filesReviewed: result.filesReviewed,
+          totalFindings: result.fileResults.reduce((sum, r) => sum + r.findings.length, 0),
+        },
+        "Review completed"
+      );
       process.exit(exitCode);
     } catch (error) {
       const err = error as Error;
-      logger.error({ 
-        error: err.message, 
-        stack: err.stack,
-        pr: options.pr
-      }, 'Review failed');
+      logger.error(
+        {
+          error: err.message,
+          stack: err.stack,
+          pr: options.pr,
+        },
+        "Review failed"
+      );
       console.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }

@@ -13,14 +13,14 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly owner: string;
   private readonly repo: string;
   private readonly botIdentifier: string;
-  private readonly logger = createChildLogger({ component: 'GitHubAdapter' });
+  private readonly logger = createChildLogger({ component: "GitHubAdapter" });
 
   constructor(config: Config) {
     this.octokit = new Octokit({ auth: config.github.token });
     this.owner = config.github.owner;
     this.repo = config.github.repo;
     this.botIdentifier = config.botCommentIdentifier;
-    this.logger.info({ owner: this.owner, repo: this.repo }, 'GitHubAdapter initialized');
+    this.logger.info({ owner: this.owner, repo: this.repo }, "GitHubAdapter initialized");
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
@@ -114,8 +114,8 @@ export class GitHubAdapter implements PlatformAdapter {
     line: number,
     body: string
   ): Promise<void> {
-    this.logger.debug({ prNumber, path, line }, 'Posting inline comment');
-    
+    this.logger.debug({ prNumber, path, line }, "Posting inline comment");
+
     const { data: pr } = await withRateLimitHandling(() =>
       this.octokit.pulls.get({
         owner: this.owner,
@@ -136,16 +136,19 @@ export class GitHubAdapter implements PlatformAdapter {
           line,
         })
       );
-      this.logger.info({ prNumber, path, line }, 'Inline comment posted successfully');
+      this.logger.info({ prNumber, path, line }, "Inline comment posted successfully");
     } catch (error) {
-      this.logger.error({
-        prNumber,
-        path,
-        line,
-        commitSha: pr.head.sha,
-        error: (error as Error).message,
-        errorDetails: error
-      }, 'Failed to post inline comment');
+      this.logger.error(
+        {
+          prNumber,
+          path,
+          line,
+          commitSha: pr.head.sha,
+          error: (error as Error).message,
+          errorDetails: error,
+        },
+        "Failed to post inline comment"
+      );
       throw error;
     }
   }
@@ -163,7 +166,7 @@ export class GitHubAdapter implements PlatformAdapter {
 
   async updateComment(commentId: number | string, body: string): Promise<void> {
     const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
-    this.logger.debug({ commentId: id }, 'Updating comment');
+    this.logger.debug({ commentId: id }, "Updating comment");
 
     try {
       await withRateLimitHandling(() =>
@@ -174,12 +177,15 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n${body}`,
         })
       );
-      this.logger.info({ commentId: id, type: 'review' }, 'Comment updated successfully');
+      this.logger.info({ commentId: id, type: "review" }, "Comment updated successfully");
     } catch (error) {
-      this.logger.warn({
-        commentId: id,
-        error: (error as Error).message
-      }, 'Failed to update review comment, trying as issue comment');
+      this.logger.warn(
+        {
+          commentId: id,
+          error: (error as Error).message,
+        },
+        "Failed to update review comment, trying as issue comment"
+      );
       console.warn(
         `Failed to update review comment ${id}, trying as issue comment:`,
         (error as Error).message
@@ -192,13 +198,13 @@ export class GitHubAdapter implements PlatformAdapter {
           body: `${this.botIdentifier}\n\n${body}`,
         })
       );
-      this.logger.info({ commentId: id, type: 'issue' }, 'Comment updated successfully');
+      this.logger.info({ commentId: id, type: "issue" }, "Comment updated successfully");
     }
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
     const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
-    this.logger.debug({ commentId: id }, 'Resolving comment');
+    this.logger.debug({ commentId: id }, "Resolving comment");
 
     try {
       const { data: comment } = await withRateLimitHandling(() =>
@@ -222,27 +228,30 @@ export class GitHubAdapter implements PlatformAdapter {
               }
             }`,
             {
-              threadId: this.toGlobalId('PullRequestReviewThread', threadId),
+              threadId: this.toGlobalId("PullRequestReviewThread", threadId),
             }
           )
         );
-        this.logger.info({ commentId: id, threadId, type: 'review' }, 'Comment thread resolved successfully');
+        this.logger.info(
+          { commentId: id, threadId, type: "review" },
+          "Comment thread resolved successfully"
+        );
       } else {
-        this.logger.warn({ commentId: id }, 'Review comment has no thread ID, cannot resolve');
+        this.logger.warn({ commentId: id }, "Review comment has no thread ID, cannot resolve");
       }
     } catch (error) {
-      this.logger.warn({
-        commentId: id,
-        error: (error as Error).message
-      }, 'Failed to resolve review comment thread');
-      console.warn(
-        `Failed to resolve review comment thread ${id}:`,
-        (error as Error).message
+      this.logger.warn(
+        {
+          commentId: id,
+          error: (error as Error).message,
+        },
+        "Failed to resolve review comment thread"
       );
+      console.warn(`Failed to resolve review comment thread ${id}:`, (error as Error).message);
     }
   }
 
   private toGlobalId(type: string, id: number): string {
-    return Buffer.from(`${type}:${id}`).toString('base64');
+    return Buffer.from(`${type}:${id}`).toString("base64");
   }
 }

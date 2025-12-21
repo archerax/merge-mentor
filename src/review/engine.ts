@@ -15,9 +15,9 @@ import type {
   PRDetails,
   PRFile,
 } from "../platforms/types.js";
+import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { CommentManager } from "./commentManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
-import { getValidDiffLines, findNearestValidLine } from "../utils/diffParser.js";
 
 /** Result of a complete PR review. */
 export interface ReviewResult {
@@ -49,7 +49,7 @@ export class ReviewEngine {
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
   private readonly options: ReviewEngineOptions;
-  private readonly logger = createChildLogger({ component: 'ReviewEngine' });
+  private readonly logger = createChildLogger({ component: "ReviewEngine" });
 
   constructor(platform: PlatformAdapter, botIdentifier: string, options?: ReviewEngineOptions) {
     this.platform = platform;
@@ -57,7 +57,10 @@ export class ReviewEngine {
     this.commentManager = new CommentManager(botIdentifier);
     this.stateCache = new ReviewStateCache();
     this.options = options ?? {};
-    this.logger.info({ copilotModel: options?.copilotModel, dryRun: options?.dryRun }, 'ReviewEngine initialized');
+    this.logger.info(
+      { copilotModel: options?.copilotModel, dryRun: options?.dryRun },
+      "ReviewEngine initialized"
+    );
   }
 
   /**
@@ -78,22 +81,22 @@ export class ReviewEngine {
    */
   async reviewPR(prNumber: number): Promise<ReviewResult> {
     if (prNumber <= 0 || !Number.isInteger(prNumber)) {
-      this.logger.error({ prNumber }, 'Invalid PR number');
+      this.logger.error({ prNumber }, "Invalid PR number");
       throw new ValidationError("prNumber", "Must be a positive integer");
     }
 
-    this.logger.info({ prNumber }, 'Starting PR review');
+    this.logger.info({ prNumber }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prNumber);
-    
+
     const { fileResults, filesSkipped } = await this.reviewFiles(files, cachedState);
-    
+
     // Validate line numbers against actual diff content
     const validatedResults = this.validateLineNumbers(fileResults, files);
-    
+
     // Skip cross-file analysis if all files were cached (no files changed)
     let crossFileResult: CrossFileReviewResult;
     if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
@@ -117,23 +120,29 @@ export class ReviewEngine {
     await this.stateCache.saveState(prNumber, validatedResults, fileShaMap, crossFileResult);
 
     if (commentStats.commentErrors.length > 0) {
-      this.logger.warn({ 
-        errorCount: commentStats.commentErrors.length,
-        errors: commentStats.commentErrors 
-      }, 'Some comments failed to post');
+      this.logger.warn(
+        {
+          errorCount: commentStats.commentErrors.length,
+          errors: commentStats.commentErrors,
+        },
+        "Some comments failed to post"
+      );
       this.log(`\n⚠️  ${commentStats.commentErrors.length} comment(s) failed to post`);
     }
 
-    this.logger.info({
-      prNumber,
-      filesReviewed: validatedResults.length,
-      filesSkipped,
-      totalFindings: validatedResults.reduce((sum, r) => sum + r.findings.length, 0),
-      commentsCreated: commentStats.commentsCreated,
-      commentsUpdated: commentStats.commentsUpdated,
-      commentsResolved: commentStats.commentsResolved,
-      commentErrors: commentStats.commentErrors.length
-    }, 'PR review completed');
+    this.logger.info(
+      {
+        prNumber,
+        filesReviewed: validatedResults.length,
+        filesSkipped,
+        totalFindings: validatedResults.reduce((sum, r) => sum + r.findings.length, 0),
+        commentsCreated: commentStats.commentsCreated,
+        commentsUpdated: commentStats.commentsUpdated,
+        commentsResolved: commentStats.commentsResolved,
+        commentErrors: commentStats.commentErrors.length,
+      },
+      "PR review completed"
+    );
 
     return {
       prDetails,
@@ -147,32 +156,41 @@ export class ReviewEngine {
 
   private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {
     this.log("Fetching PR details...");
-    this.logger.debug({ prNumber }, 'Fetching PR data');
+    this.logger.debug({ prNumber }, "Fetching PR data");
     const prDetails = await this.platform.getPRDetails(prNumber);
     const files = await this.platform.getPRFiles(prNumber);
-    this.logger.info({ 
-      prNumber, 
-      filesCount: files.length,
-      title: prDetails.title,
-      author: prDetails.author
-    }, 'PR data fetched');
+    this.logger.info(
+      {
+        prNumber,
+        filesCount: files.length,
+        title: prDetails.title,
+        author: prDetails.author,
+      },
+      "PR data fetched"
+    );
     this.log(`Found ${files.length} changed files`);
     return { prDetails, files };
   }
 
   private async fetchExistingComments(prNumber: number) {
     this.log("Fetching existing bot comments...");
-    this.logger.debug({ prNumber }, 'Fetching existing comments');
+    this.logger.debug({ prNumber }, "Fetching existing comments");
     const existingComments = await this.platform.getExistingBotComments(prNumber);
-    this.logger.info({ 
-      prNumber, 
-      commentCount: existingComments.length 
-    }, 'Existing comments fetched');
+    this.logger.info(
+      {
+        prNumber,
+        commentCount: existingComments.length,
+      },
+      "Existing comments fetched"
+    );
     this.log(`Found ${existingComments.length} existing bot comments`);
     return existingComments;
   }
 
-  private async reviewFiles(files: PRFile[], cachedState?: Awaited<ReturnType<ReviewStateCache['getState']>>): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
+  private async reviewFiles(
+    files: PRFile[],
+    cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>
+  ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     const fileResults: FileReviewResult[] = [];
     const filesContext = buildFilesSummary(files);
     let filesSkipped = 0;
@@ -185,7 +203,11 @@ export class ReviewEngine {
 
       // Check if file is unchanged and has cached review
       if (file.sha && cachedState) {
-        const cachedReview = this.stateCache.getCachedFileReview(file.filename, file.sha, cachedState);
+        const cachedReview = this.stateCache.getCachedFileReview(
+          file.filename,
+          file.sha,
+          cachedState
+        );
         if (cachedReview) {
           this.log(`Using cached review for ${file.filename} (unchanged)`);
           fileResults.push(cachedReview);
@@ -236,15 +258,18 @@ export class ReviewEngine {
     for (const result of fileResults) {
       const validLines = validLinesMap.get(result.filename);
       if (!validLines || validLines.size === 0) {
-        this.logger.warn({ 
-          filename: result.filename,
-          findingsCount: result.findings.length 
-        }, 'No valid diff lines found for file, skipping inline comments');
+        this.logger.warn(
+          {
+            filename: result.filename,
+            findingsCount: result.findings.length,
+          },
+          "No valid diff lines found for file, skipping inline comments"
+        );
         continue;
       }
 
       const validatedFindings = result.findings
-        .map(finding => {
+        .map((finding) => {
           if (validLines.has(finding.line)) {
             return finding;
           }
@@ -252,28 +277,34 @@ export class ReviewEngine {
           // Try to find nearest valid line
           const nearestLine = findNearestValidLine(finding.line, validLines);
           if (nearestLine !== undefined) {
-            this.logger.info({
-              filename: result.filename,
-              requestedLine: finding.line,
-              adjustedLine: nearestLine,
-              severity: finding.severity,
-              category: finding.category
-            }, 'Adjusted finding line number to nearest valid diff line');
+            this.logger.info(
+              {
+                filename: result.filename,
+                requestedLine: finding.line,
+                adjustedLine: nearestLine,
+                severity: finding.severity,
+                category: finding.category,
+              },
+              "Adjusted finding line number to nearest valid diff line"
+            );
 
             return {
               ...finding,
-              line: nearestLine
+              line: nearestLine,
             };
           }
 
           // No valid line found, log and filter out
-          this.logger.warn({
-            filename: result.filename,
-            invalidLine: finding.line,
-            severity: finding.severity,
-            category: finding.category,
-            message: finding.message.slice(0, 100)
-          }, 'Cannot find valid diff line for finding, skipping inline comment');
+          this.logger.warn(
+            {
+              filename: result.filename,
+              invalidLine: finding.line,
+              severity: finding.severity,
+              category: finding.category,
+              message: finding.message.slice(0, 100),
+            },
+            "Cannot find valid diff line for finding, skipping inline comment"
+          );
 
           return null;
         })
@@ -283,13 +314,16 @@ export class ReviewEngine {
         // Include files with validated findings OR files with no findings at all
         validatedResults.push({
           filename: result.filename,
-          findings: validatedFindings
+          findings: validatedFindings,
         });
       } else if (result.findings.length > 0) {
-        this.logger.warn({
-          filename: result.filename,
-          originalFindingsCount: result.findings.length
-        }, 'All findings filtered out due to invalid line numbers');
+        this.logger.warn(
+          {
+            filename: result.filename,
+            originalFindingsCount: result.findings.length,
+          },
+          "All findings filtered out due to invalid line numbers"
+        );
       }
     }
 
@@ -334,15 +368,18 @@ export class ReviewEngine {
         } catch (error) {
           const err = error as Error;
           const errorMsg = `Failed to ${action.type} comment: ${err.message}`;
-          this.logger.error({
-            prNumber,
-            actionType: action.type,
-            path: action.path,
-            line: action.line,
-            commentId: action.existingCommentId,
-            error: err.message,
-            errorStack: err.stack
-          }, 'Comment action failed');
+          this.logger.error(
+            {
+              prNumber,
+              actionType: action.type,
+              path: action.path,
+              line: action.line,
+              commentId: action.existingCommentId,
+              error: err.message,
+              errorStack: err.stack,
+            },
+            "Comment action failed"
+          );
           this.log(`Warning: ${errorMsg}`);
           commentErrors.push(errorMsg);
         }
@@ -358,13 +395,16 @@ export class ReviewEngine {
   }
 
   private async executeAction(prNumber: number, action: CommentAction): Promise<void> {
-    this.logger.debug({ 
-      prNumber, 
-      actionType: action.type,
-      path: action.path,
-      line: action.line,
-      commentId: action.existingCommentId
-    }, 'Executing comment action');
+    this.logger.debug(
+      {
+        prNumber,
+        actionType: action.type,
+        path: action.path,
+        line: action.line,
+        commentId: action.existingCommentId,
+      },
+      "Executing comment action"
+    );
 
     switch (action.type) {
       case "create":
@@ -373,10 +413,13 @@ export class ReviewEngine {
         }
         if (action.path && action.line) {
           await this.platform.postInlineComment(prNumber, action.path, action.line, action.body);
-          this.logger.info({ prNumber, path: action.path, line: action.line }, 'Inline comment created');
+          this.logger.info(
+            { prNumber, path: action.path, line: action.line },
+            "Inline comment created"
+          );
         } else {
           await this.platform.postGeneralComment(prNumber, action.body);
-          this.logger.info({ prNumber }, 'General comment created');
+          this.logger.info({ prNumber }, "General comment created");
         }
         break;
 
@@ -388,7 +431,7 @@ export class ReviewEngine {
           throw new Error("Update action requires body");
         }
         await this.platform.updateComment(action.existingCommentId, action.body);
-        this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment updated');
+        this.logger.info({ prNumber, commentId: action.existingCommentId }, "Comment updated");
         break;
 
       case "resolve":
@@ -396,7 +439,7 @@ export class ReviewEngine {
           throw new Error("Resolve action requires existingCommentId");
         }
         await this.platform.resolveComment(action.existingCommentId);
-        this.logger.info({ prNumber, commentId: action.existingCommentId }, 'Comment resolved');
+        this.logger.info({ prNumber, commentId: action.existingCommentId }, "Comment resolved");
         break;
     }
   }

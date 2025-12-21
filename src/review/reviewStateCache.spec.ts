@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ReviewStateCache } from "./reviewStateCache.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReviewResult } from "../platforms/types.js";
+import { ReviewStateCache } from "./reviewStateCache.js";
 
 describe("ReviewStateCache", () => {
   const testCacheDir = ".test-cache";
@@ -67,9 +67,7 @@ describe("ReviewStateCache", () => {
 
   describe("saveState", () => {
     it("creates cache directory if not exists", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "test.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [] }];
       const fileShaMap = new Map([["test.ts", "def456"]]);
 
       await cache.saveState(456, fileResults, fileShaMap);
@@ -107,9 +105,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("saves cross-file analysis result when provided", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "test.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [] }];
       const fileShaMap = new Map([["test.ts", "sha123"]]);
       const crossFileResult = {
         overallAssessment: "Looks good",
@@ -134,9 +130,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("saves without cross-file result when not provided", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "test.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [] }];
       const fileShaMap = new Map([["test.ts", "sha456"]]);
 
       await cache.saveState(888, fileResults, fileShaMap);
@@ -161,9 +155,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("overwrites existing state", async () => {
-      const fileResults1: FileReviewResult[] = [
-        { filename: "test.ts", findings: [] },
-      ];
+      const fileResults1: FileReviewResult[] = [{ filename: "test.ts", findings: [] }];
       const fileShaMap1 = new Map([["test.ts", "old-sha"]]);
 
       await cache.saveState(200, fileResults1, fileShaMap1);
@@ -221,9 +213,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("returns undefined when SHA does not match", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "changed.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "changed.ts", findings: [] }];
       const fileShaMap = new Map([["changed.ts", "old-sha"]]);
 
       await cache.saveState(400, fileResults, fileShaMap);
@@ -235,9 +225,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("returns undefined when file not in cache", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "cached.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "cached.ts", findings: [] }];
       const fileShaMap = new Map([["cached.ts", "sha123"]]);
 
       await cache.saveState(500, fileResults, fileShaMap);
@@ -251,9 +239,7 @@ describe("ReviewStateCache", () => {
 
   describe("clearState", () => {
     it("removes cached state file", async () => {
-      const fileResults: FileReviewResult[] = [
-        { filename: "test.ts", findings: [] },
-      ];
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [] }];
       const fileShaMap = new Map([["test.ts", "sha"]]);
 
       await cache.saveState(600, fileResults, fileShaMap);

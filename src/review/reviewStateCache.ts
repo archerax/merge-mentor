@@ -37,14 +37,20 @@ export class ReviewStateCache {
       const filePath = this.getCachePath(prNumber);
       const data = await fs.readFile(filePath, "utf-8");
       const state = JSON.parse(data) as ReviewState;
-      this.logger.debug({ prNumber, filesCount: Object.keys(state.files).length }, "Loaded cached review state");
+      this.logger.debug(
+        { prNumber, filesCount: Object.keys(state.files).length },
+        "Loaded cached review state"
+      );
       return state;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         this.logger.debug({ prNumber }, "No cached review state found");
         return undefined;
       }
-      this.logger.warn({ prNumber, error: (error as Error).message }, "Failed to load cached review state");
+      this.logger.warn(
+        { prNumber, error: (error as Error).message },
+        "Failed to load cached review state"
+      );
       return undefined;
     }
   }
@@ -83,9 +89,15 @@ export class ReviewStateCache {
 
       const filePath = this.getCachePath(prNumber);
       await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
-      this.logger.info({ prNumber, filesCount: Object.keys(files).length }, "Saved review state to cache");
+      this.logger.info(
+        { prNumber, filesCount: Object.keys(files).length },
+        "Saved review state to cache"
+      );
     } catch (error) {
-      this.logger.error({ prNumber, error: (error as Error).message }, "Failed to save review state");
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to save review state"
+      );
     }
   }
 
@@ -122,7 +134,10 @@ export class ReviewStateCache {
       this.logger.info({ prNumber }, "Cleared cached review state");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        this.logger.warn({ prNumber, error: (error as Error).message }, "Failed to clear cached review state");
+        this.logger.warn(
+          { prNumber, error: (error as Error).message },
+          "Failed to clear cached review state"
+        );
       }
     }
   }
