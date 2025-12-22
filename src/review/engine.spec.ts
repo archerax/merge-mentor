@@ -77,7 +77,7 @@ describe("ReviewEngine", () => {
   afterEach(async () => {
     // Clean up cache directory between tests
     try {
-      await fs.rm(".mergementor-cache", { recursive: true, force: true });
+      await fs.rm(".merge-mentor", { recursive: true, force: true });
     } catch {
       // Ignore cleanup errors
     }

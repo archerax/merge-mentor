@@ -38,7 +38,7 @@ describe("Config", () => {
       expect(config.azure.org).toBe("");
       expect(config.azure.project).toBe("");
       expect(config.azure.repo).toBe("");
-      expect(config.botCommentIdentifier).toBe("[MergeMentor]");
+      expect(config.botCommentIdentifier).toBe("[merge-mentor]");
     });
 
     it("should load values from environment variables", () => {

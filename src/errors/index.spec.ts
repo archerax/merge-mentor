@@ -3,15 +3,15 @@ import {
   ConfigurationError,
   CopilotCliError,
   JsonParseError,
+  MergeMentorError,
   PlatformApiError,
-  PrBotError,
   ValidationError,
 } from "./index.js";
 
 describe("Error Classes", () => {
-  describe("PrBotError", () => {
+  describe("MergeMentorError", () => {
     it("creates error with message", () => {
-      const error = new PrBotError("Test error");
+      const error = new MergeMentorError("Test error");
 
       expect(error.message).toBe("Test error");
       expect(error.name).toBe("MergeMentorError");

@@ -1,8 +1,8 @@
 /**
- * Base error class for MergeMentor errors.
+ * Base error class for merge-mentor errors.
  * All custom errors extend this class for consistent handling.
  */
-export class PrBotError extends Error {
+export class MergeMentorError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "MergeMentorError";
@@ -12,7 +12,7 @@ export class PrBotError extends Error {
 /**
  * Error thrown when the Copilot CLI fails or is unavailable.
  */
-export class CopilotCliError extends PrBotError {
+export class CopilotCliError extends MergeMentorError {
   constructor(
     message: string,
     public readonly cause?: Error
@@ -25,7 +25,7 @@ export class CopilotCliError extends PrBotError {
 /**
  * Error thrown when configuration is missing or invalid.
  */
-export class ConfigurationError extends PrBotError {
+export class ConfigurationError extends MergeMentorError {
   constructor(
     public readonly field: string,
     message: string
@@ -38,7 +38,7 @@ export class ConfigurationError extends PrBotError {
 /**
  * Error thrown when a platform API (GitHub/Azure) fails.
  */
-export class PlatformApiError extends PrBotError {
+export class PlatformApiError extends MergeMentorError {
   constructor(
     public readonly platform: "github" | "azure",
     public readonly operation: string,
@@ -53,7 +53,7 @@ export class PlatformApiError extends PrBotError {
 /**
  * Error thrown when JSON parsing fails for Copilot responses.
  */
-export class JsonParseError extends PrBotError {
+export class JsonParseError extends MergeMentorError {
   constructor(
     message: string,
     public readonly rawContent?: string
@@ -66,7 +66,7 @@ export class JsonParseError extends PrBotError {
 /**
  * Error thrown when input validation fails.
  */
-export class ValidationError extends PrBotError {
+export class ValidationError extends MergeMentorError {
   constructor(
     public readonly field: string,
     message: string

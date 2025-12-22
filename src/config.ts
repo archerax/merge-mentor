@@ -55,7 +55,7 @@ export function loadConfig(): Config {
       project: process.env.AZURE_DEVOPS_PROJECT || "",
       repo: process.env.AZURE_DEVOPS_REPO || "",
     },
-    botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || "[MergeMentor]",
+    botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || "[merge-mentor]",
     copilotModel: process.env.COPILOT_MODEL,
   };
 }

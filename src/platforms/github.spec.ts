@@ -41,7 +41,7 @@ function createTestConfig(): Config {
       project: "",
       repo: "",
     },
-    botCommentIdentifier: "<!-- MergeMentor -->",
+    botCommentIdentifier: "<!-- merge-mentor -->",
   };
 }
 
@@ -180,7 +180,7 @@ describe("GitHubAdapter", () => {
         data: [
           {
             id: 1,
-            body: "<!-- MergeMentor -->\nReview comment",
+            body: "<!-- merge-mentor -->\nReview comment",
             path: "src/test.ts",
             line: 10,
           },
@@ -196,7 +196,7 @@ describe("GitHubAdapter", () => {
         data: [
           {
             id: 3,
-            body: "<!-- MergeMentor -->\nGeneral comment",
+            body: "<!-- merge-mentor -->\nGeneral comment",
           },
           {
             id: 4,
@@ -210,13 +210,13 @@ describe("GitHubAdapter", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
         id: 1,
-        body: "<!-- MergeMentor -->\nReview comment",
+        body: "<!-- merge-mentor -->\nReview comment",
         path: "src/test.ts",
         line: 10,
       });
       expect(result[1]).toEqual({
         id: 3,
-        body: "<!-- MergeMentor -->\nGeneral comment",
+        body: "<!-- merge-mentor -->\nGeneral comment",
       });
     });
 
@@ -226,7 +226,7 @@ describe("GitHubAdapter", () => {
         data: [
           {
             id: 1,
-            body: "<!-- MergeMentor -->\nComment",
+            body: "<!-- merge-mentor -->\nComment",
             path: "test.ts",
             line: null,
           },
@@ -266,7 +266,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         pull_number: 123,
-        body: "<!-- MergeMentor -->\n\nFix this issue",
+        body: "<!-- merge-mentor -->\n\nFix this issue",
         commit_id: "abc123",
         path: "src/test.ts",
         line: 10,
@@ -285,7 +285,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         issue_number: 123,
-        body: "<!-- MergeMentor -->\n\nOverall feedback",
+        body: "<!-- merge-mentor -->\n\nOverall feedback",
       });
     });
   });
@@ -301,7 +301,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 456,
-        body: "<!-- MergeMentor -->\n\nUpdated message",
+        body: "<!-- merge-mentor -->\n\nUpdated message",
       });
     });
 
@@ -316,7 +316,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 456,
-        body: "<!-- MergeMentor -->\n\nUpdated message",
+        body: "<!-- merge-mentor -->\n\nUpdated message",
       });
     });
 
@@ -330,7 +330,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 789,
-        body: "<!-- MergeMentor -->\n\nMessage",
+        body: "<!-- merge-mentor -->\n\nMessage",
       });
     });
   });

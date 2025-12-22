@@ -1,12 +1,15 @@
 # Automated Code Review Bot - Project Specification
 
 ## Overview
+
 An automated code review bot that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. The bot provides inline comments, general feedback, and summary reports directly on PRs.
 
 ## MVP Scope
+
 A command-line tool that can be run manually from a development machine to review specified pull requests.
 
 ## Tech Stack
+
 - **Runtime**: Node.js
 - **Language**: TypeScript
 - **Key Dependencies**:
@@ -19,12 +22,15 @@ A command-line tool that can be run manually from a development machine to revie
 ## Features
 
 ### 1. Multi-Platform PR Support
+
 - Review pull requests from GitHub repositories
 - Review pull requests from Azure DevOps repositories
 - Single unified interface for both platforms
 
 ### 2. Comprehensive Code Review
+
 The bot analyzes code for:
+
 - Code quality and readability
 - Adherence to coding standards
 - Potential bugs or logical errors
@@ -35,12 +41,14 @@ The bot analyzes code for:
 - Overall design and architecture
 
 ### 3. GitHub Copilot CLI Integration
+
 - Executes Copilot CLI with custom prompts
 - Uses file-by-file review strategy with final cross-file summary pass
 - Parses JSON output from Copilot responses
 - Captures and processes console output
 
 ### 4. Intelligent Feedback Delivery
+
 - Posts inline comments on specific lines of code when issues are identified
 - Posts general comments when specific lines cannot be pinpointed
 - Creates a comprehensive summary comment at the end of the review
@@ -50,11 +58,13 @@ The bot analyzes code for:
 ## Architecture
 
 ### Command-Line Interface
+
 ```bash
 npm run review -- --pr <PR_NUMBER> [--platform <github|azure>]
 ```
 
 ### Configuration (.env)
+
 ```
 # Platform Selection (default)
 DEFAULT_PLATFORM=github
@@ -71,19 +81,22 @@ AZURE_DEVOPS_PROJECT=<project_name>
 AZURE_DEVOPS_REPO=<repository_name>
 
 # Bot Configuration
-BOT_COMMENT_IDENTIFIER=[MergeMentor]
+BOT_COMMENT_IDENTIFIER=[merge-mentor]
 ```
 
 ### Core Components
 
 #### 1. CLI Handler (`src/cli.ts`)
+
 - Parses command-line arguments using Commander
 - Validates inputs
 - Orchestrates the review process
 - Displays progress and results
 
 #### 2. Platform Adapters
+
 ##### GitHub Adapter (`src/platforms/github.ts`)
+
 - Fetches PR details and diff
 - Posts inline and general comments
 - Creates summary comment
@@ -91,6 +104,7 @@ BOT_COMMENT_IDENTIFIER=[MergeMentor]
 - Updates/resolves comments as needed
 
 ##### Azure DevOps Adapter (`src/platforms/azure.ts`)
+
 - Fetches PR details and diff
 - Posts threads with comments
 - Creates summary comment
@@ -98,12 +112,14 @@ BOT_COMMENT_IDENTIFIER=[MergeMentor]
 - Updates/resolves threads as needed
 
 #### 3. Copilot Integration (`src/copilot/client.ts`)
+
 - Executes Copilot CLI commands via child_process
 - Manages custom prompts for different review aspects
 - Parses JSON responses from CLI output
 - Handles errors and retries
 
 #### 4. Review Engine (`src/review/engine.ts`)
+
 - Coordinates the review workflow
 - Implements file-by-file review strategy
 - Performs final cross-file summary analysis
@@ -111,6 +127,7 @@ BOT_COMMENT_IDENTIFIER=[MergeMentor]
 - Maps findings to specific lines/files
 
 #### 5. Comment Manager (`src/review/commentManager.ts`)
+
 - Tracks existing bot comments
 - Determines which comments to update, close, or create
 - Ensures comments are properly attributed to the bot
@@ -165,6 +182,7 @@ BOT_COMMENT_IDENTIFIER=[MergeMentor]
 ### Copilot Prompt Structure
 
 #### File Review Prompt Template
+
 ```
 You are an expert code reviewer. Analyze the following code changes and provide a detailed review.
 
@@ -198,6 +216,7 @@ If there are no issues, return: {"findings": []}
 ```
 
 #### Cross-File Summary Prompt Template
+
 ```
 You are an expert code reviewer performing a holistic analysis of a pull request.
 
@@ -229,6 +248,7 @@ Respond ONLY with valid JSON in this exact format:
 ```
 
 ### Error Handling
+
 - Invalid PR numbers or platform selection
 - API authentication failures
 - Network errors during API calls
@@ -238,6 +258,7 @@ Respond ONLY with valid JSON in this exact format:
 - Permission errors when posting comments
 
 ### Future Enhancements (Post-MVP)
+
 - Webhook integration for automatic reviews
 - Configuration file for custom review criteria
 - Support for GitLab and Bitbucket
@@ -251,29 +272,34 @@ Respond ONLY with valid JSON in this exact format:
 ## Development Phases
 
 ### Phase 1: Foundation (Week 1)
+
 - Project setup with TypeScript and dependencies
 - CLI interface with Commander
 - Environment configuration with dotenv
 - Basic platform adapter interfaces
 
 ### Phase 2: Platform Integration (Week 2)
+
 - GitHub API integration (fetch PR, post comments)
 - Azure DevOps API integration (fetch PR, post comments)
 - Comment management system
 
 ### Phase 3: Copilot Integration (Week 3)
+
 - Copilot CLI execution wrapper
 - Prompt template system
 - JSON response parsing
 - Error handling and retries
 
 ### Phase 4: Review Engine (Week 4)
+
 - File-by-file review workflow
 - Cross-file analysis
 - Finding aggregation and deduplication
 - Comment update/close logic
 
 ### Phase 5: Testing & Polish (Week 5)
+
 - Unit tests for core components
 - Integration tests with mock APIs
 - End-to-end testing with real PRs
@@ -281,6 +307,7 @@ Respond ONLY with valid JSON in this exact format:
 - Error handling improvements
 
 ## Success Criteria
+
 - Successfully reviews PRs from both GitHub and Azure DevOps
 - Provides actionable inline comments with line numbers
 - Generates comprehensive summary reports
@@ -290,6 +317,7 @@ Respond ONLY with valid JSON in this exact format:
 - JSON parsing success rate >95%
 
 ## Constraints & Assumptions
+
 - GitHub Copilot CLI is installed and accessible in PATH
 - User has valid tokens for GitHub and/or Azure DevOps
 - Node.js version 18+ is available

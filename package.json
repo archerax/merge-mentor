@@ -1,10 +1,10 @@
 {
-  "name": "mergementor",
+  "name": "merge-mentor",
   "version": "1.0.0",
   "description": "Automated code review bot using GitHub Copilot CLI",
   "main": "dist/cli.js",
   "bin": {
-    "mergementor": "dist/cli.js"
+    "merge-mentor": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

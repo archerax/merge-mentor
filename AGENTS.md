@@ -4,7 +4,7 @@ This file contains instructions for AI agents working on this codebase.
 
 ## Project Overview
 
-MergeMentor is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
+merge-mentor is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
 ## Architecture
 
@@ -57,6 +57,7 @@ pnpm review -- --pr <number> [--platform github|azure] [--write]
 ## Code Standards
 
 Refer to `.github/instructions/` for detailed coding standards:
+
 - `clean-typescript.instructions.md` - Code cleanliness principles
 - `pragmatic-typescript.instructions.md` - Practical development guidelines
 - `testing-typescript.instructions.md` - Testing best practices
@@ -81,33 +82,37 @@ Refer to `.github/instructions/` for detailed coding standards:
 ## Common Patterns
 
 ### Dependency Injection
+
 ```typescript
 class ReviewEngine {
   constructor(
     private platform: PlatformAdapter,
     botIdentifier: string,
-    options?: ReviewEngineOptions
+    options?: ReviewEngineOptions,
   ) {}
 }
 ```
 
 ### Error Handling
+
 ```typescript
 if (!value) {
-  throw new ValidationError('field', 'Descriptive message with context');
+  throw new ValidationError("field", "Descriptive message with context");
 }
 ```
 
 ### Type Safety
+
 ```typescript
 // Prefer specific types over 'any'
-type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+type FindingSeverity = "critical" | "high" | "medium" | "low";
 ```
 
 ### Rate Limit Handling
+
 ```typescript
-await withRateLimitHandling(() => 
-  octokit.pulls.get({ owner, repo, pull_number })
+await withRateLimitHandling(() =>
+  octokit.pulls.get({ owner, repo, pull_number }),
 );
 ```
 

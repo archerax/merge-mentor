@@ -1,4 +1,4 @@
-# MergeMentor - Automated Code Review Bot
+# merge-mentor - Automated Code Review Bot
 
 [![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](./coverage)
 [![Tests](https://img.shields.io/badge/tests-261%20passing-brightgreen.svg)](./src)
@@ -30,7 +30,7 @@ An automated code review bot that leverages GitHub Copilot CLI to perform compre
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd mergementor
+cd merge-mentor
 
 # Install dependencies
 pnpm install
@@ -65,7 +65,7 @@ AZURE_DEVOPS_PROJECT=<project_name>
 AZURE_DEVOPS_REPO=<repository_name>
 
 # Bot Configuration
-BOT_COMMENT_IDENTIFIER=[MergeMentor]
+BOT_COMMENT_IDENTIFIER=[merge-mentor]
 
 # Copilot Configuration
 COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
@@ -77,17 +77,20 @@ LOG_LEVEL=info  # Optional: Set log level (debug, info, warn, error)
 ### GitHub Token Permissions
 
 Your GitHub token needs the following scopes:
+
 - `repo` - Full control of private repositories (or `public_repo` for public repos only)
 
 ### Azure DevOps Token Permissions
 
 Your Azure DevOps PAT needs:
+
 - Code: Read & Write
 - Pull Request Threads: Read & Write
 
 ### Copilot Model Selection
 
 You can optionally configure which Copilot model to use by setting `COPILOT_MODEL` in your `.env` file. If not specified, Copilot CLI will use its default model. Supported models include:
+
 - `gpt-4o` - GPT-4 Optimized (recommended)
 - `gpt-4` - GPT-4
 - `claude-3.5-sonnet` - Claude 3.5 Sonnet
@@ -98,12 +101,12 @@ Check your Copilot CLI documentation for the latest available models.
 
 ## Logging
 
-MergeMentor includes comprehensive structured logging using Pino:
+merge-mentor includes comprehensive structured logging using Pino:
 
 - **Development**: Pretty-printed logs to stderr with colors and timestamps, plus JSON logs to file
 - **Production**: JSON-formatted logs to file for log aggregation systems
 - **Log Levels**: `debug`, `info`, `warn`, `error`
-- **Log File**: `logs/mergementor.log` in the project directory (auto-created)
+- **Log File**: `.merge-mentor/logs/merge-mentor.log` in the project directory (auto-created)
 
 ### Configure Logging
 
@@ -112,12 +115,12 @@ Set the log level and output directory via environment variables:
 ```bash
 # .env
 LOG_LEVEL=debug  # Set to debug, info, warn, or error
-LOG_DIR=/var/log/mergementor  # Optional: Custom log directory (defaults to ./logs)
+LOG_DIR=/var/log/merge-mentor  # Optional: Custom log directory (defaults to .merge-mentor/logs)
 ```
 
 ### Log Files
 
-Logs are automatically written to `logs/mergementor.log` (or `$LOG_DIR/mergementor.log` if configured). The log directory is created automatically if it doesn't exist.
+Logs are automatically written to `.merge-mentor/logs/merge-mentor.log` (or `$LOG_DIR/merge-mentor.log` if configured). The log directory is created automatically if it doesn't exist.
 
 **Note**: User-facing progress messages (via `console.log`) still appear in the terminal. Only framework logging goes to the file.
 
@@ -125,16 +128,16 @@ Logs are automatically written to `logs/mergementor.log` (or `$LOG_DIR/mergement
 
 ```bash
 # View recent logs
-tail -f logs/mergementor.log
+tail -f .merge-mentor/logs/merge-mentor.log
 
 # Pretty-print JSON logs
-tail logs/mergementor.log | jq
+tail .merge-mentor/logs/merge-mentor.log | jq
 
 # Filter by level
-grep '"level":"error"' logs/mergementor.log | jq
+grep '"level":"error"' .merge-mentor/logs/merge-mentor.log | jq
 
 # Filter by component
-grep '"component":"GitHubAdapter"' logs/mergementor.log | jq
+grep '"component":"GitHubAdapter"' .merge-mentor/logs/merge-mentor.log | jq
 ```
 
 ### Log Output
@@ -156,6 +159,7 @@ Logs include contextual information to help debug issues:
 ```
 
 This detailed logging helps identify issues like:
+
 - Invalid line numbers in comment requests
 - Rate limiting problems
 - API validation failures
@@ -185,12 +189,12 @@ pnpm review -- --pr 123 --verbose false
 
 ### Command Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pr <number>` | Pull request number (required) | - |
-| `--platform <github\|azure>` | Platform to use | From env or `github` |
-| `--write` | Post comments to PR (otherwise dry-run) | `false` |
-| `--verbose` | Enable verbose output | `true` |
+| Option                       | Description                             | Default              |
+| ---------------------------- | --------------------------------------- | -------------------- |
+| `--pr <number>`              | Pull request number (required)          | -                    |
+| `--platform <github\|azure>` | Platform to use                         | From env or `github` |
+| `--write`                    | Post comments to PR (otherwise dry-run) | `false`              |
+| `--verbose`                  | Enable verbose output                   | `true`               |
 
 ### CI/CD Integration
 
@@ -210,20 +214,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      
+          node-version: "18"
+
       - name: Install Copilot CLI
         run: |
           # Install GitHub Copilot CLI
           npm install -g @githubnext/github-copilot-cli
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Run review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -239,35 +243,36 @@ trigger:
 pr:
   branches:
     include:
-      - '*'
+      - "*"
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: "ubuntu-latest"
 
 steps:
   - checkout: self
     fetchDepth: 0
-  
+
   - task: NodeTool@0
     inputs:
-      versionSpec: '18.x'
-  
+      versionSpec: "18.x"
+
   - script: npm install -g @githubnext/github-copilot-cli
-    displayName: 'Install Copilot CLI'
-  
+    displayName: "Install Copilot CLI"
+
   - script: |
       pnpm install
       pnpm build
-    displayName: 'Install dependencies'
-  
+    displayName: "Install dependencies"
+
   - script: |
       pnpm review -- --pr $(System.PullRequest.PullRequestId) --platform azure --write
-    displayName: 'Run code review'
+    displayName: "Run code review"
     env:
       AZURE_DEVOPS_TOKEN: $(AZURE_DEVOPS_TOKEN)
 ```
 
 **Key Points:**
+
 - Always include a checkout step (`actions/checkout@v4` or `checkout: self`)
 - Install the GitHub Copilot CLI before running the review
 - Pass the PR number using your platform's variables
@@ -296,21 +301,21 @@ The bot analyzes code for:
 
 ## Severity Levels
 
-| Level | Emoji | Description |
-|-------|-------|-------------|
-| Critical | 🔴 | Severe issues that must be fixed |
-| High | 🟠 | Important issues that should be addressed |
-| Medium | 🟡 | Moderate concerns worth reviewing |
-| Low | 🟢 | Minor suggestions for improvement |
+| Level    | Emoji | Description                               |
+| -------- | ----- | ----------------------------------------- |
+| Critical | 🔴    | Severe issues that must be fixed          |
+| High     | 🟠    | Important issues that should be addressed |
+| Medium   | 🟡    | Moderate concerns worth reviewing         |
+| Low      | 🟢    | Minor suggestions for improvement         |
 
 ## Incremental Reviews
 
-MergeMentor automatically caches review results to enable incremental reviews. When you re-review a PR:
+merge-mentor automatically caches review results to enable incremental reviews. When you re-review a PR:
 
 - **Unchanged files are skipped**: Files with the same content SHA are not re-reviewed
 - **Cross-file analysis is cached**: When no files changed, cross-file analysis is skipped entirely
 - **Only changed files are analyzed**: Saves time and API costs on large PRs
-- **Cache is automatic**: Stored in `.mergementor-cache/` directory (excluded from git)
+- **Cache is automatic**: Stored in `.merge-mentor/cache/` directory (excluded from git)
 - **Per-PR caching**: Each PR maintains its own review state
 
 This means subsequent reviews after pushing new commits will only analyze the files that actually changed, making re-reviews much faster and more cost-effective.
@@ -324,13 +329,14 @@ This means subsequent reviews after pushing new commits will only analyze the fi
 5. If any files changed, only those files are sent to Copilot for analysis and cross-file analysis is re-run
 6. The cache is updated with new results after each review
 
-**Note**: The cache directory (`.mergementor-cache/`) can be safely deleted to force a full re-review of all files.
+**Note**: The cache directory (`.merge-mentor/cache/`) can be safely deleted to force a full re-review of all files.
 
 ## Development
 
 ### Code Quality
 
 This project maintains high code quality standards:
+
 - **94%+ test coverage** with 261 comprehensive tests
 - **98%+ function coverage** across all modules
 - **TypeScript strict mode** enabled
@@ -341,7 +347,7 @@ This project maintains high code quality standards:
 ### Project Structure
 
 ```
-mergementor/
+merge-mentor/
 ├── src/
 │   ├── cli.ts              # Command-line interface
 │   ├── config.ts           # Configuration management
@@ -361,7 +367,9 @@ mergementor/
 │       └── reviewStateCache.ts # Review state caching
 ├── tests/                  # Unit tests
 ├── .env.example           # Example environment configuration
-├── .mergementor-cache/    # Cached review state (gitignored)
+├── .merge-mentor/         # Runtime files (gitignored)
+│   ├── cache/            # Review state cache
+│   └── logs/             # Application logs
 ├── AGENTS.md              # AI agent instructions
 ├── TASKS.md               # Code quality tasks
 ├── package.json
@@ -411,6 +419,7 @@ The bot uses specific error types for different failure scenarios:
 If you see an error like "Path does not exist" or "Repository files not accessible", the Copilot CLI cannot access the repository files. This typically occurs in CI/CD environments where the repository hasn't been checked out.
 
 **Solution**:
+
 - **GitHub Actions**: Add `uses: actions/checkout@v4` before running the review
 - **Azure Pipelines**: Add `checkout: self` step at the beginning
 - **Local Development**: Run the command from within the repository directory
@@ -419,12 +428,12 @@ The tool will exit with code 0 in this case to avoid failing pipelines for confi
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Review completed successfully (no critical issues found) |
-| 0 | Repository not checked out (configuration issue, not a failure) |
-| 1 | Review completed with critical issues found |
-| 1 | Review failed due to an error (authentication, API, etc.) |
+| Code | Meaning                                                         |
+| ---- | --------------------------------------------------------------- |
+| 0    | Review completed successfully (no critical issues found)        |
+| 0    | Repository not checked out (configuration issue, not a failure) |
+| 1    | Review completed with critical issues found                     |
+| 1    | Review failed due to an error (authentication, API, etc.)       |
 
 **Note**: When the repository is not checked out (common CI/CD configuration issue), the tool exits with code 0 to avoid failing pipelines. A warning message is displayed with instructions to fix the checkout configuration.
 

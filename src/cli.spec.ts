@@ -55,7 +55,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     defaultPlatform: "github" as const,
     github: { token: "gh-token", owner: "test-owner", repo: "test-repo" },
     azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
-    botCommentIdentifier: "[MergeMentor]",
+    botCommentIdentifier: "[merge-mentor]",
     copilotModel: "gpt-4",
     ...overrides,
   };
@@ -142,7 +142,7 @@ describe("CLI", () => {
       expect(GitHubAdapter).toHaveBeenCalled();
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
-        "[MergeMentor]",
+        "[merge-mentor]",
         expect.objectContaining({
           dryRun: true,
           verbose: true,
@@ -179,7 +179,7 @@ describe("CLI", () => {
 
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
-        "[MergeMentor]",
+        "[merge-mentor]",
         expect.objectContaining({
           dryRun: false,
           verbose: false,

@@ -1,6 +1,6 @@
 # Debugging Guide
 
-This guide explains how to use MergeMentor's logging system to debug issues with PR reviews.
+This guide explains how to use merge-mentor's logging system to debug issues with PR reviews.
 
 ## Enabling Debug Logging
 
@@ -26,6 +26,7 @@ LOG_LEVEL=debug pnpm review -- --pr 123 --write
 ### Issue: Comments Failing to Post
 
 **Symptom**: You see `⚠️ Comment Errors: 2` messages like:
+
 ```
 Failed to create comment: Validation Failed: {"resource":"PullRequestReviewComment","code":"custom","field":"pull_request_review_thread.line","message":"could not be resolved"}
 ```
@@ -33,11 +34,13 @@ Failed to create comment: Validation Failed: {"resource":"PullRequestReviewComme
 **Debug Steps**:
 
 1. Enable debug logging:
+
    ```bash
    LOG_LEVEL=debug pnpm review -- --pr 123 --write
    ```
 
 2. Look for the detailed error log:
+
    ```json
    {
      "level": "error",
@@ -66,11 +69,13 @@ Failed to create comment: Validation Failed: {"resource":"PullRequestReviewComme
 **Symptom**: Review slows down or fails with rate limit errors
 
 **Log Pattern**:
+
 ```
 Rate limit encountered (attempt 1/4). Retrying after 114ms...
 ```
 
 **Solution**: The tool automatically retries with exponential backoff. If persistent:
+
 - Wait a few minutes and retry
 - Check your API rate limit status
 - Consider reducing concurrent operations
@@ -80,6 +85,7 @@ Rate limit encountered (attempt 1/4). Retrying after 114ms...
 **Symptom**: `gh copilot: command not found`
 
 **Log Pattern**:
+
 ```json
 {
   "level": "error",
@@ -89,6 +95,7 @@ Rate limit encountered (attempt 1/4). Retrying after 114ms...
 ```
 
 **Solution**:
+
 ```bash
 # Install GitHub CLI
 gh auth login
@@ -102,6 +109,7 @@ gh extension install github/gh-copilot
 **Symptom**: Missing tokens or repository settings
 
 **Log Pattern**:
+
 ```json
 {
   "level": "error",
@@ -111,6 +119,7 @@ gh extension install github/gh-copilot
 ```
 
 **Solution**:
+
 - Verify `.env` file has all required variables
 - Check token permissions (repo access for GitHub, Code R/W for Azure DevOps)
 
@@ -137,12 +146,14 @@ In production or with `LOG_LEVEL=info`, logs are JSON-formatted for log aggregat
 ### Log Aggregation
 
 You can pipe logs to tools like:
+
 - **CloudWatch** (AWS)
 - **Datadog**
 - **Splunk**
 - **ELK Stack** (Elasticsearch, Logstash, Kibana)
 
 Example:
+
 ```bash
 NODE_ENV=production pnpm review -- --pr 123 --write | tee -a review.log
 ```
@@ -150,11 +161,13 @@ NODE_ENV=production pnpm review -- --pr 123 --write | tee -a review.log
 ## Development vs Production
 
 **Development** (default):
+
 - Colorized output
 - Human-readable timestamps
 - Pretty-printed
 
 **Production** (`NODE_ENV=production`):
+
 - JSON format
 - ISO timestamps
 - Machine-parseable
@@ -194,6 +207,7 @@ When reporting bugs, include:
 5. Copilot model used
 
 Example:
+
 ```bash
 LOG_LEVEL=debug pnpm review -- --pr 123 --platform github --write 2>&1 | tee debug.log
 ```
