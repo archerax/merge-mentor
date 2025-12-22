@@ -141,17 +141,19 @@ describe("AzureDevOpsAdapter", () => {
       ]);
 
       // Mock getBlobContent with actual file content
-      mockGitApiInstance.getBlobContent.mockImplementation((repoName, sha) => {
+      mockGitApiInstance.getBlobContent.mockImplementation((_repoName, sha) => {
         if (sha === "obj123") {
-          const content = "const x = 1;\nconst y = 2;\nconst z = 3;\n// More code\nfunction test() {\n  return 42;\n}\n// Line 8\n// Line 9\nconst updated = 4;\nconst newVar = 5;\nconst anotherVar = 6;\nconst oneMore = 7;\nconst lastOne = 8;\n";
+          const content =
+            "const x = 1;\nconst y = 2;\nconst z = 3;\n// More code\nfunction test() {\n  return 42;\n}\n// Line 8\n// Line 9\nconst updated = 4;\nconst newVar = 5;\nconst anotherVar = 6;\nconst oneMore = 7;\nconst lastOne = 8;\n";
           const buffer = Buffer.from(content);
-          const stream = require("stream").Readable.from([buffer]);
+          const stream = require("node:stream").Readable.from([buffer]);
           return Promise.resolve(stream);
         }
         if (sha === "obj456") {
-          const content = "# README\n\nThis is a test file.\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\n";
+          const content =
+            "# README\n\nThis is a test file.\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\n";
           const buffer = Buffer.from(content);
-          const stream = require("stream").Readable.from([buffer]);
+          const stream = require("node:stream").Readable.from([buffer]);
           return Promise.resolve(stream);
         }
         throw new Error("Unknown blob");
@@ -165,7 +167,7 @@ describe("AzureDevOpsAdapter", () => {
       expect(result[0].patch).toContain("diff --git");
       expect(result[0].patch).toContain("@@ -10,3 +10,5 @@");
       expect(result[0].patch).toContain("+const updated = 4;");
-      
+
       expect(result[1].filename).toBe("README.md");
       expect(result[1].status).toBe("added");
       expect(result[1].patch).toContain("diff --git");
@@ -305,19 +307,34 @@ describe("AzureDevOpsAdapter", () => {
         {
           path: "/added.ts",
           lineDiffBlocks: [
-            { modifiedLineNumberStart: 1, modifiedLinesCount: 10, originalLineNumberStart: 1, originalLinesCount: 0 },
+            {
+              modifiedLineNumberStart: 1,
+              modifiedLinesCount: 10,
+              originalLineNumberStart: 1,
+              originalLinesCount: 0,
+            },
           ],
         },
         {
           path: "/modified.ts",
           lineDiffBlocks: [
-            { modifiedLineNumberStart: 5, modifiedLinesCount: 8, originalLineNumberStart: 5, originalLinesCount: 6 },
+            {
+              modifiedLineNumberStart: 5,
+              modifiedLinesCount: 8,
+              originalLineNumberStart: 5,
+              originalLinesCount: 6,
+            },
           ],
         },
         {
           path: "/renamed.ts",
           lineDiffBlocks: [
-            { modifiedLineNumberStart: 1, modifiedLinesCount: 15, originalLineNumberStart: 1, originalLinesCount: 15 },
+            {
+              modifiedLineNumberStart: 1,
+              modifiedLinesCount: 15,
+              originalLineNumberStart: 1,
+              originalLinesCount: 15,
+            },
           ],
         },
         {
@@ -327,7 +344,12 @@ describe("AzureDevOpsAdapter", () => {
         {
           path: "/unknown.ts",
           lineDiffBlocks: [
-            { modifiedLineNumberStart: 20, modifiedLinesCount: 5, originalLineNumberStart: 20, originalLinesCount: 5 },
+            {
+              modifiedLineNumberStart: 20,
+              modifiedLinesCount: 5,
+              originalLineNumberStart: 20,
+              originalLinesCount: 5,
+            },
           ],
         },
       ]);

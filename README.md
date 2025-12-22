@@ -1,9 +1,9 @@
 # MergeMentor - Automated Code Review Bot
 
-[![Test Coverage](https://img.shields.io/badge/coverage-99.73%25-brightgreen.svg)](./coverage)
-[![Tests](https://img.shields.io/badge/tests-162%20passing-brightgreen.svg)](./src)
+[![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](./coverage)
+[![Tests](https://img.shields.io/badge/tests-261%20passing-brightgreen.svg)](./src)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-blue.svg)](https://www.typescriptlang.org/)
-[![Code Quality](https://img.shields.io/badge/quality-10%2F10-brightgreen.svg)](./IMPLEMENTATION.md)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE)
 
 An automated code review bot that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories.
 
@@ -331,12 +331,12 @@ This means subsequent reviews after pushing new commits will only analyze the fi
 ### Code Quality
 
 This project maintains high code quality standards:
-- **99.73% test coverage** with 162 comprehensive tests
-- **100% function coverage** across all modules
+- **94%+ test coverage** with 261 comprehensive tests
+- **98%+ function coverage** across all modules
 - **TypeScript strict mode** enabled
 - **Zero magic numbers** - all constants extracted
 - Follows Clean Code, Pragmatic TypeScript, and Testing best practices
-- See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for detailed quality metrics
+- See [REVIEW.md](./REVIEW.md) for detailed quality analysis
 
 ### Project Structure
 
@@ -430,4 +430,6 @@ The tool will exit with code 0 in this case to avoid failing pipelines for confi
 
 ## License
 
-ISC
+This software is proprietary and licensed for private use only with explicit permission from the author (archerax). See [LICENSE](./LICENSE) for details.
+
+Unauthorized copying, modification, distribution, or use is strictly prohibited.

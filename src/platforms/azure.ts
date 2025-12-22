@@ -5,7 +5,6 @@ import type {
   FileDiff,
   FileDiffsCriteria,
   GitPullRequestCommentThread,
-  LineDiffBlock,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import type { Config } from "../config.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
@@ -65,9 +64,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     const gitApi = await this.connection.getGitApi();
 
-    const pr = await withRateLimitHandling(() =>
-      gitApi.getPullRequestById(prNumber, this.project)
-    );
+    const pr = await withRateLimitHandling(() => gitApi.getPullRequestById(prNumber, this.project));
 
     if (!pr.lastMergeSourceCommit?.commitId || !pr.lastMergeTargetCommit?.commitId) {
       return [];
@@ -123,8 +120,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
 
       const fileDiff = fileDiffMap.get(path);
-      const patch = fileDiff 
-        ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi) 
+      const patch = fileDiff
+        ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi)
         : undefined;
 
       files.push({

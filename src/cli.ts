@@ -131,11 +131,12 @@ program
       process.exit(exitCode);
     } catch (error) {
       const err = error as Error;
-      
+
       // Check if this is a repository checkout issue (common with Azure DevOps)
-      const isCheckoutIssue = err.message.includes("Path does not exist") || 
-                              err.message.includes("no such file or directory");
-      
+      const isCheckoutIssue =
+        err.message.includes("Path does not exist") ||
+        err.message.includes("no such file or directory");
+
       if (isCheckoutIssue) {
         logger.warn(
           {
@@ -147,15 +148,17 @@ program
         );
         console.error(`\n⚠️  Repository files not accessible\n`);
         console.error(`The GitHub Copilot CLI requires access to repository files.`);
-        console.error(`\nFor Azure DevOps or CI/CD environments, ensure the repository is checked out first:\n`);
+        console.error(
+          `\nFor Azure DevOps or CI/CD environments, ensure the repository is checked out first:\n`
+        );
         console.error(`  - Azure Pipelines: Add a 'checkout: self' step before running the review`);
         console.error(`  - GitHub Actions: Add 'actions/checkout@v4' step`);
         console.error(`  - Local development: Run from within the repository directory\n`);
-        
+
         // Exit with code 0 to avoid failing the pipeline for configuration issues
         process.exit(0);
       }
-      
+
       logger.error(
         {
           error: err.message,

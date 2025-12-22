@@ -12,16 +12,24 @@ MergeMentor is an automated code review tool that leverages GitHub Copilot CLI t
 src/
 ├── cli.ts              # CLI entry point using Commander
 ├── config.ts           # Environment configuration loader
+├── constants.ts        # Application-wide constants
+├── logger.ts           # Pino logging setup
+├── errors/
+│   └── index.ts        # Custom error hierarchy
 ├── copilot/
 │   ├── client.ts       # Copilot CLI wrapper with retry logic
 │   └── prompts.ts      # Prompt templates for reviews
 ├── platforms/
-│   ├── types.ts        # Shared interfaces
+│   ├── types.ts        # Shared interfaces (PlatformAdapter, etc.)
 │   ├── github.ts       # GitHub API adapter
 │   └── azure.ts        # Azure DevOps API adapter
-└── review/
-    ├── engine.ts       # Review orchestration
-    └── commentManager.ts # Comment lifecycle management
+├── review/
+│   ├── engine.ts       # Review orchestration
+│   ├── commentManager.ts # Comment lifecycle management
+│   └── reviewStateCache.ts # SHA-based caching for incremental reviews
+└── utils/
+    ├── diffParser.ts   # Diff line validation
+    └── rateLimitHandler.ts # Rate limit handling with backoff
 ```
 
 ## Key Commands
@@ -30,6 +38,11 @@ src/
 pnpm install          # Install dependencies
 pnpm build            # Compile TypeScript
 pnpm test             # Run tests
+pnpm test:coverage    # Run tests with coverage
+pnpm lint             # Run linter
+pnpm lint:fix         # Fix lint issues
+pnpm typecheck        # Type check without building
+pnpm check            # Run all checks (typecheck, lint, test)
 pnpm review -- --pr <number> [--platform github|azure] [--write]
 ```
 
@@ -50,11 +63,12 @@ Refer to `.github/instructions/` for detailed coding standards:
 
 ## Testing
 
-- Tests are in the `tests/` directory
+- Tests are colocated with source files (e.g., `cli.spec.ts` next to `cli.ts`)
 - Use Vitest with `--pool=threads` for stability
 - Follow arrange-act-assert pattern
 - One concept per test
 - Use descriptive test names
+- Current coverage: 94%+ statements, 98%+ functions
 
 ## Adding Features
 
@@ -62,7 +76,7 @@ Refer to `.github/instructions/` for detailed coding standards:
 2. Implement platform-specific code in adapters
 3. Add business logic to the review engine
 4. Write tests before implementation
-5. Update documentation
+5. Update documentation (README.md, CHANGELOG.md)
 
 ## Common Patterns
 
@@ -71,7 +85,8 @@ Refer to `.github/instructions/` for detailed coding standards:
 class ReviewEngine {
   constructor(
     private platform: PlatformAdapter,
-    private copilot: CopilotClient
+    botIdentifier: string,
+    options?: ReviewEngineOptions
   ) {}
 }
 ```
@@ -79,7 +94,7 @@ class ReviewEngine {
 ### Error Handling
 ```typescript
 if (!value) {
-  throw new Error('Descriptive message with context');
+  throw new ValidationError('field', 'Descriptive message with context');
 }
 ```
 
@@ -88,3 +103,19 @@ if (!value) {
 // Prefer specific types over 'any'
 type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
 ```
+
+### Rate Limit Handling
+```typescript
+await withRateLimitHandling(() => 
+  octokit.pulls.get({ owner, repo, pull_number })
+);
+```
+
+## Key Files
+
+- `README.md` - User documentation and setup guide
+- `REVIEW.md` - Comprehensive project review and analysis
+- `SPEC.md` - Original project specification
+- `DEBUGGING.md` - Troubleshooting guide
+- `CHANGELOG.md` - Version history and release notes
+- `LICENSE` - MIT license

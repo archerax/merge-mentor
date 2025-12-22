@@ -24,11 +24,23 @@
     "code-review",
     "github",
     "azure-devops",
-    "copilot"
+    "copilot",
+    "pull-request",
+    "automated-review",
+    "cli"
   ],
   "author": "archerax",
   "license": "UNLICENSED",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "dependencies": {
     "@octokit/rest": "^22.0.1",
     "@types/node": "^25.0.2",
