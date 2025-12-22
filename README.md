@@ -167,6 +167,8 @@ For detailed debugging instructions, see [DEBUGGING.md](./DEBUGGING.md).
 
 ### Review a Pull Request
 
+**Important**: The GitHub Copilot CLI requires access to repository files. Ensure you're running from within a checked-out repository or that your CI/CD environment checks out the code first (see [CI/CD Integration](#cicd-integration) below).
+
 ```bash
 # Dry-run mode (default) - shows what would be posted
 pnpm review -- --pr 123
@@ -189,6 +191,87 @@ pnpm review -- --pr 123 --verbose false
 | `--platform <github\|azure>` | Platform to use | From env or `github` |
 | `--write` | Post comments to PR (otherwise dry-run) | `false` |
 | `--verbose` | Enable verbose output | `true` |
+
+### CI/CD Integration
+
+When running in CI/CD environments (GitHub Actions, Azure Pipelines, etc.), you **must** check out the repository before running the review. The Copilot CLI needs access to the actual file contents.
+
+#### GitHub Actions Example
+
+```yaml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Copilot CLI
+        run: |
+          # Install GitHub Copilot CLI
+          npm install -g @githubnext/github-copilot-cli
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Run review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm review -- --pr ${{ github.event.pull_request.number }} --write
+```
+
+#### Azure Pipelines Example
+
+```yaml
+trigger:
+  - main
+
+pr:
+  branches:
+    include:
+      - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+  
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+  
+  - script: npm install -g @githubnext/github-copilot-cli
+    displayName: 'Install Copilot CLI'
+  
+  - script: |
+      pnpm install
+      pnpm build
+    displayName: 'Install dependencies'
+  
+  - script: |
+      pnpm review -- --pr $(System.PullRequest.PullRequestId) --platform azure --write
+    displayName: 'Run code review'
+    env:
+      AZURE_DEVOPS_TOKEN: $(AZURE_DEVOPS_TOKEN)
+```
+
+**Key Points:**
+- Always include a checkout step (`actions/checkout@v4` or `checkout: self`)
+- Install the GitHub Copilot CLI before running the review
+- Pass the PR number using your platform's variables
+- Set required tokens via secrets/variables
 
 ## How It Works
 
@@ -323,12 +406,27 @@ The bot uses specific error types for different failure scenarios:
 - `JsonParseError` - Malformed JSON responses from Copilot
 - `ValidationError` - Invalid input parameters
 
+### Repository Checkout Issues
+
+If you see an error like "Path does not exist" or "Repository files not accessible", the Copilot CLI cannot access the repository files. This typically occurs in CI/CD environments where the repository hasn't been checked out.
+
+**Solution**:
+- **GitHub Actions**: Add `uses: actions/checkout@v4` before running the review
+- **Azure Pipelines**: Add `checkout: self` step at the beginning
+- **Local Development**: Run the command from within the repository directory
+
+The tool will exit with code 0 in this case to avoid failing pipelines for configuration issues.
+
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Review completed successfully (no critical issues) |
-| 1 | Review completed with critical issues or error occurred |
+| 0 | Review completed successfully (no critical issues found) |
+| 0 | Repository not checked out (configuration issue, not a failure) |
+| 1 | Review completed with critical issues found |
+| 1 | Review failed due to an error (authentication, API, etc.) |
+
+**Note**: When the repository is not checked out (common CI/CD configuration issue), the tool exits with code 0 to avoid failing pipelines. A warning message is displayed with instructions to fix the checkout configuration.
 
 ## License
 

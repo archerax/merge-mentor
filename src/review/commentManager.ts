@@ -157,9 +157,7 @@ export class CommentManager {
 **Issue**: ${finding.message}
 
 **Suggestion**:
-\`\`\`suggestion
 ${finding.suggestion}
-\`\`\`
 
 ---
 *${this.botIdentifier} Code Review*`;

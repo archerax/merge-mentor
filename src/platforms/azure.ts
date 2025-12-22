@@ -1,7 +1,11 @@
 import * as azdev from "azure-devops-node-api";
+import type { IGitApi } from "azure-devops-node-api/GitApi.js";
 import type {
   Comment,
+  FileDiff,
+  FileDiffsCriteria,
   GitPullRequestCommentThread,
+  LineDiffBlock,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import type { Config } from "../config.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
@@ -61,6 +65,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     const gitApi = await this.connection.getGitApi();
 
+    const pr = await withRateLimitHandling(() =>
+      gitApi.getPullRequestById(prNumber, this.project)
+    );
+
+    if (!pr.lastMergeSourceCommit?.commitId || !pr.lastMergeTargetCommit?.commitId) {
+      return [];
+    }
+
     const iterations = await withRateLimitHandling(() =>
       gitApi.getPullRequestIterations(this.repoName, prNumber, this.project)
     );
@@ -75,24 +87,123 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       gitApi.getPullRequestIterationChanges(this.repoName, prNumber, iterationId, this.project)
     );
 
+    if (!changes.changeEntries || changes.changeEntries.length === 0) {
+      return [];
+    }
+
+    // Get proper diffs with line numbers from Azure DevOps API
+    const fileDiffsCriteria: FileDiffsCriteria = {
+      baseVersionCommit: pr.lastMergeTargetCommit.commitId,
+      targetVersionCommit: pr.lastMergeSourceCommit.commitId,
+      fileDiffParams: changes.changeEntries
+        .filter((change) => change.item?.path)
+        .map((change) => ({
+          path: change.item!.path!,
+        })),
+    };
+
+    const fileDiffs = await withRateLimitHandling(() =>
+      gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
+    );
+
+    const fileDiffMap = new Map<string, FileDiff>();
+    for (const diff of fileDiffs || []) {
+      if (diff.path) {
+        const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
+        fileDiffMap.set(normalizedPath, diff);
+      }
+    }
+
     const files: PRFile[] = [];
-    for (const change of changes.changeEntries || []) {
+    for (const change of changes.changeEntries) {
       const item = change.item;
       if (!item?.path) continue;
 
       const status = this.mapChangeTypeToStatus(change.changeType);
+      const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
+
+      const fileDiff = fileDiffMap.get(path);
+      const patch = fileDiff 
+        ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi) 
+        : undefined;
 
       files.push({
-        filename: item.path.startsWith("/") ? item.path.slice(1) : item.path,
+        filename: path,
         status,
         additions: 0,
         deletions: 0,
-        patch: undefined,
+        patch,
         sha: item.objectId,
       });
     }
 
     return files;
+  }
+
+  /**
+   * Converts Azure DevOps FileDiff to a unified diff patch format.
+   * Fetches actual file content to generate a proper diff for code review.
+   */
+  private async convertFileDiffToUnifiedPatch(
+    filename: string,
+    fileDiff: FileDiff,
+    blobSha: string | undefined,
+    gitApi: IGitApi
+  ): Promise<string> {
+    if (!fileDiff.lineDiffBlocks || fileDiff.lineDiffBlocks.length === 0) {
+      return "";
+    }
+
+    const header = `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n`;
+    let patch = header;
+
+    // Fetch actual file content if we have a blob SHA
+    let fileLines: string[] = [];
+    if (blobSha) {
+      try {
+        const contentStream = await withRateLimitHandling(() =>
+          gitApi.getBlobContent(this.repoName, blobSha, this.project)
+        );
+        const chunks: Buffer[] = [];
+        for await (const chunk of contentStream) {
+          chunks.push(Buffer.from(chunk));
+        }
+        const content = Buffer.concat(chunks).toString("utf-8");
+        fileLines = content.split("\n");
+      } catch (error) {
+        // If we can't fetch content, fall back to line-only approach
+        console.warn(`Could not fetch content for ${filename}:`, error);
+      }
+    }
+
+    for (const block of fileDiff.lineDiffBlocks) {
+      const oldStart = block.originalLineNumberStart || 1;
+      const oldCount = block.originalLinesCount || 0;
+      const newStart = block.modifiedLineNumberStart || 1;
+      const newCount = block.modifiedLinesCount || 0;
+
+      // Generate hunk header
+      patch += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`;
+
+      // Add actual file lines if available
+      if (fileLines.length > 0 && newCount > 0) {
+        for (let i = 0; i < newCount; i++) {
+          const lineIndex = newStart - 1 + i;
+          if (lineIndex < fileLines.length) {
+            patch += `+${fileLines[lineIndex]}\n`;
+          } else {
+            patch += `+\n`;
+          }
+        }
+      } else if (newCount > 0) {
+        // Fallback: empty lines to maintain line count
+        for (let i = 0; i < newCount; i++) {
+          patch += `+\n`;
+        }
+      }
+    }
+
+    return patch;
   }
 
   private mapChangeTypeToStatus(changeType: number | undefined): FileStatus {

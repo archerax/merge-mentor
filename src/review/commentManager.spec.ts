@@ -52,7 +52,6 @@ describe("CommentManager", () => {
       expect(result).toContain("Security Issue");
       expect(result).toContain("SQL injection vulnerability");
       expect(result).toContain("Use parameterized queries");
-      expect(result).toContain("```suggestion");
       expect(result).toContain("[AI Code Review Bot]");
     });
 
@@ -88,7 +87,7 @@ describe("CommentManager", () => {
       expect(result).toContain("**Line**: 42");
     });
 
-    it("should format suggestion in code block", () => {
+    it("should format suggestion text", () => {
       const manager = createCommentManager();
       const finding = createFileFinding({
         suggestion: "Fix this code",
@@ -96,9 +95,8 @@ describe("CommentManager", () => {
 
       const result = manager.formatInlineComment(finding);
 
-      expect(result).toContain("```suggestion");
+      expect(result).toContain("**Suggestion**:");
       expect(result).toContain("Fix this code");
-      expect(result).toContain("```");
     });
 
     test.each([

@@ -6,8 +6,11 @@ const mockGitApiInstance = {
   getPullRequestById: vi.fn(),
   getPullRequestIterations: vi.fn(),
   getPullRequestIterationChanges: vi.fn(),
+  getFileDiffs: vi.fn(),
   getThreads: vi.fn(),
   createThread: vi.fn(),
+  getItemText: vi.fn(),
+  getBlobContent: vi.fn(),
 };
 
 vi.mock("azure-devops-node-api", () => ({
@@ -93,6 +96,10 @@ describe("AzureDevOpsAdapter", () => {
   describe("getPRFiles", () => {
     it("retrieves PR files successfully", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
         changeEntries: [
@@ -107,29 +114,71 @@ describe("AzureDevOpsAdapter", () => {
         ],
       });
 
+      // Mock getFileDiffs with proper line numbers
+      mockGitApiInstance.getFileDiffs.mockResolvedValue([
+        {
+          path: "/src/test.ts",
+          lineDiffBlocks: [
+            {
+              modifiedLineNumberStart: 10,
+              modifiedLinesCount: 5,
+              originalLineNumberStart: 10,
+              originalLinesCount: 3,
+            },
+          ],
+        },
+        {
+          path: "/README.md",
+          lineDiffBlocks: [
+            {
+              modifiedLineNumberStart: 1,
+              modifiedLinesCount: 10,
+              originalLineNumberStart: 1,
+              originalLinesCount: 0,
+            },
+          ],
+        },
+      ]);
+
+      // Mock getBlobContent with actual file content
+      mockGitApiInstance.getBlobContent.mockImplementation((repoName, sha) => {
+        if (sha === "obj123") {
+          const content = "const x = 1;\nconst y = 2;\nconst z = 3;\n// More code\nfunction test() {\n  return 42;\n}\n// Line 8\n// Line 9\nconst updated = 4;\nconst newVar = 5;\nconst anotherVar = 6;\nconst oneMore = 7;\nconst lastOne = 8;\n";
+          const buffer = Buffer.from(content);
+          const stream = require("stream").Readable.from([buffer]);
+          return Promise.resolve(stream);
+        }
+        if (sha === "obj456") {
+          const content = "# README\n\nThis is a test file.\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\n";
+          const buffer = Buffer.from(content);
+          const stream = require("stream").Readable.from([buffer]);
+          return Promise.resolve(stream);
+        }
+        throw new Error("Unknown blob");
+      });
+
       const result = await adapter.getPRFiles(123);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        filename: "src/test.ts",
-        status: "modified",
-        additions: 0,
-        deletions: 0,
-        patch: undefined,
-        sha: "obj123",
-      });
-      expect(result[1]).toEqual({
-        filename: "README.md",
-        status: "added",
-        additions: 0,
-        deletions: 0,
-        patch: undefined,
-        sha: "obj456",
-      });
+      expect(result[0].filename).toBe("src/test.ts");
+      expect(result[0].status).toBe("modified");
+      expect(result[0].patch).toContain("diff --git");
+      expect(result[0].patch).toContain("@@ -10,3 +10,5 @@");
+      expect(result[0].patch).toContain("+const updated = 4;");
+      
+      expect(result[1].filename).toBe("README.md");
+      expect(result[1].status).toBe("added");
+      expect(result[1].patch).toContain("diff --git");
+      expect(result[1].patch).toContain("@@ -1,0 +1,10 @@");
+      expect(result[1].patch).toContain("+# README");
     });
 
     it("handles empty iterations", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([]);
 
       const result = await adapter.getPRFiles(123);
@@ -139,6 +188,10 @@ describe("AzureDevOpsAdapter", () => {
 
     it("handles null iterations", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue(null);
 
       const result = await adapter.getPRFiles(123);
@@ -148,6 +201,10 @@ describe("AzureDevOpsAdapter", () => {
 
     it("handles missing iteration id", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{}]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
         changeEntries: [],
@@ -166,14 +223,32 @@ describe("AzureDevOpsAdapter", () => {
 
     it("skips changes without item path", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
         changeEntries: [
           { item: null },
           { item: { path: null } },
-          { item: { path: "valid.ts" }, changeType: 2 },
+          { item: { path: "valid.ts", objectId: "obj789" }, changeType: 2 },
         ],
       });
+
+      mockGitApiInstance.getFileDiffs.mockResolvedValue([
+        {
+          path: "/valid.ts",
+          lineDiffBlocks: [
+            {
+              modifiedLineNumberStart: 5,
+              modifiedLinesCount: 3,
+              originalLineNumberStart: 5,
+              originalLinesCount: 3,
+            },
+          ],
+        },
+      ]);
 
       const result = await adapter.getPRFiles(123);
 
@@ -183,6 +258,10 @@ describe("AzureDevOpsAdapter", () => {
 
     it("handles missing changeEntries", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({});
 
@@ -193,6 +272,10 @@ describe("AzureDevOpsAdapter", () => {
 
     it("handles null changeEntries", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: null });
 
@@ -203,16 +286,51 @@ describe("AzureDevOpsAdapter", () => {
 
     it("maps all change types correctly", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
       mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
         changeEntries: [
-          { item: { path: "added.ts" }, changeType: 1 },
-          { item: { path: "modified.ts" }, changeType: 2 },
-          { item: { path: "renamed.ts" }, changeType: 8 },
-          { item: { path: "deleted.ts" }, changeType: 16 },
-          { item: { path: "unknown.ts" }, changeType: 999 },
+          { item: { path: "added.ts", objectId: "a1" }, changeType: 1 },
+          { item: { path: "modified.ts", objectId: "m1" }, changeType: 2 },
+          { item: { path: "renamed.ts", objectId: "r1" }, changeType: 8 },
+          { item: { path: "deleted.ts", objectId: "d1" }, changeType: 16 },
+          { item: { path: "unknown.ts", objectId: "u1" }, changeType: 999 },
         ],
       });
+
+      mockGitApiInstance.getFileDiffs.mockResolvedValue([
+        {
+          path: "/added.ts",
+          lineDiffBlocks: [
+            { modifiedLineNumberStart: 1, modifiedLinesCount: 10, originalLineNumberStart: 1, originalLinesCount: 0 },
+          ],
+        },
+        {
+          path: "/modified.ts",
+          lineDiffBlocks: [
+            { modifiedLineNumberStart: 5, modifiedLinesCount: 8, originalLineNumberStart: 5, originalLinesCount: 6 },
+          ],
+        },
+        {
+          path: "/renamed.ts",
+          lineDiffBlocks: [
+            { modifiedLineNumberStart: 1, modifiedLinesCount: 15, originalLineNumberStart: 1, originalLinesCount: 15 },
+          ],
+        },
+        {
+          path: "/deleted.ts",
+          lineDiffBlocks: [],
+        },
+        {
+          path: "/unknown.ts",
+          lineDiffBlocks: [
+            { modifiedLineNumberStart: 20, modifiedLinesCount: 5, originalLineNumberStart: 20, originalLinesCount: 5 },
+          ],
+        },
+      ]);
 
       const result = await adapter.getPRFiles(123);
 
