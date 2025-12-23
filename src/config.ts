@@ -28,6 +28,7 @@ export interface Config {
   readonly azure: AzureConfig;
   readonly botCommentIdentifier: string;
   readonly copilotModel?: string;
+  readonly copilotTimeoutMs?: number;
 }
 
 /**
@@ -42,6 +43,10 @@ export interface Config {
  * ```
  */
 export function loadConfig(): Config {
+  const timeoutMs = process.env.COPILOT_TIMEOUT_MS
+    ? Number.parseInt(process.env.COPILOT_TIMEOUT_MS, 10)
+    : undefined;
+
   return {
     defaultPlatform: (process.env.DEFAULT_PLATFORM as Platform) || "github",
     github: {
@@ -57,6 +62,7 @@ export function loadConfig(): Config {
     },
     botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || "[merge-mentor]",
     copilotModel: process.env.COPILOT_MODEL,
+    copilotTimeoutMs: timeoutMs && timeoutMs > 0 ? timeoutMs : undefined,
   };
 }
 

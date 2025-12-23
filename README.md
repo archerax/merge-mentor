@@ -69,6 +69,7 @@ BOT_COMMENT_IDENTIFIER=[merge-mentor]
 
 # Copilot Configuration
 COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
+COPILOT_TIMEOUT_MS=180000  # Optional: CLI timeout in milliseconds (default: 180000 = 3 minutes)
 
 # Logging Configuration
 LOG_LEVEL=info  # Optional: Set log level (debug, info, warn, error)
@@ -98,6 +99,16 @@ You can optionally configure which Copilot model to use by setting `COPILOT_MODE
 - `o1-mini` - O1 Mini
 
 Check your Copilot CLI documentation for the latest available models.
+
+### Copilot Timeout Configuration
+
+The default timeout for Copilot CLI operations is 3 minutes (180000ms). For large or complex PRs, you may need to increase this timeout:
+
+```env
+COPILOT_TIMEOUT_MS=300000  # 5 minutes
+```
+
+If you see errors like `CLI process timed out after XXXms`, increase this value. Note that longer timeouts may impact performance and cost.
 
 ## Logging
 

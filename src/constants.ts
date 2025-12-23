@@ -10,7 +10,7 @@ export const DEFAULT_PAGE_SIZE = 100;
 export const DEFAULT_MAX_RETRIES = 3;
 
 /** Timeout in milliseconds for CLI operations. */
-export const DEFAULT_TIMEOUT_MS = 60000;
+export const DEFAULT_TIMEOUT_MS = 180000; // 3 minutes
 
 /** Base delay in milliseconds between retry attempts. */
 export const RETRY_DELAY_BASE_MS = 1000;

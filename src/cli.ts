@@ -47,6 +47,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
     dryRun,
     verbose: options.verbose,
     copilotModel: config.copilotModel,
+    copilotTimeoutMs: config.copilotTimeoutMs,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -117,18 +118,16 @@ program
       const result = await executeReview(options);
       displayResults(result, !options.write);
 
-      const exitCode = hasCriticalIssues(result) ? 1 : 0;
       logger.info(
         {
           pr: options.pr,
-          exitCode,
-          hasCriticalIssues: exitCode === 1,
+          hasCriticalIssues: hasCriticalIssues(result),
           filesReviewed: result.filesReviewed,
           totalFindings: result.fileResults.reduce((sum, r) => sum + r.findings.length, 0),
         },
         "Review completed"
       );
-      process.exit(exitCode);
+      process.exit(0);
     } catch (error) {
       const err = error as Error;
 

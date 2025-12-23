@@ -37,6 +37,7 @@ export interface ReviewEngineOptions {
   readonly verbose?: boolean;
   readonly dryRun?: boolean;
   readonly copilotModel?: string;
+  readonly copilotTimeoutMs?: number;
 }
 
 /**
@@ -53,12 +54,19 @@ export class ReviewEngine {
 
   constructor(platform: PlatformAdapter, botIdentifier: string, options?: ReviewEngineOptions) {
     this.platform = platform;
-    this.copilot = new CopilotClient({ model: options?.copilotModel });
+    this.copilot = new CopilotClient({
+      model: options?.copilotModel,
+      timeoutMs: options?.copilotTimeoutMs,
+    });
     this.commentManager = new CommentManager(botIdentifier);
     this.stateCache = new ReviewStateCache();
     this.options = options ?? {};
     this.logger.info(
-      { copilotModel: options?.copilotModel, dryRun: options?.dryRun },
+      {
+        copilotModel: options?.copilotModel,
+        copilotTimeoutMs: options?.copilotTimeoutMs,
+        dryRun: options?.dryRun,
+      },
       "ReviewEngine initialized"
     );
   }

@@ -131,6 +131,12 @@ export class CopilotClient {
 
         if (code === 0) {
           resolve(stdout);
+        } else if (code === null) {
+          reject(
+            new CopilotCliError(
+              `CLI process timed out after ${this.timeoutMs}ms. Consider increasing the timeout or simplifying the review scope.`
+            )
+          );
         } else {
           reject(new CopilotCliError(`Exited with code ${code}: ${stderr || stdout}`));
         }

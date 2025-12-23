@@ -22,7 +22,7 @@ describe("Constants", () => {
     });
 
     it("should define DEFAULT_TIMEOUT_MS", () => {
-      expect(DEFAULT_TIMEOUT_MS).toBe(60000);
+      expect(DEFAULT_TIMEOUT_MS).toBe(180000); // 3 minutes
       expect(typeof DEFAULT_TIMEOUT_MS).toBe("number");
     });
 
