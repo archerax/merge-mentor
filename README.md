@@ -348,7 +348,7 @@ This means subsequent reviews after pushing new commits will only analyze the fi
 
 This project maintains high code quality standards:
 
-- **94%+ test coverage** with 261 comprehensive tests
+- **94%+ test coverage** with 261 unit tests and 54 integration tests
 - **98%+ function coverage** across all modules
 - **TypeScript strict mode** enabled
 - **Zero magic numbers** - all constants extracted
@@ -376,7 +376,12 @@ merge-mentor/
 │       ├── engine.ts       # Review orchestration
 │       ├── commentManager.ts # Comment lifecycle management
 │       └── reviewStateCache.ts # Review state caching
-├── tests/                  # Unit tests
+├── tests/
+│   ├── integration/        # Integration tests
+│   │   ├── fixtures.ts     # Test fixtures
+│   │   ├── mocks.ts        # Mock factories
+│   │   └── *.test.ts       # Integration test suites
+│   └── utils/              # Test utilities
 ├── .env.example           # Example environment configuration
 ├── .merge-mentor/         # Runtime files (gitignored)
 │   ├── cache/            # Review state cache
@@ -385,7 +390,8 @@ merge-mentor/
 ├── TASKS.md               # Code quality tasks
 ├── package.json
 ├── tsconfig.json
-└── vitest.config.ts
+├── vitest.config.ts           # Unit test configuration
+└── vitest.integration.config.ts # Integration test configuration
 ```
 
 ### Scripts
@@ -394,27 +400,54 @@ merge-mentor/
 # Build the project
 pnpm build
 
-# Run tests
+# Run unit tests
 pnpm test
 
 # Run tests in watch mode
 pnpm test:watch
 
-# Run tests with coverage
+# Run unit tests with coverage
 pnpm test:coverage
+
+# Run integration tests
+pnpm test:integration
+
+# Run integration tests with coverage
+pnpm test:integration:coverage
+
+# Run all tests (unit + integration)
+pnpm test:all
 
 # Type check (no build)
 pnpm typecheck
 
-# Lint code (requires eslint installation)
+# Lint code
 pnpm lint
 
-# Format code (requires prettier installation)
+# Format code
 pnpm format
 
 # Run all quality checks
 pnpm check
 ```
+
+### Testing
+
+The project includes comprehensive testing:
+
+**Unit Tests** (`src/**/*.spec.ts`):
+- Colocated with source files
+- Fast, isolated tests with mocked dependencies
+- Run with `pnpm test`
+
+**Integration Tests** (`tests/integration/*.test.ts`):
+- Test complete workflows with mocked external services
+- Cover GitHub and Azure DevOps adapters
+- Cover CLI execution flow
+- Cover ReviewEngine orchestration
+- Run with `pnpm test:integration`
+
+All external dependencies (GitHub API, Azure DevOps API, Copilot CLI) are mocked in integration tests to ensure reliable, fast test execution without requiring actual credentials or network access.
 
 ## Error Handling
 

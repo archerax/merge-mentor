@@ -46,8 +46,11 @@ jobs:
       - name: Format check
         run: pnpm run format:check
       
-      - name: Run tests
+      - name: Run unit tests
         run: pnpm test:coverage
+      
+      - name: Run integration tests
+        run: pnpm test:integration
       
       - name: Upload coverage to Codecov
         if: matrix.node-version == '20.x'

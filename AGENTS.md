@@ -30,6 +30,15 @@ src/
 └── utils/
     ├── diffParser.ts   # Diff line validation
     └── rateLimitHandler.ts # Rate limit handling with backoff
+
+tests/
+└── integration/        # Integration tests with mocked dependencies
+    ├── fixtures.ts     # Test fixtures and sample data
+    ├── mocks.ts        # Mock factories for external dependencies
+    ├── cli.integration.test.ts
+    ├── copilot-client.integration.test.ts
+    ├── platform-adapters.integration.test.ts
+    └── review-engine.integration.test.ts
 ```
 
 ## Key Commands
@@ -37,8 +46,10 @@ src/
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Compile TypeScript
-pnpm test             # Run tests
-pnpm test:coverage    # Run tests with coverage
+pnpm test             # Run unit tests
+pnpm test:coverage    # Run unit tests with coverage
+pnpm test:integration # Run integration tests
+pnpm test:all         # Run all tests (unit + integration)
 pnpm lint             # Run linter
 pnpm lint:fix         # Fix lint issues
 pnpm typecheck        # Type check without building
@@ -64,6 +75,7 @@ Refer to `.github/instructions/` for detailed coding standards:
 
 ## Testing
 
+### Unit Tests
 - Tests are colocated with source files (e.g., `cli.spec.ts` next to `cli.ts`)
 - Use Vitest with `--pool=threads` for stability
 - Follow arrange-act-assert pattern
@@ -71,13 +83,31 @@ Refer to `.github/instructions/` for detailed coding standards:
 - Use descriptive test names
 - Current coverage: 94%+ statements, 98%+ functions
 
+### Integration Tests
+- Located in `tests/integration/`
+- Test complete workflows with mocked external dependencies
+- Mock GitHub API, Azure DevOps API, and Copilot CLI
+- Use `vi.mock()` with function constructors for class mocks
+- Run separately with `pnpm test:integration`
+
+**Integration test structure:**
+```typescript
+// Use function constructors for mocked classes
+vi.mock("module", () => ({
+  MyClass: function MyClass() {
+    return mockInstance;
+  },
+}));
+```
+
 ## Adding Features
 
 1. Define interfaces in `platforms/types.ts`
 2. Implement platform-specific code in adapters
 3. Add business logic to the review engine
-4. Write tests before implementation
-5. Update documentation (README.md, CHANGELOG.md)
+4. Write unit tests before implementation
+5. Add integration tests for complete workflows
+6. Update documentation (README.md, CHANGELOG.md)
 
 ## Common Patterns
 
