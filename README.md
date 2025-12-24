@@ -7,6 +7,28 @@
 
 An automated code review bot that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories.
 
+## Quick Start
+
+```bash
+# 1. Install globally (or use npx)
+npm install -g merge-mentor
+
+# 2. Navigate to your project and create .env file
+cd /path/to/your/project
+cat > .env << EOF
+GITHUB_TOKEN=your_github_token
+GITHUB_REPO_OWNER=owner_name
+GITHUB_REPO_NAME=repo_name
+DEFAULT_PLATFORM=github
+EOF
+
+# 3. Run a review (dry-run by default)
+merge-mentor review --pr 123
+
+# 4. Post comments to PR
+merge-mentor review --pr 123 --write
+```
+
 ## Features
 
 - **Multi-Platform Support**: Review PRs from both GitHub and Azure DevOps
@@ -27,6 +49,22 @@ An automated code review bot that leverages GitHub Copilot CLI to perform compre
 
 ## Installation
 
+### Global Installation (Recommended)
+
+Install merge-mentor globally to use it from anywhere:
+
+```bash
+# Install globally via npm
+npm install -g merge-mentor
+
+# Or use directly with npx (no installation required)
+npx merge-mentor --help
+```
+
+### Local Installation
+
+For development or customization:
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -41,10 +79,18 @@ pnpm build
 
 ## Configuration
 
-Copy the example environment file and configure your tokens:
+### Configuration File
+
+merge-mentor reads configuration from a `.env` file in your **current working directory** (the directory where you run the command). This works for both global and local installations.
+
+Create a `.env` file in your project root or the directory where you'll run merge-mentor:
 
 ```bash
+# Create from the example (if available in the repository)
 cp .env.example .env
+
+# Or create a new one
+touch .env
 ```
 
 Edit `.env` with your credentials:
@@ -131,7 +177,9 @@ LOG_DIR=/var/log/merge-mentor  # Optional: Custom log directory (defaults to .me
 
 ### Log Files
 
-Logs are automatically written to `.merge-mentor/logs/merge-mentor.log` (or `$LOG_DIR/merge-mentor.log` if configured). The log directory is created automatically if it doesn't exist.
+Logs are automatically written to `.merge-mentor/logs/merge-mentor.log` in your **current working directory** (or `$LOG_DIR/merge-mentor.log` if configured). The log directory is created automatically if it doesn't exist.
+
+This means logs are written to your project directory, not to the global installation directory when using `npx` or a global installation.
 
 **Note**: User-facing progress messages (via `console.log`) still appear in the terminal. Only framework logging goes to the file.
 
@@ -183,6 +231,27 @@ For detailed debugging instructions, see [DEBUGGING.md](./DEBUGGING.md).
 ### Review a Pull Request
 
 **Important**: The GitHub Copilot CLI requires access to repository files. Ensure you're running from within a checked-out repository or that your CI/CD environment checks out the code first (see [CI/CD Integration](#cicd-integration) below).
+
+#### Using Global Installation or npx
+
+```bash
+# Using npx (no installation required)
+npx merge-mentor review --pr 123
+
+# Using global installation
+merge-mentor review --pr 123
+
+# Actually post comments to the PR (default is dry-run)
+npx merge-mentor review --pr 123 --write
+
+# Review an Azure DevOps PR
+npx merge-mentor review --pr 456 --platform azure --write
+
+# Disable verbose output
+npx merge-mentor review --pr 123 --verbose false
+```
+
+#### Using Local Installation
 
 ```bash
 # Dry-run mode (default) - shows what would be posted
@@ -236,6 +305,20 @@ jobs:
           # Install GitHub Copilot CLI
           npm install -g @githubnext/github-copilot-cli
 
+      - name: Create .env file
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
+          echo "GITHUB_REPO_OWNER=${{ github.repository_owner }}" >> .env
+          echo "GITHUB_REPO_NAME=${{ github.event.repository.name }}" >> .env
+          echo "DEFAULT_PLATFORM=github" >> .env
+
+      - name: Run review with npx
+        run: npx merge-mentor review --pr ${{ github.event.pull_request.number }} --write
+```
+
+**Alternative: Using local installation**
+
+```yaml
       - name: Install dependencies
         run: pnpm install
 
@@ -270,6 +353,23 @@ steps:
   - script: npm install -g @githubnext/github-copilot-cli
     displayName: "Install Copilot CLI"
 
+  - script: |
+      # Create .env file with Azure DevOps configuration
+      echo "AZURE_DEVOPS_TOKEN=$(AZURE_DEVOPS_TOKEN)" > .env
+      echo "AZURE_DEVOPS_ORG=$(System.TeamFoundationCollectionUri)" >> .env
+      echo "AZURE_DEVOPS_PROJECT=$(System.TeamProject)" >> .env
+      echo "AZURE_DEVOPS_REPO=$(Build.Repository.Name)" >> .env
+      echo "DEFAULT_PLATFORM=azure" >> .env
+    displayName: "Create configuration"
+
+  - script: |
+      npx merge-mentor review --pr $(System.PullRequest.PullRequestId) --platform azure --write
+    displayName: "Run code review with npx"
+```
+
+**Alternative: Using local installation**
+
+```yaml
   - script: |
       pnpm install
       pnpm build

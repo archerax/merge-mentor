@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
+import path from "node:path";
 import { ConfigurationError } from "./errors/index.js";
 
-dotenv.config({ quiet: true });
+// Load .env from current working directory (supports both local and global usage)
+dotenv.config({ path: path.join(process.cwd(), ".env"), quiet: true });
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";

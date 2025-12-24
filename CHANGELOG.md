@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-12-24
+
+### Added
+
+- **Global tool support**: Can now be used as a global CLI tool via `npx merge-mentor` or `npm install -g merge-mentor`
+- Configuration file (`.env`) is now loaded from current working directory instead of package installation directory
+- Log files are now written to current working directory (`.merge-mentor/logs/`) instead of package installation directory
+- Enhanced documentation with global installation and usage examples
+- Added `preferGlobal` flag to package.json
+
+### Changed
+
+- **Breaking**: `.env` file must be in the current working directory where the command is run, not in the package directory
+- **Breaking**: Log files are written to `<current-dir>/.merge-mentor/logs/` instead of `<package-dir>/.merge-mentor/logs/`
+- Updated documentation to prioritize global installation method
+- Updated CI/CD examples to show both npx and local installation approaches
+
+### Fixed
+
+- Configuration loading now works correctly when installed globally
+- Logger now writes to user's project directory instead of global installation directory
+
 ## [1.0.0] - 2025-12-24
 
 ### Added

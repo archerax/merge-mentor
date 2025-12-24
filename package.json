@@ -1,6 +1,6 @@
 {
   "name": "merge-mentor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automated code review bot using GitHub Copilot CLI",
   "main": "dist/cli.js",
   "bin": {
@@ -31,10 +31,14 @@
     "copilot",
     "pull-request",
     "automated-review",
-    "cli"
+    "cli",
+    "pr-review",
+    "code-quality",
+    "static-analysis"
   ],
   "author": "archerax",
   "license": "UNLICENSED",
+  "preferGlobal": true,
   "type": "module",
   "engines": {
     "node": ">=18.0.0"

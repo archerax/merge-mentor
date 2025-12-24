@@ -6,6 +6,8 @@ This file contains instructions for AI agents working on this codebase.
 
 merge-mentor is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
+**Distribution**: Can be installed globally via npm/npx or used as a local development tool. Configuration (`.env` file) and logs are always relative to the current working directory, not the installation directory.
+
 ## Architecture
 
 ```
@@ -44,6 +46,13 @@ tests/
 ## Key Commands
 
 ```bash
+# Global installation
+npm install -g merge-mentor
+
+# Or use directly with npx
+npx merge-mentor review --pr <number>
+
+# Local development
 pnpm install          # Install dependencies
 pnpm build            # Compile TypeScript
 pnpm test             # Run unit tests
@@ -54,7 +63,10 @@ pnpm lint             # Run linter
 pnpm lint:fix         # Fix lint issues
 pnpm typecheck        # Type check without building
 pnpm check            # Run all checks (typecheck, lint, test)
-pnpm review -- --pr <number> [--platform github|azure] [--write]
+
+# When installed globally or via npx
+merge-mentor review --pr <number> [--platform github|azure] [--write]
+npx merge-mentor review --pr <number> [--platform github|azure] [--write]
 ```
 
 ## Development Guidelines
@@ -64,6 +76,7 @@ pnpm review -- --pr <number> [--platform github|azure] [--write]
 3. **Single responsibility** - Keep functions and classes focused
 4. **Explicit over implicit** - Prefer clear, verbose code over clever shortcuts
 5. **Handle errors explicitly** - Use proper error handling, avoid silent failures
+6. **Support global installation** - Configuration and logs must use `process.cwd()`, never package installation directory
 
 ## Code Standards
 

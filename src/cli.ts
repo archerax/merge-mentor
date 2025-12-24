@@ -104,7 +104,7 @@ const program = new Command();
 program
   .name("merge-mentor")
   .description("Automated code review bot using GitHub Copilot CLI")
-  .version("1.0.0");
+  .version("1.1.0");
 
 program
   .command("review")
