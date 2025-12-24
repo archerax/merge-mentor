@@ -1,7 +1,7 @@
 # merge-mentor - Automated Code Review Bot
 
 [![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](./coverage)
-[![Tests](https://img.shields.io/badge/tests-261%20passing-brightgreen.svg)](./src)
+[![Tests](https://img.shields.io/badge/tests-315%20passing-brightgreen.svg)](./src)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9.3-blue.svg)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE)
 
@@ -348,10 +348,10 @@ This means subsequent reviews after pushing new commits will only analyze the fi
 
 This project maintains high code quality standards:
 
-- **94%+ test coverage** with 261 unit tests and 54 integration tests
+- **94%+ test coverage** with 315 comprehensive tests (261 unit + 54 integration)
 - **98%+ function coverage** across all modules
 - **TypeScript strict mode** enabled
-- **Zero magic numbers** - all constants extracted
+- **Zero lint issues** - fully compliant with Biome standards
 - Follows Clean Code, Pragmatic TypeScript, and Testing best practices
 - See [REVIEW.md](./REVIEW.md) for detailed quality analysis
 
