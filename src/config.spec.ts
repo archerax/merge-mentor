@@ -12,6 +12,9 @@ function cleanEnv(): void {
   delete process.env.AZURE_DEVOPS_PROJECT;
   delete process.env.AZURE_DEVOPS_REPO;
   delete process.env.BOT_COMMENT_IDENTIFIER;
+  delete process.env.MIN_COMMENT_CONFIDENCE;
+  delete process.env.SKIP_PREEXISTING_ISSUES;
+  delete process.env.POST_RESOLUTION_COMMENTS;
 }
 
 function setEnv(overrides: Record<string, string>): void {
@@ -39,6 +42,9 @@ describe("Config", () => {
       expect(config.azure.project).toBe("");
       expect(config.azure.repo).toBe("");
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
+      expect(config.commentFilter.minConfidence).toBe("high");
+      expect(config.commentFilter.skipPreExisting).toBe(true);
+      expect(config.commentFilter.postResolutionComments).toBe(true);
     });
 
     it("should load values from environment variables", () => {
@@ -65,6 +71,40 @@ describe("Config", () => {
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[Custom Bot]");
+    });
+
+    it("should load comment filter settings from environment variables", () => {
+      setEnv({
+        MIN_COMMENT_CONFIDENCE: "medium",
+        SKIP_PREEXISTING_ISSUES: "false",
+        POST_RESOLUTION_COMMENTS: "false",
+      });
+
+      const config = loadConfig();
+
+      expect(config.commentFilter.minConfidence).toBe("medium");
+      expect(config.commentFilter.skipPreExisting).toBe(false);
+      expect(config.commentFilter.postResolutionComments).toBe(false);
+    });
+
+    it("should default to high confidence for invalid MIN_COMMENT_CONFIDENCE", () => {
+      setEnv({
+        MIN_COMMENT_CONFIDENCE: "invalid",
+      });
+
+      const config = loadConfig();
+
+      expect(config.commentFilter.minConfidence).toBe("high");
+    });
+
+    it("should accept low as MIN_COMMENT_CONFIDENCE", () => {
+      setEnv({
+        MIN_COMMENT_CONFIDENCE: "low",
+      });
+
+      const config = loadConfig();
+
+      expect(config.commentFilter.minConfidence).toBe("low");
     });
   });
 

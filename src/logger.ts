@@ -1,6 +1,6 @@
 import path from "node:path";
-import pino from "pino";
 import type { Logger } from "pino";
+import pino from "pino";
 
 let _logger: Logger | undefined;
 

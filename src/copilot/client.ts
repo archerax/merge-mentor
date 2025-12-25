@@ -6,6 +6,7 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
+  FindingConfidence,
 } from "../platforms/types.js";
 
 /** Response from executing a Copilot prompt. */
@@ -28,6 +29,8 @@ interface RawFileFinding {
   category?: unknown;
   message?: unknown;
   suggestion?: unknown;
+  confidence?: unknown;
+  isPreExisting?: unknown;
 }
 
 /** Raw cross-file finding from Copilot JSON response. */
@@ -188,6 +191,8 @@ export class CopilotClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
+          confidence: this.validateConfidence(finding.confidence),
+          isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
       }
     }
@@ -265,5 +270,13 @@ export class CopilotClient {
     return validCategories.includes(stringValue as (typeof validCategories)[number])
       ? (stringValue as CrossFileFinding["category"])
       : "design";
+  }
+
+  private validateConfidence(value: unknown): FindingConfidence {
+    const validConfidences = ["high", "medium", "low"] as const;
+    const stringValue = String(value);
+    return validConfidences.includes(stringValue as (typeof validConfidences)[number])
+      ? (stringValue as FindingConfidence)
+      : "medium";
   }
 }

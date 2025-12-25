@@ -37,6 +37,11 @@ function createTestConfig(): Config {
       repo: "test-repo",
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
+    commentFilter: {
+      minConfidence: "high",
+      skipPreExisting: true,
+      postResolutionComments: true,
+    },
   };
 }
 

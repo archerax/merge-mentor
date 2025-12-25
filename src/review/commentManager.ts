@@ -1,12 +1,21 @@
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
+import type { CommentFilterConfig } from "../config.js";
+import { CATEGORY_EMOJI, CONFIDENCE_EMOJI, SEVERITY_EMOJI } from "../constants.js";
+import { createChildLogger } from "../logger.js";
 import type {
   CommentAction,
   CrossFileReviewResult,
   ExistingComment,
   FileFinding,
   FileReviewResult,
+  FindingConfidence,
   FindingSeverity,
 } from "../platforms/types.js";
+
+/** Options for configuring comment filtering behavior. */
+export interface CommentManagerOptions {
+  /** Comment filtering configuration. */
+  readonly filterConfig?: CommentFilterConfig;
+}
 
 /**
  * Manages PR comment lifecycle (create, update, resolve).
@@ -15,9 +24,16 @@ import type {
 export class CommentManager {
   private readonly botIdentifier: string;
   private readonly summaryMarker = "<!-- AI_CODE_REVIEW_SUMMARY -->";
+  private readonly filterConfig: CommentFilterConfig;
+  private readonly logger = createChildLogger({ component: "CommentManager" });
 
-  constructor(botIdentifier: string) {
+  constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
+    this.filterConfig = options?.filterConfig ?? {
+      minConfidence: "high",
+      skipPreExisting: true,
+      postResolutionComments: true,
+    };
   }
 
   /**
@@ -47,9 +63,14 @@ export class CommentManager {
     const actions: CommentAction[] = [];
     const matchedExistingIds = new Set<number | string>();
 
-    // Process file findings
+    // Process file findings with filtering
     for (const fileResult of fileResults) {
       for (const finding of fileResult.findings) {
+        // Apply confidence and pre-existing filters
+        if (!this.shouldIncludeFinding(finding, fileResult.filename)) {
+          continue;
+        }
+
         const existingComment = this.findMatchingComment(
           existingComments,
           fileResult.filename,
@@ -83,6 +104,16 @@ export class CommentManager {
     // Resolve comments that are no longer relevant
     for (const comment of existingComments) {
       if (!matchedExistingIds.has(comment.id) && !comment.isResolved && comment.path) {
+        // Add resolution comment before resolving if configured
+        if (this.filterConfig.postResolutionComments) {
+          const resolutionBody = this.formatResolutionComment(comment.body);
+          actions.push({
+            type: "update",
+            existingCommentId: comment.id,
+            body: resolutionBody,
+            resolutionReason: "Issue no longer present in latest review",
+          });
+        }
         actions.push({
           type: "resolve",
           existingCommentId: comment.id,
@@ -124,7 +155,7 @@ export class CommentManager {
         !alreadyMatched.has(c.id) &&
         c.path === filename &&
         c.line === finding.line &&
-        c.body.includes(finding.category)
+        c.body.toLowerCase().includes(finding.category.toLowerCase())
     );
   }
 
@@ -140,6 +171,66 @@ export class CommentManager {
   }
 
   /**
+   * Checks if a finding should be included based on confidence and pre-existing filters.
+   */
+  private shouldIncludeFinding(finding: FileFinding, filename: string): boolean {
+    const confidence = finding.confidence ?? "medium";
+
+    // Check confidence threshold
+    if (!this.meetsConfidenceThreshold(confidence)) {
+      this.logger.debug(
+        {
+          filename,
+          line: finding.line,
+          confidence,
+          minConfidence: this.filterConfig.minConfidence,
+          category: finding.category,
+        },
+        "Skipping finding: below confidence threshold"
+      );
+      return false;
+    }
+
+    // Check pre-existing filter
+    if (this.filterConfig.skipPreExisting && finding.isPreExisting) {
+      this.logger.info(
+        {
+          filename,
+          line: finding.line,
+          category: finding.category,
+          message: finding.message.slice(0, 100),
+        },
+        "Skipping pre-existing issue"
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Checks if a confidence level meets the minimum threshold.
+   */
+  private meetsConfidenceThreshold(confidence: FindingConfidence): boolean {
+    const confidenceOrder: FindingConfidence[] = ["low", "medium", "high"];
+    const findingIndex = confidenceOrder.indexOf(confidence);
+    const minIndex = confidenceOrder.indexOf(this.filterConfig.minConfidence);
+    return findingIndex >= minIndex;
+  }
+
+  /**
+   * Formats a resolution comment to append before resolving.
+   */
+  private formatResolutionComment(originalBody: string): string {
+    const timestamp = new Date().toISOString();
+    return `${originalBody}
+
+---
+✅ **Issue Resolved**: This issue is no longer present in the latest review.  
+*Resolved at: ${timestamp}*`;
+  }
+
+  /**
    * Formats a file finding as an inline comment.
    *
    * @param finding - The finding to format
@@ -148,10 +239,12 @@ export class CommentManager {
   formatInlineComment(finding: FileFinding): string {
     const severityEmoji = this.getSeverityEmoji(finding.severity);
     const categoryEmoji = this.getCategoryEmoji(finding.category);
+    const confidenceEmoji = this.getConfidenceEmoji(finding.confidence ?? "medium");
 
     return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
 **Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}  
+**Confidence**: ${confidenceEmoji} ${(finding.confidence ?? "medium").charAt(0).toUpperCase() + (finding.confidence ?? "medium").slice(1)}  
 **Line**: ${finding.line}
 
 **Issue**: ${finding.message}
@@ -273,6 +366,10 @@ ${finding.message}
 
   private getCategoryEmoji(category: string): string {
     return CATEGORY_EMOJI[category as keyof typeof CATEGORY_EMOJI] || "📋";
+  }
+
+  private getConfidenceEmoji(confidence: FindingConfidence): string {
+    return CONFIDENCE_EMOJI[confidence] || "⚪";
   }
 
   private countBySeverity(results: readonly FileReviewResult[]): Record<FindingSeverity, number> {

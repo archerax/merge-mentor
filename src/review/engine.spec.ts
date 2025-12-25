@@ -292,6 +292,8 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "Test issue",
             suggestion: "Fix it",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });
@@ -333,6 +335,8 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "Updated issue",
             suggestion: "Fix it",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });
@@ -403,6 +407,8 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "New message",
             suggestion: "Fix",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });
@@ -480,6 +486,8 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "Test issue",
             suggestion: "Fix it",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });
@@ -530,6 +538,8 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "New message",
             suggestion: "Fix",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });

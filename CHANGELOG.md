@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-24
+
+### Added
+
+- **Confidence-based comment filtering**: AI now provides confidence scores (`high`, `medium`, `low`) for each finding
+- **Pre-existing issue detection**: AI detects if issues existed before the PR and skips them by default
+- **Resolution comments**: When resolving comments, a message is posted explaining the issue was fixed
+- New environment variables:
+  - `MIN_COMMENT_CONFIDENCE`: Set minimum confidence level for posting comments (default: `high`)
+  - `SKIP_PREEXISTING_ISSUES`: Skip issues that existed before the PR (default: `true`)
+  - `POST_RESOLUTION_COMMENTS`: Post explanation before resolving comments (default: `true`)
+- Confidence level displayed in comment formatting with emoji indicator (🟢 High, 🟡 Medium, 🔴 Low)
+- New `FileFinding` fields: `confidence` and `isPreExisting`
+- New `CommentAction` field: `resolutionReason`
+- 13 new unit tests for confidence filtering functionality
+- 3 new integration tests for confidence filtering workflows
+
+### Changed
+
+- Updated Copilot prompts to request confidence scores and pre-existing issue detection
+- Comment matching now case-insensitive for category comparison
+- `CommentManager` now accepts configuration options for filtering behavior
+- `ReviewEngine` passes filter configuration to `CommentManager`
+- Default behavior is now more conservative (only high-confidence new issues are posted)
+
+### Fixed
+
+- Comment matching failed when category names had different casing
+
 ## [1.1.0] - 2025-12-24
 
 ### Added

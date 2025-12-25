@@ -24,6 +24,9 @@ export interface PRFile {
 /** Severity levels for code review findings. */
 export type FindingSeverity = "critical" | "high" | "medium" | "low";
 
+/** Confidence levels for findings. */
+export type FindingConfidence = "high" | "medium" | "low";
+
 /** Categories of code review findings. */
 export type FindingCategory =
   | "bug"
@@ -42,6 +45,10 @@ export interface FileFinding {
   readonly category: FindingCategory;
   readonly message: string;
   readonly suggestion: string;
+  /** Confidence level that this issue exists and was introduced in this PR. */
+  readonly confidence?: FindingConfidence;
+  /** Whether this issue existed before the PR (in the base branch). */
+  readonly isPreExisting?: boolean;
 }
 
 /** A finding that spans multiple files. */
@@ -84,6 +91,8 @@ export interface CommentAction {
   readonly path?: string;
   readonly line?: number;
   readonly body?: string;
+  /** Reason for resolution (used for resolution comments). */
+  readonly resolutionReason?: string;
 }
 
 /**

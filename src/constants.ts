@@ -41,6 +41,13 @@ export const SEVERITY_EMOJI = {
   low: "🟢",
 } as const;
 
+/** Emoji mapping for confidence levels. */
+export const CONFIDENCE_EMOJI = {
+  high: "🟢",
+  medium: "🟡",
+  low: "🔴",
+} as const;
+
 /** Emoji mapping for finding categories. */
 export const CATEGORY_EMOJI = {
   bug: "🐛",

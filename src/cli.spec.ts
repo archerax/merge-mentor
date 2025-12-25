@@ -57,6 +57,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
     botCommentIdentifier: "[merge-mentor]",
     copilotModel: "gpt-4",
+    commentFilter: {
+      minConfidence: "high",
+      skipPreExisting: true,
+      postResolutionComments: true,
+    },
     ...overrides,
   };
 }

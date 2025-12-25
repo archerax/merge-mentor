@@ -1,6 +1,7 @@
-import dotenv from "dotenv";
 import path from "node:path";
+import dotenv from "dotenv";
 import { ConfigurationError } from "./errors/index.js";
+import type { FindingConfidence } from "./platforms/types.js";
 
 // Load .env from current working directory (supports both local and global usage)
 dotenv.config({ path: path.join(process.cwd(), ".env"), quiet: true });
@@ -23,6 +24,16 @@ export interface AzureConfig {
   readonly repo: string;
 }
 
+/** Comment filtering configuration. */
+export interface CommentFilterConfig {
+  /** Minimum confidence level for posting comments. */
+  readonly minConfidence: FindingConfidence;
+  /** Skip pre-existing issues (issues not introduced in this PR). */
+  readonly skipPreExisting: boolean;
+  /** Post a resolution comment before resolving threads. */
+  readonly postResolutionComments: boolean;
+}
+
 /** Application configuration loaded from environment variables. */
 export interface Config {
   readonly defaultPlatform: Platform;
@@ -31,6 +42,7 @@ export interface Config {
   readonly botCommentIdentifier: string;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
+  readonly commentFilter: CommentFilterConfig;
 }
 
 /**
@@ -49,6 +61,8 @@ export function loadConfig(): Config {
     ? Number.parseInt(process.env.COPILOT_TIMEOUT_MS, 10)
     : undefined;
 
+  const minConfidence = validateMinConfidence(process.env.MIN_COMMENT_CONFIDENCE);
+
   return {
     defaultPlatform: (process.env.DEFAULT_PLATFORM as Platform) || "github",
     github: {
@@ -65,7 +79,20 @@ export function loadConfig(): Config {
     botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || "[merge-mentor]",
     copilotModel: process.env.COPILOT_MODEL,
     copilotTimeoutMs: timeoutMs && timeoutMs > 0 ? timeoutMs : undefined,
+    commentFilter: {
+      minConfidence,
+      skipPreExisting: process.env.SKIP_PREEXISTING_ISSUES !== "false",
+      postResolutionComments: process.env.POST_RESOLUTION_COMMENTS !== "false",
+    },
   };
+}
+
+function validateMinConfidence(value: string | undefined): FindingConfidence {
+  const validConfidences: FindingConfidence[] = ["high", "medium", "low"];
+  if (value && validConfidences.includes(value as FindingConfidence)) {
+    return value as FindingConfidence;
+  }
+  return "high"; // Default to high confidence
 }
 
 /**

@@ -42,6 +42,18 @@ GUIDELINES:
 - Skip findings about configuration or dependency updates unless there's a specific compatibility issue
 - Focus on "what could go wrong" not "what could be different"
 
+CONFIDENCE SCORING:
+- "high": You are certain this is an issue AND it was introduced in this PR (in added/modified lines)
+- "medium": You believe this is likely an issue, but there's some uncertainty
+- "low": You suspect this might be an issue, but you're not confident
+- Only report findings with "high" or "medium" confidence
+
+PRE-EXISTING ISSUE DETECTION:
+- If an issue exists in removed lines (starting with -), it is pre-existing - set isPreExisting to true
+- If the same pattern exists in both removed and added lines, it is pre-existing - set isPreExisting to true  
+- Only set isPreExisting to false for issues that are newly introduced in added lines (+)
+- Focus primarily on new issues introduced in this PR
+
 IMPORTANT: The "line" field must reference a line number that appears in the diff above.
 - For added lines (starting with +), use the NEW line number (right side of the diff)
 - For context lines (no prefix), use the NEW line number
@@ -56,7 +68,9 @@ Respond ONLY with valid JSON in this exact format:
       "severity": "critical|high|medium|low",
       "category": "bug|security|performance|quality|documentation",
       "message": "Description of the issue",
-      "suggestion": "Recommended fix or improvement"
+      "suggestion": "Recommended fix or improvement",
+      "confidence": "high|medium|low",
+      "isPreExisting": false
     }
   ]
 }

@@ -88,6 +88,8 @@ describe("CopilotClient", () => {
         category: "bug",
         message: "Potential null pointer",
         suggestion: "Add null check",
+        confidence: "medium", // Default when not provided
+        isPreExisting: false, // Default when not provided
       });
     });
 
@@ -389,12 +391,12 @@ describe("CopilotClient", () => {
       );
 
       const promise1 = client.executePrompt("test");
-      const rejection1 = promise1.catch(e => e);
+      const rejection1 = promise1.catch((e) => e);
       await vi.runAllTimersAsync();
       await expect(rejection1).resolves.toBeInstanceOf(CopilotCliError);
-      
+
       const promise2 = client.executePrompt("test");
-      const rejection2 = promise2.catch(e => e);
+      const rejection2 = promise2.catch((e) => e);
       await vi.runAllTimersAsync();
       const error = await rejection2;
       expect(error.message).toContain("No JSON object found");
@@ -410,7 +412,7 @@ describe("CopilotClient", () => {
       );
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       await expect(rejection).resolves.toBeInstanceOf(CopilotCliError);
     });
@@ -422,7 +424,7 @@ describe("CopilotClient", () => {
       mockSpawn.mockReturnValue(createMockProcess({ error }));
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("Copilot CLI is not installed or not in PATH");
@@ -437,7 +439,7 @@ describe("CopilotClient", () => {
       );
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("CLI execution failed");
@@ -453,7 +455,7 @@ describe("CopilotClient", () => {
       );
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("Exited with code 1");
@@ -484,7 +486,7 @@ describe("CopilotClient", () => {
       mockSpawn.mockReturnValue(createMockProcess({ exitCode: 1 }));
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("Failed after 2 attempts");
@@ -506,7 +508,7 @@ describe("CopilotClient", () => {
       });
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("Failed after 2 attempts");
@@ -518,7 +520,7 @@ describe("CopilotClient", () => {
       mockSpawn.mockReturnValue(createMockProcess({ error }));
 
       const promise = client.executePrompt("test");
-      const rejection = promise.catch(e => e);
+      const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
       expect(err.message).toContain("CLI execution failed");

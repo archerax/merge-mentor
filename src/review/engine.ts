@@ -1,3 +1,4 @@
+import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { CopilotClient } from "../copilot/client.js";
 import {
@@ -38,6 +39,7 @@ export interface ReviewEngineOptions {
   readonly dryRun?: boolean;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
+  readonly commentFilter?: CommentFilterConfig;
 }
 
 /**
@@ -58,7 +60,9 @@ export class ReviewEngine {
       model: options?.copilotModel,
       timeoutMs: options?.copilotTimeoutMs,
     });
-    this.commentManager = new CommentManager(botIdentifier);
+    this.commentManager = new CommentManager(botIdentifier, {
+      filterConfig: options?.commentFilter,
+    });
     this.stateCache = new ReviewStateCache();
     this.options = options ?? {};
     this.logger.info(
@@ -66,6 +70,7 @@ export class ReviewEngine {
         copilotModel: options?.copilotModel,
         copilotTimeoutMs: options?.copilotTimeoutMs,
         dryRun: options?.dryRun,
+        commentFilter: options?.commentFilter,
       },
       "ReviewEngine initialized"
     );

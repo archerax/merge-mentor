@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
 import type {
   CrossFileReviewResult,
   ExistingComment,
@@ -6,6 +6,16 @@ import type {
   FileReviewResult,
 } from "../platforms/types.js";
 import { CommentManager } from "./commentManager.js";
+
+// Mock the logger
+vi.mock("../logger.js", () => ({
+  createChildLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
 
 function createCommentManager(): CommentManager {
   return new CommentManager("[AI Code Review Bot]");
@@ -18,6 +28,8 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
     category: "bug",
     message: "Test message",
     suggestion: "Test suggestion",
+    confidence: "high",
+    isPreExisting: false,
     ...overrides,
   };
 }
@@ -395,6 +407,8 @@ describe("CommentManager", () => {
         category: "bug",
         message: "Test message",
         suggestion: "Test suggestion",
+        confidence: "high",
+        isPreExisting: false,
       });
       const existingBody = manager.formatInlineComment(finding);
       const existingComments: ExistingComment[] = [
@@ -433,6 +447,179 @@ describe("CommentManager", () => {
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
       expect(result).toContain("**Affected Files:** Multiple files");
+    });
+  });
+
+  describe("confidence filtering", () => {
+    it("should skip low confidence findings when minConfidence is high", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "high",
+          skipPreExisting: true,
+          postResolutionComments: true,
+        },
+      });
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({
+              line: 10,
+              confidence: "low",
+              isPreExisting: false,
+            }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions([], fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0);
+    });
+
+    it("should include medium confidence findings when minConfidence is medium", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "medium",
+          skipPreExisting: true,
+          postResolutionComments: true,
+        },
+      });
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({
+              line: 10,
+              confidence: "medium",
+              isPreExisting: false,
+            }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions([], fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(1);
+    });
+
+    it("should skip pre-existing issues when skipPreExisting is true", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "high",
+          skipPreExisting: true,
+          postResolutionComments: true,
+        },
+      });
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({
+              line: 10,
+              confidence: "high",
+              isPreExisting: true,
+            }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions([], fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0);
+    });
+
+    it("should include pre-existing issues when skipPreExisting is false", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "high",
+          skipPreExisting: false,
+          postResolutionComments: true,
+        },
+      });
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({
+              line: 10,
+              confidence: "high",
+              isPreExisting: true,
+            }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions([], fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(1);
+    });
+
+    it("should include confidence in formatted comment", () => {
+      const manager = new CommentManager("[Bot]");
+      const finding = createFileFinding({
+        confidence: "high",
+      });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).toContain("**Confidence**: 🟢 High");
+    });
+
+    it("should add resolution comment before resolving when postResolutionComments is true", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "high",
+          skipPreExisting: true,
+          postResolutionComments: true,
+        },
+      });
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: "[Bot]\n\nbug issue", path: "test.ts", line: 10 },
+      ];
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const updateActions = actions.filter((a) => a.type === "update" && a.existingCommentId === 1);
+      const resolveActions = actions.filter((a) => a.type === "resolve");
+
+      expect(updateActions).toHaveLength(1);
+      expect(updateActions[0].resolutionReason).toBeDefined();
+      expect(updateActions[0].body).toContain("Issue Resolved");
+      expect(resolveActions).toHaveLength(1);
+    });
+
+    it("should not add resolution comment when postResolutionComments is false", () => {
+      const manager = new CommentManager("[Bot]", {
+        filterConfig: {
+          minConfidence: "high",
+          skipPreExisting: true,
+          postResolutionComments: false,
+        },
+      });
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: "[Bot]\n\nbug issue", path: "test.ts", line: 10 },
+      ];
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const updateActions = actions.filter((a) => a.type === "update" && a.existingCommentId === 1);
+      const resolveActions = actions.filter((a) => a.type === "resolve");
+
+      expect(updateActions).toHaveLength(0);
+      expect(resolveActions).toHaveLength(1);
     });
   });
 });

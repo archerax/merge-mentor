@@ -117,6 +117,11 @@ BOT_COMMENT_IDENTIFIER=[merge-mentor]
 COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
 COPILOT_TIMEOUT_MS=180000  # Optional: CLI timeout in milliseconds (default: 180000 = 3 minutes)
 
+# Comment Filtering Configuration
+MIN_COMMENT_CONFIDENCE=high  # Optional: Minimum confidence level (high, medium, low). Default: high
+SKIP_PREEXISTING_ISSUES=true  # Optional: Skip issues that existed before the PR. Default: true
+POST_RESOLUTION_COMMENTS=true  # Optional: Post explanation before resolving comments. Default: true
+
 # Logging Configuration
 LOG_LEVEL=info  # Optional: Set log level (debug, info, warn, error)
 ```
@@ -155,6 +160,51 @@ COPILOT_TIMEOUT_MS=300000  # 5 minutes
 ```
 
 If you see errors like `CLI process timed out after XXXms`, increase this value. Note that longer timeouts may impact performance and cost.
+
+## Comment Filtering
+
+merge-mentor includes intelligent comment filtering to reduce noise and improve precision:
+
+### Confidence-Based Filtering
+
+Each finding includes a confidence level (`high`, `medium`, `low`) indicating how certain the AI is that the issue exists and was introduced in this PR. By default, only high-confidence issues are posted as comments.
+
+```bash
+# Only post high-confidence issues (default)
+MIN_COMMENT_CONFIDENCE=high
+
+# Post medium and high confidence issues
+MIN_COMMENT_CONFIDENCE=medium
+
+# Post all issues regardless of confidence
+MIN_COMMENT_CONFIDENCE=low
+```
+
+### Pre-Existing Issue Detection
+
+The AI attempts to detect if an issue existed before the PR (in the base branch). By default, pre-existing issues are skipped to focus on new problems introduced by the PR.
+
+```bash
+# Skip pre-existing issues (default)
+SKIP_PREEXISTING_ISSUES=true
+
+# Include pre-existing issues in comments
+SKIP_PREEXISTING_ISSUES=false
+```
+
+### Resolution Comments
+
+When issues are resolved (no longer present in a re-review), merge-mentor can post an explanatory comment before marking the thread as resolved.
+
+```bash
+# Post resolution comment before resolving (default)
+POST_RESOLUTION_COMMENTS=true
+
+# Resolve without posting a comment
+POST_RESOLUTION_COMMENTS=false
+```
+
+The resolution comment includes a timestamp and a message indicating the issue was resolved.
 
 ## Logging
 

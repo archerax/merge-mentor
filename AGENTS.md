@@ -8,13 +8,18 @@ merge-mentor is an automated code review tool that leverages GitHub Copilot CLI 
 
 **Distribution**: Can be installed globally via npm/npx or used as a local development tool. Configuration (`.env` file) and logs are always relative to the current working directory, not the installation directory.
 
+**Key Features**:
+- Confidence-based comment filtering (only posts high-confidence issues by default)
+- Pre-existing issue detection (skips issues not introduced in this PR)
+- Resolution comments (explains why comments are being resolved)
+
 ## Architecture
 
 ```
 src/
 ├── cli.ts              # CLI entry point using Commander
-├── config.ts           # Environment configuration loader
-├── constants.ts        # Application-wide constants
+├── config.ts           # Environment configuration loader (includes CommentFilterConfig)
+├── constants.ts        # Application-wide constants (severity/confidence emojis)
 ├── logger.ts           # Pino logging setup
 ├── errors/
 │   └── index.ts        # Custom error hierarchy
@@ -27,7 +32,7 @@ src/
 │   └── azure.ts        # Azure DevOps API adapter
 ├── review/
 │   ├── engine.ts       # Review orchestration
-│   ├── commentManager.ts # Comment lifecycle management
+│   ├── commentManager.ts # Comment lifecycle management (confidence filtering, resolution comments)
 │   └── reviewStateCache.ts # SHA-based caching for incremental reviews
 └── utils/
     ├── diffParser.ts   # Diff line validation
