@@ -427,6 +427,79 @@ describe("CommentManager", () => {
       const updateActions = actions.filter((a) => a.type === "update");
       expect(updateActions).toHaveLength(0);
     });
+
+    it("should resolve comments identified by model as resolved", () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        {
+          id: 1,
+          body: "[AI Code Review Bot]\n\n### Bug Issue\nNull check missing",
+          path: "test.ts",
+          line: 10,
+        },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [],
+          resolvedComments: [{ line: 10, reason: "Null check was added in this commit" }],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const resolveActions = actions.filter((a) => a.type === "resolve");
+      expect(resolveActions).toHaveLength(1);
+      expect(resolveActions[0].existingCommentId).toBe(1);
+    });
+
+    it("should use model's resolution reason in resolution comment", () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: "[AI Code Review Bot]\n\nOld issue", path: "test.ts", line: 10 },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [],
+          resolvedComments: [{ line: 10, reason: "Code was refactored to handle edge case" }],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const updateActions = actions.filter((a) => a.type === "update");
+      expect(updateActions).toHaveLength(1);
+      expect(updateActions[0].body).toContain("Code was refactored to handle edge case");
+    });
+
+    it("should not resolve already resolved comments", () => {
+      const manager = createCommentManager();
+      const existingComments: ExistingComment[] = [
+        {
+          id: 1,
+          body: "[AI Code Review Bot]\n\nOld issue",
+          path: "test.ts",
+          line: 10,
+          isResolved: true,
+        },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [],
+          resolvedComments: [{ line: 10, reason: "Already resolved" }],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const resolveActions = actions.filter((a) => a.type === "resolve");
+      expect(resolveActions).toHaveLength(0);
+    });
   });
 
   describe("formatSummaryComment cross-file findings", () => {

@@ -15,6 +15,7 @@ function cleanEnv(): void {
   delete process.env.MIN_COMMENT_CONFIDENCE;
   delete process.env.SKIP_PREEXISTING_ISSUES;
   delete process.env.POST_RESOLUTION_COMMENTS;
+  delete process.env.REVIEW_RUNS;
 }
 
 function setEnv(overrides: Record<string, string>): void {
@@ -45,6 +46,7 @@ describe("Config", () => {
       expect(config.commentFilter.minConfidence).toBe("high");
       expect(config.commentFilter.skipPreExisting).toBe(true);
       expect(config.commentFilter.postResolutionComments).toBe(true);
+      expect(config.reviewRuns).toBe(1);
     });
 
     it("should load values from environment variables", () => {
@@ -105,6 +107,54 @@ describe("Config", () => {
       const config = loadConfig();
 
       expect(config.commentFilter.minConfidence).toBe("low");
+    });
+
+    it("should load REVIEW_RUNS from environment", () => {
+      setEnv({
+        REVIEW_RUNS: "3",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewRuns).toBe(3);
+    });
+
+    it("should default REVIEW_RUNS to 1 for invalid values", () => {
+      setEnv({
+        REVIEW_RUNS: "invalid",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewRuns).toBe(1);
+    });
+
+    it("should default REVIEW_RUNS to 1 for values below range", () => {
+      setEnv({
+        REVIEW_RUNS: "0",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewRuns).toBe(1);
+    });
+
+    it("should default REVIEW_RUNS to 1 for values above range", () => {
+      setEnv({
+        REVIEW_RUNS: "10",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewRuns).toBe(1);
+    });
+
+    it("should accept REVIEW_RUNS at boundary values", () => {
+      setEnv({ REVIEW_RUNS: "1" });
+      expect(loadConfig().reviewRuns).toBe(1);
+
+      setEnv({ REVIEW_RUNS: "5" });
+      expect(loadConfig().reviewRuns).toBe(5);
     });
   });
 

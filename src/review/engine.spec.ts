@@ -715,4 +715,80 @@ describe("ReviewEngine", () => {
       expect(mockPlatform.resolveComment).not.toHaveBeenCalled();
     });
   });
+
+  describe("multi-run mode", () => {
+    it("uses single run when reviewRuns is 1", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: true,
+        reviewRuns: 1,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockReturnValue({
+        filename: "test.ts",
+        findings: [],
+      });
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // Should NOT show multi-run messages
+      const multiRunCalls = consoleSpy.mock.calls.filter(
+        (call) => call[0] && String(call[0]).includes("Multi-run mode")
+      );
+      expect(multiRunCalls.length).toBe(0);
+      consoleSpy.mockRestore();
+    });
+
+    it("defaults to single run when reviewRuns not specified", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: true,
+        // reviewRuns not specified - should default to 1
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockReturnValue({
+        filename: "test.ts",
+        findings: [],
+      });
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // Should NOT show multi-run messages
+      const multiRunCalls = consoleSpy.mock.calls.filter(
+        (call) => call[0] && String(call[0]).includes("Multi-run mode")
+      );
+      expect(multiRunCalls.length).toBe(0);
+      consoleSpy.mockRestore();
+    });
+
+    it("logs reviewRuns in constructor", () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: true,
+        reviewRuns: 3,
+      });
+      expect(engine).toBeDefined();
+    });
+  });
 });

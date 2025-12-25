@@ -59,10 +59,20 @@ export interface CrossFileFinding {
   readonly affectedFiles: readonly string[];
 }
 
+/** A resolved comment identified by the model. */
+export interface ResolvedComment {
+  /** Line number where the original comment was */
+  readonly line: number;
+  /** Brief reason why the issue is resolved */
+  readonly reason: string;
+}
+
 /** Result of reviewing a single file. */
 export interface FileReviewResult {
   readonly filename: string;
   readonly findings: readonly FileFinding[];
+  /** Comments identified as resolved by the model (issue no longer present) */
+  readonly resolvedComments?: readonly ResolvedComment[];
 }
 
 /** Result of cross-file analysis. */

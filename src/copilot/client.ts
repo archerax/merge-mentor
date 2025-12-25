@@ -7,6 +7,7 @@ import type {
   FileFinding,
   FileReviewResult,
   FindingConfidence,
+  ResolvedComment,
 } from "../platforms/types.js";
 
 /** Response from executing a Copilot prompt. */
@@ -41,9 +42,16 @@ interface RawCrossFileFinding {
   affected_files?: unknown[];
 }
 
+/** Raw resolved comment from Copilot JSON response. */
+interface RawResolvedComment {
+  line?: unknown;
+  reason?: unknown;
+}
+
 /** Raw file review response from Copilot. */
 interface RawFileReviewResponse {
   findings?: RawFileFinding[];
+  resolved_comments?: RawResolvedComment[];
 }
 
 /** Raw cross-file review response from Copilot. */
@@ -182,6 +190,7 @@ export class CopilotClient {
   parseFileReview(filename: string, response: CopilotResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
     const findings: FileFinding[] = [];
+    const resolvedComments: ResolvedComment[] = [];
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
@@ -197,7 +206,22 @@ export class CopilotClient {
       }
     }
 
-    return { filename, findings };
+    if (Array.isArray(data.resolved_comments)) {
+      for (const resolved of data.resolved_comments) {
+        if (typeof resolved.line === "number" && resolved.line > 0) {
+          resolvedComments.push({
+            line: resolved.line,
+            reason: String(resolved.reason || "Issue addressed"),
+          });
+        }
+      }
+    }
+
+    return {
+      filename,
+      findings,
+      resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
+    };
   }
 
   /**

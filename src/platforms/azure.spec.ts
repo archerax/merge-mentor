@@ -42,6 +42,7 @@ function createTestConfig(): Config {
       skipPreExisting: true,
       postResolutionComments: true,
     },
+    reviewRuns: 1,
   };
 }
 

@@ -12,6 +12,8 @@ merge-mentor is an automated code review tool that leverages GitHub Copilot CLI 
 - Confidence-based comment filtering (only posts high-confidence issues by default)
 - Pre-existing issue detection (skips issues not introduced in this PR)
 - Resolution comments (explains why comments are being resolved)
+- Multi-run mode for increased thoroughness (aggregates findings from multiple review runs)
+- Intelligent deduplication via existing comment context (prevents duplicate comments)
 
 ## Architecture
 
@@ -25,14 +27,16 @@ src/
 │   └── index.ts        # Custom error hierarchy
 ├── copilot/
 │   ├── client.ts       # Copilot CLI wrapper with retry logic
-│   └── prompts.ts      # Prompt templates for reviews
+│   ├── prompts.ts      # Prompt templates for reviews (now includes comment context)
+│   └── commentContext.ts # Formats existing comments for LLM context
 ├── platforms/
 │   ├── types.ts        # Shared interfaces (PlatformAdapter, etc.)
 │   ├── github.ts       # GitHub API adapter
 │   └── azure.ts        # Azure DevOps API adapter
 ├── review/
-│   ├── engine.ts       # Review orchestration
+│   ├── engine.ts       # Review orchestration (supports single and multi-run modes)
 │   ├── commentManager.ts # Comment lifecycle management (confidence filtering, resolution comments)
+│   ├── findingAggregator.ts # Deduplication and merging of findings from multi-run mode
 │   └── reviewStateCache.ts # SHA-based caching for incremental reviews
 └── utils/
     ├── diffParser.ts   # Diff line validation
@@ -47,6 +51,69 @@ tests/
     ├── platform-adapters.integration.test.ts
     └── review-engine.integration.test.ts
 ```
+
+## Deduplication Strategy
+
+### Problem
+LLM non-determinism causes duplicate comments when:
+- Running the same PR review multiple times (re-reviews)
+- Using `--runs` mode with multiple passes
+
+### Solution: Dual-Layer Deduplication
+
+**Layer 1: LLM-Aware Context**
+- Existing comments are fetched and formatted before each review
+- LLM receives structured context showing already-identified issues
+- Prompts explicitly instruct the model to avoid duplication
+- In multi-run mode, findings from previous runs are added to context for subsequent runs
+
+**Layer 2: Fingerprint-Based Fallback**
+- `FindingAggregator` generates fingerprints (file + line + category + message prefix)
+- Catches duplicates that slip through LLM-level deduplication
+- Preserves findings with highest confidence when duplicates found
+
+### Implementation Details
+
+**Comment Context Format**:
+```
+EXISTING COMMENTS ON THIS PR:
+
+File: src/app.ts
+  - Line 10: [Bug] Null check missing for user input
+  - Line 25: [Security] SQL injection risk [RESOLVED]
+```
+
+**Multi-Run Context Accumulation**:
+- Run 1: Uses real existing comments
+- Run 2: Real comments + synthetic comments from Run 1 findings
+- Run 3: Real comments + synthetic comments from Run 1 + Run 2 findings
+
+**Key Files**:
+- `src/copilot/commentContext.ts`: Formatting logic
+- `src/copilot/prompts.ts`: Prompt builders with context integration
+- `src/review/engine.ts`: Context threading through review pipeline
+
+## Model-Based Comment Resolution
+
+The model actively evaluates existing comments to determine if issues have been resolved:
+
+### How It Works
+1. Existing comments are passed to the model with each file review
+2. Model evaluates each existing comment against the current diff
+3. For resolved issues, model returns `resolved_comments` array with:
+   - `line`: Original line number of the comment
+   - `reason`: Explanation of why the issue is resolved
+
+### Resolution Comment Format
+When an issue is resolved, the model's explanation is included:
+```
+✅ **Issue Resolved**: Null check was added in this commit
+*Resolved at: 2025-12-25T21:00:00.000Z*
+```
+
+### Key Types
+- `ResolvedComment`: `{line: number, reason: string}`
+- `FileReviewResult.resolvedComments`: Optional array of resolved comments
 
 ## Key Commands
 
@@ -70,8 +137,8 @@ pnpm typecheck        # Type check without building
 pnpm check            # Run all checks (typecheck, lint, test)
 
 # When installed globally or via npx
-merge-mentor review --pr <number> [--platform github|azure] [--write]
-npx merge-mentor review --pr <number> [--platform github|azure] [--write]
+merge-mentor review --pr <number> [--platform github|azure] [--write] [--runs 1-5]
+npx merge-mentor review --pr <number> [--platform github|azure] [--write] [--runs 1-5]
 ```
 
 ## Development Guidelines

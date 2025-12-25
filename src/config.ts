@@ -43,6 +43,8 @@ export interface Config {
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
   readonly commentFilter: CommentFilterConfig;
+  /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
+  readonly reviewRuns: number;
 }
 
 /**
@@ -62,6 +64,7 @@ export function loadConfig(): Config {
     : undefined;
 
   const minConfidence = validateMinConfidence(process.env.MIN_COMMENT_CONFIDENCE);
+  const reviewRuns = validateReviewRuns(process.env.REVIEW_RUNS);
 
   return {
     defaultPlatform: (process.env.DEFAULT_PLATFORM as Platform) || "github",
@@ -84,6 +87,7 @@ export function loadConfig(): Config {
       skipPreExisting: process.env.SKIP_PREEXISTING_ISSUES !== "false",
       postResolutionComments: process.env.POST_RESOLUTION_COMMENTS !== "false",
     },
+    reviewRuns,
   };
 }
 
@@ -93,6 +97,17 @@ function validateMinConfidence(value: string | undefined): FindingConfidence {
     return value as FindingConfidence;
   }
   return "high"; // Default to high confidence
+}
+
+function validateReviewRuns(value: string | undefined): number {
+  if (!value) {
+    return 1; // Default to 1 run
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
+    return 1; // Default to 1 for invalid values
+  }
+  return parsed;
 }
 
 /**

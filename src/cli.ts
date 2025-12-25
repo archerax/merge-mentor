@@ -13,6 +13,7 @@ export interface ReviewOptions {
   platform?: string;
   write: boolean;
   verbose: boolean;
+  runs?: number;
 }
 
 /**
@@ -43,12 +44,14 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
   }
 
   const dryRun = !options.write;
+  const reviewRuns = options.runs ?? config.reviewRuns;
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, {
     dryRun,
     verbose: options.verbose,
     copilotModel: config.copilotModel,
     copilotTimeoutMs: config.copilotTimeoutMs,
     commentFilter: config.commentFilter,
+    reviewRuns,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -105,7 +108,7 @@ const program = new Command();
 program
   .name("merge-mentor")
   .description("Automated code review bot using GitHub Copilot CLI")
-  .version("1.2.0");
+  .version("1.3.0");
 
 program
   .command("review")
@@ -114,6 +117,17 @@ program
   .option("--platform <platform>", "Platform (github or azure)", "github")
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
+  .option(
+    "--runs <number>",
+    "Number of review runs (1-5). Multiple runs aggregate findings for thoroughness.",
+    (value) => {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
+        throw new Error("--runs must be a number between 1 and 5");
+      }
+      return parsed;
+    }
+  )
   .action(async (options: ReviewOptions) => {
     try {
       const result = await executeReview(options);

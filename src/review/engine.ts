@@ -2,6 +2,10 @@ import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { CopilotClient } from "../copilot/client.js";
 import {
+  formatExistingCommentsContext,
+  formatFileCommentsContext,
+} from "../copilot/commentContext.js";
+import {
   buildCrossFilePrompt,
   buildFileReviewPrompt,
   buildFilesSummary,
@@ -11,6 +15,7 @@ import { createChildLogger } from "../logger.js";
 import type {
   CommentAction,
   CrossFileReviewResult,
+  ExistingComment,
   FileReviewResult,
   PlatformAdapter,
   PRDetails,
@@ -18,6 +23,7 @@ import type {
 } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { CommentManager } from "./commentManager.js";
+import { FindingAggregator } from "./findingAggregator.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 /** Result of a complete PR review. */
@@ -40,6 +46,8 @@ export interface ReviewEngineOptions {
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
   readonly commentFilter?: CommentFilterConfig;
+  /** Number of review runs (1-5). Multiple runs aggregate findings. */
+  readonly reviewRuns?: number;
 }
 
 /**
@@ -71,6 +79,7 @@ export class ReviewEngine {
         copilotTimeoutMs: options?.copilotTimeoutMs,
         dryRun: options?.dryRun,
         commentFilter: options?.commentFilter,
+        reviewRuns: options?.reviewRuns ?? 1,
       },
       "ReviewEngine initialized"
     );
@@ -98,31 +107,57 @@ export class ReviewEngine {
       throw new ValidationError("prNumber", "Must be a positive integer");
     }
 
-    this.logger.info({ prNumber }, "Starting PR review");
+    const runs = this.options.reviewRuns ?? 1;
+    this.logger.info({ prNumber, runs }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prNumber);
 
-    const { fileResults, filesSkipped } = await this.reviewFiles(files, cachedState);
-
-    // Validate line numbers against actual diff content
-    const validatedResults = this.validateLineNumbers(fileResults, files);
-
-    // Skip cross-file analysis if all files were cached (no files changed)
+    let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
-    if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
-      this.log("All files unchanged - using cached cross-file analysis");
-      this.logger.info({ prNumber }, "Reusing cached cross-file analysis");
-      crossFileResult = cachedState.crossFileResult;
+    let filesSkipped: number;
+
+    if (runs === 1) {
+      // Single run - use existing logic
+      const reviewData = await this.reviewFiles(files, existingComments, cachedState);
+      fileResults = reviewData.fileResults;
+      filesSkipped = reviewData.filesSkipped;
+
+      // Validate line numbers against actual diff content
+      fileResults = this.validateLineNumbers(fileResults, files);
+
+      // Skip cross-file analysis if all files were cached
+      if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
+        this.log("All files unchanged - using cached cross-file analysis");
+        this.logger.info({ prNumber }, "Reusing cached cross-file analysis");
+        crossFileResult = cachedState.crossFileResult;
+      } else {
+        crossFileResult = await this.performCrossFileAnalysis(
+          prDetails,
+          files,
+          fileResults,
+          existingComments
+        );
+      }
     } else {
-      crossFileResult = await this.performCrossFileAnalysis(prDetails, files, validatedResults);
+      // Multi-run mode - aggregate findings from multiple runs
+      const aggregated = await this.reviewPRMultiRun(
+        prNumber,
+        prDetails,
+        files,
+        runs,
+        existingComments
+      );
+      fileResults = aggregated.fileResults;
+      crossFileResult = aggregated.crossFileResult;
+      filesSkipped = 0; // Multi-run doesn't skip files
     }
 
     const actions = this.commentManager.determineActions(
       existingComments,
-      validatedResults,
+      fileResults,
       crossFileResult
     );
 
@@ -130,7 +165,7 @@ export class ReviewEngine {
 
     // Save state for future re-reviews
     const fileShaMap = this.buildFileShaMap(files);
-    await this.stateCache.saveState(prNumber, validatedResults, fileShaMap, crossFileResult);
+    await this.stateCache.saveState(prNumber, fileResults, fileShaMap, crossFileResult);
 
     if (commentStats.commentErrors.length > 0) {
       this.logger.warn(
@@ -146,9 +181,9 @@ export class ReviewEngine {
     this.logger.info(
       {
         prNumber,
-        filesReviewed: validatedResults.length,
+        filesReviewed: fileResults.length,
         filesSkipped,
-        totalFindings: validatedResults.reduce((sum, r) => sum + r.findings.length, 0),
+        totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
         commentsCreated: commentStats.commentsCreated,
         commentsUpdated: commentStats.commentsUpdated,
         commentsResolved: commentStats.commentsResolved,
@@ -159,12 +194,94 @@ export class ReviewEngine {
 
     return {
       prDetails,
-      filesReviewed: validatedResults.length - filesSkipped,
+      filesReviewed: fileResults.length - filesSkipped,
       filesSkipped,
-      fileResults: validatedResults,
+      fileResults,
       crossFileResult,
       ...commentStats,
     };
+  }
+
+  /**
+   * Performs multiple review runs and aggregates findings.
+   */
+  private async reviewPRMultiRun(
+    prNumber: number,
+    prDetails: PRDetails,
+    files: PRFile[],
+    runs: number,
+    existingComments: readonly ExistingComment[]
+  ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
+    const allFileResults: FileReviewResult[][] = [];
+    const allCrossFileResults: CrossFileReviewResult[] = [];
+
+    this.log(`\n🔄 Multi-run mode: performing ${runs} review runs...`);
+
+    // Accumulate findings from each run to provide context to subsequent runs
+    const accumulatedFindings: FileReviewResult[] = [];
+
+    for (let run = 1; run <= runs; run++) {
+      this.log(`\n📝 Review run ${run} of ${runs}...`);
+      this.logger.info({ prNumber, run, totalRuns: runs }, "Starting review run");
+
+      try {
+        // For runs after the first, create synthetic "existing comments" from previous findings
+        const runComments =
+          run === 1
+            ? existingComments
+            : this.createSyntheticComments(existingComments, accumulatedFindings);
+
+        // Perform file reviews for this run (no caching in multi-run mode)
+        const { fileResults } = await this.reviewFiles(files, runComments, undefined);
+        const validatedResults = this.validateLineNumbers(fileResults, files);
+        allFileResults.push(validatedResults);
+
+        // Accumulate findings for next run's context
+        accumulatedFindings.push(...validatedResults);
+
+        // Perform cross-file analysis for this run
+        const crossFileResult = await this.performCrossFileAnalysis(
+          prDetails,
+          files,
+          validatedResults,
+          runComments
+        );
+        allCrossFileResults.push(crossFileResult);
+
+        this.log(
+          `  Run ${run}: Found ${validatedResults.reduce((sum, r) => sum + r.findings.length, 0)} file issues, ${crossFileResult.findings.length} cross-file issues`
+        );
+
+        // Delay between runs to avoid rate limits (except after last run)
+        if (run < runs) {
+          this.log("  Waiting 2 seconds before next run...");
+          await this.delay(2000);
+        }
+      } catch (error) {
+        this.logger.error({ prNumber, run, error: (error as Error).message }, "Review run failed");
+        this.log(`  ⚠️  Run ${run} failed: ${(error as Error).message}`);
+        // Continue with remaining runs
+      }
+    }
+
+    // Aggregate findings from all successful runs
+    const aggregator = new FindingAggregator();
+    const aggregatedFileResults = aggregator.aggregateFileFindings(allFileResults);
+    const aggregatedCrossFile = aggregator.aggregateCrossFileFindings(allCrossFileResults);
+
+    const totalFindings = aggregatedFileResults.reduce((sum, r) => sum + r.findings.length, 0);
+    this.log(
+      `\n✅ Aggregated ${totalFindings} unique file findings and ${aggregatedCrossFile.findings.length} cross-file findings from ${allFileResults.length} successful run(s)`
+    );
+
+    return {
+      fileResults: aggregatedFileResults,
+      crossFileResult: aggregatedCrossFile,
+    };
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {
@@ -202,6 +319,7 @@ export class ReviewEngine {
 
   private async reviewFiles(
     files: PRFile[],
+    existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     const fileResults: FileReviewResult[] = [];
@@ -230,7 +348,7 @@ export class ReviewEngine {
       }
 
       this.log(`Reviewing ${file.filename}...`);
-      const result = await this.reviewFile(file, filesContext);
+      const result = await this.reviewFile(file, filesContext, existingComments);
       fileResults.push(result);
       this.log(`  Found ${result.findings.length} issues`);
     }
@@ -242,12 +360,24 @@ export class ReviewEngine {
     return { fileResults, filesSkipped };
   }
 
-  private async reviewFile(file: PRFile, filesContext: string): Promise<FileReviewResult> {
+  private async reviewFile(
+    file: PRFile,
+    filesContext: string,
+    existingComments: readonly ExistingComment[]
+  ): Promise<FileReviewResult> {
     if (!file.patch) {
       return { filename: file.filename, findings: [] };
     }
 
-    const prompt = buildFileReviewPrompt(file.filename, file.patch, filesContext);
+    // Format comments context for this specific file
+    const fileCommentsContext = formatFileCommentsContext(file.filename, existingComments);
+
+    const prompt = buildFileReviewPrompt(
+      file.filename,
+      file.patch,
+      filesContext,
+      fileCommentsContext || undefined
+    );
     const response = await this.copilot.executePrompt(prompt);
     return this.copilot.parseFileReview(file.filename, response);
   }
@@ -346,11 +476,13 @@ export class ReviewEngine {
   private async performCrossFileAnalysis(
     prDetails: PRDetails,
     files: PRFile[],
-    fileResults: readonly FileReviewResult[]
+    fileResults: readonly FileReviewResult[],
+    existingComments: readonly ExistingComment[]
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
     const filesSummary = buildFilesSummary(files);
-    const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults);
+    const commentsContext = formatExistingCommentsContext(existingComments);
+    const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults, commentsContext);
     const response = await this.copilot.executePrompt(prompt);
     const result = this.copilot.parseCrossFileReview(response);
     this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
@@ -461,6 +593,35 @@ export class ReviewEngine {
     if (file.status === "deleted") return true;
     if (!file.patch) return true;
     return SKIP_EXTENSIONS.some((ext) => file.filename.endsWith(ext));
+  }
+
+  /**
+   * Creates synthetic "existing comment" objects from findings to provide context
+   * to subsequent review runs in multi-run mode.
+   */
+  private createSyntheticComments(
+    realComments: readonly ExistingComment[],
+    findings: readonly FileReviewResult[]
+  ): ExistingComment[] {
+    const synthetic: ExistingComment[] = [...realComments];
+    let syntheticId = -1; // Use negative IDs for synthetic comments
+
+    for (const fileResult of findings) {
+      for (const finding of fileResult.findings) {
+        // Create a synthetic comment matching our format
+        const syntheticBody = this.commentManager.formatInlineComment(finding, fileResult.filename);
+
+        synthetic.push({
+          id: syntheticId--,
+          body: syntheticBody,
+          path: fileResult.filename,
+          line: finding.line,
+          isResolved: false,
+        });
+      }
+    }
+
+    return synthetic;
   }
 
   private buildFileShaMap(files: PRFile[]): Map<string, string> {

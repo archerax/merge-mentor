@@ -62,6 +62,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       skipPreExisting: true,
       postResolutionComments: true,
     },
+    reviewRuns: 1,
     ...overrides,
   };
 }
@@ -152,6 +153,7 @@ describe("CLI", () => {
           dryRun: true,
           verbose: true,
           copilotModel: "gpt-4",
+          reviewRuns: 1,
         })
       );
       expect(mockReviewPR).toHaveBeenCalledWith(42);
@@ -189,6 +191,7 @@ describe("CLI", () => {
           dryRun: false,
           verbose: false,
           copilotModel: "gpt-4",
+          reviewRuns: 1,
         })
       );
     });
@@ -294,6 +297,45 @@ describe("CLI", () => {
         call[0]?.toString().includes("(dry-run)")
       );
       expect(dryRunCalls.length).toBe(0);
+    });
+
+    it("passes --runs option to ReviewEngine", async () => {
+      const options: ReviewOptions = {
+        pr: 42,
+        write: false,
+        verbose: true,
+        runs: 3,
+      };
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        expect.objectContaining({
+          reviewRuns: 3,
+        })
+      );
+    });
+
+    it("uses config default for runs when --runs not specified", async () => {
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ reviewRuns: 2 }));
+
+      const options: ReviewOptions = {
+        pr: 42,
+        write: false,
+        verbose: true,
+      };
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        expect.objectContaining({
+          reviewRuns: 2,
+        })
+      );
     });
   });
 

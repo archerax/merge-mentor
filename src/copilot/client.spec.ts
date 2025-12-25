@@ -219,6 +219,82 @@ describe("CopilotClient", () => {
 
       expect(result.findings[0].suggestion).toBe("");
     });
+
+    it("should parse resolved_comments from response", () => {
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [],
+        resolved_comments: [
+          { line: 10, reason: "Null check was added" },
+          { line: 25, reason: "Issue was refactored away" },
+        ],
+      });
+
+      const result = client.parseFileReview("test.ts", response);
+
+      expect(result.resolvedComments).toBeDefined();
+      expect(result.resolvedComments).toHaveLength(2);
+      expect(result.resolvedComments![0]).toEqual({
+        line: 10,
+        reason: "Null check was added",
+      });
+      expect(result.resolvedComments![1]).toEqual({
+        line: 25,
+        reason: "Issue was refactored away",
+      });
+    });
+
+    it("should handle empty resolved_comments array", () => {
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [],
+        resolved_comments: [],
+      });
+
+      const result = client.parseFileReview("test.ts", response);
+
+      expect(result.resolvedComments).toBeUndefined();
+    });
+
+    it("should handle missing resolved_comments", () => {
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [],
+      });
+
+      const result = client.parseFileReview("test.ts", response);
+
+      expect(result.resolvedComments).toBeUndefined();
+    });
+
+    it("should skip resolved_comments with invalid line", () => {
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [],
+        resolved_comments: [
+          { line: "invalid", reason: "Should be skipped" },
+          { line: 0, reason: "Zero line should be skipped" },
+          { line: 10, reason: "Valid" },
+        ],
+      });
+
+      const result = client.parseFileReview("test.ts", response);
+
+      expect(result.resolvedComments).toHaveLength(1);
+      expect(result.resolvedComments![0].line).toBe(10);
+    });
+
+    it("should use default reason for missing resolved_comments reason", () => {
+      const client = createCopilotClient();
+      const response = createCopilotResponse({
+        findings: [],
+        resolved_comments: [{ line: 10 }],
+      });
+
+      const result = client.parseFileReview("test.ts", response);
+
+      expect(result.resolvedComments![0].reason).toBe("Issue addressed");
+    });
   });
 
   describe("parseCrossFileReview", () => {

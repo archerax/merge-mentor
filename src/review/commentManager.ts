@@ -62,6 +62,39 @@ export class CommentManager {
   ): CommentAction[] {
     const actions: CommentAction[] = [];
     const matchedExistingIds = new Set<number | string>();
+    const modelResolvedIds = new Set<number | string>();
+
+    // Collect model-identified resolved comments
+    for (const fileResult of fileResults) {
+      if (fileResult.resolvedComments) {
+        for (const resolved of fileResult.resolvedComments) {
+          // Find matching existing comment by file and line
+          const existingComment = existingComments.find(
+            (c) => c.path === fileResult.filename && c.line === resolved.line && !c.isResolved
+          );
+          if (existingComment) {
+            modelResolvedIds.add(existingComment.id);
+            // Add resolution comment with the model's reason
+            if (this.filterConfig.postResolutionComments) {
+              const resolutionBody = this.formatModelResolutionComment(
+                existingComment.body,
+                resolved.reason
+              );
+              actions.push({
+                type: "update",
+                existingCommentId: existingComment.id,
+                body: resolutionBody,
+                resolutionReason: resolved.reason,
+              });
+            }
+            actions.push({
+              type: "resolve",
+              existingCommentId: existingComment.id,
+            });
+          }
+        }
+      }
+    }
 
     // Process file findings with filtering
     for (const fileResult of fileResults) {
@@ -101,9 +134,14 @@ export class CommentManager {
       }
     }
 
-    // Resolve comments that are no longer relevant
+    // Resolve comments that are no longer relevant (fallback for comments not explicitly resolved by model)
     for (const comment of existingComments) {
-      if (!matchedExistingIds.has(comment.id) && !comment.isResolved && comment.path) {
+      if (
+        !matchedExistingIds.has(comment.id) &&
+        !modelResolvedIds.has(comment.id) &&
+        !comment.isResolved &&
+        comment.path
+      ) {
         // Add resolution comment before resolving if configured
         if (this.filterConfig.postResolutionComments) {
           const resolutionBody = this.formatResolutionComment(comment.body);
@@ -239,6 +277,18 @@ export class CommentManager {
 
 ---
 ✅ **Issue Resolved**: This issue is no longer present in the latest review.  
+*Resolved at: ${timestamp}*`;
+  }
+
+  /**
+   * Formats a resolution comment with the model's explanation.
+   */
+  private formatModelResolutionComment(originalBody: string, reason: string): string {
+    const timestamp = new Date().toISOString();
+    return `${originalBody}
+
+---
+✅ **Issue Resolved**: ${reason}  
 *Resolved at: ${timestamp}*`;
   }
 

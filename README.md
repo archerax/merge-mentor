@@ -36,8 +36,10 @@ merge-mentor review --pr 123 --write
 - **Inline Comments**: Posts specific feedback on exact lines of code
 - **Summary Reports**: Generates detailed summary comments with statistics
 - **Comment Management**: Updates/resolves existing bot comments as issues are addressed
+- **Intelligent Deduplication**: Provides existing comment context to LLM to avoid flagging the same issues repeatedly
 - **Cross-File Analysis**: Identifies architectural and design issues across the PR
 - **Incremental Reviews**: Automatically skips re-reviewing unchanged files to reduce costs and improve speed
+- **Multi-Run Mode**: Execute multiple review passes with aggregated findings for increased thoroughness
 - **Dry-Run Mode**: Preview changes before posting (default behavior)
 
 ## Prerequisites
@@ -194,7 +196,10 @@ SKIP_PREEXISTING_ISSUES=false
 
 ### Resolution Comments
 
-When issues are resolved (no longer present in a re-review), merge-mentor can post an explanatory comment before marking the thread as resolved.
+When issues are resolved, merge-mentor posts an explanatory comment before marking the thread as resolved. The AI model actively evaluates existing comments against the current code to determine:
+
+1. **Whether the issue is fixed** - The model checks if problematic code was removed or corrected
+2. **Why it's resolved** - Provides a specific explanation (e.g., "Null check was added", "Code refactored to handle edge case")
 
 ```bash
 # Post resolution comment before resolving (default)
@@ -204,7 +209,106 @@ POST_RESOLUTION_COMMENTS=true
 POST_RESOLUTION_COMMENTS=false
 ```
 
-The resolution comment includes a timestamp and a message indicating the issue was resolved.
+The resolution comment includes:
+- The model's explanation of why the issue is resolved
+- A timestamp indicating when it was resolved
+
+## Intelligent Deduplication
+
+### Problem: Comment Duplication
+
+Because LLMs are non-deterministic, running reviews multiple times can result in duplicate comments about the same issue with different wording. This occurs in:
+
+- **Re-reviews**: Running the same PR multiple times
+- **Multi-run mode**: Using `--runs 3` to increase thoroughness
+
+### Solution: Existing Comment Context
+
+merge-mentor automatically provides the LLM with context about existing comments on the PR. This enables the model to:
+
+- **Avoid re-flagging known issues**: The LLM can see what has already been commented on
+- **Focus on new findings**: Each review pass concentrates on issues not yet identified
+- **Maintain consistency**: Better alignment between multiple review runs
+
+### How It Works
+
+1. **Fetches existing comments**: Before reviewing, the tool retrieves all bot comments on the PR
+2. **Formats context**: Comments are summarized by file and line with category and issue description
+3. **Includes in prompts**: The LLM receives this context and is instructed to avoid duplication
+4. **Multi-run enhancement**: In `--runs` mode, findings from previous runs are added to the context for subsequent runs
+
+### Example Context Provided to LLM
+
+```
+EXISTING COMMENTS ON THIS PR:
+
+File: src/app.ts
+  - Line 10: [Bug] Null check missing for user input
+  - Line 25: [Security] SQL injection risk in query builder [RESOLVED]
+
+File: src/utils.ts
+  - Line 5: [Performance] Inefficient loop over large array
+```
+
+This context helps the LLM understand what issues have already been identified, significantly reducing duplicate comments while still allowing it to flag genuinely new concerns.
+
+### Fallback Deduplication
+
+Even with LLM-aware deduplication, merge-mentor maintains fingerprint-based deduplication as a safety net. This catches any duplicates that slip through by comparing:
+- Filename
+- Line number
+- Category
+- First few words of the issue message
+
+## Understanding Review Variance
+
+### Non-Deterministic Nature
+
+merge-mentor uses AI models (GPT-4o, Claude, etc.) that are **inherently non-deterministic**. Running the same review multiple times may produce different results due to:
+
+- **Model Sampling**: LLMs use probabilistic generation with temperature settings
+- **Qualitative Analysis**: AI makes judgment calls about code quality that can vary
+- **Context Interpretation**: Models may focus on different aspects of large changes
+
+This is expected behavior, not a bug. Different runs may surface different legitimate concerns.
+
+### Mitigation Strategies
+
+1. **Comprehensive Prompts**: The tool uses carefully crafted prompts to maximize thoroughness in a single run by instructing the model to perform multiple mental passes.
+
+2. **Multi-Run Mode**: For critical reviews, run multiple times and aggregate findings:
+   ```bash
+   # Run 3 times and combine unique findings
+   merge-mentor review --pr 123 --runs 3 --write
+   
+   # Configure default via environment
+   REVIEW_RUNS=3 merge-mentor review --pr 123 --write
+   ```
+
+3. **Confidence Filtering**: By default, only high-confidence findings are posted, reducing noise from uncertain observations (see [Comment Filtering](#comment-filtering)).
+
+### When to Use Multiple Runs
+
+- **Critical Production Code**: Use 3-5 runs for high-stakes changes
+- **Security-Sensitive Code**: Multiple passes increase chance of catching vulnerabilities
+- **Complex Architectural Changes**: Different runs may catch different design issues
+- **Regular Development**: Single run is usually sufficient for day-to-day reviews
+
+### Configuration
+
+```bash
+# .env
+REVIEW_RUNS=3  # Default number of runs (1-5), defaults to 1
+```
+
+```bash
+# CLI override
+merge-mentor review --pr 123 --runs 3
+```
+
+**Note**: Multiple runs increase execution time and API costs proportionally. Each run is a full independent review.
+
+For detailed technical information about LLM non-determinism and mitigation strategies, see [CONSISTENCY.md](./CONSISTENCY.md).
 
 ## Logging
 
@@ -325,6 +429,7 @@ pnpm review -- --pr 123 --verbose false
 | `--platform <github\|azure>` | Platform to use                         | From env or `github` |
 | `--write`                    | Post comments to PR (otherwise dry-run) | `false`              |
 | `--verbose`                  | Enable verbose output                   | `true`               |
+| `--runs <number>`            | Number of review runs (1-5) for aggregation | `1` or from env   |
 
 ### CI/CD Integration
 
