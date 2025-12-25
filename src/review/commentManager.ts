@@ -80,7 +80,7 @@ export class CommentManager {
 
         if (existingComment) {
           matchedExistingIds.add(existingComment.id);
-          const newBody = this.formatInlineComment(finding);
+          const newBody = this.formatInlineComment(finding, fileResult.filename);
           if (!this.commentsMatch(existingComment.body, newBody)) {
             actions.push({
               type: "update",
@@ -95,7 +95,7 @@ export class CommentManager {
             type: "create",
             path: fileResult.filename,
             line: finding.line,
-            body: this.formatInlineComment(finding),
+            body: this.formatInlineComment(finding, fileResult.filename),
           });
         }
       }
@@ -150,6 +150,18 @@ export class CommentManager {
     finding: FileFinding,
     alreadyMatched: Set<number | string>
   ): ExistingComment | undefined {
+    const findingId = this.generateFindingId(filename, finding);
+
+    // First, try to match by finding ID (most reliable)
+    const matchById = existingComments.find(
+      (c) => !alreadyMatched.has(c.id) && this.extractFindingId(c.body) === findingId
+    );
+
+    if (matchById) {
+      return matchById;
+    }
+
+    // Fallback to legacy matching for old comments without IDs
     return existingComments.find(
       (c) =>
         !alreadyMatched.has(c.id) &&
@@ -231,17 +243,37 @@ export class CommentManager {
   }
 
   /**
+   * Generates a stable identifier for a finding based on its key properties.
+   */
+  private generateFindingId(filename: string, finding: FileFinding): string {
+    const key = `${filename}:${finding.line}:${finding.category}`;
+    return Buffer.from(key).toString("base64");
+  }
+
+  /**
+   * Extracts the finding ID from a comment body.
+   */
+  private extractFindingId(commentBody: string): string | null {
+    const match = commentBody.match(/<!-- finding-id: ([A-Za-z0-9+/=]+) -->/);
+    return match ? match[1] : null;
+  }
+
+  /**
    * Formats a file finding as an inline comment.
    *
    * @param finding - The finding to format
+   * @param filename - The file path for generating unique ID
    * @returns Formatted comment body with enhanced markdown formatting
    */
-  formatInlineComment(finding: FileFinding): string {
+  formatInlineComment(finding: FileFinding, filename?: string): string {
     const severityEmoji = this.getSeverityEmoji(finding.severity);
     const categoryEmoji = this.getCategoryEmoji(finding.category);
     const confidenceEmoji = this.getConfidenceEmoji(finding.confidence ?? "medium");
 
-    return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
+    const findingId = filename ? this.generateFindingId(filename, finding) : "";
+    const idMarker = findingId ? `<!-- finding-id: ${findingId} -->\n` : "";
+
+    return `${idMarker}### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
 **Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}  
 **Confidence**: ${confidenceEmoji} ${(finding.confidence ?? "medium").charAt(0).toUpperCase() + (finding.confidence ?? "medium").slice(1)}  

@@ -143,6 +143,8 @@ export const sampleFileReviewResults: FileReviewResult[] = [
         message: "JWT secret is accessed directly from environment without validation",
         suggestion:
           "Add validation to ensure JWT_SECRET is defined at startup, or use a configuration module with proper error handling.",
+        confidence: "high",
+        isPreExisting: false,
       },
       {
         line: 17,
@@ -151,6 +153,8 @@ export const sampleFileReviewResults: FileReviewResult[] = [
         message: "TODO comment indicates missing rate limiting",
         suggestion:
           "Implement rate limiting before merging to prevent brute force attacks on the login endpoint.",
+        confidence: "high",
+        isPreExisting: false,
       },
     ],
   },
@@ -164,6 +168,8 @@ export const sampleFileReviewResults: FileReviewResult[] = [
         message: "Using 'any' type for request, response, and next parameters",
         suggestion:
           "Use proper Express types: Request, Response, NextFunction from 'express' package.",
+        confidence: "high",
+        isPreExisting: false,
       },
       {
         line: 17,
@@ -171,6 +177,8 @@ export const sampleFileReviewResults: FileReviewResult[] = [
         category: "security",
         message: "JWT secret accessed without validation",
         suggestion: "Use the same secure configuration pattern as recommended for login.ts.",
+        confidence: "high",
+        isPreExisting: false,
       },
     ],
   },

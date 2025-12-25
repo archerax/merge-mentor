@@ -161,6 +161,11 @@ export function createTestConfig(overrides?: Partial<Config>): Config {
     },
     copilotModel: "gpt-4",
     copilotTimeoutMs: 30000,
+    commentFilter: {
+      minConfidence: "high",
+      skipPreExisting: true,
+      postResolutionComments: true,
+    },
     ...overrides,
   };
 }

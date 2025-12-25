@@ -87,6 +87,8 @@ describe("ReviewEngine Integration", () => {
                 category: "security",
                 message: "JWT secret issue",
                 suggestion: "Add validation",
+                confidence: "high",
+                isPreExisting: false,
               },
             ],
           };
@@ -101,6 +103,8 @@ describe("ReviewEngine Integration", () => {
                 category: "quality",
                 message: "Using any type",
                 suggestion: "Use proper types",
+                confidence: "high",
+                isPreExisting: false,
               },
             ],
           };
@@ -266,6 +270,8 @@ describe("ReviewEngine Integration", () => {
             category: "security",
             message: "Test issue",
             suggestion: "Fix it",
+            confidence: "high",
+            isPreExisting: false,
           },
         ],
       });
@@ -388,5 +394,144 @@ describe("ReviewEngine with different platforms", () => {
     const result = await engine.reviewPR(42);
 
     expect(result.prDetails.author).toBe("azure-user");
+  });
+});
+
+describe("ReviewEngine confidence filtering", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    // Reset mock implementations to default state
+    mockCopilotInstance.executePrompt.mockReset();
+    mockCopilotInstance.parseFileReview.mockReset();
+    mockCopilotInstance.parseCrossFileReview.mockReset();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    // Clear cache directory to avoid state leakage from previous tests
+    const fs = await import("node:fs/promises");
+    try {
+      await fs.rm(".merge-mentor/cache", { recursive: true, force: true });
+    } catch {
+      // Ignore errors if directory doesn't exist
+    }
+  });
+
+  it("skips low-confidence findings when minConfidence is high", async () => {
+    const mockAdapter = createMockPlatformAdapter();
+
+    mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+    mockCopilotInstance.parseFileReview.mockReturnValue({
+      filename: "src/auth/login.ts",
+      findings: [
+        {
+          line: 27,
+          severity: "high",
+          category: "security",
+          message: "Low confidence issue",
+          suggestion: "Fix it",
+          confidence: "low",
+          isPreExisting: false,
+        },
+      ],
+    });
+    mockCopilotInstance.parseCrossFileReview.mockReturnValue({
+      overallAssessment: "OK",
+      findings: [],
+      recommendations: [],
+    });
+
+    const engine = new ReviewEngine(mockAdapter, "[Bot]", {
+      dryRun: false,
+      verbose: false,
+      commentFilter: {
+        minConfidence: "high",
+        skipPreExisting: true,
+        postResolutionComments: true,
+      },
+    });
+
+    await engine.reviewPR(42);
+
+    // No inline comments should be posted (only summary)
+    expect(mockAdapter.calls.postInlineComment).toHaveLength(0);
+  });
+
+  it("skips pre-existing issues when skipPreExisting is true", async () => {
+    const mockAdapter = createMockPlatformAdapter();
+
+    mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+    mockCopilotInstance.parseFileReview.mockReturnValue({
+      filename: "src/auth/login.ts",
+      findings: [
+        {
+          line: 27,
+          severity: "high",
+          category: "security",
+          message: "Pre-existing issue",
+          suggestion: "Fix it",
+          confidence: "high",
+          isPreExisting: true,
+        },
+      ],
+    });
+    mockCopilotInstance.parseCrossFileReview.mockReturnValue({
+      overallAssessment: "OK",
+      findings: [],
+      recommendations: [],
+    });
+
+    const engine = new ReviewEngine(mockAdapter, "[Bot]", {
+      dryRun: false,
+      verbose: false,
+      commentFilter: {
+        minConfidence: "high",
+        skipPreExisting: true,
+        postResolutionComments: true,
+      },
+    });
+
+    await engine.reviewPR(42);
+
+    // No inline comments should be posted (only summary)
+    expect(mockAdapter.calls.postInlineComment).toHaveLength(0);
+  });
+
+  it("posts resolution comment before resolving when postResolutionComments is true", async () => {
+    const mockAdapter = createMockPlatformAdapter({
+      existingComments: [
+        { id: 100, body: "[Bot]\n\nsecurity issue", path: "src/auth/login.ts", line: 27 },
+      ],
+    });
+
+    mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+    mockCopilotInstance.parseFileReview.mockReturnValue({
+      filename: "src/auth/login.ts",
+      findings: [], // No findings = issue resolved
+    });
+    mockCopilotInstance.parseCrossFileReview.mockReturnValue({
+      overallAssessment: "All issues fixed",
+      findings: [],
+      recommendations: [],
+    });
+
+    const engine = new ReviewEngine(mockAdapter, "[Bot]", {
+      dryRun: false,
+      verbose: false,
+      commentFilter: {
+        minConfidence: "high",
+        skipPreExisting: true,
+        postResolutionComments: true,
+      },
+    });
+
+    await engine.reviewPR(42);
+
+    // Should have update and resolve for the comment
+    expect(mockAdapter.calls.updateComment.length).toBeGreaterThanOrEqual(1);
+    expect(mockAdapter.calls.resolveComment.length).toBeGreaterThanOrEqual(1);
+    
+    // The update should contain resolution message
+    const updateCall = mockAdapter.calls.updateComment.find(
+      (call) => call.commentId === 100
+    );
+    expect(updateCall?.body).toContain("Issue Resolved");
   });
 });

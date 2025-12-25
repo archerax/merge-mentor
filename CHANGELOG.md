@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Confidence level displayed in comment formatting with emoji indicator (🟢 High, 🟡 Medium, 🔴 Low)
 - New `FileFinding` fields: `confidence` and `isPreExisting`
 - New `CommentAction` field: `resolutionReason`
-- 13 new unit tests for confidence filtering functionality
+- 15 new unit tests for confidence filtering and duplicate prevention functionality
 - 3 new integration tests for confidence filtering workflows
 
 ### Changed
@@ -29,10 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CommentManager` now accepts configuration options for filtering behavior
 - `ReviewEngine` passes filter configuration to `CommentManager`
 - Default behavior is now more conservative (only high-confidence new issues are posted)
+- **Improved comment matching**: Comments now include unique identifiers to prevent duplicate comments when running reviews multiple times
 
 ### Fixed
 
 - Comment matching failed when category names had different casing
+- **Duplicate comments created when running review twice with no changes**: Comments now include stable identifiers (hidden HTML comments) that survive content modifications, ensuring reliable matching across multiple review runs
 
 ## [1.1.0] - 2025-12-24
 

@@ -410,7 +410,7 @@ describe("CommentManager", () => {
         confidence: "high",
         isPreExisting: false,
       });
-      const existingBody = manager.formatInlineComment(finding);
+      const existingBody = manager.formatInlineComment(finding, "test.ts");
       const existingComments: ExistingComment[] = [
         { id: 1, body: existingBody, path: "test.ts", line: 10 },
       ];
@@ -620,6 +620,80 @@ describe("CommentManager", () => {
 
       expect(updateActions).toHaveLength(0);
       expect(resolveActions).toHaveLength(1);
+    });
+
+    it("should not create duplicate comments when run twice with no changes", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 10,
+        severity: "high",
+        category: "bug",
+        message: "Test message",
+        confidence: "high",
+        isPreExisting: false,
+      });
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [finding],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      // First run: create comment
+      const firstRunActions = manager.determineActions([], fileResults, crossFileResult);
+      const createdComment = firstRunActions.find(
+        (a) => a.type === "create" && a.path === "test.ts"
+      );
+      expect(createdComment).toBeDefined();
+      if (!createdComment || !createdComment.body) {
+        throw new Error("Expected comment to be created with body");
+      }
+
+      // Second run: should match existing comment, not create duplicate
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: createdComment.body, path: "test.ts", line: 10 },
+      ];
+      const secondRunActions = manager.determineActions(
+        existingComments,
+        fileResults,
+        crossFileResult
+      );
+      const createActions = secondRunActions.filter((a) => a.type === "create" && a.path);
+      const updateActions = secondRunActions.filter(
+        (a) => a.type === "update" && a.existingCommentId === 1
+      );
+
+      expect(createActions).toHaveLength(0); // Should not create duplicate
+      expect(updateActions).toHaveLength(0); // Should not update (content matches)
+    });
+
+    it("should match comments by finding ID even with modified body", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 10,
+        category: "bug",
+        confidence: "high",
+        isPreExisting: false,
+      });
+      const originalBody = manager.formatInlineComment(finding, "test.ts");
+      // Simulate comment that was updated with resolution text
+      const modifiedBody = `${originalBody}\n\n---\n✅ **Issue Resolved**`;
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: modifiedBody, path: "test.ts", line: 10 },
+      ];
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [finding],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0); // Should match by ID, not create duplicate
     });
   });
 });
