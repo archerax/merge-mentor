@@ -1,7 +1,25 @@
-import { afterAll } from "vitest";
-import { cleanupLogger } from "./src/logger.js";
+import { afterAll, vi } from "vitest";
 
-// Clean up logger worker threads after all tests complete
+// Mock pino to avoid CI issues with worker threads and file system operations
+vi.mock("pino", () => {
+  const mockLogger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+    child: vi.fn(() => mockLogger),
+    flush: vi.fn().mockResolvedValue(undefined),
+    level: "info",
+  };
+
+  return {
+    default: vi.fn(() => mockLogger),
+  };
+});
+
+// Clean up after all tests complete
 afterAll(async () => {
-  await cleanupLogger();
+  // No need to cleanup mocked logger
 });

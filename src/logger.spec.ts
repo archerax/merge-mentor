@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { cleanupLogger, createChildLogger, logger } from "./logger.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanupLogger, createChildLogger, getLogger, logger } from "./logger.js";
 
 describe("Logger", () => {
+  beforeEach(async () => {
+    // Reset logger state between tests
+    await cleanupLogger();
+    vi.clearAllMocks();
+  });
+
   it("creates root logger", () => {
     expect(logger).toBeDefined();
     expect(logger.info).toBeDefined();
@@ -25,7 +31,21 @@ describe("Logger", () => {
   });
 
   it("cleanup flushes and resets logger", async () => {
+    const initialLogger = getLogger();
+    expect(initialLogger).toBeDefined();
+
     await cleanupLogger();
-    expect(cleanupLogger).toBeDefined();
+
+    // After cleanup, a new logger should be created on next access
+    const newLogger = getLogger();
+    expect(newLogger).toBeDefined();
+  });
+
+  it("logger methods are callable", () => {
+    // Verify the mocked logger methods can be called without errors
+    expect(() => logger.info("test message")).not.toThrow();
+    expect(() => logger.error("error message")).not.toThrow();
+    expect(() => logger.warn("warning message")).not.toThrow();
+    expect(() => logger.debug("debug message")).not.toThrow();
   });
 });

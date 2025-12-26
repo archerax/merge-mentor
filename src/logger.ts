@@ -46,7 +46,10 @@ export function createChildLogger(context: Record<string, unknown>) {
  */
 export async function cleanupLogger(): Promise<void> {
   if (_logger) {
-    await _logger.flush();
+    // Only flush if the flush method exists (it won't in mocked pino)
+    if (typeof _logger.flush === "function") {
+      await _logger.flush();
+    }
     _logger = undefined;
   }
 }

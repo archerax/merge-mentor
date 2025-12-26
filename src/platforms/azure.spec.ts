@@ -230,6 +230,7 @@ describe("AzureDevOpsAdapter", () => {
     });
 
     it("skips changes without item path", async () => {
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const adapter = new AzureDevOpsAdapter(createTestConfig());
       mockGitApiInstance.getPullRequestById.mockResolvedValue({
         lastMergeSourceCommit: { commitId: "source123" },
@@ -262,6 +263,8 @@ describe("AzureDevOpsAdapter", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].filename).toBe("valid.ts");
+
+      consoleWarnSpy.mockRestore();
     });
 
     it("handles missing changeEntries", async () => {
@@ -293,6 +296,7 @@ describe("AzureDevOpsAdapter", () => {
     });
 
     it("maps all change types correctly", async () => {
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const adapter = new AzureDevOpsAdapter(createTestConfig());
       mockGitApiInstance.getPullRequestById.mockResolvedValue({
         lastMergeSourceCommit: { commitId: "source123" },
@@ -367,6 +371,8 @@ describe("AzureDevOpsAdapter", () => {
       expect(result[2].status).toBe("renamed");
       expect(result[3].status).toBe("deleted");
       expect(result[4].status).toBe("modified");
+
+      consoleWarnSpy.mockRestore();
     });
   });
 

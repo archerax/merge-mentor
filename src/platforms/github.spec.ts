@@ -333,6 +333,7 @@ describe("GitHubAdapter", () => {
     });
 
     it("falls back to issue comment update when review update fails", async () => {
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const adapter = new GitHubAdapter(createTestConfig());
       mockOctokitInstance.pulls.updateReviewComment.mockRejectedValue(new Error("Not found"));
       mockOctokitInstance.issues.updateComment.mockResolvedValue({});
@@ -345,6 +346,8 @@ describe("GitHubAdapter", () => {
         comment_id: 456,
         body: "<!-- merge-mentor -->\n\nUpdated message",
       });
+
+      consoleWarnSpy.mockRestore();
     });
 
     it("handles string comment ID", async () => {
