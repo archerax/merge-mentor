@@ -337,6 +337,37 @@ describe("CLI", () => {
         })
       );
     });
+
+    it("passes comment filter config to ReviewEngine", async () => {
+      const customConfig = createMockConfig({
+        commentFilter: {
+          minConfidence: "medium",
+          skipPreExisting: false,
+          postResolutionComments: false,
+        },
+      });
+      vi.mocked(loadConfig).mockReturnValue(customConfig);
+
+      const options: ReviewOptions = {
+        pr: 42,
+        write: false,
+        verbose: true,
+      };
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        expect.objectContaining({
+          commentFilter: {
+            minConfidence: "medium",
+            skipPreExisting: false,
+            postResolutionComments: false,
+          },
+        })
+      );
+    });
   });
 
   describe("displayResults", () => {
@@ -510,6 +541,27 @@ describe("CLI", () => {
     it("returns false when fileResults is empty", () => {
       const result = createMockReviewResult({
         fileResults: [],
+      });
+
+      expect(hasCriticalIssues(result)).toBe(false);
+    });
+
+    it("returns false when only cross-file findings have critical issues", () => {
+      // Note: Current implementation only checks fileResults, not crossFileResult
+      const result = createMockReviewResult({
+        fileResults: [],
+        crossFileResult: {
+          overallAssessment: "Has critical issues",
+          findings: [
+            {
+              severity: "critical",
+              category: "architecture",
+              message: "Critical cross-file issue",
+              affectedFiles: ["file1.ts", "file2.ts"],
+            },
+          ],
+          recommendations: [],
+        },
       });
 
       expect(hasCriticalIssues(result)).toBe(false);

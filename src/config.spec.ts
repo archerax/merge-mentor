@@ -156,6 +156,52 @@ describe("Config", () => {
       setEnv({ REVIEW_RUNS: "5" });
       expect(loadConfig().reviewRuns).toBe(5);
     });
+
+    it("should load COPILOT_TIMEOUT_MS from environment", () => {
+      setEnv({
+        COPILOT_TIMEOUT_MS: "60000",
+      });
+
+      const config = loadConfig();
+
+      expect(config.copilotTimeoutMs).toBe(60000);
+    });
+
+    it("should ignore COPILOT_TIMEOUT_MS when zero or negative", () => {
+      setEnv({
+        COPILOT_TIMEOUT_MS: "0",
+      });
+
+      const config = loadConfig();
+
+      expect(config.copilotTimeoutMs).toBeUndefined();
+    });
+
+    it("should ignore COPILOT_TIMEOUT_MS when negative", () => {
+      setEnv({
+        COPILOT_TIMEOUT_MS: "-1000",
+      });
+
+      const config = loadConfig();
+
+      expect(config.copilotTimeoutMs).toBeUndefined();
+    });
+
+    it("should default COPILOT_TIMEOUT_MS to undefined when not set", () => {
+      const config = loadConfig();
+
+      expect(config.copilotTimeoutMs).toBeUndefined();
+    });
+
+    it("should load COPILOT_MODEL from environment", () => {
+      setEnv({
+        COPILOT_MODEL: "gpt-4-turbo",
+      });
+
+      const config = loadConfig();
+
+      expect(config.copilotModel).toBe("gpt-4-turbo");
+    });
   });
 
   describe("validateConfig", () => {

@@ -177,6 +177,27 @@ describe("GitHubAdapter", () => {
 
       expect(result).toEqual([]);
     });
+
+    it("handles files with null sha", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.listFiles.mockResolvedValue({
+        data: [
+          {
+            filename: "src/test.ts",
+            status: "modified",
+            additions: 10,
+            deletions: 5,
+            patch: "@@ -1,3 +1,4 @@",
+            sha: null, // This tests the ?? undefined branch
+          },
+        ],
+      });
+
+      const result = await adapter.getPRFiles(123);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].sha).toBeUndefined();
+    });
   });
 
   describe("getExistingBotComments", () => {
@@ -411,6 +432,45 @@ describe("GitHubAdapter", () => {
         repo: "test-repo",
         comment_id: 789,
       });
+    });
+
+    it("logs warning when resolve fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValue({
+        data: {
+          id: 456,
+          pull_request_review_id: 789,
+          body: "Test comment",
+        },
+      });
+      mockOctokitInstance.graphql.mockRejectedValue(new Error("GraphQL error"));
+
+      await adapter.resolveComment(456);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to resolve review comment thread 456"),
+        expect.any(String)
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe("postInlineComment error handling", () => {
+    it("throws error when inline comment fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({
+        data: {
+          number: 123,
+          head: { sha: "abc123" },
+        },
+      });
+      mockOctokitInstance.pulls.createReviewComment.mockRejectedValue(new Error("API error"));
+
+      await expect(adapter.postInlineComment(123, "test.ts", 10, "Test")).rejects.toThrow(
+        "API error"
+      );
     });
   });
 });

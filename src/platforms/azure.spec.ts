@@ -594,4 +594,109 @@ describe("AzureDevOpsAdapter", () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe("getPRFiles edge cases", () => {
+    it("returns empty array when PR has no commits", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        title: "Test PR",
+        description: "Test description",
+        createdBy: { displayName: "Test User" },
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+        lastMergeSourceCommit: null,
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toEqual([]);
+      expect(mockGitApiInstance.getPullRequestIterations).not.toHaveBeenCalled();
+    });
+
+    it("returns empty array when PR has no target commit", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        title: "Test PR",
+        description: "Test description",
+        createdBy: { displayName: "Test User" },
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: null,
+      });
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toEqual([]);
+      expect(mockGitApiInstance.getPullRequestIterations).not.toHaveBeenCalled();
+    });
+
+    it("returns empty array when PR has neither commit", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        title: "Test PR",
+        description: "Test description",
+        createdBy: { displayName: "Test User" },
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+        lastMergeSourceCommit: null,
+        lastMergeTargetCommit: null,
+      });
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toEqual([]);
+      expect(mockGitApiInstance.getPullRequestIterations).not.toHaveBeenCalled();
+    });
+
+    it("handles file lines beyond range in patch generation", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        title: "Test PR",
+        description: "Test description",
+        createdBy: { displayName: "Test User" },
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        { id: 1, changeList: [{ changeId: "change1" }] },
+      ]);
+      mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
+        changeEntries: [
+          {
+            changeTrackingId: 1,
+            item: { path: "/test.ts" },
+            changeType: 2, // Edit
+          },
+        ],
+      });
+      mockGitApiInstance.getFileDiffs.mockResolvedValue([
+        {
+          path: "/test.ts",
+          lineDiffBlocks: [
+            {
+              modifiedLineNumberStart: 1,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 1,
+              originalLinesCount: 0,
+            },
+          ],
+        },
+      ]);
+      // Return empty content to trigger line beyond range
+      mockGitApiInstance.getBlobContent.mockResolvedValue("");
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(files[0].patch).toContain("+\n"); // Empty line added
+    });
+  });
 });

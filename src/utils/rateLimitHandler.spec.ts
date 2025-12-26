@@ -198,10 +198,9 @@ describe("rateLimitHandler", () => {
     });
 
     it("retries on rate limit error", async () => {
-      const fn = vi.fn().mockRejectedValueOnce({ status: 429 }).mockResolvedValue("success");
-
       vi.useFakeTimers();
 
+      const fn = vi.fn().mockRejectedValueOnce({ status: 429 }).mockResolvedValue("success");
       const promise = withRateLimitHandling(fn, { baseDelayMs: 100, maxRetries: 3 });
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -313,6 +312,8 @@ describe("rateLimitHandler", () => {
     });
 
     it("uses custom isRateLimitError function", async () => {
+      vi.useFakeTimers();
+
       const customError = { code: "CUSTOM_RATE_LIMIT" };
       const fn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("success");
 
@@ -324,8 +325,6 @@ describe("rateLimitHandler", () => {
           error.code === "CUSTOM_RATE_LIMIT"
         );
       };
-
-      vi.useFakeTimers();
 
       const promise = withRateLimitHandling(fn, {
         isRateLimitError: customCheck,
@@ -343,6 +342,8 @@ describe("rateLimitHandler", () => {
     });
 
     it("uses custom extractRetryAfter function", async () => {
+      vi.useFakeTimers();
+
       const error = { status: 429, customRetryAfter: 3 };
       const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue("success");
 
@@ -357,8 +358,6 @@ describe("rateLimitHandler", () => {
         }
         return undefined;
       };
-
-      vi.useFakeTimers();
 
       const promise = withRateLimitHandling(fn, {
         extractRetryAfter: customExtract,
@@ -404,14 +403,14 @@ describe("rateLimitHandler", () => {
     });
 
     it("retries on rate limit errors", async () => {
+      vi.useFakeTimers();
+
       const originalFn = vi
         .fn()
         .mockRejectedValueOnce({ status: 429 })
         .mockResolvedValue("success");
 
       const wrapped = withRateLimit(originalFn, { baseDelayMs: 100 });
-
-      vi.useFakeTimers();
 
       const promise = wrapped();
 
@@ -426,6 +425,8 @@ describe("rateLimitHandler", () => {
     });
 
     it("passes options to underlying handler", async () => {
+      vi.useFakeTimers();
+
       const customError = { myRateLimit: true };
       const originalFn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("ok");
 
@@ -433,8 +434,6 @@ describe("rateLimitHandler", () => {
         isRateLimitError: (err) => typeof err === "object" && err !== null && "myRateLimit" in err,
         baseDelayMs: 100,
       });
-
-      vi.useFakeTimers();
 
       const promise = wrapped();
 
