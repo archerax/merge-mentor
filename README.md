@@ -1,743 +1,316 @@
-# merge-mentor - Automated Code Review Bot
+# merge-mentor
 
-[![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](./coverage)
-[![Tests](https://img.shields.io/badge/tests-315%20passing-brightgreen.svg)](./src)
-[![TypeScript](https://img.shields.io/badge/typescript-5.9.3-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE)
-
-An automated code review bot that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories.
+Automated code review bot powered by GitHub Copilot CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
 ```bash
-# 1. Install globally (or use npx)
+# Install globally
 npm install -g merge-mentor
 
-# 2. Navigate to your project and create .env file
-cd /path/to/your/project
-cat > .env << EOF
-GITHUB_TOKEN=your_github_token
-GITHUB_REPO_OWNER=owner_name
-GITHUB_REPO_NAME=repo_name
-DEFAULT_PLATFORM=github
-EOF
-
-# 3. Run a review (dry-run by default)
+# Run a review (dry-run mode)
+GITHUB_TOKEN=your_token \
+GITHUB_REPO_OWNER=owner \
+GITHUB_REPO_NAME=repo \
 merge-mentor review --pr 123
 
-# 4. Post comments to PR
+# Post comments to PR
 merge-mentor review --pr 123 --write
+
+# Or use npx (no installation required)
+npx merge-mentor review --pr 123
 ```
 
 ## Features
 
-- **Multi-Platform Support**: Review PRs from both GitHub and Azure DevOps
-- **Comprehensive Analysis**: Reviews code for quality, bugs, security, performance, and documentation
-- **Inline Comments**: Posts specific feedback on exact lines of code
-- **Summary Reports**: Generates detailed summary comments with statistics
-- **Comment Management**: Updates/resolves existing bot comments as issues are addressed
-- **Intelligent Deduplication**: Provides existing comment context to LLM to avoid flagging the same issues repeatedly
-- **Cross-File Analysis**: Identifies architectural and design issues across the PR
-- **Incremental Reviews**: Automatically skips re-reviewing unchanged files to reduce costs and improve speed
-- **Multi-Run Mode**: Execute multiple review passes with aggregated findings for increased thoroughness
-- **Dry-Run Mode**: Preview changes before posting (default behavior)
+- **Multi-Platform Support** - Works with GitHub and Azure DevOps
+- **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
+- **Inline Comments** - Posts feedback on specific lines of code
+- **Smart Deduplication** - Avoids flagging the same issue multiple times
+- **Incremental Reviews** - Only analyzes changed files to save time
+- **Multi-Run Mode** - Aggregate findings from multiple passes for thoroughness
+- **Confidence Filtering** - Only posts high-confidence issues by default
+- **Auto-Resolution** - Detects when issues are fixed and resolves comments
+- **Dry-Run Mode** - Preview changes before posting (default)
 
 ## Prerequisites
 
-- Node.js 18+
-- pnpm (recommended) or npm
-- GitHub Copilot CLI installed and accessible in PATH
-- Personal access tokens for GitHub and/or Azure DevOps
+- **Node.js 20+**
+- **GitHub Copilot CLI** - Must be installed and accessible in PATH
+  ```bash
+  # Install Copilot CLI
+  npm install -g @githubnext/github-copilot-cli
+  ```
+- **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 ## Installation
 
-### Global Installation (Recommended)
-
-Install merge-mentor globally to use it from anywhere:
-
 ```bash
-# Install globally via npm
+# Install globally
 npm install -g merge-mentor
 
-# Or use directly with npx (no installation required)
+# Or use with npx (no installation required)
 npx merge-mentor --help
-```
-
-### Local Installation
-
-For development or customization:
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd merge-mentor
-
-# Install dependencies
-pnpm install
-
-# Build the project
-pnpm build
 ```
 
 ## Configuration
 
-### Configuration File
+Configure merge-mentor using environment variables or command-line parameters.
 
-merge-mentor reads configuration from a `.env` file in your **current working directory** (the directory where you run the command). This works for both global and local installations.
-
-Create a `.env` file in your project root or the directory where you'll run merge-mentor:
+### GitHub Configuration
 
 ```bash
-# Create from the example (if available in the repository)
-cp .env.example .env
-
-# Or create a new one
-touch .env
+export GITHUB_TOKEN=your_personal_access_token
+export GITHUB_REPO_OWNER=username_or_org
+export GITHUB_REPO_NAME=repository_name
+export DEFAULT_PLATFORM=github
 ```
 
-Edit `.env` with your credentials:
+### Azure DevOps Configuration
 
-```env
-# Platform Selection (default)
-DEFAULT_PLATFORM=github
-
-# GitHub Configuration
-GITHUB_TOKEN=<your_github_personal_access_token>
-GITHUB_REPO_OWNER=<username_or_org>
-GITHUB_REPO_NAME=<repository_name>
-
-# Azure DevOps Configuration
-AZURE_DEVOPS_TOKEN=<your_azure_devops_pat>
-AZURE_DEVOPS_ORG=<organization_name>
-AZURE_DEVOPS_PROJECT=<project_name>
-AZURE_DEVOPS_REPO=<repository_name>
-
-# Bot Configuration
-BOT_COMMENT_IDENTIFIER=[merge-mentor]
-
-# Copilot Configuration
-COPILOT_MODEL=gpt-4o  # Optional: Specify which Copilot model to use
-COPILOT_TIMEOUT_MS=180000  # Optional: CLI timeout in milliseconds (default: 180000 = 3 minutes)
-
-# Comment Filtering Configuration
-MIN_COMMENT_CONFIDENCE=high  # Optional: Minimum confidence level (high, medium, low). Default: high
-SKIP_PREEXISTING_ISSUES=true  # Optional: Skip issues that existed before the PR. Default: true
-POST_RESOLUTION_COMMENTS=true  # Optional: Post explanation before resolving comments. Default: true
-
-# Logging Configuration
-LOG_LEVEL=info  # Optional: Set log level (debug, info, warn, error)
+```bash
+export AZURE_DEVOPS_TOKEN=your_pat
+export AZURE_DEVOPS_ORG=organization_name
+export AZURE_DEVOPS_PROJECT=project_name
+export AZURE_DEVOPS_REPO=repository_name
+export DEFAULT_PLATFORM=azure
 ```
 
-### GitHub Token Permissions
+### Optional Settings
 
-Your GitHub token needs the following scopes:
+```bash
+# Copilot model selection
+export COPILOT_MODEL=gpt-4o
 
-- `repo` - Full control of private repositories (or `public_repo` for public repos only)
+# Timeout for Copilot CLI operations (milliseconds)
+export COPILOT_TIMEOUT_MS=180000
 
-### Azure DevOps Token Permissions
+# Comment filtering
+export MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
+export SKIP_PREEXISTING_ISSUES=true
+export POST_RESOLUTION_COMMENTS=true
 
-Your Azure DevOps PAT needs:
+# Multi-run mode
+export REVIEW_RUNS=1  # 1-5 runs
 
+# Logging
+export LOG_LEVEL=info  # debug, info, warn, or error
+```
+
+### Token Permissions
+
+**GitHub Token**:
+- `repo` scope (full control of private repositories)
+- Or `public_repo` for public repositories only
+
+**Azure DevOps PAT**:
 - Code: Read & Write
 - Pull Request Threads: Read & Write
 
-### Copilot Model Selection
-
-You can optionally configure which Copilot model to use by setting `COPILOT_MODEL` in your `.env` file. If not specified, Copilot CLI will use its default model. Supported models include:
-
-- `gpt-4o` - GPT-4 Optimized (recommended)
-- `gpt-4` - GPT-4
-- `claude-3.5-sonnet` - Claude 3.5 Sonnet
-- `o1-preview` - O1 Preview
-- `o1-mini` - O1 Mini
-
-Check your Copilot CLI documentation for the latest available models.
-
-### Copilot Timeout Configuration
-
-The default timeout for Copilot CLI operations is 3 minutes (180000ms). For large or complex PRs, you may need to increase this timeout:
-
-```env
-COPILOT_TIMEOUT_MS=300000  # 5 minutes
-```
-
-If you see errors like `CLI process timed out after XXXms`, increase this value. Note that longer timeouts may impact performance and cost.
-
-## Comment Filtering
-
-merge-mentor includes intelligent comment filtering to reduce noise and improve precision:
-
-### Confidence-Based Filtering
-
-Each finding includes a confidence level (`high`, `medium`, `low`) indicating how certain the AI is that the issue exists and was introduced in this PR. By default, only high-confidence issues are posted as comments.
-
-```bash
-# Only post high-confidence issues (default)
-MIN_COMMENT_CONFIDENCE=high
-
-# Post medium and high confidence issues
-MIN_COMMENT_CONFIDENCE=medium
-
-# Post all issues regardless of confidence
-MIN_COMMENT_CONFIDENCE=low
-```
-
-### Pre-Existing Issue Detection
-
-The AI attempts to detect if an issue existed before the PR (in the base branch). By default, pre-existing issues are skipped to focus on new problems introduced by the PR.
-
-```bash
-# Skip pre-existing issues (default)
-SKIP_PREEXISTING_ISSUES=true
-
-# Include pre-existing issues in comments
-SKIP_PREEXISTING_ISSUES=false
-```
-
-### Resolution Comments
-
-When issues are resolved, merge-mentor posts an explanatory comment before marking the thread as resolved. The AI model actively evaluates existing comments against the current code to determine:
-
-1. **Whether the issue is fixed** - The model checks if problematic code was removed or corrected
-2. **Why it's resolved** - Provides a specific explanation (e.g., "Null check was added", "Code refactored to handle edge case")
-
-```bash
-# Post resolution comment before resolving (default)
-POST_RESOLUTION_COMMENTS=true
-
-# Resolve without posting a comment
-POST_RESOLUTION_COMMENTS=false
-```
-
-The resolution comment includes:
-- The model's explanation of why the issue is resolved
-- A timestamp indicating when it was resolved
-
-## Intelligent Deduplication
-
-### Problem: Comment Duplication
-
-Because LLMs are non-deterministic, running reviews multiple times can result in duplicate comments about the same issue with different wording. This occurs in:
-
-- **Re-reviews**: Running the same PR multiple times
-- **Multi-run mode**: Using `--runs 3` to increase thoroughness
-
-### Solution: Existing Comment Context
-
-merge-mentor automatically provides the LLM with context about existing comments on the PR. This enables the model to:
-
-- **Avoid re-flagging known issues**: The LLM can see what has already been commented on
-- **Focus on new findings**: Each review pass concentrates on issues not yet identified
-- **Maintain consistency**: Better alignment between multiple review runs
-
-### How It Works
-
-1. **Fetches existing comments**: Before reviewing, the tool retrieves all bot comments on the PR
-2. **Formats context**: Comments are summarized by file and line with category and issue description
-3. **Includes in prompts**: The LLM receives this context and is instructed to avoid duplication
-4. **Multi-run enhancement**: In `--runs` mode, findings from previous runs are added to the context for subsequent runs
-
-### Example Context Provided to LLM
-
-```
-EXISTING COMMENTS ON THIS PR:
-
-File: src/app.ts
-  - Line 10: [Bug] Null check missing for user input
-  - Line 25: [Security] SQL injection risk in query builder [RESOLVED]
-
-File: src/utils.ts
-  - Line 5: [Performance] Inefficient loop over large array
-```
-
-This context helps the LLM understand what issues have already been identified, significantly reducing duplicate comments while still allowing it to flag genuinely new concerns.
-
-### Fallback Deduplication
-
-Even with LLM-aware deduplication, merge-mentor maintains fingerprint-based deduplication as a safety net. This catches any duplicates that slip through by comparing:
-- Filename
-- Line number
-- Category
-- First few words of the issue message
-
-## Understanding Review Variance
-
-### Non-Deterministic Nature
-
-merge-mentor uses AI models (GPT-4o, Claude, etc.) that are **inherently non-deterministic**. Running the same review multiple times may produce different results due to:
-
-- **Model Sampling**: LLMs use probabilistic generation with temperature settings
-- **Qualitative Analysis**: AI makes judgment calls about code quality that can vary
-- **Context Interpretation**: Models may focus on different aspects of large changes
-
-This is expected behavior, not a bug. Different runs may surface different legitimate concerns.
-
-### Mitigation Strategies
-
-1. **Comprehensive Prompts**: The tool uses carefully crafted prompts to maximize thoroughness in a single run by instructing the model to perform multiple mental passes.
-
-2. **Multi-Run Mode**: For critical reviews, run multiple times and aggregate findings:
-   ```bash
-   # Run 3 times and combine unique findings
-   merge-mentor review --pr 123 --runs 3 --write
-   
-   # Configure default via environment
-   REVIEW_RUNS=3 merge-mentor review --pr 123 --write
-   ```
-
-3. **Confidence Filtering**: By default, only high-confidence findings are posted, reducing noise from uncertain observations (see [Comment Filtering](#comment-filtering)).
-
-### When to Use Multiple Runs
-
-- **Critical Production Code**: Use 3-5 runs for high-stakes changes
-- **Security-Sensitive Code**: Multiple passes increase chance of catching vulnerabilities
-- **Complex Architectural Changes**: Different runs may catch different design issues
-- **Regular Development**: Single run is usually sufficient for day-to-day reviews
-
-### Configuration
-
-```bash
-# .env
-REVIEW_RUNS=3  # Default number of runs (1-5), defaults to 1
-```
-
-```bash
-# CLI override
-merge-mentor review --pr 123 --runs 3
-```
-
-**Note**: Multiple runs increase execution time and API costs proportionally. Each run is a full independent review.
-
-For detailed technical information about LLM non-determinism and mitigation strategies, see [CONSISTENCY.md](./CONSISTENCY.md).
-
-## Logging
-
-merge-mentor includes comprehensive structured logging using Pino:
-
-- **Development**: Pretty-printed logs to stderr with colors and timestamps, plus JSON logs to file
-- **Production**: JSON-formatted logs to file for log aggregation systems
-- **Log Levels**: `debug`, `info`, `warn`, `error`
-- **Log File**: `.merge-mentor/logs/merge-mentor.log` in the project directory (auto-created)
-
-### Configure Logging
-
-Set the log level and output directory via environment variables:
-
-```bash
-# .env
-LOG_LEVEL=debug  # Set to debug, info, warn, or error
-LOG_DIR=/var/log/merge-mentor  # Optional: Custom log directory (defaults to .merge-mentor/logs)
-```
-
-### Log Files
-
-Logs are automatically written to `.merge-mentor/logs/merge-mentor.log` in your **current working directory** (or `$LOG_DIR/merge-mentor.log` if configured). The log directory is created automatically if it doesn't exist.
-
-This means logs are written to your project directory, not to the global installation directory when using `npx` or a global installation.
-
-**Note**: User-facing progress messages (via `console.log`) still appear in the terminal. Only framework logging goes to the file.
-
-### Viewing Logs
-
-```bash
-# View recent logs
-tail -f .merge-mentor/logs/merge-mentor.log
-
-# Pretty-print JSON logs
-tail .merge-mentor/logs/merge-mentor.log | jq
-
-# Filter by level
-grep '"level":"error"' .merge-mentor/logs/merge-mentor.log | jq
-
-# Filter by component
-grep '"component":"GitHubAdapter"' .merge-mentor/logs/merge-mentor.log | jq
-```
-
-### Log Output
-
-Logs include contextual information to help debug issues:
-
-```json
-{
-  "level": "error",
-  "time": "2025-12-20T05:52:10.102Z",
-  "component": "GitHubAdapter",
-  "prNumber": 123,
-  "path": "src/file.ts",
-  "line": 42,
-  "commitSha": "abc123",
-  "error": "Validation Failed: {\"resource\":\"PullRequestReviewComment\",\"code\":\"custom\",\"field\":\"pull_request_review_thread.line\",\"message\":\"could not be resolved\"}",
-  "msg": "Failed to post inline comment"
-}
-```
-
-This detailed logging helps identify issues like:
-
-- Invalid line numbers in comment requests
-- Rate limiting problems
-- API validation failures
-- Network timeouts
-
-For detailed debugging instructions, see [DEBUGGING.md](./DEBUGGING.md).
+### Available Models
+
+Configure via `COPILOT_MODEL` environment variable. If not set, uses Copilot CLI default.
+
+Supported models:
+- `gpt-4o` (recommended)
+- `gpt-4-turbo`
+- `gpt-4`
+- `claude-3.5-sonnet`
+- `claude-3-opus`
+- `o1-preview`
+- `o1-mini`
+
+Check Copilot CLI documentation for the latest available models.
 
 ## Usage
 
-### Review a Pull Request
-
-**Important**: The GitHub Copilot CLI requires access to repository files. Ensure you're running from within a checked-out repository or that your CI/CD environment checks out the code first (see [CI/CD Integration](#cicd-integration) below).
-
-#### Using Global Installation or npx
+Run merge-mentor from within a checked-out repository (Copilot CLI needs access to files):
 
 ```bash
-# Using npx (no installation required)
-npx merge-mentor review --pr 123
-
-# Using global installation
+# Dry-run mode (preview only)
 merge-mentor review --pr 123
 
-# Actually post comments to the PR (default is dry-run)
-npx merge-mentor review --pr 123 --write
+# Post comments to PR
+merge-mentor review --pr 123 --write
 
-# Review an Azure DevOps PR
-npx merge-mentor review --pr 456 --platform azure --write
+# Azure DevOps
+merge-mentor review --pr 456 --platform azure --write
 
-# Disable verbose output
-npx merge-mentor review --pr 123 --verbose false
-```
+# Multiple review passes for thoroughness
+merge-mentor review --pr 123 --runs 3 --write
 
-#### Using Local Installation
-
-```bash
-# Dry-run mode (default) - shows what would be posted
-pnpm review -- --pr 123
-
-# Actually post comments to the PR
-pnpm review -- --pr 123 --write
-
-# Review an Azure DevOps PR
-pnpm review -- --pr 456 --platform azure --write
-
-# Disable verbose output
-pnpm review -- --pr 123 --verbose false
+# Quiet mode
+merge-mentor review --pr 123 --verbose false
 ```
 
 ### Command Options
 
-| Option                       | Description                             | Default              |
-| ---------------------------- | --------------------------------------- | -------------------- |
-| `--pr <number>`              | Pull request number (required)          | -                    |
-| `--platform <github\|azure>` | Platform to use                         | From env or `github` |
-| `--write`                    | Post comments to PR (otherwise dry-run) | `false`              |
-| `--verbose`                  | Enable verbose output                   | `true`               |
-| `--runs <number>`            | Number of review runs (1-5) for aggregation | `1` or from env   |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--pr <number>` | Pull request number (required) | - |
+| `--platform <github\|azure>` | Platform to use | `github` |
+| `--write` | Post comments (otherwise dry-run) | `false` |
+| `--verbose` | Enable verbose output | `true` |
+| `--runs <1-5>` | Number of review passes | `1` |
 
-### CI/CD Integration
+## Key Features Explained
 
-When running in CI/CD environments (GitHub Actions, Azure Pipelines, etc.), you **must** check out the repository before running the review. The Copilot CLI needs access to the actual file contents.
+### Confidence-Based Filtering
 
-#### GitHub Actions Example
+Only high-confidence issues are posted by default to reduce noise:
+
+```bash
+export MIN_COMMENT_CONFIDENCE=high  # high (default), medium, or low
+```
+
+### Pre-Existing Issue Detection
+
+Skips issues that existed before the PR:
+
+```bash
+export SKIP_PREEXISTING_ISSUES=true  # default
+```
+
+### Auto-Resolution with Explanations
+
+When code is fixed, the bot resolves comments with an explanation:
+
+```bash
+export POST_RESOLUTION_COMMENTS=true  # default
+```
+
+### Multi-Run Mode
+
+AI reviews are non-deterministic. Running multiple passes catches more issues:
+
+```bash
+# Run 3 times and aggregate findings
+merge-mentor review --pr 123 --runs 3 --write
+```
+
+Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
+
+### Incremental Reviews
+
+Only analyzes changed files on re-reviews, saving time and cost. Cache stored in `.merge-mentor/cache/`.
+
+## Review Categories & Severity
+
+**Categories**:
+- 🐛 **Bug** - Potential bugs or logical errors
+- 🔒 **Security** - Security vulnerabilities
+- ⚡ **Performance** - Performance issues
+- 📝 **Quality** - Code quality and readability
+- 📖 **Documentation** - Missing or inadequate documentation
+
+**Severity Levels**:
+- 🔴 **Critical** - Must be fixed
+- 🟠 **High** - Should be addressed
+- 🟡 **Medium** - Worth reviewing
+- 🟢 **Low** - Minor suggestions
+
+## CI/CD Integration
+
+**Important**: Check out the repository before running (Copilot CLI needs file access).
+
+### GitHub Actions
 
 ```yaml
 name: Code Review
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize]
 
 jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
 
       - name: Install Copilot CLI
-        run: |
-          # Install GitHub Copilot CLI
-          npm install -g @githubnext/github-copilot-cli
+        run: npm install -g @githubnext/github-copilot-cli
 
-      - name: Create .env file
-        run: |
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
-          echo "GITHUB_REPO_OWNER=${{ github.repository_owner }}" >> .env
-          echo "GITHUB_REPO_NAME=${{ github.event.repository.name }}" >> .env
-          echo "DEFAULT_PLATFORM=github" >> .env
-
-      - name: Run review with npx
+      - name: Run Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO_NAME: ${{ github.event.repository.name }}
         run: npx merge-mentor review --pr ${{ github.event.pull_request.number }} --write
 ```
 
-**Alternative: Using local installation**
+### Azure Pipelines
 
 ```yaml
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Run review
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm review -- --pr ${{ github.event.pull_request.number }} --write
-```
-
-#### Azure Pipelines Example
-
-```yaml
-trigger:
-  - main
-
 pr:
   branches:
-    include:
-      - "*"
+    include: ["*"]
 
 pool:
-  vmImage: "ubuntu-latest"
+  vmImage: ubuntu-latest
 
 steps:
   - checkout: self
-    fetchDepth: 0
-
+  
   - task: NodeTool@0
     inputs:
-      versionSpec: "18.x"
+      versionSpec: "20.x"
 
   - script: npm install -g @githubnext/github-copilot-cli
-    displayName: "Install Copilot CLI"
+    displayName: Install Copilot CLI
 
   - script: |
-      # Create .env file with Azure DevOps configuration
-      echo "AZURE_DEVOPS_TOKEN=$(AZURE_DEVOPS_TOKEN)" > .env
-      echo "AZURE_DEVOPS_ORG=$(System.TeamFoundationCollectionUri)" >> .env
-      echo "AZURE_DEVOPS_PROJECT=$(System.TeamProject)" >> .env
-      echo "AZURE_DEVOPS_REPO=$(Build.Repository.Name)" >> .env
-      echo "DEFAULT_PLATFORM=azure" >> .env
-    displayName: "Create configuration"
-
-  - script: |
-      npx merge-mentor review --pr $(System.PullRequest.PullRequestId) --platform azure --write
-    displayName: "Run code review with npx"
-```
-
-**Alternative: Using local installation**
-
-```yaml
-  - script: |
-      pnpm install
-      pnpm build
-    displayName: "Install dependencies"
-
-  - script: |
-      pnpm review -- --pr $(System.PullRequest.PullRequestId) --platform azure --write
-    displayName: "Run code review"
+      npx merge-mentor review \
+        --pr $(System.PullRequest.PullRequestId) \
+        --platform azure \
+        --write
+    displayName: Run Review
     env:
       AZURE_DEVOPS_TOKEN: $(AZURE_DEVOPS_TOKEN)
+      AZURE_DEVOPS_ORG: $(System.TeamFoundationCollectionUri)
+      AZURE_DEVOPS_PROJECT: $(System.TeamProject)
+      AZURE_DEVOPS_REPO: $(Build.Repository.Name)
 ```
 
-**Key Points:**
+## Logging
 
-- Always include a checkout step (`actions/checkout@v4` or `checkout: self`)
-- Install the GitHub Copilot CLI before running the review
-- Pass the PR number using your platform's variables
-- Set required tokens via secrets/variables
-
-## How It Works
-
-1. **Initialization**: Authenticates with the selected platform API
-2. **PR Retrieval**: Fetches PR metadata and changed files
-3. **Cache Check**: Loads previous review state to identify unchanged files
-4. **File-by-File Review**: Analyzes each changed file using Copilot CLI with specialized prompts
-5. **Cross-File Analysis**: Performs holistic analysis of all changes (skipped if all files cached)
-6. **Comment Management**: Compares findings with existing bot comments
-7. **Feedback Delivery**: Posts inline comments and a summary report
-8. **State Caching**: Saves review results and cross-file analysis for future incremental reviews
-
-## Review Categories
-
-The bot analyzes code for:
-
-- **Bug**: Potential bugs or logical errors
-- **Security**: Security vulnerabilities
-- **Performance**: Performance issues or inefficiencies
-- **Quality**: Code quality and readability concerns
-- **Documentation**: Missing or inadequate documentation
-
-## Severity Levels
-
-| Level    | Emoji | Description                               |
-| -------- | ----- | ----------------------------------------- |
-| Critical | 🔴    | Severe issues that must be fixed          |
-| High     | 🟠    | Important issues that should be addressed |
-| Medium   | 🟡    | Moderate concerns worth reviewing         |
-| Low      | 🟢    | Minor suggestions for improvement         |
-
-## Incremental Reviews
-
-merge-mentor automatically caches review results to enable incremental reviews. When you re-review a PR:
-
-- **Unchanged files are skipped**: Files with the same content SHA are not re-reviewed
-- **Cross-file analysis is cached**: When no files changed, cross-file analysis is skipped entirely
-- **Only changed files are analyzed**: Saves time and API costs on large PRs
-- **Cache is automatic**: Stored in `.merge-mentor/cache/` directory (excluded from git)
-- **Per-PR caching**: Each PR maintains its own review state
-
-This means subsequent reviews after pushing new commits will only analyze the files that actually changed, making re-reviews much faster and more cost-effective.
-
-### How It Works
-
-1. After each review, file content hashes (SHAs), review results, and cross-file analysis are saved
-2. On re-review, the current file SHAs are compared with cached SHAs
-3. Files with matching SHAs reuse cached review results
-4. If all files are unchanged, the cross-file analysis is also reused (no Copilot calls)
-5. If any files changed, only those files are sent to Copilot for analysis and cross-file analysis is re-run
-6. The cache is updated with new results after each review
-
-**Note**: The cache directory (`.merge-mentor/cache/`) can be safely deleted to force a full re-review of all files.
-
-## Development
-
-### Code Quality
-
-This project maintains high code quality standards:
-
-- **94%+ test coverage** with 315 comprehensive tests (261 unit + 54 integration)
-- **98%+ function coverage** across all modules
-- **TypeScript strict mode** enabled
-- **Zero lint issues** - fully compliant with Biome standards
-- Follows Clean Code, Pragmatic TypeScript, and Testing best practices
-- See [REVIEW.md](./REVIEW.md) for detailed quality analysis
-
-### Project Structure
-
-```
-merge-mentor/
-├── src/
-│   ├── cli.ts              # Command-line interface
-│   ├── config.ts           # Configuration management
-│   ├── logger.ts           # Logging framework (Pino)
-│   ├── errors/             # Custom error classes
-│   │   └── index.ts
-│   ├── platforms/
-│   │   ├── types.ts        # Platform adapter interfaces
-│   │   ├── github.ts       # GitHub API adapter
-│   │   └── azure.ts        # Azure DevOps API adapter
-│   ├── copilot/
-│   │   ├── client.ts       # Copilot CLI wrapper
-│   │   └── prompts.ts      # Review prompt templates
-│   └── review/
-│       ├── engine.ts       # Review orchestration
-│       ├── commentManager.ts # Comment lifecycle management
-│       └── reviewStateCache.ts # Review state caching
-├── tests/
-│   ├── integration/        # Integration tests
-│   │   ├── fixtures.ts     # Test fixtures
-│   │   ├── mocks.ts        # Mock factories
-│   │   └── *.test.ts       # Integration test suites
-│   └── utils/              # Test utilities
-├── .env.example           # Example environment configuration
-├── .merge-mentor/         # Runtime files (gitignored)
-│   ├── cache/            # Review state cache
-│   └── logs/             # Application logs
-├── AGENTS.md              # AI agent instructions
-├── TASKS.md               # Code quality tasks
-├── package.json
-├── tsconfig.json
-├── vitest.config.ts           # Unit test configuration
-└── vitest.integration.config.ts # Integration test configuration
-```
-
-### Scripts
+Logs are written to `.merge-mentor/logs/merge-mentor.log` in your current directory.
 
 ```bash
-# Build the project
-pnpm build
+# View logs
+tail -f .merge-mentor/logs/merge-mentor.log
 
-# Run unit tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Run unit tests with coverage
-pnpm test:coverage
-
-# Run integration tests
-pnpm test:integration
-
-# Run integration tests with coverage
-pnpm test:integration:coverage
-
-# Run all tests (unit + integration)
-pnpm test:all
-
-# Type check (no build)
-pnpm typecheck
-
-# Lint code
-pnpm lint
-
-# Format code
-pnpm format
-
-# Run all quality checks
-pnpm check
+# Set log level
+export LOG_LEVEL=debug  # debug, info, warn, error
 ```
 
-### Testing
+## Troubleshooting
 
-The project includes comprehensive testing:
+### Repository not accessible
+Ensure you're running from within a checked-out repository:
+- **GitHub Actions**: Add `uses: actions/checkout@v4`
+- **Azure Pipelines**: Add `checkout: self`
+- **Local**: Run from repository directory
 
-**Unit Tests** (`src/**/*.spec.ts`):
-- Colocated with source files
-- Fast, isolated tests with mocked dependencies
-- Run with `pnpm test`
+### Timeout errors
+Increase timeout for large PRs:
+```bash
+export COPILOT_TIMEOUT_MS=300000  # 5 minutes
+```
 
-**Integration Tests** (`tests/integration/*.test.ts`):
-- Test complete workflows with mocked external services
-- Cover GitHub and Azure DevOps adapters
-- Cover CLI execution flow
-- Cover ReviewEngine orchestration
-- Run with `pnpm test:integration`
-
-All external dependencies (GitHub API, Azure DevOps API, Copilot CLI) are mocked in integration tests to ensure reliable, fast test execution without requiring actual credentials or network access.
-
-## Error Handling
-
-The bot uses specific error types for different failure scenarios:
-
-- `ConfigurationError` - Missing or invalid configuration
-- `CopilotCliError` - Copilot CLI failures or unavailability
-- `JsonParseError` - Malformed JSON responses from Copilot
-- `ValidationError` - Invalid input parameters
-
-### Repository Checkout Issues
-
-If you see an error like "Path does not exist" or "Repository files not accessible", the Copilot CLI cannot access the repository files. This typically occurs in CI/CD environments where the repository hasn't been checked out.
-
-**Solution**:
-
-- **GitHub Actions**: Add `uses: actions/checkout@v4` before running the review
-- **Azure Pipelines**: Add `checkout: self` step at the beginning
-- **Local Development**: Run the command from within the repository directory
-
-The tool will exit with code 0 in this case to avoid failing pipelines for configuration issues.
-
-## Exit Codes
-
-| Code | Meaning                                                         |
-| ---- | --------------------------------------------------------------- |
-| 0    | Review completed successfully (no critical issues found)        |
-| 0    | Repository not checked out (configuration issue, not a failure) |
-| 1    | Review completed with critical issues found                     |
-| 1    | Review failed due to an error (authentication, API, etc.)       |
-
-**Note**: When the repository is not checked out (common CI/CD configuration issue), the tool exits with code 0 to avoid failing pipelines. A warning message is displayed with instructions to fix the checkout configuration.
+### Exit Codes
+- `0` - Success or configuration issue
+- `1` - Review failed or critical issues found
 
 ## License
 
-This software is proprietary and licensed for private use only with explicit permission from the author (archerax). See [LICENSE](./LICENSE) for details.
+Proprietary software. See [LICENSE](./LICENSE) for details.
 
-Unauthorized copying, modification, distribution, or use is strictly prohibited.
+---
+
+**Version**: 1.4.0  
+**Author**: archerax  
+**Documentation**: Included in npm package
