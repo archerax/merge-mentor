@@ -902,78 +902,72 @@ describe("ReviewEngine", () => {
       expect(engine).toBeDefined();
     });
 
-    it(
-      "executes multiple runs and aggregates findings",
-      async () => {
-        vi.useFakeTimers();
+    it("executes multiple runs and aggregates findings", async () => {
+      vi.useFakeTimers();
 
-        const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-        const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-          verbose: true,
-          reviewRuns: 2,
-        });
-        const prDetails = createPRDetails();
-        const files = [createPRFile()];
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: true,
+        reviewRuns: 2,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
 
-        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-        mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
 
-        // Return different findings for each run
-        mockParseFileReview.mockReturnValue({
-          filename: "test.ts",
-          findings: [],
-        });
+      // Return different findings for each run
+      mockParseFileReview.mockReturnValue({
+        filename: "test.ts",
+        findings: [],
+      });
 
-        mockParseCrossFileReview.mockReturnValue({
-          overallAssessment: "Good",
-          findings: [],
-          recommendations: [],
-        });
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
 
-        const promise = engine.reviewPR(123);
-        await vi.advanceTimersByTimeAsync(2000);
-        const result = await promise;
+      const promise = engine.reviewPR(123);
+      await vi.advanceTimersByTimeAsync(2000);
+      const result = await promise;
 
-        // Should show multi-run log output
-        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("📝 Review run"));
-        expect(result).toBeDefined();
+      // Should show multi-run log output
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("📝 Review run"));
+      expect(result).toBeDefined();
 
-        consoleSpy.mockRestore();
-        vi.useRealTimers();
-      },
-      10000
-    ); // 10 second timeout
+      consoleSpy.mockRestore();
+      vi.useRealTimers();
+    }, 10000); // 10 second timeout
 
-    it(
-      "continues with remaining runs when one run fails",
-      async () => {
-        vi.useFakeTimers();
+    it("continues with remaining runs when one run fails", async () => {
+      vi.useFakeTimers();
 
-        const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-        const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-          verbose: false, // Reduce logging
-          reviewRuns: 2,
-        });
-        const prDetails = createPRDetails();
-        const files = [createPRFile()];
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false, // Reduce logging
+        reviewRuns: 2,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
 
-        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
 
-        // First run fails, second succeeds
-        let callCount = 0;
-        mockExecutePrompt.mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            throw new Error("Run 1 failed");
-          }
-          return Promise.resolve({ raw: "{}", parsed: {} });
-        });
+      // First run fails, second succeeds
+      let callCount = 0;
+      mockExecutePrompt.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error("Run 1 failed");
+        }
+        return Promise.resolve({ raw: "{}", parsed: {} });
+      });
 
-        mockParseFileReview.mockReturnValue({
+      mockParseFileReview.mockReturnValue({
         filename: "test.ts",
         findings: [],
       });

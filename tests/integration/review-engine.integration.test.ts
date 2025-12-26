@@ -6,11 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CopilotResponse } from "../../src/copilot/client.js";
 import { ReviewEngine } from "../../src/review/engine.js";
-import {
-  sampleExistingComments,
-  samplePRDetails,
-  samplePRFiles,
-} from "./fixtures.js";
+import { sampleExistingComments, samplePRDetails } from "./fixtures.js";
 import { createMockPlatformAdapter, createTestConfig } from "./mocks.js";
 
 // Create mock instance that can be shared
@@ -74,9 +70,9 @@ describe("ReviewEngine Integration", () => {
         parsed: {},
       } as CopilotResponse);
 
-      let fileReviewCallCount = 0;
+      let _fileReviewCallCount = 0;
       mockCopilotInstance.parseFileReview.mockImplementation((filename: string) => {
-        fileReviewCallCount++;
+        _fileReviewCallCount++;
         if (filename === "src/auth/login.ts") {
           return {
             filename,
@@ -527,11 +523,9 @@ describe("ReviewEngine confidence filtering", () => {
     // Should have update and resolve for the comment
     expect(mockAdapter.calls.updateComment.length).toBeGreaterThanOrEqual(1);
     expect(mockAdapter.calls.resolveComment.length).toBeGreaterThanOrEqual(1);
-    
+
     // The update should contain resolution message
-    const updateCall = mockAdapter.calls.updateComment.find(
-      (call) => call.commentId === 100
-    );
+    const updateCall = mockAdapter.calls.updateComment.find((call) => call.commentId === 100);
     expect(updateCall?.body).toContain("Issue Resolved");
   });
 });

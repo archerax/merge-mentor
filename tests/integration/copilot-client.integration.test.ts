@@ -1,13 +1,13 @@
 /**
  * Integration tests for the Copilot client parsing functionality.
  * Tests response parsing and validation behavior.
- * 
+ *
  * Note: Tests for executePrompt that require spawn mocking are in
  * the unit tests (src/copilot/client.spec.ts). This file focuses on
  * integration-level parsing and response handling.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { CopilotClient } from "../../src/copilot/client.js";
 
 describe("CopilotClient Response Parsing Integration", () => {

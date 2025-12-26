@@ -16,7 +16,6 @@ import type {
 import {
   createCopilotCrossFileResponse,
   createCopilotFileResponse,
-  createEmptyCrossFileResponse,
   createEmptyReviewResponse,
   sampleCrossFileResult,
   sampleExistingComments,
@@ -69,14 +68,12 @@ export function createMockPlatformAdapter(options?: {
       calls.getExistingBotComments.push(prNumber);
       return options?.existingComments ?? [];
     }),
-    postInlineComment: vi.fn(
-      async (prNumber: number, path: string, line: number, body: string) => {
-        calls.postInlineComment.push({ prNumber, path, line, body });
-        if (options?.postInlineCommentError) {
-          throw options.postInlineCommentError;
-        }
+    postInlineComment: vi.fn(async (prNumber: number, path: string, line: number, body: string) => {
+      calls.postInlineComment.push({ prNumber, path, line, body });
+      if (options?.postInlineCommentError) {
+        throw options.postInlineCommentError;
       }
-    ),
+    }),
     postGeneralComment: vi.fn(async (prNumber: number, body: string) => {
       calls.postGeneralComment.push({ prNumber, body });
       if (options?.postGeneralCommentError) {
@@ -181,7 +178,7 @@ export function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>
           try {
             const response = copilotMock.getNextResponse();
             callback(Buffer.from(response));
-          } catch (error) {
+          } catch (_error) {
             // Error will be handled in the close event
           }
         }

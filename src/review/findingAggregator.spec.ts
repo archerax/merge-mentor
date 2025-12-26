@@ -359,7 +359,7 @@ describe("FindingAggregator", () => {
 
     it("aggregates resolved comments from multiple runs", () => {
       const aggregator = new FindingAggregator();
-      
+
       const run1 = [
         {
           filename: "file.ts",
@@ -370,7 +370,7 @@ describe("FindingAggregator", () => {
           ],
         },
       ];
-      
+
       const run2 = [
         {
           filename: "file.ts",
@@ -391,7 +391,7 @@ describe("FindingAggregator", () => {
 
     it("handles file results without resolved comments", () => {
       const aggregator = new FindingAggregator();
-      
+
       const run1 = [
         {
           filename: "file.ts",
@@ -401,13 +401,13 @@ describe("FindingAggregator", () => {
       ];
 
       const result = aggregator.aggregateFileFindings([run1]);
-      
+
       expect(result[0].resolvedComments).toBeUndefined();
     });
 
     it("merges resolved comments from files without findings", () => {
       const aggregator = new FindingAggregator();
-      
+
       const run1 = [
         {
           filename: "file.ts",
