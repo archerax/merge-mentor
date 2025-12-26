@@ -39,3 +39,14 @@ export const logger = new Proxy({} as Logger, {
 export function createChildLogger(context: Record<string, unknown>) {
   return getLogger().child(context);
 }
+
+/**
+ * Cleanup the logger instance and flush any pending logs.
+ * Primarily used for testing to prevent worker thread issues.
+ */
+export async function cleanupLogger(): Promise<void> {
+  if (_logger) {
+    await _logger.flush();
+    _logger = undefined;
+  }
+}

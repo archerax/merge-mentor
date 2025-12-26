@@ -10,6 +10,7 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
+    setupFiles: ["./vitest.setup.ts"],
     testTimeout: 30000,
     hookTimeout: 10000,
     coverage: {

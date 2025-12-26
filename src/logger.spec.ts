@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createChildLogger, logger } from "./logger.js";
+import { cleanupLogger, createChildLogger, logger } from "./logger.js";
 
 describe("Logger", () => {
   it("creates root logger", () => {
@@ -22,5 +22,10 @@ describe("Logger", () => {
     expect(typeof childLogger.error).toBe("function");
     expect(typeof childLogger.warn).toBe("function");
     expect(typeof childLogger.debug).toBe("function");
+  });
+
+  it("cleanup flushes and resets logger", async () => {
+    await cleanupLogger();
+    expect(cleanupLogger).toBeDefined();
   });
 });

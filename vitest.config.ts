@@ -10,6 +10,7 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
+    setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
