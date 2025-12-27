@@ -43,6 +43,8 @@ npx merge-mentor review --pr 123
   ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
+**Supported Platforms**: Windows, macOS, and Linux
+
 ## Installation
 
 ```bash
@@ -59,6 +61,7 @@ Configure merge-mentor using environment variables or command-line parameters.
 
 ### GitHub Configuration
 
+**Linux/macOS:**
 ```bash
 export GITHUB_TOKEN=your_personal_access_token
 export GITHUB_REPO_OWNER=username_or_org
@@ -66,8 +69,25 @@ export GITHUB_REPO_NAME=repository_name
 export DEFAULT_PLATFORM=github
 ```
 
+**Windows (PowerShell):**
+```powershell
+$env:GITHUB_TOKEN="your_personal_access_token"
+$env:GITHUB_REPO_OWNER="username_or_org"
+$env:GITHUB_REPO_NAME="repository_name"
+$env:DEFAULT_PLATFORM="github"
+```
+
+**Windows (Command Prompt):**
+```cmd
+set GITHUB_TOKEN=your_personal_access_token
+set GITHUB_REPO_OWNER=username_or_org
+set GITHUB_REPO_NAME=repository_name
+set DEFAULT_PLATFORM=github
+```
+
 ### Azure DevOps Configuration
 
+**Linux/macOS:**
 ```bash
 export AZURE_DEVOPS_TOKEN=your_pat
 export AZURE_DEVOPS_ORG=organization_name
@@ -76,8 +96,27 @@ export AZURE_DEVOPS_REPO=repository_name
 export DEFAULT_PLATFORM=azure
 ```
 
+**Windows (PowerShell):**
+```powershell
+$env:AZURE_DEVOPS_TOKEN="your_pat"
+$env:AZURE_DEVOPS_ORG="organization_name"
+$env:AZURE_DEVOPS_PROJECT="project_name"
+$env:AZURE_DEVOPS_REPO="repository_name"
+$env:DEFAULT_PLATFORM="azure"
+```
+
+**Windows (Command Prompt):**
+```cmd
+set AZURE_DEVOPS_TOKEN=your_pat
+set AZURE_DEVOPS_ORG=organization_name
+set AZURE_DEVOPS_PROJECT=project_name
+set AZURE_DEVOPS_REPO=repository_name
+set DEFAULT_PLATFORM=azure
+```
+
 ### Optional Settings
 
+**Linux/macOS:**
 ```bash
 # Copilot model selection
 export COPILOT_MODEL=gpt-4o

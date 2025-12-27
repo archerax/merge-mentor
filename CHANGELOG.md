@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Windows and macOS compatibility**: Full cross-platform support for Windows, macOS, and Linux. Build scripts now use `cross-env` for environment variable handling, and command execution explicitly avoids shell-specific syntax. Documentation includes platform-specific configuration examples.
+
+### Fixed
+
+- Build script now works correctly on Windows (replaced `NODE_ENV=production` with `cross-env NODE_ENV=production`)
+
 ## [1.5.0] - 2025-12-27
 
 ### Added

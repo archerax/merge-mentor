@@ -131,9 +131,12 @@ export class CopilotClient {
         args.push("--model", this.model);
       }
 
+      // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
+      // Node.js will automatically handle .exe extension on Windows
       const proc = spawn("copilot", args, {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
+        shell: false, // Explicit shell: false ensures consistent cross-platform behavior
       });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
