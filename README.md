@@ -343,6 +343,6 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 
 ---
 
-**Version**: 1.4.0  
+**Version**: 1.5.0  
 **Author**: archerax  
 **Documentation**: Included in npm package
