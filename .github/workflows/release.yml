@@ -78,15 +78,8 @@ jobs:
           body_path: release_notes.md
           files: |
             merge-mentor-${{ steps.version.outputs.VERSION }}.tgz
-            dist/**/*
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload NPM package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-package
-          path: merge-mentor-${{ steps.version.outputs.VERSION }}.tgz
-          retention-days: 90
+
