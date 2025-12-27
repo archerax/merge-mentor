@@ -1,3 +1,4 @@
+import { getAuditLogger } from "../audit/index.js";
 import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { CopilotClient } from "../copilot/client.js";
@@ -61,6 +62,8 @@ export class ReviewEngine {
   private readonly stateCache: ReviewStateCache;
   private readonly options: ReviewEngineOptions;
   private readonly logger = createChildLogger({ component: "ReviewEngine" });
+  private readonly auditLogger = getAuditLogger();
+  private platformName = "unknown";
 
   constructor(platform: PlatformAdapter, botIdentifier: string, options?: ReviewEngineOptions) {
     this.platform = platform;
@@ -73,6 +76,9 @@ export class ReviewEngine {
     });
     this.stateCache = new ReviewStateCache();
     this.options = options ?? {};
+    this.platformName = platform.constructor.name.toLowerCase().includes("github")
+      ? "github"
+      : "azure";
     this.logger.info(
       {
         copilotModel: options?.copilotModel,
@@ -110,6 +116,7 @@ export class ReviewEngine {
     const runs = this.options.reviewRuns ?? 1;
     this.logger.info({ prNumber, runs }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
+    this.auditLogger.logReviewStart(prNumber, this.platformName, runs);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
@@ -190,6 +197,17 @@ export class ReviewEngine {
         commentErrors: commentStats.commentErrors.length,
       },
       "PR review completed"
+    );
+
+    this.auditLogger.logReviewComplete(
+      prNumber,
+      this.platformName,
+      fileResults.length - filesSkipped,
+      filesSkipped,
+      commentStats.commentsCreated,
+      commentStats.commentsUpdated,
+      commentStats.commentsResolved,
+      commentStats.commentErrors.length
     );
 
     return {
@@ -369,17 +387,32 @@ export class ReviewEngine {
       return { filename: file.filename, findings: [] };
     }
 
-    // Format comments context for this specific file
-    const fileCommentsContext = formatFileCommentsContext(file.filename, existingComments);
+    this.auditLogger.logFileReviewStart(file.filename, 0);
 
-    const prompt = buildFileReviewPrompt(
-      file.filename,
-      file.patch,
-      filesContext,
-      fileCommentsContext || undefined
-    );
-    const response = await this.copilot.executePrompt(prompt);
-    return this.copilot.parseFileReview(file.filename, response);
+    try {
+      const fileCommentsContext = formatFileCommentsContext(file.filename, existingComments);
+
+      const prompt = buildFileReviewPrompt(
+        file.filename,
+        file.patch,
+        filesContext,
+        fileCommentsContext || undefined
+      );
+      const response = await this.copilot.executePrompt(prompt);
+      const result = this.copilot.parseFileReview(file.filename, response);
+
+      this.auditLogger.logFileReviewComplete(file.filename, 0, result.findings.length);
+      return result;
+    } catch (error) {
+      this.auditLogger.logFileReviewComplete(
+        file.filename,
+        0,
+        0,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   /**
@@ -480,13 +513,27 @@ export class ReviewEngine {
     existingComments: readonly ExistingComment[]
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
-    const filesSummary = buildFilesSummary(files);
-    const commentsContext = formatExistingCommentsContext(existingComments);
-    const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults, commentsContext);
-    const response = await this.copilot.executePrompt(prompt);
-    const result = this.copilot.parseCrossFileReview(response);
-    this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
-    return result;
+    this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
+
+    try {
+      const filesSummary = buildFilesSummary(files);
+      const commentsContext = formatExistingCommentsContext(existingComments);
+      const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults, commentsContext);
+      const response = await this.copilot.executePrompt(prompt);
+      const result = this.copilot.parseCrossFileReview(response);
+      this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
+
+      this.auditLogger.logCrossFileReviewComplete(prDetails.number, result.findings.length);
+      return result;
+    } catch (error) {
+      this.auditLogger.logCrossFileReviewComplete(
+        prDetails.number,
+        0,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   private async executeCommentActions(

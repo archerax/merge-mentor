@@ -95,7 +95,53 @@ export REVIEW_RUNS=1  # 1-5 runs
 
 # Logging
 export LOG_LEVEL=info  # debug, info, warn, or error
+export LOG_DIR=.merge-mentor/logs  # optional, defaults to .merge-mentor/logs
+
+# Audit logging (enabled by default for security/compliance)
+export AUDIT_LOGGING_ENABLED=true
 ```
+
+### Audit Logging
+
+Audit logging is enabled by default for security and compliance tracking. All critical actions are logged with structured data including:
+
+- **PR Operations**: Fetching PR details, files, and comments
+- **Comment Actions**: Creating, updating, and resolving comments
+- **Copilot Execution**: All LLM prompt executions
+- **Review Lifecycle**: Start/completion of reviews and individual file analysis
+
+Audit logs are written to the application logs (`.merge-mentor/logs/merge-mentor.log`) with a dedicated `audit` field for easy filtering and analysis.
+
+**Example audit log entry**:
+```json
+{
+  "audit": {
+    "eventType": "comment.post.inline",
+    "timestamp": "2025-12-27T13:00:00.000Z",
+    "severity": "info",
+    "actor": "merge-mentor-bot",
+    "resource": {
+      "type": "comment",
+      "id": "pr-123-src/app.ts-42",
+      "details": {
+        "prNumber": 123,
+        "path": "src/app.ts",
+        "line": 42,
+        "platform": "github"
+      }
+    },
+    "action": "Post inline comment on PR #123 at src/app.ts:42",
+    "result": "success"
+  }
+}
+```
+
+Audit logs can be filtered and analyzed for:
+- Security audits and compliance reporting
+- Tracking bot activity across PRs
+- Debugging failed operations
+- Usage analytics and cost tracking
+- Identifying patterns in review failures
 
 ### Token Permissions
 

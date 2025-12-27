@@ -23,18 +23,21 @@ src/
 ├── config.ts           # Environment configuration loader (includes CommentFilterConfig)
 ├── constants.ts        # Application-wide constants (severity/confidence emojis)
 ├── logger.ts           # Pino logging setup
+├── audit/
+│   ├── auditLogger.ts  # Audit logging for security/compliance tracking
+│   └── index.ts        # Audit module exports
 ├── errors/
 │   └── index.ts        # Custom error hierarchy
 ├── copilot/
-│   ├── client.ts       # Copilot CLI wrapper with retry logic
+│   ├── client.ts       # Copilot CLI wrapper with retry logic (with audit logging)
 │   ├── prompts.ts      # Prompt templates for reviews (now includes comment context)
 │   └── commentContext.ts # Formats existing comments for LLM context
 ├── platforms/
 │   ├── types.ts        # Shared interfaces (PlatformAdapter, etc.)
-│   ├── github.ts       # GitHub API adapter
-│   └── azure.ts        # Azure DevOps API adapter
+│   ├── github.ts       # GitHub API adapter (with audit logging)
+│   └── azure.ts        # Azure DevOps API adapter (with audit logging)
 ├── review/
-│   ├── engine.ts       # Review orchestration (supports single and multi-run modes)
+│   ├── engine.ts       # Review orchestration (supports single and multi-run modes, with audit logging)
 │   ├── commentManager.ts # Comment lifecycle management (confidence filtering, resolution comments)
 │   ├── findingAggregator.ts # Deduplication and merging of findings from multi-run mode
 │   └── reviewStateCache.ts # SHA-based caching for incremental reviews
@@ -114,6 +117,85 @@ When an issue is resolved, the model's explanation is included:
 ### Key Types
 - `ResolvedComment`: `{line: number, reason: string}`
 - `FileReviewResult.resolvedComments`: Optional array of resolved comments
+
+## Audit Logging
+
+Comprehensive audit logging is implemented for security and compliance requirements. All critical actions are logged with structured data.
+
+### Audited Events
+
+**PR Operations**:
+- `pr.details.fetch` - Fetching PR metadata
+- `pr.files.fetch` - Fetching changed files
+- `pr.comments.fetch` - Fetching existing comments
+
+**Comment Operations**:
+- `comment.post.inline` - Posting inline code comments
+- `comment.post.general` - Posting general PR comments
+- `comment.update` - Updating existing comments
+- `comment.resolve` - Resolving comment threads
+
+**AI/LLM Operations**:
+- `copilot.execute` - Executing Copilot CLI prompts
+
+**Review Lifecycle**:
+- `review.start` - Starting a PR review
+- `review.complete` - Completing a PR review
+- `file.review.start` - Starting individual file review
+- `file.review.complete` - Completing individual file review
+- `crossfile.review.start` - Starting cross-file analysis
+- `crossfile.review.complete` - Completing cross-file analysis
+
+### Audit Log Structure
+
+Each audit event includes:
+- `eventType`: Type of event (see above)
+- `timestamp`: ISO 8601 timestamp
+- `severity`: `info`, `warn`, or `error`
+- `actor`: Bot identifier (default: "merge-mentor-bot")
+- `resource`: Object being acted upon (type, id, details)
+- `action`: Human-readable action description
+- `result`: `success`, `failure`, or `partial`
+- `metadata`: Additional context (platform, counts, etc.)
+- `error`: Error message if action failed
+
+### Implementation Details
+
+**Key Files**:
+- `src/audit/auditLogger.ts`: Core audit logging implementation
+- `src/platforms/github.ts`: Audit logging for GitHub operations
+- `src/platforms/azure.ts`: Audit logging for Azure DevOps operations
+- `src/copilot/client.ts`: Audit logging for Copilot executions
+- `src/review/engine.ts`: Audit logging for review lifecycle
+
+**Usage**:
+```typescript
+import { getAuditLogger } from "../audit/index.js";
+
+const auditLogger = getAuditLogger();
+
+// Log an action
+auditLogger.logPRDetailsFetch(prNumber, "github", "success");
+
+// Log a failure
+auditLogger.logInlineCommentPost(
+  prNumber, 
+  path, 
+  line, 
+  "github", 
+  "failure", 
+  error.message
+);
+```
+
+### Configuration
+
+Audit logging is enabled by default. Configure via environment:
+```bash
+export AUDIT_LOGGING_ENABLED=true  # default
+```
+
+Logs are written to `.merge-mentor/logs/merge-mentor.log` with structured JSON format for easy parsing and analysis.
 
 ## Key Commands
 

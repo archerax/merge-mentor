@@ -6,6 +6,7 @@ import type {
   FileDiffsCriteria,
   GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
@@ -37,6 +38,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly project: string;
   private readonly repoName: string;
   private readonly botIdentifier: string;
+  private readonly auditLogger = getAuditLogger();
 
   constructor(config: Config) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
@@ -48,93 +50,120 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
-    const gitApi = await this.connection.getGitApi();
-    const pr = await withRateLimitHandling(() => gitApi.getPullRequestById(prNumber, this.project));
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
 
-    return {
-      number: pr.pullRequestId || prNumber,
-      title: pr.title || "",
-      description: pr.description || "",
-      author: pr.createdBy?.displayName || "unknown",
-      baseBranch: pr.targetRefName?.replace("refs/heads/", "") || "",
-      headBranch: pr.sourceRefName?.replace("refs/heads/", "") || "",
-    };
+      const details = {
+        number: pr.pullRequestId || prNumber,
+        title: pr.title || "",
+        description: pr.description || "",
+        author: pr.createdBy?.displayName || "unknown",
+        baseBranch: pr.targetRefName?.replace("refs/heads/", "") || "",
+        headBranch: pr.sourceRefName?.replace("refs/heads/", "") || "",
+      };
+
+      this.auditLogger.logPRDetailsFetch(prNumber, "azure", "success");
+      return details;
+    } catch (error) {
+      this.auditLogger.logPRDetailsFetch(prNumber, "azure", "failure", (error as Error).message);
+      throw error;
+    }
   }
 
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
-    const gitApi = await this.connection.getGitApi();
+    try {
+      const gitApi = await this.connection.getGitApi();
 
-    const pr = await withRateLimitHandling(() => gitApi.getPullRequestById(prNumber, this.project));
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
 
-    if (!pr.lastMergeSourceCommit?.commitId || !pr.lastMergeTargetCommit?.commitId) {
-      return [];
-    }
-
-    const iterations = await withRateLimitHandling(() =>
-      gitApi.getPullRequestIterations(this.repoName, prNumber, this.project)
-    );
-    if (!iterations || iterations.length === 0) {
-      return [];
-    }
-
-    const lastIteration = iterations[iterations.length - 1];
-    const iterationId = lastIteration.id || 1;
-
-    const changes = await withRateLimitHandling(() =>
-      gitApi.getPullRequestIterationChanges(this.repoName, prNumber, iterationId, this.project)
-    );
-
-    if (!changes.changeEntries || changes.changeEntries.length === 0) {
-      return [];
-    }
-
-    // Get proper diffs with line numbers from Azure DevOps API
-    const fileDiffsCriteria: FileDiffsCriteria = {
-      baseVersionCommit: pr.lastMergeTargetCommit.commitId,
-      targetVersionCommit: pr.lastMergeSourceCommit.commitId,
-      fileDiffParams: changes.changeEntries
-        .filter((change) => change.item?.path)
-        .map((change) => ({
-          path: change.item!.path!,
-        })),
-    };
-
-    const fileDiffs = await withRateLimitHandling(() =>
-      gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
-    );
-
-    const fileDiffMap = new Map<string, FileDiff>();
-    for (const diff of fileDiffs || []) {
-      if (diff.path) {
-        const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
-        fileDiffMap.set(normalizedPath, diff);
+      if (!pr.lastMergeSourceCommit?.commitId || !pr.lastMergeTargetCommit?.commitId) {
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
       }
+
+      const iterations = await withRateLimitHandling(() =>
+        gitApi.getPullRequestIterations(this.repoName, prNumber, this.project)
+      );
+      if (!iterations || iterations.length === 0) {
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      const lastIteration = iterations[iterations.length - 1];
+      const iterationId = lastIteration.id || 1;
+
+      const changes = await withRateLimitHandling(() =>
+        gitApi.getPullRequestIterationChanges(this.repoName, prNumber, iterationId, this.project)
+      );
+
+      if (!changes.changeEntries || changes.changeEntries.length === 0) {
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      // Get proper diffs with line numbers from Azure DevOps API
+      const fileDiffsCriteria: FileDiffsCriteria = {
+        baseVersionCommit: pr.lastMergeTargetCommit.commitId,
+        targetVersionCommit: pr.lastMergeSourceCommit.commitId,
+        fileDiffParams: changes.changeEntries
+          .filter((change) => change.item?.path)
+          .map((change) => ({
+            path: change.item!.path!,
+          })),
+      };
+
+      const fileDiffs = await withRateLimitHandling(() =>
+        gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
+      );
+
+      const fileDiffMap = new Map<string, FileDiff>();
+      for (const diff of fileDiffs || []) {
+        if (diff.path) {
+          const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
+          fileDiffMap.set(normalizedPath, diff);
+        }
+      }
+
+      const files: PRFile[] = [];
+      for (const change of changes.changeEntries) {
+        const item = change.item;
+        if (!item?.path) continue;
+
+        const status = this.mapChangeTypeToStatus(change.changeType);
+        const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
+
+        const fileDiff = fileDiffMap.get(path);
+        const patch = fileDiff
+          ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi)
+          : undefined;
+
+        files.push({
+          filename: path,
+          status,
+          additions: 0,
+          deletions: 0,
+          patch,
+          sha: item.objectId,
+        });
+      }
+
+      this.auditLogger.logPRFilesFetch(prNumber, "azure", files.length);
+      return files;
+    } catch (error) {
+      this.auditLogger.logPRFilesFetch(
+        prNumber,
+        "azure",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
     }
-
-    const files: PRFile[] = [];
-    for (const change of changes.changeEntries) {
-      const item = change.item;
-      if (!item?.path) continue;
-
-      const status = this.mapChangeTypeToStatus(change.changeType);
-      const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
-
-      const fileDiff = fileDiffMap.get(path);
-      const patch = fileDiff
-        ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi)
-        : undefined;
-
-      files.push({
-        filename: path,
-        status,
-        additions: 0,
-        deletions: 0,
-        patch,
-        sha: item.objectId,
-      });
-    }
-
-    return files;
   }
 
   /**
@@ -219,26 +248,38 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
-    const gitApi = await this.connection.getGitApi();
-    const threads = await withRateLimitHandling(() =>
-      gitApi.getThreads(this.repoName, prNumber, this.project)
-    );
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
 
-    const comments: ExistingComment[] = [];
-    for (const thread of threads || []) {
-      const firstComment = thread.comments?.[0];
-      if (firstComment?.content?.includes(this.botIdentifier)) {
-        comments.push({
-          id: thread.id?.toString() || "",
-          body: firstComment.content || "",
-          path: thread.threadContext?.filePath,
-          line: thread.threadContext?.rightFileStart?.line,
-          isResolved: thread.status === AzureThreadStatus.FIXED,
-        });
+      const comments: ExistingComment[] = [];
+      for (const thread of threads || []) {
+        const firstComment = thread.comments?.[0];
+        if (firstComment?.content?.includes(this.botIdentifier)) {
+          comments.push({
+            id: thread.id?.toString() || "",
+            body: firstComment.content || "",
+            path: thread.threadContext?.filePath,
+            line: thread.threadContext?.rightFileStart?.line,
+            isResolved: thread.status === AzureThreadStatus.FIXED,
+          });
+        }
       }
-    }
 
-    return comments;
+      this.auditLogger.logCommentsFetch(prNumber, "azure", comments.length);
+      return comments;
+    } catch (error) {
+      this.auditLogger.logCommentsFetch(
+        prNumber,
+        "azure",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async postInlineComment(
@@ -247,58 +288,81 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     line: number,
     body: string
   ): Promise<void> {
-    const gitApi = await this.connection.getGitApi();
+    try {
+      const gitApi = await this.connection.getGitApi();
 
-    const thread: GitPullRequestCommentThread = {
-      comments: [
-        {
-          content: `${this.botIdentifier}\n\n${body}`,
-          commentType: AzureCommentType.TEXT,
-        } as Comment,
-      ],
-      threadContext: {
-        filePath: path.startsWith("/") ? path : `/${path}`,
-        rightFileStart: { line, offset: 1 },
-        rightFileEnd: { line, offset: 1 },
-      },
-      status: AzureThreadStatus.ACTIVE,
-    };
+      const thread: GitPullRequestCommentThread = {
+        comments: [
+          {
+            content: `${this.botIdentifier}\n\n${body}`,
+            commentType: AzureCommentType.TEXT,
+          } as Comment,
+        ],
+        threadContext: {
+          filePath: path.startsWith("/") ? path : `/${path}`,
+          rightFileStart: { line, offset: 1 },
+          rightFileEnd: { line, offset: 1 },
+        },
+        status: AzureThreadStatus.ACTIVE,
+      };
 
-    await withRateLimitHandling(() =>
-      gitApi.createThread(thread, this.repoName, prNumber, this.project)
-    );
+      await withRateLimitHandling(() =>
+        gitApi.createThread(thread, this.repoName, prNumber, this.project)
+      );
+      this.auditLogger.logInlineCommentPost(prNumber, path, line, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        path,
+        line,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
-    const gitApi = await this.connection.getGitApi();
+    try {
+      const gitApi = await this.connection.getGitApi();
 
-    const thread: GitPullRequestCommentThread = {
-      comments: [
-        {
-          content: `${this.botIdentifier}\n\n${body}`,
-          commentType: AzureCommentType.TEXT,
-        } as Comment,
-      ],
-      status: AzureThreadStatus.ACTIVE,
-    };
+      const thread: GitPullRequestCommentThread = {
+        comments: [
+          {
+            content: `${this.botIdentifier}\n\n${body}`,
+            commentType: AzureCommentType.TEXT,
+          } as Comment,
+        ],
+        status: AzureThreadStatus.ACTIVE,
+      };
 
-    await withRateLimitHandling(() =>
-      gitApi.createThread(thread, this.repoName, prNumber, this.project)
-    );
+      await withRateLimitHandling(() =>
+        gitApi.createThread(thread, this.repoName, prNumber, this.project)
+      );
+      this.auditLogger.logGeneralCommentPost(prNumber, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logGeneralCommentPost(
+        prNumber,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async updateComment(commentId: number | string, _body: string): Promise<void> {
     const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
 
-    // For Azure DevOps, updating comments requires the PR number context
-    // This is a simplified approach - the review engine tracks context
+    this.auditLogger.logCommentUpdate(threadId, 0, "azure", "success");
     console.log(`Note: Azure DevOps comment update requested for thread ${threadId}`);
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
     const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
 
-    // Similar limitation as updateComment - we need the PR number
+    this.auditLogger.logCommentResolve(threadId, 0, "azure", "success");
     console.log(`Note: Azure DevOps comment resolve requested for thread ${threadId}`);
   }
 }

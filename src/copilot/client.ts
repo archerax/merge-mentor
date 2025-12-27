@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { getAuditLogger } from "../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../constants.js";
 import { CopilotCliError, JsonParseError, ValidationError } from "../errors/index.js";
 import type {
@@ -69,6 +70,7 @@ export class CopilotClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly auditLogger = getAuditLogger();
 
   constructor(options?: CopilotClientOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -89,12 +91,14 @@ export class CopilotClient {
       throw new ValidationError("prompt", "Prompt cannot be empty");
     }
 
+    const promptType = this.inferPromptType(prompt);
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
         const raw = await this.runCopilotCli(prompt);
         const parsed = this.parseJsonResponse(raw);
+        this.auditLogger.logCopilotExecution(promptType, this.model, "success");
         return { raw, parsed };
       } catch (error) {
         lastError = error as Error;
@@ -104,10 +108,17 @@ export class CopilotClient {
       }
     }
 
+    this.auditLogger.logCopilotExecution(promptType, this.model, "failure", lastError?.message);
     throw new CopilotCliError(
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
       lastError ?? undefined
     );
+  }
+
+  private inferPromptType(prompt: string): string {
+    if (prompt.includes("cross-file")) return "cross-file-review";
+    if (prompt.includes("Review the following file")) return "file-review";
+    return "unknown";
   }
 
   private runCopilotCli(prompt: string): Promise<string> {

@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
 import { createChildLogger } from "../logger.js";
@@ -14,6 +15,7 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly repo: string;
   private readonly botIdentifier: string;
   private readonly logger = createChildLogger({ component: "GitHubAdapter" });
+  private readonly auditLogger = getAuditLogger();
 
   constructor(config: Config) {
     this.octokit = new Octokit({ auth: config.github.token });
@@ -24,88 +26,122 @@ export class GitHubAdapter implements PlatformAdapter {
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
-    const { data } = await withRateLimitHandling(() =>
-      this.octokit.pulls.get({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: prNumber,
-      })
-    );
+    try {
+      const { data } = await withRateLimitHandling(() =>
+        this.octokit.pulls.get({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+        })
+      );
 
-    return {
-      number: data.number,
-      title: data.title,
-      description: data.body || "",
-      author: data.user?.login || "unknown",
-      baseBranch: data.base.ref,
-      headBranch: data.head.ref,
-    };
+      const details = {
+        number: data.number,
+        title: data.title,
+        description: data.body || "",
+        author: data.user?.login || "unknown",
+        baseBranch: data.base.ref,
+        headBranch: data.head.ref,
+      };
+
+      this.auditLogger.logPRDetailsFetch(prNumber, "github", "success");
+      return details;
+    } catch (error) {
+      this.auditLogger.logPRDetailsFetch(prNumber, "github", "failure", (error as Error).message);
+      throw error;
+    }
   }
 
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
-    const { data } = await withRateLimitHandling(() =>
-      this.octokit.pulls.listFiles({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: prNumber,
-        per_page: DEFAULT_PAGE_SIZE,
-      })
-    );
+    try {
+      const { data } = await withRateLimitHandling(() =>
+        this.octokit.pulls.listFiles({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+          per_page: DEFAULT_PAGE_SIZE,
+        })
+      );
 
-    return data.map((file) => ({
-      filename: file.filename,
-      status: file.status as FileStatus,
-      additions: file.additions,
-      deletions: file.deletions,
-      patch: file.patch,
-      sha: file.sha ?? undefined,
-    }));
+      const files = data.map((file) => ({
+        filename: file.filename,
+        status: file.status as FileStatus,
+        additions: file.additions,
+        deletions: file.deletions,
+        patch: file.patch,
+        sha: file.sha ?? undefined,
+      }));
+
+      this.auditLogger.logPRFilesFetch(prNumber, "github", files.length);
+      return files;
+    } catch (error) {
+      this.auditLogger.logPRFilesFetch(
+        prNumber,
+        "github",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
-    const comments: ExistingComment[] = [];
+    try {
+      const comments: ExistingComment[] = [];
 
-    // Get PR review comments (inline comments)
-    const { data: reviewComments } = await withRateLimitHandling(() =>
-      this.octokit.pulls.listReviewComments({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: prNumber,
-        per_page: DEFAULT_PAGE_SIZE,
-      })
-    );
+      // Get PR review comments (inline comments)
+      const { data: reviewComments } = await withRateLimitHandling(() =>
+        this.octokit.pulls.listReviewComments({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+          per_page: DEFAULT_PAGE_SIZE,
+        })
+      );
 
-    for (const comment of reviewComments) {
-      if (comment.body.includes(this.botIdentifier)) {
-        comments.push({
-          id: comment.id,
-          body: comment.body,
-          path: comment.path,
-          line: comment.line ?? undefined,
-        });
+      for (const comment of reviewComments) {
+        if (comment.body.includes(this.botIdentifier)) {
+          comments.push({
+            id: comment.id,
+            body: comment.body,
+            path: comment.path,
+            line: comment.line ?? undefined,
+          });
+        }
       }
-    }
 
-    // Get issue comments (general comments)
-    const { data: issueComments } = await withRateLimitHandling(() =>
-      this.octokit.issues.listComments({
-        owner: this.owner,
-        repo: this.repo,
-        issue_number: prNumber,
-        per_page: DEFAULT_PAGE_SIZE,
-      })
-    );
+      // Get issue comments (general comments)
+      const { data: issueComments } = await withRateLimitHandling(() =>
+        this.octokit.issues.listComments({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: prNumber,
+          per_page: DEFAULT_PAGE_SIZE,
+        })
+      );
 
-    for (const comment of issueComments) {
-      if (comment.body?.includes(this.botIdentifier)) {
-        comments.push({
-          id: comment.id,
-          body: comment.body,
-        });
+      for (const comment of issueComments) {
+        if (comment.body?.includes(this.botIdentifier)) {
+          comments.push({
+            id: comment.id,
+            body: comment.body,
+          });
+        }
       }
-    }
 
-    return comments;
+      this.auditLogger.logCommentsFetch(prNumber, "github", comments.length);
+      return comments;
+    } catch (error) {
+      this.auditLogger.logCommentsFetch(
+        prNumber,
+        "github",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async postInlineComment(
@@ -116,15 +152,15 @@ export class GitHubAdapter implements PlatformAdapter {
   ): Promise<void> {
     this.logger.debug({ prNumber, path, line }, "Posting inline comment");
 
-    const { data: pr } = await withRateLimitHandling(() =>
-      this.octokit.pulls.get({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: prNumber,
-      })
-    );
-
     try {
+      const { data: pr } = await withRateLimitHandling(() =>
+        this.octokit.pulls.get({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+        })
+      );
+
       await withRateLimitHandling(() =>
         this.octokit.pulls.createReviewComment({
           owner: this.owner,
@@ -137,31 +173,50 @@ export class GitHubAdapter implements PlatformAdapter {
         })
       );
       this.logger.info({ prNumber, path, line }, "Inline comment posted successfully");
+      this.auditLogger.logInlineCommentPost(prNumber, path, line, "github", "success");
     } catch (error) {
       this.logger.error(
         {
           prNumber,
           path,
           line,
-          commitSha: pr.head.sha,
           error: (error as Error).message,
           errorDetails: error,
         },
         "Failed to post inline comment"
+      );
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        path,
+        line,
+        "github",
+        "failure",
+        (error as Error).message
       );
       throw error;
     }
   }
 
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
-    await withRateLimitHandling(() =>
-      this.octokit.issues.createComment({
-        owner: this.owner,
-        repo: this.repo,
-        issue_number: prNumber,
-        body: `${this.botIdentifier}\n\n${body}`,
-      })
-    );
+    try {
+      await withRateLimitHandling(() =>
+        this.octokit.issues.createComment({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: prNumber,
+          body: `${this.botIdentifier}\n\n${body}`,
+        })
+      );
+      this.auditLogger.logGeneralCommentPost(prNumber, "github", "success");
+    } catch (error) {
+      this.auditLogger.logGeneralCommentPost(
+        prNumber,
+        "github",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
   }
 
   async updateComment(commentId: number | string, body: string): Promise<void> {
@@ -178,6 +233,7 @@ export class GitHubAdapter implements PlatformAdapter {
         })
       );
       this.logger.info({ commentId: id, type: "review" }, "Comment updated successfully");
+      this.auditLogger.logCommentUpdate(id, 0, "github", "success");
     } catch (error) {
       this.logger.warn(
         {
@@ -190,15 +246,27 @@ export class GitHubAdapter implements PlatformAdapter {
         `Failed to update review comment ${id}, trying as issue comment:`,
         (error as Error).message
       );
-      await withRateLimitHandling(() =>
-        this.octokit.issues.updateComment({
-          owner: this.owner,
-          repo: this.repo,
-          comment_id: id,
-          body: `${this.botIdentifier}\n\n${body}`,
-        })
-      );
-      this.logger.info({ commentId: id, type: "issue" }, "Comment updated successfully");
+      try {
+        await withRateLimitHandling(() =>
+          this.octokit.issues.updateComment({
+            owner: this.owner,
+            repo: this.repo,
+            comment_id: id,
+            body: `${this.botIdentifier}\n\n${body}`,
+          })
+        );
+        this.logger.info({ commentId: id, type: "issue" }, "Comment updated successfully");
+        this.auditLogger.logCommentUpdate(id, 0, "github", "success");
+      } catch (finalError) {
+        this.auditLogger.logCommentUpdate(
+          id,
+          0,
+          "github",
+          "failure",
+          (finalError as Error).message
+        );
+        throw finalError;
+      }
     }
   }
 
@@ -236,8 +304,10 @@ export class GitHubAdapter implements PlatformAdapter {
           { commentId: id, threadId, type: "review" },
           "Comment thread resolved successfully"
         );
+        this.auditLogger.logCommentResolve(id, 0, "github", "success");
       } else {
         this.logger.warn({ commentId: id }, "Review comment has no thread ID, cannot resolve");
+        this.auditLogger.logCommentResolve(id, 0, "github", "failure", "No thread ID");
       }
     } catch (error) {
       this.logger.warn(
@@ -248,6 +318,7 @@ export class GitHubAdapter implements PlatformAdapter {
         "Failed to resolve review comment thread"
       );
       console.warn(`Failed to resolve review comment thread ${id}:`, (error as Error).message);
+      this.auditLogger.logCommentResolve(id, 0, "github", "failure", (error as Error).message);
     }
   }
 
