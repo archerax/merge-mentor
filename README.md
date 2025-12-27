@@ -124,8 +124,6 @@ Check Copilot CLI documentation for the latest available models.
 
 ## Usage
 
-Run merge-mentor from within a checked-out repository (Copilot CLI needs access to files):
-
 ```bash
 # Dry-run mode (preview only)
 merge-mentor review --pr 123
@@ -211,8 +209,6 @@ Only analyzes changed files on re-reviews, saving time and cost. Cache stored in
 
 ## CI/CD Integration
 
-**Important**: Check out the repository before running (Copilot CLI needs file access).
-
 ### GitHub Actions
 
 ```yaml
@@ -225,8 +221,6 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -253,8 +247,6 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-  - checkout: self
-  
   - task: NodeTool@0
     inputs:
       versionSpec: "20.x"
@@ -288,12 +280,6 @@ export LOG_LEVEL=debug  # debug, info, warn, error
 ```
 
 ## Troubleshooting
-
-### Repository not accessible
-Ensure you're running from within a checked-out repository:
-- **GitHub Actions**: Add `uses: actions/checkout@v4`
-- **Azure Pipelines**: Add `checkout: self`
-- **Local**: Run from repository directory
 
 ### Timeout errors
 Increase timeout for large PRs:
