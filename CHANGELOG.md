@@ -5,30 +5,38 @@ All notable changes to merge-mentor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2025-12-30
 
 ### Added
 
-- **Multi-AI provider support**: You can select the AI provider used for reviews (for example, GitHub Copilot CLI or OpenCode). Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable. Provider-specific options can be configured via environment variables as documented in the README.
+- **Multi-AI provider support**: Select your preferred AI provider for reviews. Supports GitHub Copilot CLI (default), OpenCode CLI, and Cursor CLI. Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable.
 
+- **Cursor CLI provider**: New AI provider option using Cursor's AI capabilities. Configure with `--provider cursor` or `export AI_PROVIDER=cursor`. Supports model selection via `CURSOR_MODEL` environment variable.
+
+- **OpenCode CLI provider**: Alternative AI provider using OpenCode CLI. Configure with `--provider opencode` or `export AI_PROVIDER=opencode`. Supports model selection via `OPENCODE_MODEL` environment variable.
 
 ### Changed
 
-- No breaking changes for typical users; existing command-line usage remains compatible.
-
 - CLI description updated to reflect multi-provider support
+- No breaking changes for existing users; defaults to Copilot CLI
 
 ### Migration
 
-Existing configurations work without changes (defaults to Copilot CLI). To use OpenCode CLI:
+Existing configurations work without changes (defaults to Copilot CLI). To use alternative providers:
 
 ```bash
-# Via environment variable
+# Use OpenCode CLI
 export AI_PROVIDER=opencode
-export OPENCODE_MODEL=claude-3.5-sonnet
+export OPENCODE_MODEL=claude-sonnet-4.5
+merge-mentor review --pr 123 --write
 
-# Or via CLI flag
-merge-mentor review --pr 123 --provider opencode --write
+# Use Cursor CLI
+export AI_PROVIDER=cursor
+export CURSOR_MODEL=gpt-5
+merge-mentor review --pr 123 --write
+
+# Or via CLI flag (overrides environment variable)
+merge-mentor review --pr 123 --provider cursor --write
 ```
 
 ## [1.5.0] - 2025-12-27

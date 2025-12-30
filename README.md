@@ -452,6 +452,6 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 
 ---
 
-**Version**: 1.5.0  
+**Version**: 1.6.0  
 **Author**: archerax  
 **Documentation**: Included in npm package
