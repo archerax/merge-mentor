@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI and OpenCode CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, and Cursor CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -20,13 +20,16 @@ merge-mentor review --pr 123 --write
 # Use OpenCode CLI instead of Copilot
 merge-mentor review --pr 123 --provider opencode --write
 
+# Use Cursor CLI
+merge-mentor review --pr 123 --provider cursor --write
+
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
 ```
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI and OpenCode CLI
+- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Inline Comments** - Posts feedback on specific lines of code
@@ -49,6 +52,12 @@ npx merge-mentor review --pr 123
     ```bash
     # Install OpenCode CLI (follow official instructions)
     # https://opencode.dev
+    ```
+  - **Cursor CLI**:
+    ```bash
+    # Install Cursor CLI
+    curl https://cursor.com/install -fsS | bash
+    # Ensure cursor-agent is in your PATH
     ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
@@ -129,7 +138,7 @@ set DEFAULT_PLATFORM=azure
 
 **Linux/macOS:**
 ```bash
-# Select AI provider (copilot or opencode)
+# Select AI provider (copilot, opencode, or cursor)
 export AI_PROVIDER=copilot
 
 # Copilot-specific settings
@@ -139,6 +148,10 @@ export COPILOT_TIMEOUT_MS=180000
 # OpenCode-specific settings (when using --provider opencode)
 export OPENCODE_MODEL=claude-sonnet-4.5
 export OPENCODE_TIMEOUT_MS=180000
+
+# Cursor-specific settings (when using --provider cursor)
+export CURSOR_MODEL=gpt-5
+export CURSOR_TIMEOUT_MS=180000
 ```
 
 **Windows (PowerShell):**
@@ -153,6 +166,10 @@ $env:COPILOT_TIMEOUT_MS="180000"
 # OpenCode settings
 $env:OPENCODE_MODEL="claude-sonnet-4.5"
 $env:OPENCODE_TIMEOUT_MS="180000"
+
+# Cursor settings
+$env:CURSOR_MODEL="gpt-5"
+$env:CURSOR_TIMEOUT_MS="180000"
 ```
 
 ### Optional Settings
@@ -247,6 +264,10 @@ Audit logs can be filtered and analyzed for:
 **OpenCode CLI**: Configure via `OPENCODE_MODEL` environment variable.
 - Check OpenCode documentation for supported models
 
+**Cursor CLI**: Configure via `CURSOR_MODEL` environment variable.
+- Supports multiple AI models (GPT-5, Claude 4 Sonnet, Claude 4 Opus)
+- Check Cursor CLI documentation for latest supported models
+
 ## Usage
 
 ```bash
@@ -258,6 +279,9 @@ merge-mentor review --pr 123 --write
 
 # Use OpenCode CLI instead of Copilot
 merge-mentor review --pr 123 --provider opencode --write
+
+# Use Cursor CLI
+merge-mentor review --pr 123 --provider cursor --write
 
 # Azure DevOps
 merge-mentor review --pr 456 --platform azure --write
@@ -275,7 +299,7 @@ merge-mentor review --pr 123 --verbose false
 |--------|-------------|---------|
 | `--pr <number>` | Pull request number (required) | - |
 | `--platform <github\|azure>` | Platform to use | `github` |
-| `--provider <copilot\|opencode>` | AI provider to use | `copilot` |
+| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `copilot` |
 | `--write` | Post comments (otherwise dry-run) | `false` |
 | `--verbose` | Enable verbose output | `true` |
 | `--runs <1-5>` | Number of review passes | `1` |
@@ -413,7 +437,9 @@ export LOG_LEVEL=debug  # debug, info, warn, error
 ### Timeout errors
 Increase timeout for large PRs:
 ```bash
-export COPILOT_TIMEOUT_MS=300000  # 5 minutes
+export COPILOT_TIMEOUT_MS=300000  # 5 minutes (for Copilot)
+export OPENCODE_TIMEOUT_MS=300000  # 5 minutes (for OpenCode)
+export CURSOR_TIMEOUT_MS=300000  # 5 minutes (for Cursor)
 ```
 
 ### Exit Codes

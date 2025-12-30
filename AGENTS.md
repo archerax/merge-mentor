@@ -4,12 +4,12 @@ This file contains instructions for AI agents working on this codebase.
 
 ## Project Overview
 
-merge-mentor is an automated code review tool that supports multiple AI providers (GitHub Copilot CLI, OpenCode CLI) to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
+merge-mentor is an automated code review tool that supports multiple AI providers (GitHub Copilot CLI, OpenCode CLI, Cursor CLI) to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
 **Distribution**: Can be installed globally via npm/npx or used as a local development tool. Configuration (`.env` file) and logs are always relative to the current working directory, not the installation directory.
 
 **Key Features**:
-- Multi-provider support (Copilot CLI, OpenCode CLI)
+- Multi-provider support (Copilot CLI, OpenCode CLI, Cursor CLI)
 - Confidence-based comment filtering (only posts high-confidence issues by default)
 - Pre-existing issue detection (skips issues not introduced in this PR)
 - Resolution comments (explains why comments are being resolved)
@@ -30,6 +30,7 @@ src/
 │   ├── index.ts        # Module exports
 │   └── providers/
 │       ├── copilot.ts  # GitHub Copilot CLI provider implementation
+│       ├── cursor.ts   # Cursor CLI provider implementation
 │       └── opencode.ts # OpenCode CLI provider implementation
 ├── audit/
 │   ├── auditLogger.ts  # Audit logging for security/compliance tracking

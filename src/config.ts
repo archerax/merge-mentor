@@ -47,6 +47,8 @@ export interface Config {
   readonly copilotTimeoutMs?: number;
   readonly opencodeModel?: string;
   readonly opencodeTimeoutMs?: number;
+  readonly cursorModel?: string;
+  readonly cursorTimeoutMs?: number;
   readonly commentFilter: CommentFilterConfig;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
@@ -69,6 +71,9 @@ export function loadConfig(): Config {
     : undefined;
   const opencodeTimeoutMs = process.env.OPENCODE_TIMEOUT_MS
     ? Number.parseInt(process.env.OPENCODE_TIMEOUT_MS, 10)
+    : undefined;
+  const cursorTimeoutMs = process.env.CURSOR_TIMEOUT_MS
+    ? Number.parseInt(process.env.CURSOR_TIMEOUT_MS, 10)
     : undefined;
 
   const minConfidence = validateMinConfidence(process.env.MIN_COMMENT_CONFIDENCE);
@@ -94,6 +99,8 @@ export function loadConfig(): Config {
     copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
     opencodeModel: process.env.OPENCODE_MODEL,
     opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
+    cursorModel: process.env.CURSOR_MODEL,
+    cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
     commentFilter: {
       minConfidence,
       skipPreExisting: process.env.SKIP_PREEXISTING_ISSUES !== "false",
@@ -123,7 +130,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "opencode"];
+  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

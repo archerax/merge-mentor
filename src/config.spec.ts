@@ -21,6 +21,8 @@ function cleanEnv(): void {
   delete process.env.COPILOT_TIMEOUT_MS;
   delete process.env.OPENCODE_MODEL;
   delete process.env.OPENCODE_TIMEOUT_MS;
+  delete process.env.CURSOR_MODEL;
+  delete process.env.CURSOR_TIMEOUT_MS;
 }
 
 function setEnv(overrides: Record<string, string>): void {
@@ -235,6 +237,9 @@ describe("Config", () => {
 
       setEnv({ AI_PROVIDER: "opencode" });
       expect(loadConfig().aiProvider).toBe("opencode");
+
+      setEnv({ AI_PROVIDER: "cursor" });
+      expect(loadConfig().aiProvider).toBe("cursor");
     });
 
     it("should load OPENCODE_MODEL from environment", () => {
@@ -265,6 +270,36 @@ describe("Config", () => {
       const config = loadConfig();
 
       expect(config.opencodeTimeoutMs).toBeUndefined();
+    });
+
+    it("should load CURSOR_MODEL from environment", () => {
+      setEnv({
+        CURSOR_MODEL: "gpt-5",
+      });
+
+      const config = loadConfig();
+
+      expect(config.cursorModel).toBe("gpt-5");
+    });
+
+    it("should load CURSOR_TIMEOUT_MS from environment", () => {
+      setEnv({
+        CURSOR_TIMEOUT_MS: "180000",
+      });
+
+      const config = loadConfig();
+
+      expect(config.cursorTimeoutMs).toBe(180000);
+    });
+
+    it("should ignore CURSOR_TIMEOUT_MS when zero or negative", () => {
+      setEnv({
+        CURSOR_TIMEOUT_MS: "0",
+      });
+
+      const config = loadConfig();
+
+      expect(config.cursorTimeoutMs).toBeUndefined();
     });
   });
 

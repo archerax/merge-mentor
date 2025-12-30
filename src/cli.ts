@@ -43,9 +43,11 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "opencode"].includes(aiProvider)) {
+  if (!["copilot", "opencode", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
-    throw new Error(`Invalid AI provider "${aiProvider}". Must be "copilot" or "opencode".`);
+    throw new Error(
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", or "cursor".`
+    );
   }
 
   validateConfig(config, platform);
@@ -61,9 +63,22 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
   const reviewRuns = options.runs ?? config.reviewRuns;
 
   // Select provider-specific model and timeout
-  const aiModel = aiProvider === "opencode" ? config.opencodeModel : config.copilotModel;
-  const aiTimeoutMs =
-    aiProvider === "opencode" ? config.opencodeTimeoutMs : config.copilotTimeoutMs;
+  let aiModel: string | undefined;
+  let aiTimeoutMs: number | undefined;
+
+  switch (aiProvider) {
+    case "opencode":
+      aiModel = config.opencodeModel;
+      aiTimeoutMs = config.opencodeTimeoutMs;
+      break;
+    case "cursor":
+      aiModel = config.cursorModel;
+      aiTimeoutMs = config.cursorTimeoutMs;
+      break;
+    default:
+      aiModel = config.copilotModel;
+      aiTimeoutMs = config.copilotTimeoutMs;
+  }
 
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun,
@@ -130,7 +145,9 @@ const program = new Command();
 
 program
   .name("merge-mentor")
-  .description("Automated code review bot using AI providers (Copilot CLI, OpenCode CLI)")
+  .description(
+    "Automated code review bot using AI providers (Copilot CLI, OpenCode CLI, Cursor CLI)"
+  )
   .version("1.4.0");
 
 program
@@ -138,7 +155,7 @@ program
   .description("Review a pull request")
   .requiredOption("--pr <number>", "Pull request number", parseInt)
   .option("--platform <platform>", "Platform (github or azure)", "github")
-  .option("--provider <provider>", "AI provider (copilot or opencode)")
+  .option("--provider <provider>", "AI provider (copilot, opencode, or cursor)")
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
   .option(

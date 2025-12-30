@@ -403,6 +403,34 @@ describe("CLI", () => {
       );
     });
 
+    it("uses cursor provider when specified via --provider", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          cursorModel: "gpt-5",
+          cursorTimeoutMs: 180000,
+        })
+      );
+
+      const options: ReviewOptions = {
+        pr: 42,
+        provider: "cursor",
+        write: false,
+        verbose: true,
+      };
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "cursor",
+        expect.objectContaining({
+          aiModel: "gpt-5",
+          aiTimeoutMs: 180000,
+        })
+      );
+    });
+
     it("throws error for invalid provider", async () => {
       const options: ReviewOptions = {
         pr: 42,
@@ -412,7 +440,7 @@ describe("CLI", () => {
       };
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot" or "opencode".'
+        'Invalid AI provider "invalid". Must be "copilot", "opencode", or "cursor".'
       );
     });
   });

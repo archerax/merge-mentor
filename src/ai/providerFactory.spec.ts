@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigurationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
 import { CopilotProvider } from "./providers/copilot.js";
+import { CursorProvider } from "./providers/cursor.js";
 import { OpenCodeProvider } from "./providers/opencode.js";
 
 describe("createAIProvider", () => {
@@ -13,6 +14,11 @@ describe("createAIProvider", () => {
   it("should create OpenCodeProvider for 'opencode' type", () => {
     const provider = createAIProvider("opencode");
     expect(provider).toBeInstanceOf(OpenCodeProvider);
+  });
+
+  it("should create CursorProvider for 'cursor' type", () => {
+    const provider = createAIProvider("cursor");
+    expect(provider).toBeInstanceOf(CursorProvider);
   });
 
   it("should pass options to CopilotProvider", () => {
@@ -33,10 +39,19 @@ describe("createAIProvider", () => {
     expect(provider).toBeInstanceOf(OpenCodeProvider);
   });
 
+  it("should pass options to CursorProvider", () => {
+    const provider = createAIProvider("cursor", {
+      model: "gpt-5",
+      timeoutMs: 180000,
+      maxRetries: 4,
+    });
+    expect(provider).toBeInstanceOf(CursorProvider);
+  });
+
   it("should throw ConfigurationError for unsupported provider type", () => {
     expect(() => createAIProvider("invalid" as any)).toThrow(ConfigurationError);
     expect(() => createAIProvider("invalid" as any)).toThrow(
-      "Unsupported AI provider: invalid. Valid options are: copilot, opencode"
+      "Unsupported AI provider: invalid. Valid options are: copilot, opencode, cursor"
     );
   });
 
