@@ -9,15 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Windows and macOS compatibility**: Full cross-platform support for Windows, macOS, and Linux. Build scripts now use `cross-env` for environment variable handling, and command execution explicitly avoids shell-specific syntax. Documentation includes platform-specific configuration examples.
+- **Multi-AI provider support**: You can select the AI provider used for reviews (for example, GitHub Copilot CLI or OpenCode). Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable. Provider-specific options can be configured via environment variables as documented in the README.
 
-### Fixed
 
-- Build script now works correctly on Windows (replaced `NODE_ENV=production` with `cross-env NODE_ENV=production`)
+### Changed
+
+- No breaking changes for typical users; existing command-line usage remains compatible.
+
+- CLI description updated to reflect multi-provider support
+
+### Migration
+
+Existing configurations work without changes (defaults to Copilot CLI). To use OpenCode CLI:
+
+```bash
+# Via environment variable
+export AI_PROVIDER=opencode
+export OPENCODE_MODEL=claude-3.5-sonnet
+
+# Or via CLI flag
+merge-mentor review --pr 123 --provider opencode --write
+```
 
 ## [1.5.0] - 2025-12-27
 
 ### Added
+
+- **Windows and macOS compatibility**: Full cross-platform support for Windows, macOS, and Linux. Build scripts now use `cross-env` for environment variable handling, and command execution explicitly avoids shell-specific syntax. Documentation includes platform-specific configuration examples.
 
 - **Comprehensive audit logging for security and compliance**: All critical bot actions are now logged with structured data, including PR operations, comment actions, AI executions, and review lifecycle events. Audit logs are written to `.merge-mentor/logs/merge-mentor.log` in JSON format for easy parsing and analysis. Enabled by default for enterprise compliance requirements.
 

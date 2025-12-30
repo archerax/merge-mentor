@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by GitHub Copilot CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI and OpenCode CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -17,12 +17,16 @@ merge-mentor review --pr 123
 # Post comments to PR
 merge-mentor review --pr 123 --write
 
+# Use OpenCode CLI instead of Copilot
+merge-mentor review --pr 123 --provider opencode --write
+
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
 ```
 
 ## Features
 
+- **Multi-Provider Support** - Works with GitHub Copilot CLI and OpenCode CLI
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Inline Comments** - Posts feedback on specific lines of code
@@ -36,11 +40,16 @@ npx merge-mentor review --pr 123
 ## Prerequisites
 
 - **Node.js 20+**
-- **GitHub Copilot CLI** - Must be installed and accessible in PATH
-  ```bash
-  # Install Copilot CLI
-  npm install -g @githubnext/github-copilot-cli
-  ```
+- **AI CLI Tool** - At least one must be installed and accessible in PATH:
+  - **GitHub Copilot CLI** (default):
+    ```bash
+    npm install -g @githubnext/github-copilot-cli
+    ```
+  - **OpenCode CLI**:
+    ```bash
+    # Install OpenCode CLI (follow official instructions)
+    # https://opencode.dev
+    ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 **Supported Platforms**: Windows, macOS, and Linux
@@ -114,16 +123,42 @@ set AZURE_DEVOPS_REPO=repository_name
 set DEFAULT_PLATFORM=azure
 ```
 
+### AI Provider Configuration
+
+**Default Provider**: GitHub Copilot CLI (`copilot`)
+
+**Linux/macOS:**
+```bash
+# Select AI provider (copilot or opencode)
+export AI_PROVIDER=copilot
+
+# Copilot-specific settings
+export COPILOT_MODEL=gpt-5.2
+export COPILOT_TIMEOUT_MS=180000
+
+# OpenCode-specific settings (when using --provider opencode)
+export OPENCODE_MODEL=claude-sonnet-4.5
+export OPENCODE_TIMEOUT_MS=180000
+```
+
+**Windows (PowerShell):**
+```powershell
+# Select AI provider
+$env:AI_PROVIDER="copilot"
+
+# Copilot settings
+$env:COPILOT_MODEL="gpt-5.2"
+$env:COPILOT_TIMEOUT_MS="180000"
+
+# OpenCode settings
+$env:OPENCODE_MODEL="claude-sonnet-4.5"
+$env:OPENCODE_TIMEOUT_MS="180000"
+```
+
 ### Optional Settings
 
 **Linux/macOS:**
 ```bash
-# Copilot model selection
-export COPILOT_MODEL=gpt-4o
-
-# Timeout for Copilot CLI operations (milliseconds)
-export COPILOT_TIMEOUT_MS=180000
-
 # Comment filtering
 export MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
 export SKIP_PREEXISTING_ISSUES=true
@@ -194,18 +229,23 @@ Audit logs can be filtered and analyzed for:
 
 ### Available Models
 
-Configure via `COPILOT_MODEL` environment variable. If not set, uses Copilot CLI default.
+**Copilot CLI**: Configure via `COPILOT_MODEL` environment variable.
+- `claude-sonnet-4.5`
+- `claude-haiku-4.5`
+- `claude-opus-4.5`
+- `claude-sonnet-4`
+- `gpt-5.1-codex-max`
+- `gpt-5.1-codex`
+- `gpt-5.2`
+- `gpt-5.1`
+- `gpt-5`
+- `gpt-5.1-codex-mini`
+- `gpt-5-mini`
+- `gpt-4.1`
+- `gemini-3-pro-preview`
 
-Supported models:
-- `gpt-4o` (recommended)
-- `gpt-4-turbo`
-- `gpt-4`
-- `claude-3.5-sonnet`
-- `claude-3-opus`
-- `o1-preview`
-- `o1-mini`
-
-Check Copilot CLI documentation for the latest available models.
+**OpenCode CLI**: Configure via `OPENCODE_MODEL` environment variable.
+- Check OpenCode documentation for supported models
 
 ## Usage
 
@@ -215,6 +255,9 @@ merge-mentor review --pr 123
 
 # Post comments to PR
 merge-mentor review --pr 123 --write
+
+# Use OpenCode CLI instead of Copilot
+merge-mentor review --pr 123 --provider opencode --write
 
 # Azure DevOps
 merge-mentor review --pr 456 --platform azure --write
@@ -232,6 +275,7 @@ merge-mentor review --pr 123 --verbose false
 |--------|-------------|---------|
 | `--pr <number>` | Pull request number (required) | - |
 | `--platform <github\|azure>` | Platform to use | `github` |
+| `--provider <copilot\|opencode>` | AI provider to use | `copilot` |
 | `--write` | Post comments (otherwise dry-run) | `false` |
 | `--verbose` | Enable verbose output | `true` |
 | `--runs <1-5>` | Number of review passes | `1` |

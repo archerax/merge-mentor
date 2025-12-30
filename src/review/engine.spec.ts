@@ -4,21 +4,18 @@ import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { ReviewEngine } from "./engine.js";
 
+// Mock the createAIProvider function with a factory that returns a mock provider
 const mockExecutePrompt = vi.fn();
 const mockParseFileReview = vi.fn();
 const mockParseCrossFileReview = vi.fn();
 
-vi.mock("../copilot/client.js", () => {
-  class MockCopilotClient {
-    executePrompt = mockExecutePrompt;
-    parseFileReview = mockParseFileReview;
-    parseCrossFileReview = mockParseCrossFileReview;
-  }
-
-  return {
-    CopilotClient: MockCopilotClient,
-  };
-});
+vi.mock("../ai/index.js", () => ({
+  createAIProvider: vi.fn(() => ({
+    executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
+    parseFileReview: (...args: unknown[]) => mockParseFileReview(...args),
+    parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
+  })),
+}));
 
 function createMockPlatform(): PlatformAdapter {
   return {

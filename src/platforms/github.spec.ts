@@ -42,6 +42,7 @@ function createTestConfig(): Config {
       repo: "",
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
+    aiProvider: "copilot",
     commentFilter: {
       minConfidence: "high",
       skipPreExisting: true,

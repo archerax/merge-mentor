@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { getAuditLogger } from "../audit/index.js";
-import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../constants.js";
-import { CopilotCliError, JsonParseError, ValidationError } from "../errors/index.js";
+import { getAuditLogger } from "../../audit/index.js";
+import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
+import { CopilotCliError, JsonParseError, ValidationError } from "../../errors/index.js";
 import type {
   CrossFileFinding,
   CrossFileReviewResult,
@@ -9,20 +9,8 @@ import type {
   FileReviewResult,
   FindingConfidence,
   ResolvedComment,
-} from "../platforms/types.js";
-
-/** Response from executing a Copilot prompt. */
-export interface CopilotResponse {
-  readonly raw: string;
-  readonly parsed: unknown;
-}
-
-/** Options for configuring CopilotClient. */
-export interface CopilotClientOptions {
-  readonly maxRetries?: number;
-  readonly timeoutMs?: number;
-  readonly model?: string;
-}
+} from "../../platforms/types.js";
+import type { AIProviderClient, AIProviderOptions, AIResponse } from "../types.js";
 
 /** Raw finding structure from Copilot JSON response. */
 interface RawFileFinding {
@@ -63,19 +51,16 @@ interface RawCrossFileReviewResponse {
 }
 
 /**
- * Client for executing prompts via the GitHub Copilot CLI.
+ * AI provider implementation for GitHub Copilot CLI.
  * Handles retries, JSON parsing, and response validation.
- *
- * @deprecated Use CopilotProvider from ../ai/providers/copilot.js instead.
- * This class is kept for backward compatibility.
  */
-export class CopilotClient {
+export class CopilotProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
 
-  constructor(options?: CopilotClientOptions) {
+  constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
@@ -89,7 +74,7 @@ export class CopilotClient {
    * @throws {ValidationError} When prompt is empty or invalid
    * @throws {CopilotCliError} When CLI execution fails after all retries
    */
-  async executePrompt(prompt: string): Promise<CopilotResponse> {
+  async executePrompt(prompt: string): Promise<AIResponse> {
     if (!prompt || prompt.trim().length === 0) {
       throw new ValidationError("prompt", "Prompt cannot be empty");
     }
@@ -99,9 +84,9 @@ export class CopilotClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const raw = await this.runCopilotCli(prompt);
+        const raw = await this.runCli(prompt);
         const parsed = this.parseJsonResponse(raw);
-        this.auditLogger.logCopilotExecution(promptType, this.model, "success");
+        this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
         return { raw, parsed };
       } catch (error) {
         lastError = error as Error;
@@ -111,7 +96,13 @@ export class CopilotClient {
       }
     }
 
-    this.auditLogger.logCopilotExecution(promptType, this.model, "failure", lastError?.message);
+    this.auditLogger.logAIProviderExecution(
+      "copilot",
+      promptType,
+      this.model,
+      "failure",
+      lastError?.message
+    );
     throw new CopilotCliError(
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
       lastError ?? undefined
@@ -124,7 +115,7 @@ export class CopilotClient {
     return "unknown";
   }
 
-  private runCopilotCli(prompt: string): Promise<string> {
+  private runCli(prompt: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
@@ -195,16 +186,8 @@ export class CopilotClient {
    * @param filename - Name of the reviewed file
    * @param response - Raw Copilot response
    * @returns Structured file review result
-   *
-   * @example
-   * ```typescript
-   * const client = new CopilotClient();
-   * const response = await client.executePrompt(prompt);
-   * const review = client.parseFileReview('src/app.ts', response);
-   * console.log(`Found ${review.findings.length} issues in ${review.filename}`);
-   * ```
    */
-  parseFileReview(filename: string, response: CopilotResponse): FileReviewResult {
+  parseFileReview(filename: string, response: AIResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
     const findings: FileFinding[] = [];
     const resolvedComments: ResolvedComment[] = [];
@@ -246,17 +229,8 @@ export class CopilotClient {
    *
    * @param response - Raw Copilot response
    * @returns Structured cross-file review result
-   *
-   * @example
-   * ```typescript
-   * const client = new CopilotClient();
-   * const response = await client.executePrompt(crossFilePrompt);
-   * const review = client.parseCrossFileReview(response);
-   * console.log(review.overallAssessment);
-   * console.log(`${review.recommendations.length} recommendations`);
-   * ```
    */
-  parseCrossFileReview(response: CopilotResponse): CrossFileReviewResult {
+  parseCrossFileReview(response: AIResponse): CrossFileReviewResult {
     const data = response.parsed as RawCrossFileReviewResponse;
     const findings: CrossFileFinding[] = [];
 

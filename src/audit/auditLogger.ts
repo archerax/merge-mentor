@@ -10,6 +10,7 @@ export type AuditEventType =
   | "comment.update"
   | "comment.resolve"
   | "copilot.execute"
+  | "ai.provider.execute"
   | "review.start"
   | "review.complete"
   | "file.review.start"
@@ -243,6 +244,7 @@ export class AuditLogger {
 
   /**
    * Logs Copilot CLI execution.
+   * @deprecated Use logAIProviderExecution instead
    */
   logCopilotExecution(
     promptType: string,
@@ -250,12 +252,25 @@ export class AuditLogger {
     result: "success" | "failure" = "success",
     error?: string
   ): void {
+    this.logAIProviderExecution("copilot", promptType, model, result, error);
+  }
+
+  /**
+   * Logs AI provider CLI execution.
+   */
+  logAIProviderExecution(
+    provider: string,
+    promptType: string,
+    model?: string,
+    result: "success" | "failure" = "success",
+    error?: string
+  ): void {
     this.logEvent(
-      "copilot.execute",
-      { type: "copilot", id: promptType, details: { model } },
-      `Execute Copilot prompt: ${promptType}`,
+      "ai.provider.execute",
+      { type: "copilot", id: `${provider}:${promptType}`, details: { provider, model } },
+      `Execute ${provider} prompt: ${promptType}`,
       result,
-      { promptType, model },
+      { provider, promptType, model },
       error
     );
   }

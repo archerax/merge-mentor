@@ -4,11 +4,12 @@ This file contains instructions for AI agents working on this codebase.
 
 ## Project Overview
 
-merge-mentor is an automated code review tool that leverages GitHub Copilot CLI to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
+merge-mentor is an automated code review tool that supports multiple AI providers (GitHub Copilot CLI, OpenCode CLI) to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
 **Distribution**: Can be installed globally via npm/npx or used as a local development tool. Configuration (`.env` file) and logs are always relative to the current working directory, not the installation directory.
 
 **Key Features**:
+- Multi-provider support (Copilot CLI, OpenCode CLI)
 - Confidence-based comment filtering (only posts high-confidence issues by default)
 - Pre-existing issue detection (skips issues not introduced in this PR)
 - Resolution comments (explains why comments are being resolved)
@@ -20,16 +21,23 @@ merge-mentor is an automated code review tool that leverages GitHub Copilot CLI 
 ```
 src/
 ├── cli.ts              # CLI entry point using Commander
-├── config.ts           # Environment configuration loader (includes CommentFilterConfig)
+├── config.ts           # Environment configuration loader (includes CommentFilterConfig, AI provider config)
 ├── constants.ts        # Application-wide constants (severity/confidence emojis)
 ├── logger.ts           # Pino logging setup
+├── ai/                 # AI provider abstraction layer
+│   ├── types.ts        # AIProviderClient interface, AIProviderType, AIResponse
+│   ├── providerFactory.ts # Factory for creating AI provider instances
+│   ├── index.ts        # Module exports
+│   └── providers/
+│       ├── copilot.ts  # GitHub Copilot CLI provider implementation
+│       └── opencode.ts # OpenCode CLI provider implementation
 ├── audit/
 │   ├── auditLogger.ts  # Audit logging for security/compliance tracking
 │   └── index.ts        # Audit module exports
 ├── errors/
 │   └── index.ts        # Custom error hierarchy
 ├── copilot/
-│   ├── client.ts       # Copilot CLI wrapper with retry logic (with audit logging)
+│   ├── client.ts       # Legacy Copilot CLI wrapper (deprecated, use ai/providers/copilot.ts)
 │   ├── prompts.ts      # Prompt templates for reviews (now includes comment context)
 │   └── commentContext.ts # Formats existing comments for LLM context
 ├── platforms/
@@ -54,6 +62,30 @@ tests/
     ├── platform-adapters.integration.test.ts
     └── review-engine.integration.test.ts
 ```
+
+## AI Provider Architecture
+
+### Provider Interface
+
+All AI providers implement the `AIProviderClient` interface:
+
+```typescript
+interface AIProviderClient {
+  executePrompt(prompt: string): Promise<AIResponse>;
+  parseFileReview(filename: string, response: AIResponse): FileReviewResult;
+  parseCrossFileReview(response: AIResponse): CrossFileReviewResult;
+}
+```
+
+### Adding a New Provider
+
+1. Create `src/ai/providers/newprovider.ts` implementing `AIProviderClient`
+2. Add error class (e.g., `NewProviderCliError`)
+3. Export from `src/ai/index.ts`
+4. Add case to `createAIProvider()` in `src/ai/providerFactory.ts`
+5. Add configuration in `src/config.ts` (model, timeout env vars)
+6. Add CLI option validation in `src/cli.ts`
+7. Add tests in `src/ai/providers/newprovider.spec.ts`
 
 ## Deduplication Strategy
 

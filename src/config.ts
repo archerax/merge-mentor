@@ -1,5 +1,6 @@
 import path from "node:path";
 import dotenv from "dotenv";
+import type { AIProviderType } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
 import type { FindingConfidence } from "./platforms/types.js";
 
@@ -40,8 +41,12 @@ export interface Config {
   readonly github: GitHubConfig;
   readonly azure: AzureConfig;
   readonly botCommentIdentifier: string;
+  /** AI provider to use for code reviews. Default: copilot */
+  readonly aiProvider: AIProviderType;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
+  readonly opencodeModel?: string;
+  readonly opencodeTimeoutMs?: number;
   readonly commentFilter: CommentFilterConfig;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
@@ -59,12 +64,16 @@ export interface Config {
  * ```
  */
 export function loadConfig(): Config {
-  const timeoutMs = process.env.COPILOT_TIMEOUT_MS
+  const copilotTimeoutMs = process.env.COPILOT_TIMEOUT_MS
     ? Number.parseInt(process.env.COPILOT_TIMEOUT_MS, 10)
+    : undefined;
+  const opencodeTimeoutMs = process.env.OPENCODE_TIMEOUT_MS
+    ? Number.parseInt(process.env.OPENCODE_TIMEOUT_MS, 10)
     : undefined;
 
   const minConfidence = validateMinConfidence(process.env.MIN_COMMENT_CONFIDENCE);
   const reviewRuns = validateReviewRuns(process.env.REVIEW_RUNS);
+  const aiProvider = validateAIProvider(process.env.AI_PROVIDER);
 
   return {
     defaultPlatform: (process.env.DEFAULT_PLATFORM as Platform) || "github",
@@ -80,8 +89,11 @@ export function loadConfig(): Config {
       repo: process.env.AZURE_DEVOPS_REPO || "",
     },
     botCommentIdentifier: process.env.BOT_COMMENT_IDENTIFIER || "[merge-mentor]",
+    aiProvider,
     copilotModel: process.env.COPILOT_MODEL,
-    copilotTimeoutMs: timeoutMs && timeoutMs > 0 ? timeoutMs : undefined,
+    copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
+    opencodeModel: process.env.OPENCODE_MODEL,
+    opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
     commentFilter: {
       minConfidence,
       skipPreExisting: process.env.SKIP_PREEXISTING_ISSUES !== "false",
@@ -108,6 +120,14 @@ function validateReviewRuns(value: string | undefined): number {
     return 1; // Default to 1 for invalid values
   }
   return parsed;
+}
+
+function validateAIProvider(value: string | undefined): AIProviderType {
+  const validProviders: AIProviderType[] = ["copilot", "opencode"];
+  if (value && validProviders.includes(value as AIProviderType)) {
+    return value as AIProviderType;
+  }
+  return "copilot"; // Default to copilot for backward compatibility
 }
 
 /**

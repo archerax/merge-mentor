@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { getAuditLogger } from "../audit/index.js";
-import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../constants.js";
-import { CopilotCliError, JsonParseError, ValidationError } from "../errors/index.js";
+import { getAuditLogger } from "../../audit/index.js";
+import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
+import { JsonParseError, ValidationError } from "../../errors/index.js";
 import type {
   CrossFileFinding,
   CrossFileReviewResult,
@@ -9,22 +9,23 @@ import type {
   FileReviewResult,
   FindingConfidence,
   ResolvedComment,
-} from "../platforms/types.js";
+} from "../../platforms/types.js";
+import type { AIProviderClient, AIProviderOptions, AIResponse } from "../types.js";
 
-/** Response from executing a Copilot prompt. */
-export interface CopilotResponse {
-  readonly raw: string;
-  readonly parsed: unknown;
+/**
+ * Error thrown when the OpenCode CLI fails or is unavailable.
+ */
+export class OpenCodeCliError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = "OpenCodeCliError";
+  }
 }
 
-/** Options for configuring CopilotClient. */
-export interface CopilotClientOptions {
-  readonly maxRetries?: number;
-  readonly timeoutMs?: number;
-  readonly model?: string;
-}
-
-/** Raw finding structure from Copilot JSON response. */
+/** Raw finding structure from OpenCode JSON response. */
 interface RawFileFinding {
   line?: unknown;
   severity?: unknown;
@@ -35,7 +36,7 @@ interface RawFileFinding {
   isPreExisting?: unknown;
 }
 
-/** Raw cross-file finding from Copilot JSON response. */
+/** Raw cross-file finding from OpenCode JSON response. */
 interface RawCrossFileFinding {
   severity?: unknown;
   category?: unknown;
@@ -43,19 +44,19 @@ interface RawCrossFileFinding {
   affected_files?: unknown[];
 }
 
-/** Raw resolved comment from Copilot JSON response. */
+/** Raw resolved comment from OpenCode JSON response. */
 interface RawResolvedComment {
   line?: unknown;
   reason?: unknown;
 }
 
-/** Raw file review response from Copilot. */
+/** Raw file review response from OpenCode. */
 interface RawFileReviewResponse {
   findings?: RawFileFinding[];
   resolved_comments?: RawResolvedComment[];
 }
 
-/** Raw cross-file review response from Copilot. */
+/** Raw cross-file review response from OpenCode. */
 interface RawCrossFileReviewResponse {
   overall_assessment?: string;
   findings?: RawCrossFileFinding[];
@@ -63,33 +64,32 @@ interface RawCrossFileReviewResponse {
 }
 
 /**
- * Client for executing prompts via the GitHub Copilot CLI.
+ * AI provider implementation for OpenCode CLI.
  * Handles retries, JSON parsing, and response validation.
  *
- * @deprecated Use CopilotProvider from ../ai/providers/copilot.js instead.
- * This class is kept for backward compatibility.
+ * OpenCode CLI is invoked as: opencode -p "prompt" [--model <model>]
  */
-export class CopilotClient {
+export class OpenCodeProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
 
-  constructor(options?: CopilotClientOptions) {
+  constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
   }
 
   /**
-   * Executes a prompt via Copilot CLI with automatic retries.
+   * Executes a prompt via OpenCode CLI with automatic retries.
    *
-   * @param prompt - The prompt to send to Copilot
+   * @param prompt - The prompt to send to OpenCode
    * @returns Response containing raw output and parsed JSON
    * @throws {ValidationError} When prompt is empty or invalid
-   * @throws {CopilotCliError} When CLI execution fails after all retries
+   * @throws {OpenCodeCliError} When CLI execution fails after all retries
    */
-  async executePrompt(prompt: string): Promise<CopilotResponse> {
+  async executePrompt(prompt: string): Promise<AIResponse> {
     if (!prompt || prompt.trim().length === 0) {
       throw new ValidationError("prompt", "Prompt cannot be empty");
     }
@@ -99,9 +99,9 @@ export class CopilotClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const raw = await this.runCopilotCli(prompt);
+        const raw = await this.runCli(prompt);
         const parsed = this.parseJsonResponse(raw);
-        this.auditLogger.logCopilotExecution(promptType, this.model, "success");
+        this.auditLogger.logAIProviderExecution("opencode", promptType, this.model, "success");
         return { raw, parsed };
       } catch (error) {
         lastError = error as Error;
@@ -111,8 +111,14 @@ export class CopilotClient {
       }
     }
 
-    this.auditLogger.logCopilotExecution(promptType, this.model, "failure", lastError?.message);
-    throw new CopilotCliError(
+    this.auditLogger.logAIProviderExecution(
+      "opencode",
+      promptType,
+      this.model,
+      "failure",
+      lastError?.message
+    );
+    throw new OpenCodeCliError(
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
       lastError ?? undefined
     );
@@ -124,7 +130,7 @@ export class CopilotClient {
     return "unknown";
   }
 
-  private runCopilotCli(prompt: string): Promise<string> {
+  private runCli(prompt: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
@@ -134,12 +140,11 @@ export class CopilotClient {
         args.push("--model", this.model);
       }
 
-      // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
-      // Node.js will automatically handle .exe extension on Windows
-      const proc = spawn("copilot", args, {
+      // Using array-based args with spawn handles escaping correctly on all platforms
+      const proc = spawn("opencode", args, {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
-        shell: false, // Explicit shell: false ensures consistent cross-platform behavior
+        shell: false,
       });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
@@ -147,9 +152,9 @@ export class CopilotClient {
 
       proc.on("error", (error) => {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(new CopilotCliError("Copilot CLI is not installed or not in PATH"));
+          reject(new OpenCodeCliError("OpenCode CLI is not installed or not in PATH"));
         } else {
-          reject(new CopilotCliError("CLI execution failed", error));
+          reject(new OpenCodeCliError("CLI execution failed", error));
         }
       });
 
@@ -161,12 +166,12 @@ export class CopilotClient {
           resolve(stdout);
         } else if (code === null) {
           reject(
-            new CopilotCliError(
+            new OpenCodeCliError(
               `CLI process timed out after ${this.timeoutMs}ms. Consider increasing the timeout or simplifying the review scope.`
             )
           );
         } else {
-          reject(new CopilotCliError(`Exited with code ${code}: ${stderr || stdout}`));
+          reject(new OpenCodeCliError(`Exited with code ${code}: ${stderr || stdout}`));
         }
       });
     });
@@ -190,21 +195,13 @@ export class CopilotClient {
   }
 
   /**
-   * Parses a Copilot response into a file review result.
+   * Parses an OpenCode response into a file review result.
    *
    * @param filename - Name of the reviewed file
-   * @param response - Raw Copilot response
+   * @param response - Raw OpenCode response
    * @returns Structured file review result
-   *
-   * @example
-   * ```typescript
-   * const client = new CopilotClient();
-   * const response = await client.executePrompt(prompt);
-   * const review = client.parseFileReview('src/app.ts', response);
-   * console.log(`Found ${review.findings.length} issues in ${review.filename}`);
-   * ```
    */
-  parseFileReview(filename: string, response: CopilotResponse): FileReviewResult {
+  parseFileReview(filename: string, response: AIResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
     const findings: FileFinding[] = [];
     const resolvedComments: ResolvedComment[] = [];
@@ -242,21 +239,12 @@ export class CopilotClient {
   }
 
   /**
-   * Parses a Copilot response into a cross-file review result.
+   * Parses an OpenCode response into a cross-file review result.
    *
-   * @param response - Raw Copilot response
+   * @param response - Raw OpenCode response
    * @returns Structured cross-file review result
-   *
-   * @example
-   * ```typescript
-   * const client = new CopilotClient();
-   * const response = await client.executePrompt(crossFilePrompt);
-   * const review = client.parseCrossFileReview(response);
-   * console.log(review.overallAssessment);
-   * console.log(`${review.recommendations.length} recommendations`);
-   * ```
    */
-  parseCrossFileReview(response: CopilotResponse): CrossFileReviewResult {
+  parseCrossFileReview(response: AIResponse): CrossFileReviewResult {
     const data = response.parsed as RawCrossFileReviewResponse;
     const findings: CrossFileFinding[] = [];
 

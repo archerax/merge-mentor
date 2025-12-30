@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import type { AIProviderType } from "./ai/types.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
@@ -11,6 +12,7 @@ import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 export interface ReviewOptions {
   pr: number;
   platform?: string;
+  provider?: string;
   write: boolean;
   verbose: boolean;
   runs?: number;
@@ -22,7 +24,12 @@ export interface ReviewOptions {
  */
 export async function executeReview(options: ReviewOptions): Promise<ReviewResult> {
   logger.info(
-    { pr: options.pr, platform: options.platform, write: options.write },
+    {
+      pr: options.pr,
+      platform: options.platform,
+      provider: options.provider,
+      write: options.write,
+    },
     "Review command initiated"
   );
 
@@ -32,6 +39,13 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
   if (!["github", "azure"].includes(platform)) {
     logger.error({ platform }, "Invalid platform specified");
     throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
+  }
+
+  // Validate and resolve AI provider
+  const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
+  if (!["copilot", "opencode"].includes(aiProvider)) {
+    logger.error({ provider: aiProvider }, "Invalid AI provider specified");
+    throw new Error(`Invalid AI provider "${aiProvider}". Must be "copilot" or "opencode".`);
   }
 
   validateConfig(config, platform);
@@ -45,17 +59,26 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
 
   const dryRun = !options.write;
   const reviewRuns = options.runs ?? config.reviewRuns;
-  const engine = new ReviewEngine(adapter, config.botCommentIdentifier, {
+
+  // Select provider-specific model and timeout
+  const aiModel = aiProvider === "opencode" ? config.opencodeModel : config.copilotModel;
+  const aiTimeoutMs =
+    aiProvider === "opencode" ? config.opencodeTimeoutMs : config.copilotTimeoutMs;
+
+  const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun,
     verbose: options.verbose,
-    copilotModel: config.copilotModel,
-    copilotTimeoutMs: config.copilotTimeoutMs,
+    aiModel,
+    aiTimeoutMs,
     commentFilter: config.commentFilter,
     reviewRuns,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
-  console.log(`\n🔍 Starting code review for PR #${options.pr} on ${platform} ${modeLabel}...\n`);
+  const providerLabel = `[${aiProvider}]`;
+  console.log(
+    `\n🔍 Starting code review for PR #${options.pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
+  );
 
   return await engine.reviewPR(options.pr);
 }
@@ -107,14 +130,15 @@ const program = new Command();
 
 program
   .name("merge-mentor")
-  .description("Automated code review bot using GitHub Copilot CLI")
-  .version("1.3.0");
+  .description("Automated code review bot using AI providers (Copilot CLI, OpenCode CLI)")
+  .version("1.4.0");
 
 program
   .command("review")
   .description("Review a pull request")
   .requiredOption("--pr <number>", "Pull request number", parseInt)
   .option("--platform <platform>", "Platform (github or azure)", "github")
+  .option("--provider <provider>", "AI provider (copilot or opencode)")
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
   .option(

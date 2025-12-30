@@ -16,6 +16,11 @@ function cleanEnv(): void {
   delete process.env.SKIP_PREEXISTING_ISSUES;
   delete process.env.POST_RESOLUTION_COMMENTS;
   delete process.env.REVIEW_RUNS;
+  delete process.env.AI_PROVIDER;
+  delete process.env.COPILOT_MODEL;
+  delete process.env.COPILOT_TIMEOUT_MS;
+  delete process.env.OPENCODE_MODEL;
+  delete process.env.OPENCODE_TIMEOUT_MS;
 }
 
 function setEnv(overrides: Record<string, string>): void {
@@ -43,6 +48,7 @@ describe("Config", () => {
       expect(config.azure.project).toBe("");
       expect(config.azure.repo).toBe("");
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
+      expect(config.aiProvider).toBe("copilot");
       expect(config.commentFilter.minConfidence).toBe("high");
       expect(config.commentFilter.skipPreExisting).toBe(true);
       expect(config.commentFilter.postResolutionComments).toBe(true);
@@ -201,6 +207,64 @@ describe("Config", () => {
       const config = loadConfig();
 
       expect(config.copilotModel).toBe("gpt-4-turbo");
+    });
+
+    it("should load AI_PROVIDER from environment", () => {
+      setEnv({
+        AI_PROVIDER: "opencode",
+      });
+
+      const config = loadConfig();
+
+      expect(config.aiProvider).toBe("opencode");
+    });
+
+    it("should default AI_PROVIDER to copilot for invalid values", () => {
+      setEnv({
+        AI_PROVIDER: "invalid",
+      });
+
+      const config = loadConfig();
+
+      expect(config.aiProvider).toBe("copilot");
+    });
+
+    it("should accept all valid AI_PROVIDER values", () => {
+      setEnv({ AI_PROVIDER: "copilot" });
+      expect(loadConfig().aiProvider).toBe("copilot");
+
+      setEnv({ AI_PROVIDER: "opencode" });
+      expect(loadConfig().aiProvider).toBe("opencode");
+    });
+
+    it("should load OPENCODE_MODEL from environment", () => {
+      setEnv({
+        OPENCODE_MODEL: "claude-3.5-sonnet",
+      });
+
+      const config = loadConfig();
+
+      expect(config.opencodeModel).toBe("claude-3.5-sonnet");
+    });
+
+    it("should load OPENCODE_TIMEOUT_MS from environment", () => {
+      setEnv({
+        OPENCODE_TIMEOUT_MS: "120000",
+      });
+
+      const config = loadConfig();
+
+      expect(config.opencodeTimeoutMs).toBe(120000);
+    });
+
+    it("should ignore OPENCODE_TIMEOUT_MS when zero or negative", () => {
+      setEnv({
+        OPENCODE_TIMEOUT_MS: "0",
+      });
+
+      const config = loadConfig();
+
+      expect(config.opencodeTimeoutMs).toBeUndefined();
     });
   });
 

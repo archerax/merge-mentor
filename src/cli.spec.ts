@@ -56,6 +56,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     github: { token: "gh-token", owner: "test-owner", repo: "test-repo" },
     azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
     botCommentIdentifier: "[merge-mentor]",
+    aiProvider: "copilot",
     copilotModel: "gpt-4",
     commentFilter: {
       minConfidence: "high",
@@ -149,10 +150,11 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
+        "copilot",
         expect.objectContaining({
           dryRun: true,
           verbose: true,
-          copilotModel: "gpt-4",
+          aiModel: "gpt-4",
           reviewRuns: 1,
         })
       );
@@ -187,10 +189,11 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
+        "copilot",
         expect.objectContaining({
           dryRun: false,
           verbose: false,
-          copilotModel: "gpt-4",
+          aiModel: "gpt-4",
           reviewRuns: 1,
         })
       );
@@ -312,6 +315,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
+        "copilot",
         expect.objectContaining({
           reviewRuns: 3,
         })
@@ -332,6 +336,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
+        "copilot",
         expect.objectContaining({
           reviewRuns: 2,
         })
@@ -359,6 +364,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
+        "copilot",
         expect.objectContaining({
           commentFilter: {
             minConfidence: "medium",
@@ -366,6 +372,47 @@ describe("CLI", () => {
             postResolutionComments: false,
           },
         })
+      );
+    });
+
+    it("uses opencode provider when specified via --provider", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          opencodeModel: "claude-3.5-sonnet",
+          opencodeTimeoutMs: 120000,
+        })
+      );
+
+      const options: ReviewOptions = {
+        pr: 42,
+        provider: "opencode",
+        write: false,
+        verbose: true,
+      };
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "opencode",
+        expect.objectContaining({
+          aiModel: "claude-3.5-sonnet",
+          aiTimeoutMs: 120000,
+        })
+      );
+    });
+
+    it("throws error for invalid provider", async () => {
+      const options: ReviewOptions = {
+        pr: 42,
+        provider: "invalid",
+        write: false,
+        verbose: true,
+      };
+
+      await expect(executeReview(options)).rejects.toThrow(
+        'Invalid AI provider "invalid". Must be "copilot" or "opencode".'
       );
     });
   });

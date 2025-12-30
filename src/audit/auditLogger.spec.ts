@@ -97,11 +97,15 @@ describe("AuditLogger", () => {
       logger.logCopilotExecution("file-review", "gpt-4", "success");
 
       expect(logEventSpy).toHaveBeenCalledWith(
-        "copilot.execute",
-        { type: "copilot", id: "file-review", details: { model: "gpt-4" } },
-        "Execute Copilot prompt: file-review",
+        "ai.provider.execute",
+        {
+          type: "copilot",
+          id: "copilot:file-review",
+          details: { provider: "copilot", model: "gpt-4" },
+        },
+        "Execute copilot prompt: file-review",
         "success",
-        { promptType: "file-review", model: "gpt-4" },
+        { provider: "copilot", promptType: "file-review", model: "gpt-4" },
         undefined
       );
     });

@@ -1,7 +1,7 @@
+import { type AIProviderClient, type AIProviderType, createAIProvider } from "../ai/index.js";
 import { getAuditLogger } from "../audit/index.js";
 import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
-import { CopilotClient } from "../copilot/client.js";
 import {
   formatExistingCommentsContext,
   formatFileCommentsContext,
@@ -44,8 +44,14 @@ export interface ReviewResult {
 export interface ReviewEngineOptions {
   readonly verbose?: boolean;
   readonly dryRun?: boolean;
+  /** @deprecated Use aiModel instead */
   readonly copilotModel?: string;
+  /** @deprecated Use aiTimeoutMs instead */
   readonly copilotTimeoutMs?: number;
+  /** Model to use for the AI provider */
+  readonly aiModel?: string;
+  /** Timeout in milliseconds for AI provider operations */
+  readonly aiTimeoutMs?: number;
   readonly commentFilter?: CommentFilterConfig;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
@@ -53,11 +59,11 @@ export interface ReviewEngineOptions {
 
 /**
  * Orchestrates the PR review process.
- * Coordinates between platform adapters, Copilot client, and comment management.
+ * Coordinates between platform adapters, AI provider, and comment management.
  */
 export class ReviewEngine {
   private readonly platform: PlatformAdapter;
-  private readonly copilot: CopilotClient;
+  private readonly provider: AIProviderClient;
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
   private readonly options: ReviewEngineOptions;
@@ -65,27 +71,51 @@ export class ReviewEngine {
   private readonly auditLogger = getAuditLogger();
   private platformName = "unknown";
 
-  constructor(platform: PlatformAdapter, botIdentifier: string, options?: ReviewEngineOptions) {
+  constructor(
+    platform: PlatformAdapter,
+    botIdentifier: string,
+    providerType?: AIProviderType | ReviewEngineOptions,
+    options?: ReviewEngineOptions
+  ) {
     this.platform = platform;
-    this.copilot = new CopilotClient({
-      model: options?.copilotModel,
-      timeoutMs: options?.copilotTimeoutMs,
+
+    // Handle overloaded constructor for backward compatibility
+    let resolvedOptions: ReviewEngineOptions | undefined;
+    let resolvedProviderType: AIProviderType;
+
+    if (typeof providerType === "string") {
+      resolvedProviderType = providerType;
+      resolvedOptions = options;
+    } else {
+      // Legacy signature: (platform, botIdentifier, options)
+      resolvedProviderType = "copilot";
+      resolvedOptions = providerType;
+    }
+
+    // Resolve model and timeout (support both legacy and new options)
+    const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
+    const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
+
+    this.provider = createAIProvider(resolvedProviderType, {
+      model,
+      timeoutMs,
     });
     this.commentManager = new CommentManager(botIdentifier, {
-      filterConfig: options?.commentFilter,
+      filterConfig: resolvedOptions?.commentFilter,
     });
     this.stateCache = new ReviewStateCache();
-    this.options = options ?? {};
+    this.options = resolvedOptions ?? {};
     this.platformName = platform.constructor.name.toLowerCase().includes("github")
       ? "github"
       : "azure";
     this.logger.info(
       {
-        copilotModel: options?.copilotModel,
-        copilotTimeoutMs: options?.copilotTimeoutMs,
-        dryRun: options?.dryRun,
-        commentFilter: options?.commentFilter,
-        reviewRuns: options?.reviewRuns ?? 1,
+        aiProvider: resolvedProviderType,
+        aiModel: model,
+        aiTimeoutMs: timeoutMs,
+        dryRun: resolvedOptions?.dryRun,
+        commentFilter: resolvedOptions?.commentFilter,
+        reviewRuns: resolvedOptions?.reviewRuns ?? 1,
       },
       "ReviewEngine initialized"
     );
@@ -100,7 +130,7 @@ export class ReviewEngine {
    *
    * @example
    * ```typescript
-   * const engine = new ReviewEngine(githubAdapter, '[Bot]', { dryRun: true });
+   * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', { dryRun: true });
    * const result = await engine.reviewPR(123);
    * console.log(`Reviewed ${result.filesReviewed} files`);
    * console.log(`Skipped ${result.filesSkipped} unchanged files`);
@@ -398,8 +428,8 @@ export class ReviewEngine {
         filesContext,
         fileCommentsContext || undefined
       );
-      const response = await this.copilot.executePrompt(prompt);
-      const result = this.copilot.parseFileReview(file.filename, response);
+      const response = await this.provider.executePrompt(prompt);
+      const result = this.provider.parseFileReview(file.filename, response);
 
       this.auditLogger.logFileReviewComplete(file.filename, 0, result.findings.length);
       return result;
@@ -519,8 +549,8 @@ export class ReviewEngine {
       const filesSummary = buildFilesSummary(files);
       const commentsContext = formatExistingCommentsContext(existingComments);
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults, commentsContext);
-      const response = await this.copilot.executePrompt(prompt);
-      const result = this.copilot.parseCrossFileReview(response);
+      const response = await this.provider.executePrompt(prompt);
+      const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
 
       this.auditLogger.logCrossFileReviewComplete(prDetails.number, result.findings.length);
