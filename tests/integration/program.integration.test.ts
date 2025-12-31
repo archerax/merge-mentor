@@ -139,7 +139,7 @@ describe("CLI Integration", () => {
 
   describe("executeReview", () => {
     it("executes review with GitHub platform", async () => {
-      const { executeReview } = await import("../../src/cli.js");
+      const { executeReview } = await import("../../src/program.js");
 
       const result = await executeReview({
         pr: 42,
@@ -153,7 +153,7 @@ describe("CLI Integration", () => {
     });
 
     it("executes review with Azure platform", async () => {
-      const { executeReview } = await import("../../src/cli.js");
+      const { executeReview } = await import("../../src/program.js");
 
       const result = await executeReview({
         pr: 42,
@@ -167,7 +167,7 @@ describe("CLI Integration", () => {
     });
 
     it("throws error for invalid platform", async () => {
-      const { executeReview } = await import("../../src/cli.js");
+      const { executeReview } = await import("../../src/program.js");
 
       await expect(
         executeReview({
@@ -180,7 +180,7 @@ describe("CLI Integration", () => {
     });
 
     it("uses default platform from config", async () => {
-      const { executeReview } = await import("../../src/cli.js");
+      const { executeReview } = await import("../../src/program.js");
 
       const result = await executeReview({
         pr: 42,
@@ -196,7 +196,7 @@ describe("CLI Integration", () => {
 
   describe("displayResults", () => {
     it("displays results for dry-run mode", async () => {
-      const { displayResults } = await import("../../src/cli.js");
+      const { displayResults } = await import("../../src/program.js");
 
       const result = {
         prDetails: {
@@ -243,7 +243,7 @@ describe("CLI Integration", () => {
     });
 
     it("displays results for write mode", async () => {
-      const { displayResults } = await import("../../src/cli.js");
+      const { displayResults } = await import("../../src/program.js");
 
       const result = {
         prDetails: {
@@ -276,7 +276,7 @@ describe("CLI Integration", () => {
     });
 
     it("displays comment errors when present", async () => {
-      const { displayResults } = await import("../../src/cli.js");
+      const { displayResults } = await import("../../src/program.js");
 
       const result = {
         prDetails: {
@@ -310,7 +310,7 @@ describe("CLI Integration", () => {
 
   describe("hasCriticalIssues", () => {
     it("returns true when critical issues exist", async () => {
-      const { hasCriticalIssues } = await import("../../src/cli.js");
+      const { hasCriticalIssues } = await import("../../src/program.js");
 
       const result = {
         prDetails: {
@@ -352,7 +352,7 @@ describe("CLI Integration", () => {
     });
 
     it("returns false when no critical issues", async () => {
-      const { hasCriticalIssues } = await import("../../src/cli.js");
+      const { hasCriticalIssues } = await import("../../src/program.js");
 
       const result = {
         prDetails: {
@@ -403,14 +403,14 @@ describe("CLI Program", () => {
   });
 
   it("exports program for external use", async () => {
-    const { program } = await import("../../src/cli.js");
+    const { program } = await import("../../src/program.js");
 
     expect(program).toBeDefined();
     expect(program.name()).toBe("merge-mentor");
   });
 
   it("has review command configured", async () => {
-    const { program } = await import("../../src/cli.js");
+    const { program } = await import("../../src/program.js");
 
     const commands = program.commands.map((c) => c.name());
     expect(commands).toContain("review");

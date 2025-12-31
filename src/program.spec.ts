@@ -43,7 +43,7 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
-import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./cli.js";
+import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./program.js";
 // Import after mocks are set up
 import { loadConfig, validateConfig } from "./config.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
