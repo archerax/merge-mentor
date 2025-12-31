@@ -16,14 +16,10 @@ const mockCopilotInstance = {
   parseCrossFileReview: vi.fn(),
 };
 
-// Mock the CopilotClient module with a proper class mock
-vi.mock("../../src/copilot/client.js", () => {
-  return {
-    CopilotClient: function CopilotClient() {
-      return mockCopilotInstance;
-    },
-  };
-});
+// Mock the createAIProvider function to return our mock instance
+vi.mock("../../src/ai/index.js", () => ({
+  createAIProvider: () => mockCopilotInstance,
+}));
 
 // Mock the logger to suppress output during tests
 vi.mock("../../src/logger.js", () => ({

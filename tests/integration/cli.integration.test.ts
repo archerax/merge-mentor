@@ -75,15 +75,14 @@ vi.mock("../../src/platforms/azure.js", () => ({
   },
 }));
 
-vi.mock("../../src/copilot/client.js", () => ({
-  CopilotClient: function CopilotClient() {
-    return mockCopilotInstance;
-  },
+vi.mock("../../src/ai/index.js", () => ({
+  createAIProvider: () => mockCopilotInstance,
 }));
 
 vi.mock("../../src/config.js", () => ({
   loadConfig: vi.fn().mockReturnValue({
     defaultPlatform: "github",
+    aiProvider: "copilot",
     botCommentIdentifier: "[TestBot]",
     github: {
       token: "test-token",
