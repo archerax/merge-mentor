@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { CopilotCliError, JsonParseError, ValidationError } from "../../errors/index.js";
@@ -51,6 +53,12 @@ interface RawCrossFileReviewResponse {
 }
 
 /**
+ * Threshold for prompt length - prompts longer than this will use temp files.
+ * CLI arguments have platform-specific limits (typically 8KB-128KB).
+ */
+const PROMPT_LENGTH_THRESHOLD = 4000;
+
+/**
  * AI provider implementation for GitHub Copilot CLI.
  * Handles retries, JSON parsing, and response validation.
  */
@@ -59,11 +67,13 @@ export class CopilotProvider implements AIProviderClient {
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
+  private readonly tempDir: string;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
   }
 
   /**
@@ -81,32 +91,50 @@ export class CopilotProvider implements AIProviderClient {
 
     const promptType = this.inferPromptType(prompt);
     let lastError: Error | null = null;
+    let tempFile: string | undefined;
 
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-      try {
-        const raw = await this.runCli(prompt);
-        const parsed = this.parseJsonResponse(raw);
-        this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
-        return { raw, parsed };
-      } catch (error) {
-        lastError = error as Error;
-        if (attempt < this.maxRetries - 1) {
-          await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
+    try {
+      for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+        try {
+          // Use temp file for large prompts to avoid CLI argument length limits
+          if (prompt.length > PROMPT_LENGTH_THRESHOLD) {
+            tempFile = await this.createTempPromptFile(prompt);
+            const shortPrompt = `Please follow the instructions in @${path.basename(tempFile)}`;
+            const raw = await this.runCli(shortPrompt, tempFile);
+            const parsed = this.parseJsonResponse(raw);
+            this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
+            return { raw, parsed };
+          } else {
+            const raw = await this.runCli(prompt);
+            const parsed = this.parseJsonResponse(raw);
+            this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
+            return { raw, parsed };
+          }
+        } catch (error) {
+          lastError = error as Error;
+          if (attempt < this.maxRetries - 1) {
+            await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
+          }
         }
       }
-    }
 
-    this.auditLogger.logAIProviderExecution(
-      "copilot",
-      promptType,
-      this.model,
-      "failure",
-      lastError?.message
-    );
-    throw new CopilotCliError(
-      `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
-      lastError ?? undefined
-    );
+      this.auditLogger.logAIProviderExecution(
+        "copilot",
+        promptType,
+        this.model,
+        "failure",
+        lastError?.message
+      );
+      throw new CopilotCliError(
+        `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
+        lastError ?? undefined
+      );
+    } finally {
+      // Clean up temp file
+      if (tempFile) {
+        await this.deleteTempFile(tempFile);
+      }
+    }
   }
 
   private inferPromptType(prompt: string): string {
@@ -115,7 +143,23 @@ export class CopilotProvider implements AIProviderClient {
     return "unknown";
   }
 
-  private runCli(prompt: string): Promise<string> {
+  private async createTempPromptFile(prompt: string): Promise<string> {
+    await fs.mkdir(this.tempDir, { recursive: true });
+    const filename = `prompt-${Date.now()}-${Math.random().toString(36).substring(7)}.md`;
+    const filepath = path.join(this.tempDir, filename);
+    await fs.writeFile(filepath, prompt, "utf-8");
+    return filepath;
+  }
+
+  private async deleteTempFile(filepath: string): Promise<void> {
+    try {
+      await fs.unlink(filepath);
+    } catch (_error) {
+      // Ignore deletion errors - temp files will be cleaned up eventually
+    }
+  }
+
+  private runCli(prompt: string, tempFilePath?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
@@ -124,6 +168,11 @@ export class CopilotProvider implements AIProviderClient {
       if (this.model) {
         args.push("--model", this.model);
       }
+      
+      // Add --allow-all-tools when using temp files so Copilot can read them
+      if (tempFilePath) {
+        args.push("--allow-all-tools");
+      }
 
       // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
       // Node.js will automatically handle .exe extension on Windows
@@ -131,6 +180,7 @@ export class CopilotProvider implements AIProviderClient {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
         shell: false, // Explicit shell: false ensures consistent cross-platform behavior
+        cwd: tempFilePath ? this.tempDir : undefined, // Run from temp dir to use relative paths
       });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
