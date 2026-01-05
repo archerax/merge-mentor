@@ -705,5 +705,72 @@ describe("AzureDevOpsAdapter", () => {
       expect(files).toHaveLength(1);
       expect(files[0].patch).toContain("+\n"); // Empty line added
     });
+
+    it("batches file diffs when PR has more than 10 files", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      
+      // Create 15 test files
+      const changeEntries = Array.from({ length: 15 }, (_, i) => ({
+        item: { path: `/file${i + 1}.ts`, objectId: `obj${i + 1}` },
+        changeType: 2, // EDIT
+      }));
+      
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        lastMergeSourceCommit: { commitId: "source123" },
+        lastMergeTargetCommit: { commitId: "target123" },
+      });
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
+      mockGitApiInstance.getPullRequestIterationChanges.mockResolvedValue({
+        changeEntries,
+      });
+
+      // Mock getFileDiffs to track batch calls
+      let callCount = 0;
+      mockGitApiInstance.getFileDiffs.mockImplementation((criteria) => {
+        callCount++;
+        // Return mock diffs for each batch
+        return Promise.resolve(
+          criteria.fileDiffParams.map((param: { path: string }) => ({
+            path: param.path,
+            lineDiffBlocks: [
+              {
+                modifiedLineNumberStart: 1,
+                modifiedLinesCount: 1,
+                originalLineNumberStart: 1,
+                originalLinesCount: 1,
+              },
+            ],
+          }))
+        );
+      });
+
+      // Mock getBlobContent
+      mockGitApiInstance.getBlobContent.mockImplementation(() => {
+        const content = "test content\n";
+        const buffer = Buffer.from(content);
+        const stream = require("node:stream").Readable.from([buffer]);
+        return Promise.resolve(stream);
+      });
+
+      const result = await adapter.getPRFiles(123);
+
+      // Verify batching: 15 files should require 2 calls (10 + 5)
+      expect(callCount).toBe(2);
+      expect(mockGitApiInstance.getFileDiffs).toHaveBeenCalledTimes(2);
+      
+      // First batch should have 10 files
+      const firstCall = mockGitApiInstance.getFileDiffs.mock.calls[0][0];
+      expect(firstCall.fileDiffParams).toHaveLength(10);
+      
+      // Second batch should have 5 files
+      const secondCall = mockGitApiInstance.getFileDiffs.mock.calls[1][0];
+      expect(secondCall.fileDiffParams).toHaveLength(5);
+
+      // All 15 files should be returned
+      expect(result).toHaveLength(15);
+      result.forEach((file, i) => {
+        expect(file.filename).toBe(`file${i + 1}.ts`);
+      });
+    });
   });
 });

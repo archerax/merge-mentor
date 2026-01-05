@@ -107,25 +107,34 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       }
 
       // Get proper diffs with line numbers from Azure DevOps API
-      const fileDiffsCriteria: FileDiffsCriteria = {
-        baseVersionCommit: pr.lastMergeTargetCommit.commitId,
-        targetVersionCommit: pr.lastMergeSourceCommit.commitId,
-        fileDiffParams: changes.changeEntries
-          .filter((change) => change.item?.path)
-          .map((change) => ({
-            path: change.item!.path!,
-          })),
-      };
-
-      const fileDiffs = await withRateLimitHandling(() =>
-        gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
-      );
+      // Azure DevOps API limits getFileDiffs to 10 files per request, so we batch them
+      const BATCH_SIZE = 10;
+      const filePaths = changes.changeEntries
+        .filter((change) => change.item?.path)
+        .map((change) => ({
+          path: change.item!.path!,
+        }));
 
       const fileDiffMap = new Map<string, FileDiff>();
-      for (const diff of fileDiffs || []) {
-        if (diff.path) {
-          const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
-          fileDiffMap.set(normalizedPath, diff);
+      
+      for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
+        const batch = filePaths.slice(i, i + BATCH_SIZE);
+        
+        const fileDiffsCriteria: FileDiffsCriteria = {
+          baseVersionCommit: pr.lastMergeTargetCommit.commitId,
+          targetVersionCommit: pr.lastMergeSourceCommit.commitId,
+          fileDiffParams: batch,
+        };
+
+        const fileDiffs = await withRateLimitHandling(() =>
+          gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
+        );
+
+        for (const diff of fileDiffs || []) {
+          if (diff.path) {
+            const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
+            fileDiffMap.set(normalizedPath, diff);
+          }
         }
       }
 

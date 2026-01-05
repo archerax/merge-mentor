@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Azure DevOps large PR support** - Fixed "Invalid number of file diffs requested" error when reviewing PRs with more than 10 files. The Azure DevOps API limits `getFileDiffs` to 10 files per request, so file diffs are now automatically batched in groups of 10. PRs with any number of files are now supported.
+
 - **Copilot CLI argument length limit** - Large prompts now use temporary files with `@filename` syntax instead of passing the entire prompt as a CLI argument. This prevents failures when reviewing PRs with large diffs or many existing comments. Temp files are automatically created in `.merge-mentor/temp/` and cleaned up after execution. The `--allow-all-tools` flag is used to allow Copilot to read the temp files.
 
 ## [1.6.0] - 2025-12-30
