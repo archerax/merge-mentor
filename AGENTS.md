@@ -28,6 +28,9 @@ src/
 │   ├── types.ts        # AIProviderClient interface, AIProviderType, AIResponse
 │   ├── providerFactory.ts # Factory for creating AI provider instances
 │   ├── index.ts        # Module exports
+│   ├── prompts/
+│   │   ├── prompts.ts      # Prompt templates for reviews (provider-agnostic)
+│   │   └── commentContext.ts # Formats existing comments for LLM context
 │   └── providers/
 │       ├── copilot.ts  # GitHub Copilot CLI provider implementation
 │       ├── cursor.ts   # Cursor CLI provider implementation
@@ -37,10 +40,6 @@ src/
 │   └── index.ts        # Audit module exports
 ├── errors/
 │   └── index.ts        # Custom error hierarchy
-├── copilot/
-│   ├── client.ts       # Legacy Copilot CLI wrapper (deprecated, use ai/providers/copilot.ts)
-│   ├── prompts.ts      # Prompt templates for reviews (now includes comment context)
-│   └── commentContext.ts # Formats existing comments for LLM context
 ├── platforms/
 │   ├── types.ts        # Shared interfaces (PlatformAdapter, etc.)
 │   ├── github.ts       # GitHub API adapter (with audit logging)
@@ -59,7 +58,6 @@ tests/
     ├── fixtures.ts     # Test fixtures and sample data
     ├── mocks.ts        # Mock factories for external dependencies
     ├── cli.integration.test.ts
-    ├── copilot-client.integration.test.ts
     ├── platform-adapters.integration.test.ts
     └── review-engine.integration.test.ts
 ```
@@ -125,8 +123,8 @@ File: src/app.ts
 - Run 3: Real comments + synthetic comments from Run 1 + Run 2 findings
 
 **Key Files**:
-- `src/copilot/commentContext.ts`: Formatting logic
-- `src/copilot/prompts.ts`: Prompt builders with context integration
+- `src/ai/prompts/commentContext.ts`: Formatting logic
+- `src/ai/prompts/prompts.ts`: Prompt builders with context integration
 - `src/review/engine.ts`: Context threading through review pipeline
 
 ## Model-Based Comment Resolution
@@ -198,7 +196,7 @@ Each audit event includes:
 - `src/audit/auditLogger.ts`: Core audit logging implementation
 - `src/platforms/github.ts`: Audit logging for GitHub operations
 - `src/platforms/azure.ts`: Audit logging for Azure DevOps operations
-- `src/copilot/client.ts`: Audit logging for Copilot executions
+- `src/ai/providers/copilot.ts`: Audit logging for Copilot executions
 - `src/review/engine.ts`: Audit logging for review lifecycle
 
 **Usage**:

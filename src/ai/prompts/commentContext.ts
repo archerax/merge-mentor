@@ -1,4 +1,4 @@
-import type { ExistingComment } from "../platforms/types.js";
+import type { ExistingComment } from "../../platforms/types.js";
 
 /**
  * Formats existing comments into a concise context string for LLM prompts.

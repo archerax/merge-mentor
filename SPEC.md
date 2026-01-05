@@ -111,12 +111,13 @@ BOT_COMMENT_IDENTIFIER=[merge-mentor]
 - Manages existing bot threads
 - Updates/resolves threads as needed
 
-#### 3. Copilot Integration (`src/copilot/client.ts`)
+#### 3. AI Provider Integration (`src/ai/providers/`)
 
-- Executes Copilot CLI commands via child_process
+- Executes AI provider CLI commands via child_process
 - Manages custom prompts for different review aspects
 - Parses JSON responses from CLI output
 - Handles errors and retries
+- Supports multiple providers (Copilot, OpenCode, Cursor)
 
 #### 4. Review Engine (`src/review/engine.ts`)
 

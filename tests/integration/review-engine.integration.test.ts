@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CopilotResponse } from "../../src/copilot/client.js";
+import type { AIResponse } from "../../src/ai/types.js";
 import { ReviewEngine } from "../../src/review/engine.js";
 import { sampleExistingComments, samplePRDetails } from "./fixtures.js";
 import { createMockPlatformAdapter, createTestConfig } from "./mocks.js";
@@ -64,7 +64,7 @@ describe("ReviewEngine Integration", () => {
       mockCopilotInstance.executePrompt.mockResolvedValue({
         raw: "{}",
         parsed: {},
-      } as CopilotResponse);
+      } as AIResponse);
 
       let _fileReviewCallCount = 0;
       mockCopilotInstance.parseFileReview.mockImplementation((filename: string) => {

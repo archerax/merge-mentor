@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { FileReviewResult, PRDetails, PRFile } from "../platforms/types.js";
+import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
 import { buildCrossFilePrompt, buildFileReviewPrompt, buildFilesSummary } from "./prompts.js";
 
-describe("Copilot Prompts", () => {
+describe("AI Prompts", () => {
   describe("buildFileReviewPrompt", () => {
     it("should include the filename and diff", () => {
       const prompt = buildFileReviewPrompt("src/test.ts", '@@ -1,3 +1,4 @@\n+console.log("test");');

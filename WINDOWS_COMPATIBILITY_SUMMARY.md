@@ -30,7 +30,7 @@ pnpm add -D cross-env
 **Before**: `NODE_ENV=production node build.mjs` (Unix-only)
 **After**: `cross-env NODE_ENV=production node build.mjs` (cross-platform)
 
-### 3. Enhanced CopilotClient (src/copilot/client.ts)
+### 3. Enhanced AI Provider Clients (src/ai/providers/)
 ```typescript
 const proc = spawn("copilot", args, {
   stdio: ["inherit", "pipe", "pipe"],
@@ -106,7 +106,7 @@ Only one critical issue needed fixing:
 
 1. `package.json` - Added cross-env dependency and updated build script
 2. `pnpm-lock.yaml` - Updated dependencies
-3. `src/copilot/client.ts` - Added clarity comments and explicit shell: false
+3. `src/ai/providers/` - Added clarity comments and explicit shell: false
 4. `README.md` - Added platform-specific configuration examples
 5. `CHANGELOG.md` - Documented changes
 6. `PLATFORM_COMPATIBILITY.md` - New comprehensive documentation

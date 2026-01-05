@@ -5,12 +5,12 @@ import { SKIP_EXTENSIONS } from "../constants.js";
 import {
   formatExistingCommentsContext,
   formatFileCommentsContext,
-} from "../copilot/commentContext.js";
+} from "../ai/prompts/commentContext.js";
 import {
   buildCrossFilePrompt,
   buildFileReviewPrompt,
   buildFilesSummary,
-} from "../copilot/prompts.js";
+} from "../ai/prompts/prompts.js";
 import { ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import type {

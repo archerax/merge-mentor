@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExistingComment } from "../platforms/types.js";
+import type { ExistingComment } from "../../platforms/types.js";
 import { formatExistingCommentsContext, formatFileCommentsContext } from "./commentContext.js";
 
 describe("commentContext", () => {

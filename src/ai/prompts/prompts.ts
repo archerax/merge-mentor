@@ -1,4 +1,4 @@
-import type { FileReviewResult, PRDetails, PRFile } from "../platforms/types.js";
+import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
 
 /**
  * Builds a prompt for reviewing a single file.
