@@ -1,4 +1,4 @@
-# Changelog
+## v1.7.0 - 2026-01-05\n\n- Changelog: minor release.\n\n# Changelog
 
 All notable changes to merge-mentor will be documented in this file.
 
