@@ -199,7 +199,6 @@ describe("rateLimitHandler", () => {
 
     it("retries on rate limit error", async () => {
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const fn = vi.fn().mockRejectedValueOnce({ status: 429 }).mockResolvedValue("success");
       const promise = withRateLimitHandling(fn, { baseDelayMs: 100, maxRetries: 3 });
@@ -211,7 +210,6 @@ describe("rateLimitHandler", () => {
       expect(result).toBe("success");
       expect(fn).toHaveBeenCalledTimes(2);
 
-      consoleWarnSpy.mockRestore();
       vi.useRealTimers();
     });
 
@@ -223,7 +221,6 @@ describe("rateLimitHandler", () => {
         .mockResolvedValue("success");
 
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const promise = withRateLimitHandling(fn, { baseDelayMs: 1000, maxRetries: 3 });
 
@@ -233,7 +230,6 @@ describe("rateLimitHandler", () => {
 
       expect(result).toBe("success");
       expect(fn).toHaveBeenCalledTimes(3);
-      expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
     });
@@ -251,7 +247,6 @@ describe("rateLimitHandler", () => {
       const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue("success");
 
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const promise = withRateLimitHandling(fn, { maxRetries: 3 });
 
@@ -260,9 +255,7 @@ describe("rateLimitHandler", () => {
       const result = await promise;
 
       expect(result).toBe("success");
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Rate limit encountered")
-      );
+      expect(fn).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
     });
@@ -272,7 +265,6 @@ describe("rateLimitHandler", () => {
       const fn = vi.fn().mockRejectedValue(error);
 
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const promise = withRateLimitHandling(fn, { maxRetries: 2, baseDelayMs: 100 });
 
@@ -282,7 +274,6 @@ describe("rateLimitHandler", () => {
       await expect(Promise.all([promise, advancePromise])).rejects.toEqual(error);
 
       expect(fn).toHaveBeenCalledTimes(3); // Initial + 2 retries
-      expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
     });
@@ -295,7 +286,6 @@ describe("rateLimitHandler", () => {
         .mockResolvedValue("success");
 
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const promise = withRateLimitHandling(fn, {
         baseDelayMs: 10000,
@@ -308,14 +298,13 @@ describe("rateLimitHandler", () => {
       const result = await promise;
 
       expect(result).toBe("success");
-      expect(consoleWarnSpy.mock.calls[0][0]).toContain("5000ms");
+      expect(fn).toHaveBeenCalledTimes(3);
 
       vi.useRealTimers();
     });
 
     it("uses custom isRateLimitError function", async () => {
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const customError = { code: "CUSTOM_RATE_LIMIT" };
       const fn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("success");
@@ -341,13 +330,11 @@ describe("rateLimitHandler", () => {
       expect(result).toBe("success");
       expect(fn).toHaveBeenCalledTimes(2);
 
-      consoleWarnSpy.mockRestore();
       vi.useRealTimers();
     });
 
     it("uses custom extractRetryAfter function", async () => {
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const error = { status: 429, customRetryAfter: 3 };
       const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue("success");
@@ -374,7 +361,6 @@ describe("rateLimitHandler", () => {
 
       expect(result).toBe("success");
 
-      consoleWarnSpy.mockRestore();
       vi.useRealTimers();
     });
 
@@ -410,7 +396,6 @@ describe("rateLimitHandler", () => {
 
     it("retries on rate limit errors", async () => {
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const originalFn = vi
         .fn()
@@ -428,13 +413,11 @@ describe("rateLimitHandler", () => {
       expect(result).toBe("success");
       expect(originalFn).toHaveBeenCalledTimes(2);
 
-      consoleWarnSpy.mockRestore();
       vi.useRealTimers();
     });
 
     it("passes options to underlying handler", async () => {
       vi.useFakeTimers();
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const customError = { myRateLimit: true };
       const originalFn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("ok");
@@ -452,7 +435,6 @@ describe("rateLimitHandler", () => {
 
       expect(result).toBe("ok");
 
-      consoleWarnSpy.mockRestore();
       vi.useRealTimers();
     });
   });

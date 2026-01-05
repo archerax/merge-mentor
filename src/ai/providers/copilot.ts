@@ -86,7 +86,7 @@ export class CopilotProvider implements AIProviderClient {
    */
   async executePrompt(prompt: string): Promise<AIResponse> {
     if (!prompt || prompt.trim().length === 0) {
-      throw new ValidationError("prompt", "Prompt cannot be empty");
+      throw new ValidationError("prompt", "Prompt cannot be empty.");
     }
 
     const promptType = this.inferPromptType(prompt);
@@ -188,9 +188,9 @@ export class CopilotProvider implements AIProviderClient {
 
       proc.on("error", (error) => {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(new CopilotCliError("Copilot CLI is not installed or not in PATH"));
+          reject(new CopilotCliError("Copilot CLI is not installed or not in PATH."));
         } else {
-          reject(new CopilotCliError("CLI execution failed", error));
+          reject(new CopilotCliError("CLI execution failed.", error));
         }
       });
 
@@ -216,7 +216,7 @@ export class CopilotProvider implements AIProviderClient {
   private parseJsonResponse(raw: string): unknown {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new JsonParseError("No JSON object found in response", raw);
+      throw new JsonParseError("No JSON object found in response.", raw);
     }
 
     try {

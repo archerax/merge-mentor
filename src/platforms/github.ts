@@ -242,10 +242,6 @@ export class GitHubAdapter implements PlatformAdapter {
         },
         "Failed to update review comment, trying as issue comment"
       );
-      console.warn(
-        `Failed to update review comment ${id}, trying as issue comment:`,
-        (error as Error).message
-      );
       try {
         await withRateLimitHandling(() =>
           this.octokit.issues.updateComment({
@@ -317,7 +313,6 @@ export class GitHubAdapter implements PlatformAdapter {
         },
         "Failed to resolve review comment thread"
       );
-      console.warn(`Failed to resolve review comment thread ${id}:`, (error as Error).message);
       this.auditLogger.logCommentResolve(id, 0, "github", "failure", (error as Error).message);
     }
   }

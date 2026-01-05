@@ -148,15 +148,15 @@ describe("CopilotProvider", () => {
       mockSpawn.mockReturnValue(mockProcess);
 
       const promise = provider.executePrompt(longPrompt);
-      await vi.runAllTimersAsync();
       
-      // Properly handle the rejected promise
-      try {
-        await promise;
-        expect.fail("Should have thrown");
-      } catch (error) {
-        expect(error).toBeInstanceOf(CopilotCliError);
-      }
+      // Run timers and handle rejection simultaneously
+      await Promise.all([
+        vi.runAllTimersAsync(),
+        promise.catch(() => {}) // Catch to prevent unhandled rejection
+      ]);
+      
+      // Now verify the error was thrown
+      await expect(promise).rejects.toThrow(CopilotCliError);
 
       expect(mockFs.unlink).toHaveBeenCalled();
     });

@@ -8,6 +8,7 @@ import type {
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
+import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
@@ -39,6 +40,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly repoName: string;
   private readonly botIdentifier: string;
   private readonly auditLogger = getAuditLogger();
+  private readonly logger = createChildLogger({ component: "AzureDevOpsAdapter" });
 
   constructor(config: Config) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
@@ -206,8 +208,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         const content = Buffer.concat(chunks).toString("utf-8");
         fileLines = content.split("\n");
       } catch (error) {
-        // If we can't fetch content, fall back to line-only approach
-        console.warn(`Could not fetch content for ${filename}:`, error);
+        this.logger.warn({ filename, error: (error as Error).message }, "Could not fetch blob content");
       }
     }
 
@@ -362,16 +363,16 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   async updateComment(commentId: number | string, _body: string): Promise<void> {
-    const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+    const threadId = typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
 
+    this.logger.info({ threadId }, "Azure DevOps comment update requested (not implemented)");
     this.auditLogger.logCommentUpdate(threadId, 0, "azure", "success");
-    console.log(`Note: Azure DevOps comment update requested for thread ${threadId}`);
   }
 
   async resolveComment(commentId: number | string): Promise<void> {
-    const threadId = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
+    const threadId = typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
 
+    this.logger.info({ threadId }, "Azure DevOps comment resolve requested (not implemented)");
     this.auditLogger.logCommentResolve(threadId, 0, "azure", "success");
-    console.log(`Note: Azure DevOps comment resolve requested for thread ${threadId}`);
   }
 }

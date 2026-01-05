@@ -1,3 +1,5 @@
+import { createChildLogger } from "../logger.js";
+
 /**
  * Rate limit handling utilities for API requests.
  */
@@ -5,6 +7,8 @@
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 30000;
+
+const logger = createChildLogger({ component: "RateLimitHandler" });
 
 export interface RateLimitOptions {
   /** Maximum number of retry attempts. Default: 3 */
@@ -176,9 +180,9 @@ export async function withRateLimitHandling<T>(
         delayMs = calculateBackoffDelay(attempt, baseDelayMs, maxDelayMs);
       }
 
-      console.warn(
-        `Rate limit encountered (attempt ${attempt + 1}/${maxRetries + 1}). ` +
-          `Retrying after ${delayMs}ms...`
+      logger.warn(
+        { attempt: attempt + 1, maxAttempts: maxRetries + 1, delayMs },
+        "Rate limit encountered, retrying after delay"
       );
 
       await sleep(delayMs);
