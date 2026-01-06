@@ -38,7 +38,7 @@ npx merge-mentor review --pr 123
 - **Multi-Run Mode** - Aggregate findings from multiple passes for thoroughness
 - **Confidence Filtering** - Only posts high-confidence issues by default
 - **Auto-Resolution** - Detects when issues are fixed and resolves comments
-- **Dry-Run Mode** - Preview changes before posting (default)
+- **Dry-Run Mode** - Preview changes before posting with detailed markdown reports (default)
 
 ## Prerequisites
 
@@ -271,7 +271,7 @@ Audit logs can be filtered and analyzed for:
 ## Usage
 
 ```bash
-# Dry-run mode (preview only)
+# Dry-run mode (preview only) - generates detailed markdown report
 merge-mentor review --pr 123
 
 # Post comments to PR
@@ -300,7 +300,7 @@ merge-mentor review --pr 123 --verbose false
 | `--pr <number>` | Pull request number (required) | - |
 | `--platform <github\|azure>` | Platform to use | `github` |
 | `--provider <copilot\|opencode\|cursor>` | AI provider to use | `copilot` |
-| `--write` | Post comments (otherwise dry-run) | `false` |
+| `--write` | Post comments (otherwise dry-run with markdown report) | `false` |
 | `--verbose` | Enable verbose output | `true` |
 | `--runs <1-5>` | Number of review passes | `1` |
 
@@ -340,6 +340,27 @@ merge-mentor review --pr 123 --runs 3 --write
 ```
 
 Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
+
+### Detailed Markdown Reports
+
+In dry-run mode, merge-mentor automatically generates comprehensive markdown reports with all findings:
+
+```bash
+# Generate detailed report without posting comments
+merge-mentor review --pr 123
+
+# Report saved to: .merge-mentor/reports/pr-123-review-report.md
+```
+
+The markdown report includes:
+- **PR summary** with metadata and statistics
+- **Issues by severity and category** with visual indicators
+- **File-specific findings** with line numbers and suggestions
+- **Cross-file analysis** for architectural concerns
+- **Overall assessment** and recommendations
+- **Resolved issues** from previous reviews
+
+Reports use emojis for visual clarity (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low) and category icons (🐛 Bug, 🔒 Security, ⚡ Performance, etc.).
 
 ### Incremental Reviews
 

@@ -21,7 +21,7 @@ import type {
 } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { CommentManager } from "./commentManager.js";
-import { DiffStorage } from "./diffStorage.js";
+import { DiffStorage, type DiffManifest } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 

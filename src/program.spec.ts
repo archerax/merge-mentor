@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "./config.js";
+import { generateMarkdownReport } from "./program.js";
 import type { ReviewResult } from "./review/engine.js";
 
 const mockReviewPR = vi.fn();
@@ -474,6 +475,19 @@ describe("CLI", () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Resolve: 0"));
     });
 
+    it("generates markdown report in dry-run mode with AI provider", () => {
+      const result = createMockReviewResult();
+
+      displayResults(result, true, "copilot");
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Detailed markdown report generated:")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("pr-42-review-report.md")
+      );
+    });
+
     it("displays write mode specific output", () => {
       const result = createMockReviewResult();
 
@@ -685,6 +699,126 @@ describe("CLI", () => {
       });
 
       expect(hasCriticalIssues(result)).toBe(true);
+    });
+  });
+
+  describe("generateMarkdownReport", () => {
+    it("generates a complete markdown report", () => {
+      const result = createMockReviewResult({
+        prDetails: {
+          number: 123, // Override to use 123 for this specific test
+          title: "Test PR",
+          author: "test-author",
+          headBranch: "feature/test",
+          baseBranch: "main",
+          description: "Test description"
+        },
+        filesReviewed: 2,
+        filesSkipped: 1,
+        fileResults: [
+          {
+            filename: "test.ts",
+            findings: [
+              {
+                line: 10,
+                severity: "high",
+                category: "bug",
+                message: "Potential null pointer exception",
+                suggestion: "Add null check",
+                confidence: "high"
+              }
+            ]
+          }
+        ],
+        crossFileResult: {
+          overallAssessment: "Code quality looks good overall",
+          findings: [
+            {
+              severity: "medium",
+              category: "architecture", 
+              message: "Consider extracting common logic",
+              affectedFiles: ["file1.ts", "file2.ts"]
+            }
+          ],
+          recommendations: ["Use consistent naming", "Add more tests"]
+        }
+      });
+
+      const report = generateMarkdownReport(result, "copilot");
+
+      expect(report).toContain("# Code Review Report - PR #123");
+      expect(report).toContain("**PR Title:** Test PR");
+      expect(report).toContain("**Author:** test-author");
+      expect(report).toContain("**AI Provider:** copilot");
+      expect(report).toContain("- **Files Reviewed:** 2");
+      expect(report).toContain("- **Files Skipped:** 1");
+      expect(report).toContain("- **Total Issues Found:** 2");
+      expect(report).toContain("## 📊 Review Summary");
+      expect(report).toContain("### 📝 Planned Actions (Dry-Run)");
+      expect(report).toContain("### Issues by Severity");
+      expect(report).toContain("🟠 **High:** 1");
+      expect(report).toContain("🟡 **Medium:** 1");
+      expect(report).toContain("### Issues by Category");
+      expect(report).toContain("🐛 **Bug:** 1");
+      expect(report).toContain("🏗️ **Architecture:** 1");
+      expect(report).toContain("## 📁 File-Specific Issues");
+      expect(report).toContain("### `test.ts`");
+      expect(report).toContain("#### 1. Line 10 🟠 🐛");
+      expect(report).toContain("**Severity:** HIGH");
+      expect(report).toContain("**Category:** bug");
+      expect(report).toContain("**Confidence:** high 🟢");
+      expect(report).toContain("**Issue:** Potential null pointer exception");
+      expect(report).toContain("**Suggestion:** Add null check");
+      expect(report).toContain("## 🔗 Cross-File Issues");
+      expect(report).toContain("### 1. 🟡 🏗️ ARCHITECTURE");
+      expect(report).toContain("**Affected Files:** `file1.ts`, `file2.ts`");
+      expect(report).toContain("## 🎯 Overall Assessment");
+      expect(report).toContain("Code quality looks good overall");
+      expect(report).toContain("## 💡 Recommendations");
+      expect(report).toContain("1. Use consistent naming");
+      expect(report).toContain("2. Add more tests");
+    });
+
+    it("handles empty results gracefully", () => {
+      const result = createMockReviewResult({
+        fileResults: [],
+        crossFileResult: {
+          overallAssessment: "",
+          findings: [],
+          recommendations: []
+        }
+      });
+
+      const report = generateMarkdownReport(result, "opencode");
+
+      expect(report).toContain("# Code Review Report - PR #42"); // Use the actual PR number from mock
+      expect(report).toContain("**AI Provider:** opencode");
+      expect(report).toContain("- **Total Issues Found:** 0");
+      expect(report).not.toContain("## 📁 File-Specific Issues");
+      expect(report).not.toContain("## 🔗 Cross-File Issues");
+      expect(report).not.toContain("## 🎯 Overall Assessment");
+      expect(report).not.toContain("## 💡 Recommendations");
+    });
+
+    it("includes resolved comments when present", () => {
+      const result = createMockReviewResult({
+        fileResults: [
+          {
+            filename: "test.ts",
+            findings: [],
+            resolvedComments: [
+              { line: 5, reason: "Issue was fixed by adding validation" },
+              { line: 15, reason: "Error handling was improved" }
+            ]
+          }
+        ]
+      });
+
+      const report = generateMarkdownReport(result, "cursor");
+
+      expect(report).toContain("## ✅ Resolved Issues");
+      expect(report).toContain("1. **Line 5:** Issue was fixed by adding validation");
+      expect(report).toContain("2. **Line 15:** Error handling was improved");
     });
   });
 });

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Detailed markdown reports in dry-run mode** - Dry runs now automatically generate comprehensive markdown reports saved to `.merge-mentor/reports/pr-{number}-review-report.md`. Reports include PR metadata, issue summaries by severity/category with visual indicators, detailed file-specific findings, cross-file analysis, overall assessment, and recommendations. Perfect for viewing all issues when console output is too limited.
 - **Batched file review mode** - Major performance improvement for large PRs. Instead of making one AI call per file (50-300 calls for large PRs), the tool now stores all diffs to disk and makes a single batched AI call to review all files at once. This reduces review time from potentially hours to minutes for large PRs.
 
 ### Changed
