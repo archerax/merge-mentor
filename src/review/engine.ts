@@ -1,16 +1,13 @@
 import { type AIProviderClient, type AIProviderType, createAIProvider } from "../ai/index.js";
+import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
+import {
+  buildBatchedFileReviewPrompt,
+  buildCrossFilePrompt,
+  buildFilesSummary,
+} from "../ai/prompts/prompts.js";
 import { getAuditLogger } from "../audit/index.js";
 import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
-import {
-  formatExistingCommentsContext,
-  formatFileCommentsContext,
-} from "../ai/prompts/commentContext.js";
-import {
-  buildCrossFilePrompt,
-  buildFileReviewPrompt,
-  buildFilesSummary,
-} from "../ai/prompts/prompts.js";
 import { ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import type {
@@ -24,6 +21,7 @@ import type {
 } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { CommentManager } from "./commentManager.js";
+import { DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
@@ -158,7 +156,7 @@ export class ReviewEngine {
 
     if (runs === 1) {
       // Single run - use existing logic
-      const reviewData = await this.reviewFiles(files, existingComments, cachedState);
+      const reviewData = await this.reviewFiles(prNumber, files, existingComments, cachedState);
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
 
@@ -280,7 +278,7 @@ export class ReviewEngine {
             : this.createSyntheticComments(existingComments, accumulatedFindings);
 
         // Perform file reviews for this run (no caching in multi-run mode)
-        const { fileResults } = await this.reviewFiles(files, runComments, undefined);
+        const { fileResults } = await this.reviewFiles(prNumber, files, runComments, undefined);
         const validatedResults = this.validateLineNumbers(fileResults, files);
         allFileResults.push(validatedResults);
 
@@ -366,12 +364,14 @@ export class ReviewEngine {
   }
 
   private async reviewFiles(
+    prNumber: number,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
-    const fileResults: FileReviewResult[] = [];
-    const filesContext = buildFilesSummary(files);
+    // Filter out files that should be skipped
+    const filesToReview: PRFile[] = [];
+    const cachedResults: FileReviewResult[] = [];
     let filesSkipped = 0;
 
     for (const file of files) {
@@ -389,17 +389,29 @@ export class ReviewEngine {
         );
         if (cachedReview) {
           this.log(`Using cached review for ${file.filename} (unchanged)`);
-          fileResults.push(cachedReview);
+          cachedResults.push(cachedReview);
           filesSkipped++;
           continue;
         }
       }
 
-      this.log(`Reviewing ${file.filename}...`);
-      const result = await this.reviewFile(file, filesContext, existingComments);
-      fileResults.push(result);
-      this.log(`  Found ${result.findings.length} issues`);
+      filesToReview.push(file);
     }
+
+    // If no files to review, return cached results only
+    if (filesToReview.length === 0) {
+      if (filesSkipped > 0) {
+        this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review`);
+      }
+      return { fileResults: cachedResults, filesSkipped };
+    }
+
+    // Use batched review for all files at once
+    this.log(`Reviewing ${filesToReview.length} file(s) in batched mode...`);
+    const batchedResults = await this.reviewFilesBatched(prNumber, filesToReview, existingComments);
+
+    // Combine cached and new results
+    const fileResults = [...cachedResults, ...batchedResults];
 
     if (filesSkipped > 0) {
       this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review`);
@@ -408,40 +420,118 @@ export class ReviewEngine {
     return { fileResults, filesSkipped };
   }
 
-  private async reviewFile(
-    file: PRFile,
-    filesContext: string,
+  /**
+   * Reviews multiple files in a single batched AI call.
+   * Stores diffs to disk and asks the AI to review all files at once.
+   */
+  private async reviewFilesBatched(
+    prNumber: number,
+    files: PRFile[],
     existingComments: readonly ExistingComment[]
-  ): Promise<FileReviewResult> {
-    if (!file.patch) {
-      return { filename: file.filename, findings: [] };
+  ): Promise<FileReviewResult[]> {
+    const diffStorage = new DiffStorage();
+
+    // Filter files with patches
+    const filesWithPatches = files.filter((f) => f.patch);
+    if (filesWithPatches.length === 0) {
+      return files.map((f) => ({ filename: f.filename, findings: [] }));
     }
 
-    this.auditLogger.logFileReviewStart(file.filename, 0);
+    this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
-      const fileCommentsContext = formatFileCommentsContext(file.filename, existingComments);
-
-      const prompt = buildFileReviewPrompt(
-        file.filename,
-        file.patch,
-        filesContext,
-        fileCommentsContext || undefined
+      // Store diffs to disk
+      const { diffDir, manifest } = await diffStorage.storeDiffs(prNumber, filesWithPatches);
+      this.logger.info(
+        { prNumber, fileCount: manifest.files.length, diffDir },
+        "Stored diffs for batched review"
       );
-      const response = await this.provider.executePrompt(prompt);
-      const result = this.provider.parseFileReview(file.filename, response);
 
-      this.auditLogger.logFileReviewComplete(file.filename, 0, result.findings.length);
-      return result;
+      // Build batched prompt
+      const commentsContext = formatExistingCommentsContext(existingComments);
+      const prompt = buildBatchedFileReviewPrompt(manifest, commentsContext || undefined);
+
+      console.log("=== DEBUG: Copying diffs to temp directory for Copilot access ===");
+      // Copy diff files to temp directory so Copilot CLI can access them
+      await this.copyDiffsToTempDir(diffDir, manifest);
+
+      // Single AI call for all files
+      console.log("=== DEBUG: Batched prompt being sent ===");
+      console.log("Prompt length:", prompt.length);
+      console.log("Prompt (first 2000 chars):", prompt.substring(0, 2000));
+      console.log("Prompt (last 500 chars):", prompt.substring(Math.max(0, prompt.length - 500)));
+      
+      const response = await this.provider.executePrompt(prompt);
+      const results = this.provider.parseBatchedFileReview(response);
+
+      // Log individual file results
+      const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
+      this.log(
+        `  Batched review found ${totalFindings} total issues across ${results.length} files`
+      );
+
+      for (const result of results) {
+        if (result.findings.length > 0) {
+          this.log(`    ${result.filename}: ${result.findings.length} issues`);
+        }
+      }
+
+      this.auditLogger.logFileReviewComplete(
+        `batched-${filesWithPatches.length}-files`,
+        prNumber,
+        totalFindings
+      );
+
+      // Ensure we have results for all files (fill in missing ones with empty results)
+      const resultMap = new Map(results.map((r) => [r.filename, r]));
+      const completeResults: FileReviewResult[] = filesWithPatches.map((file) => {
+        return resultMap.get(file.filename) ?? { filename: file.filename, findings: [] };
+      });
+
+      return completeResults;
     } catch (error) {
       this.auditLogger.logFileReviewComplete(
-        file.filename,
-        0,
+        `batched-${filesWithPatches.length}-files`,
+        prNumber,
         0,
         "failure",
         (error as Error).message
       );
       throw error;
+    } finally {
+      // Clean up diffs
+      await diffStorage.cleanup(prNumber);
+    }
+  }
+
+  /**
+   * Copy diff files from storage directory to temp directory for Copilot CLI access
+   */
+  private async copyDiffsToTempDir(diffDir: string, manifest: DiffManifest): Promise<void> {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    
+    const tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
+    
+    // Ensure temp directory exists
+    await fs.mkdir(tempDir, { recursive: true });
+    
+    console.log(`Copying ${manifest.files.length} diff files to temp directory`);
+    
+    for (const fileEntry of manifest.files) {
+      const sourcePath = path.join(diffDir, fileEntry.diffPath);
+      const destPath = path.join(tempDir, fileEntry.diffPath);
+      
+      console.log(`Copying ${fileEntry.diffPath}: ${sourcePath} → ${destPath}`);
+      
+      try {
+        const content = await fs.readFile(sourcePath, "utf-8");
+        await fs.writeFile(destPath, content, "utf-8");
+        console.log(`✅ Copied ${fileEntry.diffPath} (${content.length} chars)`);
+      } catch (error) {
+        console.log(`❌ Failed to copy ${fileEntry.diffPath}:`, (error as Error).message);
+        throw error;
+      }
     }
   }
 

@@ -696,13 +696,13 @@ describe("AzureDevOpsAdapter", () => {
 
     it("batches file diffs when PR has more than 10 files", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
-      
+
       // Create 15 test files
       const changeEntries = Array.from({ length: 15 }, (_, i) => ({
         item: { path: `/file${i + 1}.ts`, objectId: `obj${i + 1}` },
         changeType: 2, // EDIT
       }));
-      
+
       mockGitApiInstance.getPullRequestById.mockResolvedValue({
         lastMergeSourceCommit: { commitId: "source123" },
         lastMergeTargetCommit: { commitId: "target123" },
@@ -745,11 +745,11 @@ describe("AzureDevOpsAdapter", () => {
       // Verify batching: 15 files should require 2 calls (10 + 5)
       expect(callCount).toBe(2);
       expect(mockGitApiInstance.getFileDiffs).toHaveBeenCalledTimes(2);
-      
+
       // First batch should have 10 files
       const firstCall = mockGitApiInstance.getFileDiffs.mock.calls[0][0];
       expect(firstCall.fileDiffParams).toHaveLength(10);
-      
+
       // Second batch should have 5 files
       const secondCall = mockGitApiInstance.getFileDiffs.mock.calls[1][0];
       expect(secondCall.fileDiffParams).toHaveLength(5);

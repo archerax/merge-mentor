@@ -45,4 +45,13 @@ export interface AIProviderClient {
    * @returns Structured cross-file review result
    */
   parseCrossFileReview(response: AIResponse): CrossFileReviewResult;
+
+  /**
+   * Parses an AI response containing batched file reviews into multiple results.
+   * Used for batched review mode where all files are reviewed in a single AI call.
+   *
+   * @param response - Raw AI response containing results for multiple files
+   * @returns Array of structured file review results
+   */
+  parseBatchedFileReview(response: AIResponse): FileReviewResult[];
 }

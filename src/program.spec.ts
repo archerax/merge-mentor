@@ -43,11 +43,11 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
-import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./program.js";
 // Import after mocks are set up
 import { loadConfig, validateConfig } from "./config.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
+import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./program.js";
 import { ReviewEngine } from "./review/engine.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {

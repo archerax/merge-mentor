@@ -118,10 +118,10 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         }));
 
       const fileDiffMap = new Map<string, FileDiff>();
-      
+
       for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
         const batch = filePaths.slice(i, i + BATCH_SIZE);
-        
+
         const fileDiffsCriteria: FileDiffsCriteria = {
           baseVersionCommit: pr.lastMergeTargetCommit.commitId,
           targetVersionCommit: pr.lastMergeSourceCommit.commitId,
@@ -208,7 +208,10 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         const content = Buffer.concat(chunks).toString("utf-8");
         fileLines = content.split("\n");
       } catch (error) {
-        this.logger.warn({ filename, error: (error as Error).message }, "Could not fetch blob content");
+        this.logger.warn(
+          { filename, error: (error as Error).message },
+          "Could not fetch blob content"
+        );
       }
     }
 

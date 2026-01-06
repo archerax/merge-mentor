@@ -8,12 +8,14 @@ import { ReviewEngine } from "./engine.js";
 const mockExecutePrompt = vi.fn();
 const mockParseFileReview = vi.fn();
 const mockParseCrossFileReview = vi.fn();
+const mockParseBatchedFileReview = vi.fn();
 
 vi.mock("../ai/index.js", () => ({
   createAIProvider: vi.fn(() => ({
     executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
     parseFileReview: (...args: unknown[]) => mockParseFileReview(...args),
     parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
+    parseBatchedFileReview: (...args: unknown[]) => mockParseBatchedFileReview(...args),
   })),
 }));
 
@@ -69,6 +71,7 @@ describe("ReviewEngine", () => {
       findings: [],
       recommendations: [],
     });
+    mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
   });
 
   afterEach(async () => {
@@ -280,20 +283,22 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 2,
-            severity: "high",
-            category: "bug",
-            message: "Test issue",
-            suggestion: "Fix it",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "Test issue",
+              suggestion: "Fix it",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
@@ -474,20 +479,22 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 2,
-            severity: "high",
-            category: "bug",
-            message: "Test issue",
-            suggestion: "Fix it",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "Test issue",
+              suggestion: "Fix it",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
@@ -526,20 +533,22 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue(existingComments);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 2,
-            severity: "high",
-            category: "bug",
-            message: "New message",
-            suggestion: "Fix",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "New message",
+              suggestion: "Fix",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
@@ -672,10 +681,10 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockImplementation((filename) => ({
-        filename: filename,
-        findings: [],
-      }));
+      mockParseBatchedFileReview.mockReturnValue([
+        { filename: "unchanged.ts", findings: [] },
+        { filename: "changed.ts", findings: [] },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "First review",
         findings: [],
@@ -686,7 +695,7 @@ describe("ReviewEngine", () => {
 
       // Clear mock call counts but keep implementation
       mockExecutePrompt.mockClear();
-      mockParseFileReview.mockClear();
+      mockParseBatchedFileReview.mockClear();
       mockParseCrossFileReview.mockClear();
 
       // Second review with one changed file
@@ -703,10 +712,8 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(updatedFiles);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockImplementation((filename) => ({
-        filename: filename,
-        findings: [],
-      }));
+      // Batched review returns only the changed file since unchanged is cached
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "changed.ts", findings: [] }]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Updated review",
         findings: [],
@@ -723,9 +730,8 @@ describe("ReviewEngine", () => {
       expect(result.filesSkipped).toBe(1);
       expect(result.filesReviewed).toBe(1);
 
-      // Should have reviewed only the changed file
-      expect(mockParseFileReview).toHaveBeenCalledTimes(1);
-      expect(mockParseFileReview).toHaveBeenCalledWith("changed.ts", expect.any(Object));
+      // Should have called batched review for the changed file
+      expect(mockParseBatchedFileReview).toHaveBeenCalledTimes(1);
     });
 
     it("handles action with no existingCommentId for update", async () => {
@@ -1017,10 +1023,12 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
 
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [],
+        },
+      ]);
 
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",

@@ -63,6 +63,11 @@ interface RawCrossFileReviewResponse {
   recommendations?: unknown[];
 }
 
+/** Raw batched file review response from Cursor. */
+interface RawBatchedFileReviewResponse {
+  file_results?: Record<string, RawFileReviewResponse>;
+}
+
 /**
  * AI provider implementation for Cursor CLI (cursor-agent).
  * Handles retries, JSON parsing, and response validation.
@@ -266,6 +271,61 @@ export class CursorProvider implements AIProviderClient {
       findings,
       recommendations: Array.isArray(data.recommendations) ? data.recommendations.map(String) : [],
     };
+  }
+
+  /**
+   * Parses a batched Cursor response containing reviews for multiple files.
+   *
+   * @param response - Raw Cursor response with file_results object
+   * @returns Array of structured file review results
+   */
+  parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
+    const data = response.parsed as RawBatchedFileReviewResponse;
+    const results: FileReviewResult[] = [];
+
+    if (!data.file_results || typeof data.file_results !== "object") {
+      return results;
+    }
+
+    for (const [filename, fileData] of Object.entries(data.file_results)) {
+      const rawFileData = fileData as RawFileReviewResponse;
+      const findings: FileFinding[] = [];
+      const resolvedComments: ResolvedComment[] = [];
+
+      if (Array.isArray(rawFileData.findings)) {
+        for (const finding of rawFileData.findings) {
+          findings.push({
+            line: typeof finding.line === "number" ? finding.line : 0,
+            severity: this.validateSeverity(finding.severity),
+            category: this.validateCategory(finding.category),
+            message: String(finding.message || ""),
+            suggestion: String(finding.suggestion || ""),
+            confidence: this.validateConfidence(finding.confidence),
+            isPreExisting:
+              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
+          });
+        }
+      }
+
+      if (Array.isArray(rawFileData.resolved_comments)) {
+        for (const resolved of rawFileData.resolved_comments) {
+          if (typeof resolved.line === "number" && resolved.line > 0) {
+            resolvedComments.push({
+              line: resolved.line,
+              reason: String(resolved.reason || "Issue addressed"),
+            });
+          }
+        }
+      }
+
+      results.push({
+        filename,
+        findings,
+        resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
+      });
+    }
+
+    return results;
   }
 
   private validateSeverity(value: unknown): FileFinding["severity"] {

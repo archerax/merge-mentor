@@ -16,9 +16,9 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 import { spawn } from "node:child_process";
+import { CopilotCliError } from "../../errors/index.js";
 import type { AIResponse } from "../types.js";
 import { CopilotProvider } from "./copilot.js";
-import { CopilotCliError } from "../../errors/index.js";
 
 const mockSpawn = vi.mocked(spawn);
 const mockFs = vi.mocked(fs);
@@ -117,10 +117,9 @@ describe("CopilotProvider", () => {
       const result = await promise;
 
       expect(result.parsed).toEqual(mockResponse);
-      expect(mockFs.mkdir).toHaveBeenCalledWith(
-        expect.stringContaining(".merge-mentor/temp"),
-        { recursive: true }
-      );
+      expect(mockFs.mkdir).toHaveBeenCalledWith(expect.stringContaining(".merge-mentor/temp"), {
+        recursive: true,
+      });
       expect(mockFs.writeFile).toHaveBeenCalledWith(
         expect.stringMatching(/prompt-.*\.md$/),
         longPrompt,
@@ -148,13 +147,13 @@ describe("CopilotProvider", () => {
       mockSpawn.mockReturnValue(mockProcess);
 
       const promise = provider.executePrompt(longPrompt);
-      
+
       // Run timers and handle rejection simultaneously
       await Promise.all([
         vi.runAllTimersAsync(),
-        promise.catch(() => {}) // Catch to prevent unhandled rejection
+        promise.catch(() => {}), // Catch to prevent unhandled rejection
       ]);
-      
+
       // Now verify the error was thrown
       await expect(promise).rejects.toThrow(CopilotCliError);
 
@@ -190,7 +189,7 @@ describe("CopilotProvider", () => {
       const provider = createCopilotProvider(2, 5000);
       const mockResponse = { findings: [] };
       let attemptCount = 0;
-      
+
       // Reset mock to clear previous test calls
       mockSpawn.mockReset();
 
@@ -279,7 +278,9 @@ describe("CopilotProvider", () => {
     it("normalizes invalid confidence values", () => {
       const provider = createCopilotProvider();
       const response = createAIResponse({
-        findings: [{ line: 1, severity: "high", category: "bug", message: "test", confidence: "invalid" }],
+        findings: [
+          { line: 1, severity: "high", category: "bug", message: "test", confidence: "invalid" },
+        ],
       });
 
       const result = provider.parseFileReview("test.ts", response);

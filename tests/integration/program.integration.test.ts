@@ -60,6 +60,7 @@ const mockCopilotInstance = {
     findings: [],
     recommendations: [],
   }),
+  parseBatchedFileReview: vi.fn().mockReturnValue([{ filename: "src/test.ts", findings: [] }]),
 };
 
 // Mock external dependencies before importing CLI modules

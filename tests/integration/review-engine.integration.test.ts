@@ -3,6 +3,7 @@
  * Tests the complete review flow from PR fetch to comment posting.
  */
 
+import fs from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIResponse } from "../../src/ai/types.js";
 import { ReviewEngine } from "../../src/review/engine.js";
@@ -14,6 +15,7 @@ const mockCopilotInstance = {
   executePrompt: vi.fn(),
   parseFileReview: vi.fn(),
   parseCrossFileReview: vi.fn(),
+  parseBatchedFileReview: vi.fn(),
 };
 
 // Mock the createAIProvider function to return our mock instance
@@ -49,6 +51,12 @@ describe("ReviewEngine Integration", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    // Clean up cache directory before each test
+    try {
+      await fs.rm(".merge-mentor", { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   afterEach(() => {
@@ -66,43 +74,37 @@ describe("ReviewEngine Integration", () => {
         parsed: {},
       } as AIResponse);
 
-      let _fileReviewCallCount = 0;
-      mockCopilotInstance.parseFileReview.mockImplementation((filename: string) => {
-        _fileReviewCallCount++;
-        if (filename === "src/auth/login.ts") {
-          return {
-            filename,
-            findings: [
-              {
-                line: 27,
-                severity: "high",
-                category: "security",
-                message: "JWT secret issue",
-                suggestion: "Add validation",
-                confidence: "high",
-                isPreExisting: false,
-              },
-            ],
-          };
-        }
-        if (filename === "src/auth/middleware.ts") {
-          return {
-            filename,
-            findings: [
-              {
-                line: 7,
-                severity: "medium",
-                category: "quality",
-                message: "Using any type",
-                suggestion: "Use proper types",
-                confidence: "high",
-                isPreExisting: false,
-              },
-            ],
-          };
-        }
-        return { filename, findings: [] };
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+        {
+          filename: "src/auth/login.ts",
+          findings: [
+            {
+              line: 27,
+              severity: "high",
+              category: "security",
+              message: "JWT secret issue",
+              suggestion: "Add validation",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+        {
+          filename: "src/auth/middleware.ts",
+          findings: [
+            {
+              line: 7,
+              severity: "medium",
+              category: "quality",
+              message: "Using any type",
+              suggestion: "Use proper types",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+        { filename: "README.md", findings: [] },
+      ]);
 
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "Good PR with some issues",
@@ -143,10 +145,9 @@ describe("ReviewEngine Integration", () => {
       const config = createTestConfig();
 
       mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockCopilotInstance.parseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+        { filename: "test.ts", findings: [] },
+      ]);
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "OK",
         findings: [],
@@ -180,10 +181,7 @@ describe("ReviewEngine Integration", () => {
       const config = createTestConfig();
 
       mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockCopilotInstance.parseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([]);
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "No issues found",
         findings: [],
@@ -223,10 +221,12 @@ describe("ReviewEngine Integration", () => {
       const config = createTestConfig();
 
       mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockCopilotInstance.parseFileReview.mockReturnValue({
-        filename: "src/auth/login.ts",
-        findings: [], // No findings = issue fixed
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+        {
+          filename: "src/auth/login.ts",
+          findings: [], // No findings = issue fixed
+        },
+      ]);
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "Issues fixed",
         findings: [],
@@ -247,26 +247,78 @@ describe("ReviewEngine Integration", () => {
 
   describe("error handling", () => {
     it("continues when posting inline comment fails", async () => {
+      // Use a specific file that matches what the batched review returns
+      const prFiles: import("../../src/platforms/types.js").PRFile[] = [
+        {
+          filename: "src/auth/login.ts",
+          status: "added" as const,
+          additions: 45,
+          deletions: 0,
+          sha: "abc123",
+          patch: `@@ -0,0 +1,45 @@
++import { hash, compare } from 'bcrypt';
++import { sign } from 'jsonwebtoken';
++
++interface LoginRequest {
++  email: string;
++  password: string;
++}
++
++interface LoginResponse {
++  token: string;
++  expiresIn: number;
++}
++
++export async function login(request: LoginRequest): Promise<LoginResponse> {
++  const { email, password } = request;
++
++  // TODO: Add rate limiting
++  const user = await findUserByEmail(email);
++  if (!user) {
++    throw new Error('Invalid credentials');
++  }
++
++  const isValid = await compare(password, user.passwordHash);
++  if (!isValid) {
++    throw new Error('Invalid credentials');
++  }
++
++  const token = sign({ userId: user.id }, process.env.JWT_SECRET!, {
++    expiresIn: '1h',
++  });
++
++  return { token, expiresIn: 3600 };
++}
++
++async function findUserByEmail(email: string) {
++  return { id: '123', email, passwordHash: 'hashed' };
++}`,
+        },
+      ];
+
       const mockAdapter = createMockPlatformAdapter({
+        prFiles,
         postInlineCommentError: new Error("Rate limit exceeded"),
       });
       const config = createTestConfig();
 
       mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockCopilotInstance.parseFileReview.mockReturnValue({
-        filename: "src/auth/login.ts",
-        findings: [
-          {
-            line: 27,
-            severity: "high",
-            category: "security",
-            message: "Test issue",
-            suggestion: "Fix it",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+        {
+          filename: "src/auth/login.ts",
+          findings: [
+            {
+              line: 27,
+              severity: "high",
+              category: "security",
+              message: "Test issue",
+              suggestion: "Fix it",
+              confidence: "high",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "Has issues",
         findings: [],
@@ -296,10 +348,9 @@ describe("ReviewEngine Integration", () => {
         callCount++;
         return { raw: "{}", parsed: {} };
       });
-      mockCopilotInstance.parseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
+      mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+        { filename: "test.ts", findings: [] },
+      ]);
       mockCopilotInstance.parseCrossFileReview.mockReturnValue({
         overallAssessment: "OK",
         findings: [],
@@ -311,15 +362,17 @@ describe("ReviewEngine Integration", () => {
         verbose: false,
       });
 
-      // First review
+      // First review: 2 AI calls (batched file review + cross-file analysis)
       await engine.reviewPR(42);
       const firstCallCount = callCount;
+      expect(firstCallCount).toBe(2); // Batched review + cross-file
 
       // Second review of same PR with same files should use cache
       await engine.reviewPR(42);
 
-      // Should have fewer Copilot calls on second run due to caching
-      expect(callCount).toBe(firstCallCount * 2); // Same because files haven't changed in mock
+      // With batched review and caching, second run should use cached results
+      // Total calls should be 2 (all from first run, none from second)
+      expect(callCount).toBe(2);
     });
   });
 });
@@ -339,10 +392,9 @@ describe("ReviewEngine with different platforms", () => {
     });
 
     mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-    mockCopilotInstance.parseFileReview.mockReturnValue({
-      filename: "test.ts",
-      findings: [],
-    });
+    mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+      { filename: "test.ts", findings: [] },
+    ]);
     mockCopilotInstance.parseCrossFileReview.mockReturnValue({
       overallAssessment: "OK",
       findings: [],
@@ -368,10 +420,9 @@ describe("ReviewEngine with different platforms", () => {
     });
 
     mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-    mockCopilotInstance.parseFileReview.mockReturnValue({
-      filename: "test.ts",
-      findings: [],
-    });
+    mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+      { filename: "test.ts", findings: [] },
+    ]);
     mockCopilotInstance.parseCrossFileReview.mockReturnValue({
       overallAssessment: "OK",
       findings: [],
@@ -394,7 +445,7 @@ describe("ReviewEngine confidence filtering", () => {
     vi.clearAllMocks();
     // Reset mock implementations to default state
     mockCopilotInstance.executePrompt.mockReset();
-    mockCopilotInstance.parseFileReview.mockReset();
+    mockCopilotInstance.parseBatchedFileReview.mockReset();
     mockCopilotInstance.parseCrossFileReview.mockReset();
     vi.spyOn(console, "log").mockImplementation(() => {});
     // Clear cache directory to avoid state leakage from previous tests
@@ -410,20 +461,22 @@ describe("ReviewEngine confidence filtering", () => {
     const mockAdapter = createMockPlatformAdapter();
 
     mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-    mockCopilotInstance.parseFileReview.mockReturnValue({
-      filename: "src/auth/login.ts",
-      findings: [
-        {
-          line: 27,
-          severity: "high",
-          category: "security",
-          message: "Low confidence issue",
-          suggestion: "Fix it",
-          confidence: "low",
-          isPreExisting: false,
-        },
-      ],
-    });
+    mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+      {
+        filename: "src/auth/login.ts",
+        findings: [
+          {
+            line: 27,
+            severity: "high",
+            category: "security",
+            message: "Low confidence issue",
+            suggestion: "Fix it",
+            confidence: "low",
+            isPreExisting: false,
+          },
+        ],
+      },
+    ]);
     mockCopilotInstance.parseCrossFileReview.mockReturnValue({
       overallAssessment: "OK",
       findings: [],
@@ -450,20 +503,22 @@ describe("ReviewEngine confidence filtering", () => {
     const mockAdapter = createMockPlatformAdapter();
 
     mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-    mockCopilotInstance.parseFileReview.mockReturnValue({
-      filename: "src/auth/login.ts",
-      findings: [
-        {
-          line: 27,
-          severity: "high",
-          category: "security",
-          message: "Pre-existing issue",
-          suggestion: "Fix it",
-          confidence: "high",
-          isPreExisting: true,
-        },
-      ],
-    });
+    mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+      {
+        filename: "src/auth/login.ts",
+        findings: [
+          {
+            line: 27,
+            severity: "high",
+            category: "security",
+            message: "Pre-existing issue",
+            suggestion: "Fix it",
+            confidence: "high",
+            isPreExisting: true,
+          },
+        ],
+      },
+    ]);
     mockCopilotInstance.parseCrossFileReview.mockReturnValue({
       overallAssessment: "OK",
       findings: [],
@@ -494,10 +549,12 @@ describe("ReviewEngine confidence filtering", () => {
     });
 
     mockCopilotInstance.executePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-    mockCopilotInstance.parseFileReview.mockReturnValue({
-      filename: "src/auth/login.ts",
-      findings: [], // No findings = issue resolved
-    });
+    mockCopilotInstance.parseBatchedFileReview.mockReturnValue([
+      {
+        filename: "src/auth/login.ts",
+        findings: [], // No findings = issue resolved
+      },
+    ]);
     mockCopilotInstance.parseCrossFileReview.mockReturnValue({
       overallAssessment: "All issues fixed",
       findings: [],

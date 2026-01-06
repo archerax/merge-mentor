@@ -52,6 +52,11 @@ interface RawCrossFileReviewResponse {
   recommendations?: unknown[];
 }
 
+/** Raw batched file review response from Copilot. */
+interface RawBatchedFileReviewResponse {
+  file_results?: Record<string, RawFileReviewResponse>;
+}
+
 /**
  * Threshold for prompt length - prompts longer than this will use temp files.
  * CLI arguments have platform-specific limits (typically 8KB-128KB).
@@ -168,7 +173,7 @@ export class CopilotProvider implements AIProviderClient {
       if (this.model) {
         args.push("--model", this.model);
       }
-      
+
       // Add --allow-all-tools when using temp files so Copilot can read them
       if (tempFilePath) {
         args.push("--allow-all-tools");
@@ -214,14 +219,29 @@ export class CopilotProvider implements AIProviderClient {
   }
 
   private parseJsonResponse(raw: string): unknown {
+    console.log("=== DEBUG: JSON Parsing ===");
+    console.log("Raw response length:", raw.length);
+    console.log("Raw response first 500 chars:", raw.substring(0, 500));
+    console.log("Raw response last 500 chars:", raw.substring(Math.max(0, raw.length - 500)));
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.log("ERROR: No JSON object found in response");
+      console.log("Full raw response:", raw);
       throw new JsonParseError("No JSON object found in response.", raw);
     }
 
+    console.log("Extracted JSON string length:", jsonMatch[0].length);
+    console.log("Extracted JSON first 300 chars:", jsonMatch[0].substring(0, 300));
+
     try {
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log("JSON parsing successful");
+      console.log("Parsed object keys:", Object.keys(parsed));
+      return parsed;
     } catch (error) {
+      console.log("JSON parsing failed:", (error as Error).message);
+      console.log("Failed JSON string:", jsonMatch[0]);
       throw new JsonParseError((error as Error).message, raw);
     }
   }
@@ -302,6 +322,88 @@ export class CopilotProvider implements AIProviderClient {
       findings,
       recommendations: Array.isArray(data.recommendations) ? data.recommendations.map(String) : [],
     };
+  }
+
+  /**
+   * Parses a batched Copilot response containing reviews for multiple files.
+   *
+   * @param response - Raw Copilot response with file_results object
+   * @returns Array of structured file review results
+   */
+  parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
+    // DEBUG: Log raw response for debugging
+    console.log("=== COPILOT RAW RESPONSE ===");
+    console.log("Raw response length:", response.raw?.length || 0);
+    console.log("Raw response (first 1000 chars):", response.raw?.substring(0, 1000));
+    console.log("=== COPILOT PARSED RESPONSE ===");
+    console.log("Parsed response:", JSON.stringify(response.parsed, null, 2));
+
+    const data = response.parsed as RawBatchedFileReviewResponse;
+    const results: FileReviewResult[] = [];
+
+    if (!data.file_results || typeof data.file_results !== "object") {
+      console.log("=== DEBUG: Missing or invalid file_results ===");
+      console.log("data.file_results exists:", !!data.file_results);
+      console.log("data.file_results type:", typeof data.file_results);
+      console.log("Full parsed data keys:", Object.keys(data));
+      return results;
+    }
+
+    console.log("=== DEBUG: Processing file_results ===");
+    console.log("Number of files in file_results:", Object.keys(data.file_results).length);
+    console.log("File names:", Object.keys(data.file_results));
+
+    for (const [filename, fileData] of Object.entries(data.file_results)) {
+      console.log(`=== DEBUG: Processing file: ${filename} ===`);
+      console.log("File data:", JSON.stringify(fileData, null, 2));
+      
+      const rawFileData = fileData as RawFileReviewResponse;
+      const findings: FileFinding[] = [];
+      const resolvedComments: ResolvedComment[] = [];
+
+      console.log("Findings array exists:", Array.isArray(rawFileData.findings));
+      console.log("Findings count:", rawFileData.findings?.length || 0);
+
+      if (Array.isArray(rawFileData.findings)) {
+        for (const finding of rawFileData.findings) {
+          findings.push({
+            line: typeof finding.line === "number" ? finding.line : 0,
+            severity: this.validateSeverity(finding.severity),
+            category: this.validateCategory(finding.category),
+            message: String(finding.message || ""),
+            suggestion: String(finding.suggestion || ""),
+            confidence: this.validateConfidence(finding.confidence),
+            isPreExisting:
+              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
+          });
+        }
+      }
+
+      if (Array.isArray(rawFileData.resolved_comments)) {
+        for (const resolved of rawFileData.resolved_comments) {
+          if (typeof resolved.line === "number" && resolved.line > 0) {
+            resolvedComments.push({
+              line: resolved.line,
+              reason: String(resolved.reason || "Issue addressed"),
+            });
+          }
+        }
+      }
+
+      console.log(`Final result for ${filename}: ${findings.length} findings, ${resolvedComments.length} resolved comments`);
+
+      results.push({
+        filename,
+        findings,
+        resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
+      });
+    }
+
+    console.log("=== DEBUG: Final batched results ===");
+    console.log("Total files processed:", results.length);
+    console.log("Total findings across all files:", results.reduce((sum, r) => sum + r.findings.length, 0));
+
+    return results;
   }
 
   private validateSeverity(value: unknown): FileFinding["severity"] {

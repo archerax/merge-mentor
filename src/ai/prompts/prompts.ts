@@ -1,4 +1,5 @@
 import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
+import type { DiffManifest } from "../../review/diffStorage.js";
 
 /**
  * Builds a prompt for reviewing a single file.
@@ -201,4 +202,123 @@ export function buildFilesSummary(files: readonly PRFile[]): string {
   return files
     .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
     .join("\n");
+}
+
+/**
+ * Builds a prompt for batched file review where all files are reviewed in a single AI call.
+ * The diffs are stored on disk and referenced via the manifest.
+ *
+ * @param manifest - Manifest describing stored diff files
+ * @param existingCommentsContext - Optional context of existing comments to avoid duplication
+ * @returns Formatted prompt for batched review
+ */
+export function buildBatchedFileReviewPrompt(
+  manifest: DiffManifest,
+  existingCommentsContext?: string
+): string {
+  const filesListing = manifest.files
+    .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${f.diffPath}`)
+    .join("\n");
+
+  const commentsSection = existingCommentsContext
+    ? `\n${existingCommentsContext}\n\nIMPORTANT: Review the existing comments above. Do NOT flag the same issues again, even if worded differently. Focus on finding NEW issues not already covered by existing comments.\n`
+    : "";
+
+  return `You are an expert code reviewer analyzing changes made by senior developers. Focus on substantive issues that would impact correctness, security, or maintainability.
+
+BATCHED REVIEW MODE: Review ALL files listed below. Each file has its diff stored in a separate file that you can read.
+
+FILES TO REVIEW:
+${filesListing}
+${commentsSection}
+INSTRUCTIONS:
+1. Read each diff file listed above (use the @filename syntax to read them)
+2. Review each file thoroughly
+3. Return a single JSON response with results for ALL files
+
+COMPREHENSIVE REVIEW APPROACH:
+- Perform multiple mental passes: logic → security → performance → quality
+- Consider edge cases: null/undefined, empty arrays, boundary values, concurrent access
+- Think about "what could go wrong" scenarios exhaustively
+- Don't stop at first issue - scan the entire change thoroughly
+- Consider both what's present and what might be missing
+${existingCommentsContext ? "- AVOID duplicating issues already mentioned in EXISTING COMMENTS above" : ""}
+
+FOCUS ON SUBSTANTIVE ISSUES:
+- Actual bugs: logic errors, race conditions, edge cases not handled
+- Security vulnerabilities: injection flaws, authentication issues, data exposure
+- Performance problems: algorithmic inefficiency, memory leaks, unnecessary operations
+- Breaking changes: API incompatibilities, contract violations
+- Critical architectural concerns: tight coupling, violated principles
+
+DO NOT flag:
+- Obvious best practices that any senior developer knows
+- Stylistic preferences unless they violate established patterns
+- Trivial suggestions that don't materially improve the code
+- Documentation for self-evident code
+
+GUIDELINES:
+- Only report findings if you can explain a specific negative consequence
+- Assume the developer is experienced and made intentional choices
+- Focus on "what could go wrong" not "what could be different"
+
+CONFIDENCE SCORING:
+- "high": You are certain this is an issue AND it was introduced in this PR
+- "medium": You believe this is likely an issue, but there's some uncertainty
+- "low": You suspect this might be an issue, but you're not confident
+- Only report findings with "high" or "medium" confidence
+
+PRE-EXISTING ISSUE DETECTION:
+- If an issue exists in removed lines (starting with -), set isPreExisting to true
+- Only set isPreExisting to false for issues newly introduced in added lines (+)
+
+LINE NUMBER REQUIREMENTS:
+- The "line" field must reference a line number from the diff
+- For added lines (starting with +), use the NEW line number (right side of the diff)
+- Line numbers should match the @@ hunk headers (e.g., @@ -10,5 +15,7 @@ means new lines start at 15)
+${
+  existingCommentsContext
+    ? `
+RESOLVED COMMENT DETECTION:
+- Review the EXISTING COMMENTS listed above
+- For each existing comment, check if the issue has been FIXED in the current diff
+- Include resolved comments in the "resolved_comments" array with the original line number and brief reason
+`
+    : ""
+}
+Respond ONLY with valid JSON in this exact format:
+{
+  "file_results": {
+    "path/to/file1.ts": {
+      "findings": [
+        {
+          "line": <line_number>,
+          "severity": "critical|high|medium|low",
+          "category": "bug|security|performance|quality|documentation",
+          "message": "Description of the issue",
+          "suggestion": "Recommended fix or improvement",
+          "confidence": "high|medium|low",
+          "isPreExisting": false
+        }
+      ]${
+        existingCommentsContext
+          ? `,
+      "resolved_comments": [
+        {
+          "line": <original_line_number>,
+          "reason": "Brief explanation of why this issue is now resolved"
+        }
+      ]`
+          : ""
+      }
+    },
+    "path/to/file2.ts": {
+      "findings": [],
+      "resolved_comments": []
+    }
+  }
+}
+
+IMPORTANT: Include an entry for EVERY file listed above, even if it has no findings (use empty arrays).
+If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""} }`;
 }

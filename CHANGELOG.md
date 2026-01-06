@@ -1,4 +1,4 @@
-## v1.7.0 - 2026-01-05\n\n- Changelog: minor release.\n\n# Changelog
+# Changelog
 
 All notable changes to merge-mentor will be documented in this file.
 
@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- **Batched file review mode** - Major performance improvement for large PRs. Instead of making one AI call per file (50-300 calls for large PRs), the tool now stores all diffs to disk and makes a single batched AI call to review all files at once. This reduces review time from potentially hours to minutes for large PRs.
+
+### Changed
+
+- **Review architecture** - File reviews now use a batched approach:
+  1. Diffs are stored to `.merge-mentor/diffs/pr-{number}/` directory
+  2. A single AI call reviews all files using `@filename` syntax to read diff files
+  3. Cross-file analysis remains a separate call
+  4. Total AI calls reduced from N+1 (per file + cross-file) to 2 (batched + cross-file)
 
 ### Fixed
 
