@@ -291,8 +291,8 @@ function countIssuesByCategory(result: ReviewResult): Record<string, number> {
 export function displayResults(
   result: ReviewResult, 
   dryRun: boolean, 
-  adapter: PlatformAdapter, 
-  platform: Platform,
+  adapter?: PlatformAdapter, 
+  platform?: Platform,
   aiProvider?: AIProviderType
 ): void {
   console.log("=".repeat(60));
@@ -315,7 +315,7 @@ export function displayResults(
     console.log(`  Comments to Resolve: ${result.commentsResolved}`);
     
     // Generate and save markdown report
-    if (aiProvider) {
+    if (aiProvider && adapter && platform) {
       try {
         const markdownReport = generateMarkdownReport(result, aiProvider);
         const reportDir = join(process.cwd(), '.merge-mentor', 'reports');

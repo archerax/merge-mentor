@@ -827,6 +827,7 @@ export class ReviewEngine {
 
   private log(message: string): void {
     if (this.options.verbose !== false) {
+      console.log(message);
       this.logger.debug(message);
     }
   }

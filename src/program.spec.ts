@@ -160,7 +160,11 @@ describe("CLI", () => {
         })
       );
       expect(mockReviewPR).toHaveBeenCalledWith(42);
-      expect(result).toEqual(createMockReviewResult());
+      expect(result).toEqual({
+        result: createMockReviewResult(),
+        adapter: expect.any(Object),
+        platform: "github"
+      });
     });
 
     it("executes review with Azure platform", async () => {
@@ -477,14 +481,18 @@ describe("CLI", () => {
 
     it("generates markdown report in dry-run mode with AI provider", () => {
       const result = createMockReviewResult();
+      const mockAdapterWithId = {
+        ...mockAdapter,
+        getProjectIdentifier: () => "test-owner-test-repo",
+      };
 
-      displayResults(result, true, "copilot");
+      displayResults(result, true, mockAdapterWithId as any, "github", "copilot");
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Detailed markdown report generated:")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("pr-42-review-report.md")
+        expect.stringContaining("Github-test-owner-test-repo-PR42-review-report.md")
       );
     });
 
