@@ -49,6 +49,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     this.project = config.azure.project;
     this.repoName = config.azure.repo;
     this.botIdentifier = config.botCommentIdentifier;
+    this.logger.info(
+      { project: this.project, repo: this.repoName },
+      "AzureDevOpsAdapter initialized"
+    );
+  }
+
+  getProjectIdentifier(): string {
+    return this.project;
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {

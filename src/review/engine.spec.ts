@@ -21,6 +21,7 @@ vi.mock("../ai/index.js", () => ({
 
 function createMockPlatform(): PlatformAdapter {
   return {
+    getProjectIdentifier: vi.fn().mockReturnValue("test-repo"),
     getPRDetails: vi.fn(),
     getPRFiles: vi.fn(),
     getExistingBotComments: vi.fn(),

@@ -11,7 +11,7 @@ interface CachedFileReview {
 
 /** Cached review state for a pull request. */
 interface ReviewState {
-  readonly prNumber: number;
+  readonly prIdentifier: string;
   readonly lastReviewedAt: string;
   readonly files: Record<string, CachedFileReview>;
   readonly crossFileResult?: import("../platforms/types.js").CrossFileReviewResult;
@@ -29,26 +29,26 @@ export class ReviewStateCache {
   /**
    * Gets the cached review state for a PR.
    *
-   * @param prNumber - The PR number
+   * @param prIdentifier - The unique PR identifier
    * @returns Cached state or undefined if not found
    */
-  async getState(prNumber: number): Promise<ReviewState | undefined> {
+  async getState(prIdentifier: string): Promise<ReviewState | undefined> {
     try {
-      const filePath = this.getCachePath(prNumber);
+      const filePath = this.getCachePath(prIdentifier);
       const data = await fs.readFile(filePath, "utf-8");
       const state = JSON.parse(data) as ReviewState;
       this.logger.debug(
-        { prNumber, filesCount: Object.keys(state.files).length },
+        { prIdentifier, filesCount: Object.keys(state.files).length },
         "Loaded cached review state"
       );
       return state;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        this.logger.debug({ prNumber }, "No cached review state found");
+        this.logger.debug({ prIdentifier }, "No cached review state found");
         return undefined;
       }
       this.logger.warn(
-        { prNumber, error: (error as Error).message },
+        { prIdentifier, error: (error as Error).message },
         "Failed to load cached review state"
       );
       return undefined;
@@ -58,13 +58,13 @@ export class ReviewStateCache {
   /**
    * Saves the review state for a PR.
    *
-   * @param prNumber - The PR number
+   * @param prIdentifier - The unique PR identifier
    * @param fileResults - Results from file reviews with SHA information
    * @param fileShaMap - Map of filenames to their SHA values
    * @param crossFileResult - Optional cross-file analysis result
    */
   async saveState(
-    prNumber: number,
+    prIdentifier: string,
     fileResults: readonly FileReviewResult[],
     fileShaMap: Map<string, string>,
     crossFileResult?: import("../platforms/types.js").CrossFileReviewResult
@@ -81,21 +81,21 @@ export class ReviewStateCache {
       }
 
       const state: ReviewState = {
-        prNumber,
+        prIdentifier,
         lastReviewedAt: new Date().toISOString(),
         files,
         crossFileResult,
       };
 
-      const filePath = this.getCachePath(prNumber);
+      const filePath = this.getCachePath(prIdentifier);
       await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
       this.logger.info(
-        { prNumber, filesCount: Object.keys(files).length },
+        { prIdentifier, filesCount: Object.keys(files).length },
         "Saved review state to cache"
       );
     } catch (error) {
       this.logger.error(
-        { prNumber, error: (error as Error).message },
+        { prIdentifier, error: (error as Error).message },
         "Failed to save review state"
       );
     }
@@ -125,24 +125,24 @@ export class ReviewStateCache {
   /**
    * Clears the cache for a specific PR.
    *
-   * @param prNumber - The PR number
+   * @param prIdentifier - The unique PR identifier
    */
-  async clearState(prNumber: number): Promise<void> {
+  async clearState(prIdentifier: string): Promise<void> {
     try {
-      const filePath = this.getCachePath(prNumber);
+      const filePath = this.getCachePath(prIdentifier);
       await fs.unlink(filePath);
-      this.logger.info({ prNumber }, "Cleared cached review state");
+      this.logger.info({ prIdentifier }, "Cleared cached review state");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         this.logger.warn(
-          { prNumber, error: (error as Error).message },
+          { prIdentifier, error: (error as Error).message },
           "Failed to clear cached review state"
         );
       }
     }
   }
 
-  private getCachePath(prNumber: number): string {
-    return path.join(this.cacheDir, `pr-${prNumber}.json`);
+  private getCachePath(prIdentifier: string): string {
+    return path.join(this.cacheDir, `${prIdentifier}.json`);
   }
 }

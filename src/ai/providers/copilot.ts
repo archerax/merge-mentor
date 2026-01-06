@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { execPromise } from "../../utils/execPromise.js";
 import { getAuditLogger } from "../../audit/index.js";
+import { createChildLogger } from "../../logger.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { CopilotCliError, JsonParseError, ValidationError } from "../../errors/index.js";
 import type {
@@ -72,6 +75,7 @@ export class CopilotProvider implements AIProviderClient {
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
+  private readonly logger = createChildLogger({ component: "CopilotProvider" });
   private readonly tempDir: string;
 
   constructor(options?: AIProviderOptions) {
@@ -219,29 +223,47 @@ export class CopilotProvider implements AIProviderClient {
   }
 
   private parseJsonResponse(raw: string): unknown {
-    console.log("=== DEBUG: JSON Parsing ===");
-    console.log("Raw response length:", raw.length);
-    console.log("Raw response first 500 chars:", raw.substring(0, 500));
-    console.log("Raw response last 500 chars:", raw.substring(Math.max(0, raw.length - 500)));
+    this.logger.debug(
+      {
+        responseLength: raw.length,
+        responsePreview: raw.substring(0, 500),
+        responseSuffix: raw.substring(Math.max(0, raw.length - 500))
+      },
+      "Parsing JSON response"
+    );
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.log("ERROR: No JSON object found in response");
-      console.log("Full raw response:", raw);
+      this.logger.error(
+        { fullResponse: raw },
+        "No JSON object found in response"
+      );
       throw new JsonParseError("No JSON object found in response.", raw);
     }
 
-    console.log("Extracted JSON string length:", jsonMatch[0].length);
-    console.log("Extracted JSON first 300 chars:", jsonMatch[0].substring(0, 300));
+    this.logger.debug(
+      {
+        jsonLength: jsonMatch[0].length,
+        jsonPreview: jsonMatch[0].substring(0, 300)
+      },
+      "Extracted JSON for parsing"
+    );
 
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log("JSON parsing successful");
-      console.log("Parsed object keys:", Object.keys(parsed));
+      this.logger.debug(
+        { parsedKeys: Object.keys(parsed) },
+        "JSON parsing successful"
+      );
       return parsed;
     } catch (error) {
-      console.log("JSON parsing failed:", (error as Error).message);
-      console.log("Failed JSON string:", jsonMatch[0]);
+      this.logger.error(
+        {
+          error: (error as Error).message,
+          failedJson: jsonMatch[0]
+        },
+        "JSON parsing failed"
+      );
       throw new JsonParseError((error as Error).message, raw);
     }
   }
@@ -332,37 +354,56 @@ export class CopilotProvider implements AIProviderClient {
    */
   parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
     // DEBUG: Log raw response for debugging
-    console.log("=== COPILOT RAW RESPONSE ===");
-    console.log("Raw response length:", response.raw?.length || 0);
-    console.log("Raw response (first 1000 chars):", response.raw?.substring(0, 1000));
-    console.log("=== COPILOT PARSED RESPONSE ===");
-    console.log("Parsed response:", JSON.stringify(response.parsed, null, 2));
+    this.logger.debug(
+      {
+        rawResponseLength: response.raw?.length || 0,
+        rawResponsePreview: response.raw?.substring(0, 1000),
+        parsedResponse: response.parsed
+      },
+      "Copilot response details"
+    );
 
     const data = response.parsed as RawBatchedFileReviewResponse;
     const results: FileReviewResult[] = [];
 
     if (!data.file_results || typeof data.file_results !== "object") {
-      console.log("=== DEBUG: Missing or invalid file_results ===");
-      console.log("data.file_results exists:", !!data.file_results);
-      console.log("data.file_results type:", typeof data.file_results);
-      console.log("Full parsed data keys:", Object.keys(data));
+      this.logger.debug(
+        {
+          fileResultsExists: !!data.file_results,
+          fileResultsType: typeof data.file_results,
+          parsedDataKeys: Object.keys(data)
+        },
+        "Missing or invalid file_results"
+      );
       return results;
     }
 
-    console.log("=== DEBUG: Processing file_results ===");
-    console.log("Number of files in file_results:", Object.keys(data.file_results).length);
-    console.log("File names:", Object.keys(data.file_results));
+    this.logger.debug(
+      {
+        fileCount: Object.keys(data.file_results).length,
+        fileNames: Object.keys(data.file_results)
+      },
+      "Processing file_results"
+    );
 
     for (const [filename, fileData] of Object.entries(data.file_results)) {
-      console.log(`=== DEBUG: Processing file: ${filename} ===`);
-      console.log("File data:", JSON.stringify(fileData, null, 2));
+      this.logger.debug(
+        { filename, fileData },
+        "Processing individual file"
+      );
       
       const rawFileData = fileData as RawFileReviewResponse;
       const findings: FileFinding[] = [];
       const resolvedComments: ResolvedComment[] = [];
 
-      console.log("Findings array exists:", Array.isArray(rawFileData.findings));
-      console.log("Findings count:", rawFileData.findings?.length || 0);
+      this.logger.debug(
+        {
+          filename,
+          findingsExists: Array.isArray(rawFileData.findings),
+          findingsCount: rawFileData.findings?.length || 0
+        },
+        "Processing file findings"
+      );
 
       if (Array.isArray(rawFileData.findings)) {
         for (const finding of rawFileData.findings) {
@@ -390,7 +431,14 @@ export class CopilotProvider implements AIProviderClient {
         }
       }
 
-      console.log(`Final result for ${filename}: ${findings.length} findings, ${resolvedComments.length} resolved comments`);
+      this.logger.debug(
+        {
+          filename,
+          findingsCount: findings.length,
+          resolvedCommentsCount: resolvedComments.length
+        },
+        "Final file review result"
+      );
 
       results.push({
         filename,
@@ -399,9 +447,13 @@ export class CopilotProvider implements AIProviderClient {
       });
     }
 
-    console.log("=== DEBUG: Final batched results ===");
-    console.log("Total files processed:", results.length);
-    console.log("Total findings across all files:", results.reduce((sum, r) => sum + r.findings.length, 0));
+    this.logger.debug(
+      {
+        filesProcessed: results.length,
+        totalFindings: results.reduce((sum, r) => sum + r.findings.length, 0)
+      },
+      "Final batched results"
+    );
 
     return results;
   }

@@ -9,13 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Detailed markdown reports in dry-run mode** - Dry runs now automatically generate comprehensive markdown reports saved to `.merge-mentor/reports/pr-{number}-review-report.md`. Reports include PR metadata, issue summaries by severity/category with visual indicators, detailed file-specific findings, cross-file analysis, overall assessment, and recommendations. Perfect for viewing all issues when console output is too limited.
+- **Per-run log files** - Each review run now generates a unique timestamped log file (e.g., `merge-mentor_2025-01-06_18-40-30.log`) instead of overwriting a single log file. This preserves historical logs and makes debugging easier.
+- **Unique PR identifiers** - Cache files, diff storage, and reports now use platform-aware unique identifiers (e.g., `Github-myrepo-PR123`, `Azure-MyProject-PR456`) instead of just PR numbers. This prevents conflicts when working with multiple platforms or projects.
+- **Enhanced syntax tolerance** - AI prompts now explicitly instruct models not to flag syntax or compilation issues, assuming all code is valid. This reduces false positives for newer language features the model may not recognize.
+- **Detailed markdown reports in dry-run mode** - Dry runs now automatically generate comprehensive markdown reports saved to `.merge-mentor/reports/{platform}-{project}-PR{number}-review-report.md`. Reports include PR metadata, issue summaries by severity/category with visual indicators, detailed file-specific findings, cross-file analysis, overall assessment, and recommendations. Perfect for viewing all issues when console output is too limited.
 - **Batched file review mode** - Major performance improvement for large PRs. Instead of making one AI call per file (50-300 calls for large PRs), the tool now stores all diffs to disk and makes a single batched AI call to review all files at once. This reduces review time from potentially hours to minutes for large PRs.
 
 ### Changed
 
+- **Debug output moved to logs** - All debug messages (diff processing, JSON parsing, file copying, etc.) are now written to log files instead of cluttering console output. Console output is now clean and focused on user-relevant information.
+- **Stronger focus on changed lines** - AI prompts now emphasize more strongly that only NEW issues introduced in added/modified lines should be flagged, not pre-existing code issues.
+- **File organization** - Cache files now use unique identifiers: `.merge-mentor/cache/Github-myrepo-PR123.json` instead of `pr-123.json`. Diff storage similarly uses unique directory names.
 - **Review architecture** - File reviews now use a batched approach:
-  1. Diffs are stored to `.merge-mentor/diffs/pr-{number}/` directory
+  1. Diffs are stored to `.merge-mentor/diffs/{platform}-{project}-PR{number}/` directory
   2. A single AI call reviews all files using `@filename` syntax to read diff files
   3. Cross-file analysis remains a separate call
   4. Total AI calls reduced from N+1 (per file + cross-file) to 2 (batched + cross-file)

@@ -48,6 +48,8 @@ DO NOT flag:
 - Trivial suggestions that don't materially improve the code
 - Well-known trade-offs without explaining why the choice is problematic in this context
 - Documentation for self-evident code
+- Syntax or compilation issues (assume all code compiles and is valid syntax)
+- Language features you're unfamiliar with (they may be newer language features)
 
 GUIDELINES:
 - Only report findings if you can explain a specific negative consequence
@@ -65,10 +67,12 @@ CONFIDENCE SCORING:
 - Only report findings with "high" or "medium" confidence
 
 PRE-EXISTING ISSUE DETECTION:
+- **CRITICAL**: Only flag issues that are NEW in this PR - introduced by added/modified lines (marked with +)
 - If an issue exists in removed lines (starting with -), it is pre-existing - set isPreExisting to true
 - If the same pattern exists in both removed and added lines, it is pre-existing - set isPreExisting to true  
 - Only set isPreExisting to false for issues that are newly introduced in added lines (+)
-- Focus primarily on new issues introduced in this PR
+- **Focus EXCLUSIVELY on new issues introduced in this PR**
+- Do NOT flag existing code issues that were already present before this PR
 
 IMPORTANT: The "line" field must reference a line number that appears in the diff above.
 - For added lines (starting with +), use the NEW line number (right side of the diff)
@@ -168,6 +172,8 @@ DO NOT flag:
 - General suggestions without specific actionable improvements
 - Best practices that are obvious to experienced developers
 - Documentation for standard patterns
+- Syntax or compilation issues (assume all code compiles and is valid syntax)
+- Language features you're unfamiliar with (they may be newer language features)
 
 GUIDELINES:
 - Only provide recommendations that would prevent production issues or significantly improve maintainability
@@ -256,6 +262,8 @@ DO NOT flag:
 - Stylistic preferences unless they violate established patterns
 - Trivial suggestions that don't materially improve the code
 - Documentation for self-evident code
+- Syntax or compilation issues (assume all code compiles and is valid syntax)
+- Language features you're unfamiliar with (they may be newer language features)
 
 GUIDELINES:
 - Only report findings if you can explain a specific negative consequence
@@ -269,8 +277,11 @@ CONFIDENCE SCORING:
 - Only report findings with "high" or "medium" confidence
 
 PRE-EXISTING ISSUE DETECTION:
+- **CRITICAL**: Only flag issues that are NEW in this PR - introduced by added/modified lines (marked with +)
 - If an issue exists in removed lines (starting with -), set isPreExisting to true
 - Only set isPreExisting to false for issues newly introduced in added lines (+)
+- **Focus EXCLUSIVELY on new issues introduced in this PR**
+- Do NOT flag existing code issues that were already present before this PR
 
 LINE NUMBER REQUIREMENTS:
 - The "line" field must reference a line number from the diff

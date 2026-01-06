@@ -141,14 +141,18 @@ export class ReviewEngine {
       throw new ValidationError("prNumber", "Must be a positive integer");
     }
 
+    // Generate unique PR identifier
+    const projectId = this.platform.getProjectIdentifier();
+    const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
+
     const runs = this.options.reviewRuns ?? 1;
-    this.logger.info({ prNumber, runs }, "Starting PR review");
+    this.logger.info({ prNumber, prIdentifier, runs }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
     this.auditLogger.logReviewStart(prNumber, this.platformName, runs);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
-    const cachedState = await this.stateCache.getState(prNumber);
+    const cachedState = await this.stateCache.getState(prIdentifier);
 
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
@@ -156,7 +160,7 @@ export class ReviewEngine {
 
     if (runs === 1) {
       // Single run - use existing logic
-      const reviewData = await this.reviewFiles(prNumber, files, existingComments, cachedState);
+      const reviewData = await this.reviewFiles(prIdentifier, files, existingComments, cachedState);
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
 
@@ -180,6 +184,7 @@ export class ReviewEngine {
       // Multi-run mode - aggregate findings from multiple runs
       const aggregated = await this.reviewPRMultiRun(
         prNumber,
+        prIdentifier,
         prDetails,
         files,
         runs,
@@ -200,7 +205,7 @@ export class ReviewEngine {
 
     // Save state for future re-reviews
     const fileShaMap = this.buildFileShaMap(files);
-    await this.stateCache.saveState(prNumber, fileResults, fileShaMap, crossFileResult);
+    await this.stateCache.saveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
 
     if (commentStats.commentErrors.length > 0) {
       this.logger.warn(
@@ -253,6 +258,7 @@ export class ReviewEngine {
    */
   private async reviewPRMultiRun(
     prNumber: number,
+    prIdentifier: string,
     prDetails: PRDetails,
     files: PRFile[],
     runs: number,
@@ -278,7 +284,7 @@ export class ReviewEngine {
             : this.createSyntheticComments(existingComments, accumulatedFindings);
 
         // Perform file reviews for this run (no caching in multi-run mode)
-        const { fileResults } = await this.reviewFiles(prNumber, files, runComments, undefined);
+        const { fileResults } = await this.reviewFiles(prIdentifier, files, runComments, undefined);
         const validatedResults = this.validateLineNumbers(fileResults, files);
         allFileResults.push(validatedResults);
 
@@ -364,7 +370,7 @@ export class ReviewEngine {
   }
 
   private async reviewFiles(
-    prNumber: number,
+    prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>
@@ -408,7 +414,7 @@ export class ReviewEngine {
 
     // Use batched review for all files at once
     this.log(`Reviewing ${filesToReview.length} file(s) in batched mode...`);
-    const batchedResults = await this.reviewFilesBatched(prNumber, filesToReview, existingComments);
+    const batchedResults = await this.reviewFilesBatched(prIdentifier, filesToReview, existingComments);
 
     // Combine cached and new results
     const fileResults = [...cachedResults, ...batchedResults];
@@ -425,7 +431,7 @@ export class ReviewEngine {
    * Stores diffs to disk and asks the AI to review all files at once.
    */
   private async reviewFilesBatched(
-    prNumber: number,
+    prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[]
   ): Promise<FileReviewResult[]> {
@@ -437,11 +443,13 @@ export class ReviewEngine {
       return files.map((f) => ({ filename: f.filename, findings: [] }));
     }
 
+    // Extract PR number from identifier for audit logging
+    const prNumber = parseInt(prIdentifier.split('-PR')[1]);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
       // Store diffs to disk
-      const { diffDir, manifest } = await diffStorage.storeDiffs(prNumber, filesWithPatches);
+      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
       this.logger.info(
         { prNumber, fileCount: manifest.files.length, diffDir },
         "Stored diffs for batched review"
@@ -451,15 +459,19 @@ export class ReviewEngine {
       const commentsContext = formatExistingCommentsContext(existingComments);
       const prompt = buildBatchedFileReviewPrompt(manifest, commentsContext || undefined);
 
-      console.log("=== DEBUG: Copying diffs to temp directory for Copilot access ===");
+      this.logger.debug("Copying diffs to temp directory for Copilot access");
       // Copy diff files to temp directory so Copilot CLI can access them
       await this.copyDiffsToTempDir(diffDir, manifest);
 
       // Single AI call for all files
-      console.log("=== DEBUG: Batched prompt being sent ===");
-      console.log("Prompt length:", prompt.length);
-      console.log("Prompt (first 2000 chars):", prompt.substring(0, 2000));
-      console.log("Prompt (last 500 chars):", prompt.substring(Math.max(0, prompt.length - 500)));
+      this.logger.debug(
+        {
+          promptLength: prompt.length,
+          promptPreview: prompt.substring(0, 2000),
+          promptSuffix: prompt.substring(Math.max(0, prompt.length - 500))
+        },
+        "Batched prompt being sent"
+      );
       
       const response = await this.provider.executePrompt(prompt);
       const results = this.provider.parseBatchedFileReview(response);
@@ -500,7 +512,7 @@ export class ReviewEngine {
       throw error;
     } finally {
       // Clean up diffs
-      await diffStorage.cleanup(prNumber);
+      await diffStorage.cleanup(prIdentifier);
     }
   }
 
@@ -516,20 +528,32 @@ export class ReviewEngine {
     // Ensure temp directory exists
     await fs.mkdir(tempDir, { recursive: true });
     
-    console.log(`Copying ${manifest.files.length} diff files to temp directory`);
+    this.logger.debug(
+      { fileCount: manifest.files.length },
+      "Copying diff files to temp directory"
+    );
     
     for (const fileEntry of manifest.files) {
       const sourcePath = path.join(diffDir, fileEntry.diffPath);
       const destPath = path.join(tempDir, fileEntry.diffPath);
       
-      console.log(`Copying ${fileEntry.diffPath}: ${sourcePath} → ${destPath}`);
+      this.logger.debug(
+        { diffPath: fileEntry.diffPath, sourcePath, destPath },
+        "Copying diff file"
+      );
       
       try {
         const content = await fs.readFile(sourcePath, "utf-8");
         await fs.writeFile(destPath, content, "utf-8");
-        console.log(`✅ Copied ${fileEntry.diffPath} (${content.length} chars)`);
+        this.logger.debug(
+          { diffPath: fileEntry.diffPath, contentLength: content.length },
+          "Successfully copied diff file"
+        );
       } catch (error) {
-        console.log(`❌ Failed to copy ${fileEntry.diffPath}:`, (error as Error).message);
+        this.logger.warn(
+          { diffPath: fileEntry.diffPath, error: (error as Error).message },
+          "Failed to copy diff file"
+        );
         throw error;
       }
     }
@@ -803,7 +827,7 @@ export class ReviewEngine {
 
   private log(message: string): void {
     if (this.options.verbose !== false) {
-      console.log(message);
+      this.logger.debug(message);
     }
   }
 

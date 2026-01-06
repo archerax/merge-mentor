@@ -9,6 +9,7 @@ import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
 import type { PlatformAdapter } from "./platforms/types.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
+import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
 
 export interface ReviewOptions {
   pr: number;
@@ -19,11 +20,17 @@ export interface ReviewOptions {
   runs?: number;
 }
 
+export interface ReviewExecutionResult {
+  result: ReviewResult;
+  adapter: PlatformAdapter;
+  platform: Platform;
+}
+
 /**
  * Execute the review command logic.
  * Extracted for testability.
  */
-export async function executeReview(options: ReviewOptions): Promise<ReviewResult> {
+export async function executeReview(options: ReviewOptions): Promise<ReviewExecutionResult> {
   logger.info(
     {
       pr: options.pr,
@@ -96,7 +103,8 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewResul
     `\n🔍 Starting code review for PR #${options.pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
   );
 
-  return await engine.reviewPR(options.pr);
+  const result = await engine.reviewPR(options.pr);
+  return { result, adapter, platform };
 }
 
 /**
@@ -280,7 +288,13 @@ function countIssuesByCategory(result: ReviewResult): Record<string, number> {
 /**
  * Display review results to console.
  */
-export function displayResults(result: ReviewResult, dryRun: boolean, aiProvider?: AIProviderType): void {
+export function displayResults(
+  result: ReviewResult, 
+  dryRun: boolean, 
+  adapter: PlatformAdapter, 
+  platform: Platform,
+  aiProvider?: AIProviderType
+): void {
   console.log("=".repeat(60));
   console.log("📊 Review Complete");
   console.log("=".repeat(60));
@@ -305,7 +319,11 @@ export function displayResults(result: ReviewResult, dryRun: boolean, aiProvider
       try {
         const markdownReport = generateMarkdownReport(result, aiProvider);
         const reportDir = join(process.cwd(), '.merge-mentor', 'reports');
-        const reportFile = join(reportDir, `pr-${result.prDetails.number}-review-report.md`);
+        
+        // Generate unique report filename using platform and project
+        const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
+        const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
+        const reportFile = join(reportDir, `${prIdentifier}-review-report.md`);
         
         // Ensure directory exists
         mkdirSync(reportDir, { recursive: true });
@@ -376,8 +394,8 @@ program
       const config = loadConfig();
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       
-      const result = await executeReview(options);
-      displayResults(result, !options.write, aiProvider);
+      const { result, adapter, platform } = await executeReview(options);
+      displayResults(result, !options.write, adapter, platform, aiProvider);
 
       logger.info(
         {

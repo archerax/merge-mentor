@@ -201,7 +201,7 @@ Audit logging is enabled by default for security and compliance tracking. All cr
 - **Copilot Execution**: All LLM prompt executions
 - **Review Lifecycle**: Start/completion of reviews and individual file analysis
 
-Audit logs are written to the application logs (`.merge-mentor/logs/merge-mentor.log`) with a dedicated `audit` field for easy filtering and analysis.
+Audit logs are written to timestamped log files (`.merge-mentor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log`) with a dedicated `audit` field for easy filtering and analysis. Each review run generates its own log file, preserving historical audit trails.
 
 **Example audit log entry**:
 ```json
@@ -443,15 +443,42 @@ steps:
 
 ## Logging
 
-Logs are written to `.merge-mentor/logs/merge-mentor.log` in your current directory.
+Logs are written to timestamped files in `.merge-mentor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log` in your current directory. Each review run generates its own log file, preserving historical logs for debugging and audit purposes.
 
 ```bash
-# View logs
-tail -f .merge-mentor/logs/merge-mentor.log
+# View latest logs
+ls -la .merge-mentor/logs/
+tail -f .merge-mentor/logs/merge-mentor_*.log
+
+# View specific run
+tail -f .merge-mentor/logs/merge-mentor_2025-01-06_18-40-30.log
 
 # Set log level
 export LOG_LEVEL=debug  # debug, info, warn, error
 ```
+
+## File Organization
+
+merge-mentor creates several directories in your project root for different purposes:
+
+```
+.merge-mentor/
+├── cache/                          # Review state caching
+│   └── Github-myrepo-PR123.json     # Platform-aware cache files
+├── diffs/                          # Temporary diff storage for batched reviews  
+│   └── Azure-MyProject-PR456/       # Platform-aware diff directories
+├── logs/                           # Timestamped log files
+│   └── merge-mentor_2025-01-06_18-40-30.log
+├── reports/                        # Dry-run markdown reports
+│   └── Github-myrepo-PR123-review-report.md
+└── temp/                           # Temporary files for large prompts
+    └── prompt-abc123.txt             # Auto-cleaned after use
+```
+
+**Key improvements**:
+- **Unique identifiers**: Cache and diff files use `{Platform}-{Project}-PR{Number}` format to prevent conflicts
+- **Historical preservation**: Each run creates new timestamped log files instead of overwriting
+- **Platform isolation**: Multiple platforms and projects can be used without file conflicts
 
 ## Troubleshooting
 

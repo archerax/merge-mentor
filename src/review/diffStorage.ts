@@ -19,8 +19,8 @@ export interface DiffFileEntry {
 
 /** Manifest describing all diffs stored for a PR. */
 export interface DiffManifest {
-  /** PR number */
-  readonly prNumber: number;
+  /** Unique PR identifier */
+  readonly prIdentifier: string;
   /** List of files with their diff paths */
   readonly files: readonly DiffFileEntry[];
   /** ISO timestamp when diffs were stored */
@@ -37,7 +37,7 @@ export interface DiffStorageResult {
 
 /**
  * Handles storing PR diffs to the filesystem for batched review.
- * Diffs are stored in `.merge-mentor/diffs/pr-{number}/` directory.
+ * Diffs are stored in `.merge-mentor/diffs/{prIdentifier}/` directory.
  */
 export class DiffStorage {
   private readonly baseDir: string;
@@ -50,35 +50,46 @@ export class DiffStorage {
   /**
    * Stores all file diffs to disk for batched review.
    *
-   * @param prNumber - The PR number
+   * @param prIdentifier - The unique PR identifier
    * @param files - Array of PR files with patches
    * @returns The diff directory path and manifest
    */
-  async storeDiffs(prNumber: number, files: readonly PRFile[]): Promise<DiffStorageResult> {
-    const diffDir = path.join(this.baseDir, `pr-${prNumber}`);
+  async storeDiffs(prIdentifier: string, files: readonly PRFile[]): Promise<DiffStorageResult> {
+    const diffDir = path.join(this.baseDir, prIdentifier);
 
     // Clean up any existing diffs for this PR
-    await this.cleanup(prNumber);
+    await this.cleanup(prIdentifier);
 
     // Create the diffs directory
     await fs.mkdir(diffDir, { recursive: true });
 
     const entries: DiffFileEntry[] = [];
 
-    console.log("=== DEBUG: Storing diffs ===");
-    console.log("PR Number:", prNumber);
-    console.log("Files to store:", files.map(f => ({ filename: f.filename, patchLength: f.patch?.length || 0, status: f.status })));
+    this.logger.debug(
+      {
+        prIdentifier,
+        files: files.map(f => ({ filename: f.filename, patchLength: f.patch?.length || 0, status: f.status }))
+      },
+      "Storing diffs"
+    );
 
     for (const file of files) {
       if (!file.patch) {
-        console.log(`Skipping ${file.filename} - no patch`);
+        this.logger.debug({ filename: file.filename }, "Skipping file - no patch");
         continue;
       }
 
-      console.log(`=== Processing file: ${file.filename} ===`);
-      console.log(`Status: ${file.status}, Additions: ${file.additions}, Deletions: ${file.deletions}`);
-      console.log(`Patch length: ${file.patch.length} chars`);
-      console.log(`First 300 chars of patch:`, file.patch.substring(0, 300));
+      this.logger.debug(
+        {
+          filename: file.filename,
+          status: file.status,
+          additions: file.additions,
+          deletions: file.deletions,
+          patchLength: file.patch.length,
+          patchPreview: file.patch.substring(0, 300)
+        },
+        "Processing file"
+      );
 
       // Sanitize filename for filesystem (replace path separators with underscores)
       const sanitizedName = this.sanitizeFilename(file.filename);
@@ -104,7 +115,7 @@ export class DiffStorage {
     }
 
     const manifest: DiffManifest = {
-      prNumber,
+      prIdentifier,
       files: entries,
       createdAt: new Date().toISOString(),
     };
@@ -118,7 +129,7 @@ export class DiffStorage {
 
     this.logger.info(
       {
-        prNumber,
+        prIdentifier,
         fileCount: entries.length,
         diffDir,
       },
@@ -131,19 +142,19 @@ export class DiffStorage {
   /**
    * Cleans up stored diffs for a PR.
    *
-   * @param prNumber - The PR number to clean up
+   * @param prIdentifier - The unique PR identifier to clean up
    */
-  async cleanup(prNumber: number): Promise<void> {
-    const diffDir = path.join(this.baseDir, `pr-${prNumber}`);
+  async cleanup(prIdentifier: string): Promise<void> {
+    const diffDir = path.join(this.baseDir, prIdentifier);
 
     try {
       await fs.rm(diffDir, { recursive: true, force: true });
-      this.logger.debug({ prNumber, diffDir }, "Cleaned up diff directory");
+      this.logger.debug({ prIdentifier, diffDir }, "Cleaned up diff directory");
     } catch (error) {
       // Ignore errors if directory doesn't exist
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         this.logger.warn(
-          { prNumber, error: (error as Error).message },
+          { prIdentifier, error: (error as Error).message },
           "Failed to cleanup diff directory"
         );
       }

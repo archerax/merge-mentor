@@ -5,7 +5,7 @@ import { ConfigurationError } from "./errors/index.js";
 import type { FindingConfidence } from "./platforms/types.js";
 
 // Load .env from current working directory (supports both local and global usage)
-dotenv.config({ path: path.join(process.cwd(), ".env"), quiet: true });
+dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";

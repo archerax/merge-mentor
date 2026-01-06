@@ -111,6 +111,13 @@ export interface CommentAction {
  */
 export interface PlatformAdapter {
   /**
+   * Gets the project identifier for this platform instance.
+   * Used for generating unique cache keys and file names.
+   * @returns Project identifier (repo name for GitHub, project name for Azure)
+   */
+  getProjectIdentifier(): string;
+
+  /**
    * Retrieves pull request details.
    * @param prNumber - The PR number to fetch
    */

@@ -25,6 +25,10 @@ export class GitHubAdapter implements PlatformAdapter {
     this.logger.info({ owner: this.owner, repo: this.repo }, "GitHubAdapter initialized");
   }
 
+  getProjectIdentifier(): string {
+    return this.repo;
+  }
+
   async getPRDetails(prNumber: number): Promise<PRDetails> {
     try {
       const { data } = await withRateLimitHandling(() =>

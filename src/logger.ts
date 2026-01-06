@@ -10,10 +10,10 @@ let _logger: Logger | undefined;
  */
 export function getLogger(): Logger {
   if (!_logger) {
-    // Determine log file path (defaults to .merge-mentor/logs/merge-mentor.log in current working directory)
-    // This ensures logs are written to the user's project directory, not the global installation directory
+    // Determine log file path with timestamp for per-run logging
     const logDir = process.env.LOG_DIR || path.join(process.cwd(), ".merge-mentor", "logs");
-    const logFile = path.join(logDir, "merge-mentor.log");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, -5);
+    const logFile = path.join(logDir, `merge-mentor_${timestamp}.log`);
 
     _logger = pino({
       level: process.env.LOG_LEVEL || "info",
