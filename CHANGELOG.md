@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-01-06
+
 ### Added
 
 - **Per-run log files** - Each review run now generates a unique timestamped log file (e.g., `merge-mentor_2025-01-06_18-40-30.log`) instead of overwriting a single log file. This preserves historical logs and makes debugging easier.
