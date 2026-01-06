@@ -23,7 +23,7 @@ describe("ReviewStateCache", () => {
 
   describe("getState", () => {
     it("returns undefined when no cached state exists", async () => {
-      const state = await cache.getState(123);
+      const state = await cache.getState("test-PR123");
 
       expect(state).toBeUndefined();
     });

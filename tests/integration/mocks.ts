@@ -56,6 +56,7 @@ export function createMockPlatformAdapter(options?: {
 
   return {
     calls,
+    getProjectIdentifier: vi.fn(() => "test-project"),
     getPRDetails: vi.fn(async (prNumber: number) => {
       calls.getPRDetails.push(prNumber);
       return options?.prDetails ?? samplePRDetails;

@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { execPromise } from "../../utils/execPromise.js";
 import { getAuditLogger } from "../../audit/index.js";
 import { createChildLogger } from "../../logger.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";

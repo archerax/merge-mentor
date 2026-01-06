@@ -444,7 +444,7 @@ export class ReviewEngine {
     }
 
     // Extract PR number from identifier for audit logging
-    const prNumber = parseInt(prIdentifier.split('-PR')[1]);
+    const prNumber = parseInt(prIdentifier.split('-PR')[1], 10);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
