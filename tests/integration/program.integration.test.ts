@@ -144,29 +144,29 @@ describe("CLI Integration", () => {
     it("executes review with GitHub platform", async () => {
       const { executeReview } = await import("../../src/program.js");
 
-      const result = await executeReview({
+      const executionResult = await executeReview({
         pr: 42,
         platform: "github",
         write: false,
         verbose: false,
       });
 
-      expect(result).toBeDefined();
-      expect(result.prDetails.number).toBe(42);
+      expect(executionResult).toBeDefined();
+      expect(executionResult.result.prDetails.number).toBe(42);
     });
 
     it("executes review with Azure platform", async () => {
       const { executeReview } = await import("../../src/program.js");
 
-      const result = await executeReview({
+      const executionResult = await executeReview({
         pr: 42,
         platform: "azure",
         write: false,
         verbose: false,
       });
 
-      expect(result).toBeDefined();
-      expect(result.prDetails.number).toBe(42);
+      expect(executionResult).toBeDefined();
+      expect(executionResult.result.prDetails.number).toBe(42);
     });
 
     it("throws error for invalid platform", async () => {
@@ -185,15 +185,15 @@ describe("CLI Integration", () => {
     it("uses default platform from config", async () => {
       const { executeReview } = await import("../../src/program.js");
 
-      const result = await executeReview({
+      const executionResult = await executeReview({
         pr: 42,
         write: false,
         verbose: false,
       });
 
-      expect(result).toBeDefined();
+      expect(executionResult).toBeDefined();
       // Default is github from mocked config
-      expect(result.prDetails).toBeDefined();
+      expect(executionResult.result.prDetails).toBeDefined();
     });
   });
 
