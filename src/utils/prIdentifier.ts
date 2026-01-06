@@ -9,7 +9,11 @@ import type { Platform } from "../config.js";
  * @param prNumber - PR number
  * @returns Unique identifier string like "GitHub-myrepo-PR123" or "Azure-MyProject-PR456"
  */
-export function generatePRIdentifier(platform: Platform, project: string, prNumber: number): string {
+export function generatePRIdentifier(
+  platform: Platform,
+  project: string,
+  prNumber: number
+): string {
   const platformCapitalized = platform.charAt(0).toUpperCase() + platform.slice(1);
   return `${platformCapitalized}-${project}-PR${prNumber}`;
 }

@@ -68,7 +68,11 @@ export class DiffStorage {
     this.logger.debug(
       {
         prIdentifier,
-        files: files.map(f => ({ filename: f.filename, patchLength: f.patch?.length || 0, status: f.status }))
+        files: files.map((f) => ({
+          filename: f.filename,
+          patchLength: f.patch?.length || 0,
+          status: f.status,
+        })),
       },
       "Storing diffs"
     );
@@ -86,7 +90,7 @@ export class DiffStorage {
           additions: file.additions,
           deletions: file.deletions,
           patchLength: file.patch.length,
-          patchPreview: file.patch.substring(0, 300)
+          patchPreview: file.patch.substring(0, 300),
         },
         "Processing file"
       );

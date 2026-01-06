@@ -57,7 +57,11 @@ describe("ReviewStateCache", () => {
 
     it("returns undefined for corrupted cache file", async () => {
       await fs.mkdir(testCacheDir, { recursive: true });
-      await fs.writeFile(path.join(testCacheDir, "Github-testrepo-PR123.json"), "invalid json", "utf-8");
+      await fs.writeFile(
+        path.join(testCacheDir, "Github-testrepo-PR123.json"),
+        "invalid json",
+        "utf-8"
+      );
 
       const state = await cache.getState("Github-testrepo-PR123");
 

@@ -114,16 +114,16 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
-  
+
   let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
-  
+
   // Header with PR details
   report += `**Generated:** ${date}  \n`;
   report += `**AI Provider:** ${aiProvider}  \n`;
   report += `**PR Title:** ${result.prDetails.title}  \n`;
   report += `**Author:** ${result.prDetails.author}  \n`;
   report += `**Branch:** \`${result.prDetails.headBranch}\` → \`${result.prDetails.baseBranch}\`  \n\n`;
-  
+
   // Summary
   report += `## 📊 Review Summary\n\n`;
   report += `- **Files Reviewed:** ${result.filesReviewed}\n`;
@@ -131,16 +131,16 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
   report += `- **Total Issues Found:** ${totalIssues + crossFileIssues}\n`;
   report += `  - File-specific issues: ${totalIssues}\n`;
   report += `  - Cross-file issues: ${crossFileIssues}\n\n`;
-  
+
   // Dry-run actions summary
   report += `### 📝 Planned Actions (Dry-Run)\n\n`;
   report += `- Comments to Create: ${result.commentsCreated}\n`;
   report += `- Comments to Update: ${result.commentsUpdated}\n`;
   report += `- Comments to Resolve: ${result.commentsResolved}\n\n`;
-  
+
   // Issues by severity
   const severityCounts = countIssuesBySeverity(result);
-  if (Object.values(severityCounts).some(count => count > 0)) {
+  if (Object.values(severityCounts).some((count) => count > 0)) {
     report += `### Issues by Severity\n\n`;
     Object.entries(severityCounts).forEach(([severity, count]) => {
       if (count > 0) {
@@ -150,10 +150,10 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
     });
     report += `\n`;
   }
-  
+
   // Issues by category
   const categoryCounts = countIssuesByCategory(result);
-  if (Object.values(categoryCounts).some(count => count > 0)) {
+  if (Object.values(categoryCounts).some((count) => count > 0)) {
     report += `### Issues by Category\n\n`;
     Object.entries(categoryCounts).forEach(([category, count]) => {
       if (count > 0) {
@@ -163,20 +163,20 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
     });
     report += `\n`;
   }
-  
+
   // File-specific issues
   if (totalIssues > 0) {
     report += `## 📁 File-Specific Issues\n\n`;
-    
-    result.fileResults.forEach(fileResult => {
+
+    result.fileResults.forEach((fileResult) => {
       if (fileResult.findings.length > 0) {
         report += `### \`${fileResult.filename}\`\n\n`;
-        
+
         fileResult.findings.forEach((finding, index) => {
           const severityEmoji = SEVERITY_EMOJI[finding.severity];
           const categoryEmoji = CATEGORY_EMOJI[finding.category];
-          const confidenceEmoji = finding.confidence ? CONFIDENCE_EMOJI[finding.confidence] : '';
-          
+          const confidenceEmoji = finding.confidence ? CONFIDENCE_EMOJI[finding.confidence] : "";
+
           report += `#### ${index + 1}. Line ${finding.line} ${severityEmoji} ${categoryEmoji}\n\n`;
           report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
           report += `**Category:** ${finding.category}  \n`;
@@ -193,29 +193,29 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
       }
     });
   }
-  
+
   // Cross-file issues
   if (crossFileIssues > 0) {
     report += `## 🔗 Cross-File Issues\n\n`;
-    
+
     result.crossFileResult.findings.forEach((finding, index) => {
       const severityEmoji = SEVERITY_EMOJI[finding.severity];
       const categoryEmoji = CATEGORY_EMOJI[finding.category];
-      
+
       report += `### ${index + 1}. ${severityEmoji} ${categoryEmoji} ${finding.category.toUpperCase()}\n\n`;
       report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
-      report += `**Affected Files:** ${finding.affectedFiles.map(f => `\`${f}\``).join(', ')}  \n\n`;
+      report += `**Affected Files:** ${finding.affectedFiles.map((f) => `\`${f}\``).join(", ")}  \n\n`;
       report += `**Issue:** ${finding.message}\n\n`;
       report += `---\n\n`;
     });
   }
-  
+
   // Overall assessment
   if (result.crossFileResult.overallAssessment) {
     report += `## 🎯 Overall Assessment\n\n`;
     report += `${result.crossFileResult.overallAssessment}\n\n`;
   }
-  
+
   // Recommendations
   if (result.crossFileResult.recommendations.length > 0) {
     report += `## 💡 Recommendations\n\n`;
@@ -224,9 +224,9 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
     });
     report += `\n`;
   }
-  
+
   // Resolved comments (if any)
-  const resolvedComments = result.fileResults.flatMap(fr => fr.resolvedComments || []);
+  const resolvedComments = result.fileResults.flatMap((fr) => fr.resolvedComments || []);
   if (resolvedComments.length > 0) {
     report += `## ✅ Resolved Issues\n\n`;
     resolvedComments.forEach((resolved, index) => {
@@ -234,7 +234,7 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
     });
     report += `\n`;
   }
-  
+
   return report;
 }
 
@@ -246,21 +246,21 @@ function countIssuesBySeverity(result: ReviewResult): Record<string, number> {
     critical: 0,
     high: 0,
     medium: 0,
-    low: 0
+    low: 0,
   };
-  
+
   // Count file-specific issues
-  result.fileResults.forEach(fileResult => {
-    fileResult.findings.forEach(finding => {
+  result.fileResults.forEach((fileResult) => {
+    fileResult.findings.forEach((finding) => {
       counts[finding.severity] = (counts[finding.severity] || 0) + 1;
     });
   });
-  
+
   // Count cross-file issues
-  result.crossFileResult.findings.forEach(finding => {
+  result.crossFileResult.findings.forEach((finding) => {
     counts[finding.severity] = (counts[finding.severity] || 0) + 1;
   });
-  
+
   return counts;
 }
 
@@ -269,19 +269,19 @@ function countIssuesBySeverity(result: ReviewResult): Record<string, number> {
  */
 function countIssuesByCategory(result: ReviewResult): Record<string, number> {
   const counts: Record<string, number> = {};
-  
+
   // Count file-specific issues
-  result.fileResults.forEach(fileResult => {
-    fileResult.findings.forEach(finding => {
+  result.fileResults.forEach((fileResult) => {
+    fileResult.findings.forEach((finding) => {
       counts[finding.category] = (counts[finding.category] || 0) + 1;
     });
   });
-  
+
   // Count cross-file issues
-  result.crossFileResult.findings.forEach(finding => {
+  result.crossFileResult.findings.forEach((finding) => {
     counts[finding.category] = (counts[finding.category] || 0) + 1;
   });
-  
+
   return counts;
 }
 
@@ -289,9 +289,9 @@ function countIssuesByCategory(result: ReviewResult): Record<string, number> {
  * Display review results to console.
  */
 export function displayResults(
-  result: ReviewResult, 
-  dryRun: boolean, 
-  adapter?: PlatformAdapter, 
+  result: ReviewResult,
+  dryRun: boolean,
+  adapter?: PlatformAdapter,
   platform?: Platform,
   aiProvider?: AIProviderType
 ): void {
@@ -313,24 +313,24 @@ export function displayResults(
     console.log(`  Comments to Create: ${result.commentsCreated}`);
     console.log(`  Comments to Update: ${result.commentsUpdated}`);
     console.log(`  Comments to Resolve: ${result.commentsResolved}`);
-    
+
     // Generate and save markdown report
     if (aiProvider && adapter && platform) {
       try {
         const markdownReport = generateMarkdownReport(result, aiProvider);
-        const reportDir = join(process.cwd(), '.merge-mentor', 'reports');
-        
+        const reportDir = join(process.cwd(), ".merge-mentor", "reports");
+
         // Generate unique report filename using platform and project
         const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
         const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
         const reportFile = join(reportDir, `${prIdentifier}-review-report.md`);
-        
+
         // Ensure directory exists
         mkdirSync(reportDir, { recursive: true });
-        
+
         // Write the report
-        writeFileSync(reportFile, markdownReport, 'utf-8');
-        
+        writeFileSync(reportFile, markdownReport, "utf-8");
+
         console.log("");
         console.log("📄 Detailed markdown report generated:");
         console.log(`  ${reportFile}`);
@@ -393,7 +393,7 @@ program
     try {
       const config = loadConfig();
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-      
+
       const { result, adapter, platform } = await executeReview(options);
       displayResults(result, !options.write, adapter, platform, aiProvider);
 

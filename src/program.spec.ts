@@ -163,7 +163,7 @@ describe("CLI", () => {
       expect(result).toEqual({
         result: createMockReviewResult(),
         adapter: expect.any(Object),
-        platform: "github"
+        platform: "github",
       });
     });
 
@@ -719,7 +719,7 @@ describe("CLI", () => {
           author: "test-author",
           headBranch: "feature/test",
           baseBranch: "main",
-          description: "Test description"
+          description: "Test description",
         },
         filesReviewed: 2,
         filesSkipped: 1,
@@ -733,23 +733,23 @@ describe("CLI", () => {
                 category: "bug",
                 message: "Potential null pointer exception",
                 suggestion: "Add null check",
-                confidence: "high"
-              }
-            ]
-          }
+                confidence: "high",
+              },
+            ],
+          },
         ],
         crossFileResult: {
           overallAssessment: "Code quality looks good overall",
           findings: [
             {
               severity: "medium",
-              category: "architecture", 
+              category: "architecture",
               message: "Consider extracting common logic",
-              affectedFiles: ["file1.ts", "file2.ts"]
-            }
+              affectedFiles: ["file1.ts", "file2.ts"],
+            },
           ],
-          recommendations: ["Use consistent naming", "Add more tests"]
-        }
+          recommendations: ["Use consistent naming", "Add more tests"],
+        },
       });
 
       const report = generateMarkdownReport(result, "copilot");
@@ -793,8 +793,8 @@ describe("CLI", () => {
         crossFileResult: {
           overallAssessment: "",
           findings: [],
-          recommendations: []
-        }
+          recommendations: [],
+        },
       });
 
       const report = generateMarkdownReport(result, "opencode");
@@ -816,10 +816,10 @@ describe("CLI", () => {
             findings: [],
             resolvedComments: [
               { line: 5, reason: "Issue was fixed by adding validation" },
-              { line: 15, reason: "Error handling was improved" }
-            ]
-          }
-        ]
+              { line: 15, reason: "Error handling was improved" },
+            ],
+          },
+        ],
       });
 
       const report = generateMarkdownReport(result, "cursor");

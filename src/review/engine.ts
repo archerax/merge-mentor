@@ -414,7 +414,11 @@ export class ReviewEngine {
 
     // Use batched review for all files at once
     this.log(`Reviewing ${filesToReview.length} file(s) in batched mode...`);
-    const batchedResults = await this.reviewFilesBatched(prIdentifier, filesToReview, existingComments);
+    const batchedResults = await this.reviewFilesBatched(
+      prIdentifier,
+      filesToReview,
+      existingComments
+    );
 
     // Combine cached and new results
     const fileResults = [...cachedResults, ...batchedResults];
@@ -444,7 +448,7 @@ export class ReviewEngine {
     }
 
     // Extract PR number from identifier for audit logging
-    const prNumber = parseInt(prIdentifier.split('-PR')[1], 10);
+    const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
@@ -468,11 +472,11 @@ export class ReviewEngine {
         {
           promptLength: prompt.length,
           promptPreview: prompt.substring(0, 2000),
-          promptSuffix: prompt.substring(Math.max(0, prompt.length - 500))
+          promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
         },
         "Batched prompt being sent"
       );
-      
+
       const response = await this.provider.executePrompt(prompt);
       const results = this.provider.parseBatchedFileReview(response);
 
@@ -522,26 +526,23 @@ export class ReviewEngine {
   private async copyDiffsToTempDir(diffDir: string, manifest: DiffManifest): Promise<void> {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
-    
+
     const tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
-    
+
     // Ensure temp directory exists
     await fs.mkdir(tempDir, { recursive: true });
-    
-    this.logger.debug(
-      { fileCount: manifest.files.length },
-      "Copying diff files to temp directory"
-    );
-    
+
+    this.logger.debug({ fileCount: manifest.files.length }, "Copying diff files to temp directory");
+
     for (const fileEntry of manifest.files) {
       const sourcePath = path.join(diffDir, fileEntry.diffPath);
       const destPath = path.join(tempDir, fileEntry.diffPath);
-      
+
       this.logger.debug(
         { diffPath: fileEntry.diffPath, sourcePath, destPath },
         "Copying diff file"
       );
-      
+
       try {
         const content = await fs.readFile(sourcePath, "utf-8");
         await fs.writeFile(destPath, content, "utf-8");
