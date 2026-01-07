@@ -1,9 +1,9 @@
-import { Command } from "commander";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Command } from "commander";
 import type { AIProviderType } from "./ai/types.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
-import { SEVERITY_EMOJI, CONFIDENCE_EMOJI, CATEGORY_EMOJI } from "./constants.js";
+import { CATEGORY_EMOJI, CONFIDENCE_EMOJI, SEVERITY_EMOJI } from "./constants.js";
 import { logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";

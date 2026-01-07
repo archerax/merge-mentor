@@ -83,6 +83,19 @@ export class DiffStorage {
         continue;
       }
 
+      // Check if patch only contains headers (< 150 chars is suspicious)
+      const hasContent = file.patch.split("\n").length > 4;
+      if (!hasContent) {
+        this.logger.warn(
+          {
+            filename: file.filename,
+            patchLength: file.patch.length,
+            patch: file.patch,
+          },
+          "Patch appears to have no content (only headers)"
+        );
+      }
+
       this.logger.debug(
         {
           filename: file.filename,

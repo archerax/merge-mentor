@@ -1,11 +1,9 @@
 import * as azdev from "azure-devops-node-api";
-import type { IGitApi } from "azure-devops-node-api/GitApi.js";
 import type {
   Comment,
-  FileDiff,
-  FileDiffsCriteria,
   GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import * as Diff from "diff";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { createChildLogger } from "../logger.js";
@@ -13,7 +11,7 @@ import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
 
 /** Azure DevOps change type values. */
-const AzureChangeType = {
+const _AzureChangeType = {
   ADD: 1,
   EDIT: 2,
   RENAME: 8,
@@ -41,14 +39,17 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly botIdentifier: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "AzureDevOpsAdapter" });
+  private readonly token: string;
+  private readonly orgUrl: string;
 
   constructor(config: Config) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
-    const orgUrl = `https://dev.azure.com/${config.azure.org}`;
-    this.connection = new azdev.WebApi(orgUrl, authHandler);
+    this.orgUrl = `https://dev.azure.com/${config.azure.org}`;
+    this.connection = new azdev.WebApi(this.orgUrl, authHandler);
     this.project = config.azure.project;
     this.repoName = config.azure.repo;
     this.botIdentifier = config.botCommentIdentifier;
+    this.token = config.azure.token;
     this.logger.info(
       { project: this.project, repo: this.repoName },
       "AzureDevOpsAdapter initialized"
@@ -87,11 +88,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     try {
       const gitApi = await this.connection.getGitApi();
 
+      // Get PR details to find repository ID
       const pr = await withRateLimitHandling(() =>
         gitApi.getPullRequestById(prNumber, this.project)
       );
 
-      if (!pr.lastMergeSourceCommit?.commitId || !pr.lastMergeTargetCommit?.commitId) {
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        this.logger.warn({ prNumber }, "Could not find repository ID for PR");
         this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
         return [];
       }
@@ -105,74 +109,40 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       }
 
       const lastIteration = iterations[iterations.length - 1];
-      const iterationId = lastIteration.id || 1;
 
-      const changes = await withRateLimitHandling(() =>
-        gitApi.getPullRequestIterationChanges(this.repoName, prNumber, iterationId, this.project)
-      );
-
-      if (!changes.changeEntries || changes.changeEntries.length === 0) {
+      // Use sourceRefCommit (head) and commonRefCommit (base) from iteration for accurate diffs
+      if (!lastIteration.sourceRefCommit?.commitId || !lastIteration.commonRefCommit?.commitId) {
+        this.logger.warn(
+          {
+            prNumber,
+            iterationId: lastIteration.id,
+            hasSourceRef: !!lastIteration.sourceRefCommit,
+            hasCommonRef: !!lastIteration.commonRefCommit,
+          },
+          "Missing sourceRefCommit or commonRefCommit in PR iteration"
+        );
         this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
         return [];
       }
 
-      // Get proper diffs with line numbers from Azure DevOps API
-      // Azure DevOps API limits getFileDiffs to 10 files per request, so we batch them
-      const BATCH_SIZE = 10;
-      const filePaths = changes.changeEntries
-        .filter((change) => change.item?.path)
-        .map((change) => ({
-          path: change.item!.path!,
-        }));
+      const baseCommitId = lastIteration.commonRefCommit.commitId;
+      const headCommitId = lastIteration.sourceRefCommit.commitId;
 
-      const fileDiffMap = new Map<string, FileDiff>();
+      this.logger.info(
+        {
+          prNumber,
+          repositoryId,
+          baseCommitId,
+          headCommitId,
+        },
+        "Fetching commit diffs via REST API"
+      );
 
-      for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
-        const batch = filePaths.slice(i, i + BATCH_SIZE);
+      // Fetch diffs directly using REST API
+      const diffs = await this.fetchCommitDiffsViaREST(repositoryId, baseCommitId, headCommitId);
 
-        const fileDiffsCriteria: FileDiffsCriteria = {
-          baseVersionCommit: pr.lastMergeTargetCommit.commitId,
-          targetVersionCommit: pr.lastMergeSourceCommit.commitId,
-          fileDiffParams: batch,
-        };
-
-        const fileDiffs = await withRateLimitHandling(() =>
-          gitApi.getFileDiffs(fileDiffsCriteria, this.project, this.repoName)
-        );
-
-        for (const diff of fileDiffs || []) {
-          if (diff.path) {
-            const normalizedPath = diff.path.startsWith("/") ? diff.path.slice(1) : diff.path;
-            fileDiffMap.set(normalizedPath, diff);
-          }
-        }
-      }
-
-      const files: PRFile[] = [];
-      for (const change of changes.changeEntries) {
-        const item = change.item;
-        if (!item?.path) continue;
-
-        const status = this.mapChangeTypeToStatus(change.changeType);
-        const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
-
-        const fileDiff = fileDiffMap.get(path);
-        const patch = fileDiff
-          ? await this.convertFileDiffToUnifiedPatch(path, fileDiff, item.objectId, gitApi)
-          : undefined;
-
-        files.push({
-          filename: path,
-          status,
-          additions: 0,
-          deletions: 0,
-          patch,
-          sha: item.objectId,
-        });
-      }
-
-      this.auditLogger.logPRFilesFetch(prNumber, "azure", files.length);
-      return files;
+      this.auditLogger.logPRFilesFetch(prNumber, "azure", diffs.length);
+      return diffs;
     } catch (error) {
       this.auditLogger.logPRFilesFetch(
         prNumber,
@@ -186,86 +156,235 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   /**
-   * Converts Azure DevOps FileDiff to a unified diff patch format.
-   * Fetches actual file content to generate a proper diff for code review.
+   * Fetches commit diffs directly via Azure DevOps REST API.
+   * This bypasses the Node SDK which has issues with file content retrieval.
+   * Uses the Commits API to get actual diff content.
    */
-  private async convertFileDiffToUnifiedPatch(
-    filename: string,
-    fileDiff: FileDiff,
-    blobSha: string | undefined,
-    gitApi: IGitApi
+  private async fetchCommitDiffsViaREST(
+    repositoryId: string,
+    baseCommitId: string,
+    targetCommitId: string
+  ): Promise<PRFile[]> {
+    // Azure DevOps Commits API provides actual diff content
+    // We'll get the changes for the target commit and use baseCommit as the diff base
+    const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/commits/${targetCommitId}/changes?api-version=7.0`;
+
+    this.logger.info({ baseCommitId, targetCommitId }, "Fetching commit changes via REST API");
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      this.logger.error(
+        { status: response.status, statusText: response.statusText, errorText },
+        "Failed to fetch commit changes via REST API"
+      );
+      throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as {
+      changes?: Array<{
+        item?: { path?: string; objectId?: string; gitObjectType?: string };
+        changeType?: string;
+      }>;
+    };
+
+    if (!data.changes || data.changes.length === 0) {
+      this.logger.info("No changes found in commit");
+      return [];
+    }
+
+    this.logger.info({ changesCount: data.changes.length }, "Received changes from Commits API");
+
+    // Filter out folder changes and process files
+    const files: PRFile[] = [];
+    for (const change of data.changes) {
+      const item = change.item;
+      if (!item?.path || item.gitObjectType === "tree") {
+        continue; // Skip folders
+      }
+
+      const status = this.mapCommitChangeTypeToStatus(change.changeType);
+      const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
+
+      // Fetch file content at both commits and generate diff
+      const patch = await this.generateDiffFromBlobs(
+        repositoryId,
+        path,
+        baseCommitId,
+        targetCommitId,
+        status
+      );
+
+      files.push({
+        filename: path,
+        status,
+        additions: 0,
+        deletions: 0,
+        patch,
+        sha: item.objectId,
+      });
+    }
+
+    return files;
+  }
+
+  /**
+   * Generates a unified diff by fetching blob content at both commits.
+   */
+  private async generateDiffFromBlobs(
+    repositoryId: string,
+    filePath: string,
+    baseCommitId: string,
+    targetCommitId: string,
+    status: FileStatus
   ): Promise<string> {
-    if (!fileDiff.lineDiffBlocks || fileDiff.lineDiffBlocks.length === 0) {
+    try {
+      let baseContent = "";
+      let targetContent = "";
+
+      // Fetch base version content (if not added)
+      if (status !== "added") {
+        try {
+          baseContent = await this.fetchFileContentAtCommit(repositoryId, filePath, baseCommitId);
+        } catch (error) {
+          this.logger.debug(
+            { filePath, commit: baseCommitId, error: (error as Error).message },
+            "Could not fetch base content (file may be new)"
+          );
+        }
+      }
+
+      // Fetch target version content (if not deleted)
+      if (status !== "deleted") {
+        try {
+          targetContent = await this.fetchFileContentAtCommit(
+            repositoryId,
+            filePath,
+            targetCommitId
+          );
+        } catch (error) {
+          this.logger.debug(
+            { filePath, commit: targetCommitId, error: (error as Error).message },
+            "Could not fetch target content (file may be deleted)"
+          );
+        }
+      }
+
+      this.logger.debug(
+        {
+          filePath,
+          baseLength: baseContent.length,
+          targetLength: targetContent.length,
+        },
+        "Fetched file contents for diff generation"
+      );
+
+      // Generate unified diff using the diff library
+      const structuredDiff = Diff.structuredPatch(
+        filePath,
+        filePath,
+        baseContent,
+        targetContent,
+        "",
+        ""
+      );
+
+      // Format as git-style unified diff
+      let patch = `diff --git a/${filePath} b/${filePath}\n`;
+      patch += `--- a/${filePath}\n`;
+      patch += `+++ b/${filePath}\n`;
+
+      for (const hunk of structuredDiff.hunks) {
+        patch += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
+        for (const line of hunk.lines) {
+          patch += `${line}\n`;
+        }
+      }
+
+      if (structuredDiff.hunks.length === 0) {
+        this.logger.warn(
+          { filePath, baseLength: baseContent.length, targetLength: targetContent.length },
+          "No diff hunks generated - files may be identical"
+        );
+      } else {
+        this.logger.info(
+          { filePath, hunksCount: structuredDiff.hunks.length },
+          "Generated diff successfully"
+        );
+      }
+
+      return patch;
+    } catch (error) {
+      this.logger.warn(
+        { filePath, error: (error as Error).message },
+        "Failed to generate diff from blobs"
+      );
+      return this.createEmptyDiffHeader(filePath);
+    }
+  }
+
+  /**
+   * Fetches file content at a specific commit using the Items API.
+   */
+  private async fetchFileContentAtCommit(
+    repositoryId: string,
+    filePath: string,
+    commitId: string
+  ): Promise<string> {
+    const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(`/${filePath}`)}&versionType=commit&version=${commitId}&includeContent=true&api-version=7.0`;
+
+    this.logger.debug({ filePath, commitId }, "Fetching file content at commit");
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file content: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as { content?: string };
+
+    if (!data.content) {
+      this.logger.warn({ filePath, commitId }, "No content returned from Items API");
       return "";
     }
 
-    const header = `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n`;
-    let patch = header;
-
-    // Fetch actual file content if we have a blob SHA
-    let fileLines: string[] = [];
-    if (blobSha) {
-      try {
-        const contentStream = await withRateLimitHandling(() =>
-          gitApi.getBlobContent(this.repoName, blobSha, this.project)
-        );
-        const chunks: Buffer[] = [];
-        for await (const chunk of contentStream) {
-          chunks.push(Buffer.from(chunk));
-        }
-        const content = Buffer.concat(chunks).toString("utf-8");
-        fileLines = content.split("\n");
-      } catch (error) {
-        this.logger.warn(
-          { filename, error: (error as Error).message },
-          "Could not fetch blob content"
-        );
-      }
-    }
-
-    for (const block of fileDiff.lineDiffBlocks) {
-      const oldStart = block.originalLineNumberStart || 1;
-      const oldCount = block.originalLinesCount || 0;
-      const newStart = block.modifiedLineNumberStart || 1;
-      const newCount = block.modifiedLinesCount || 0;
-
-      // Generate hunk header
-      patch += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`;
-
-      // Add actual file lines if available
-      if (fileLines.length > 0 && newCount > 0) {
-        for (let i = 0; i < newCount; i++) {
-          const lineIndex = newStart - 1 + i;
-          if (lineIndex < fileLines.length) {
-            patch += `+${fileLines[lineIndex]}\n`;
-          } else {
-            patch += `+\n`;
-          }
-        }
-      } else if (newCount > 0) {
-        // Fallback: empty lines to maintain line count
-        for (let i = 0; i < newCount; i++) {
-          patch += `+\n`;
-        }
-      }
-    }
-
-    return patch;
+    return data.content;
   }
 
-  private mapChangeTypeToStatus(changeType: number | undefined): FileStatus {
-    switch (changeType) {
-      case AzureChangeType.ADD:
+  /**
+   * Maps commit change type string to FileStatus.
+   */
+  private mapCommitChangeTypeToStatus(changeType?: string): FileStatus {
+    switch (changeType?.toLowerCase()) {
+      case "add":
         return "added";
-      case AzureChangeType.EDIT:
+      case "edit":
         return "modified";
-      case AzureChangeType.DELETE:
+      case "delete":
         return "deleted";
-      case AzureChangeType.RENAME:
+      case "rename":
         return "renamed";
       default:
         return "modified";
     }
+  }
+
+  /**
+   * Creates an empty diff header (no content changes).
+   */
+  private createEmptyDiffHeader(filename: string): string {
+    return `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n`;
   }
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
