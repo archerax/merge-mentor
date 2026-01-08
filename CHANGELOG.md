@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Comment line number accuracy** - Enhanced AI prompts with explicit, step-by-step instructions on how to calculate line numbers from git diffs. Includes concrete examples showing how to parse hunk headers (e.g., `@@ -80,5 +155,7 @@`) and count through diff lines correctly. This significantly reduces instances where comments are placed on incorrect line numbers (e.g., line 83 instead of line 158).
 - **Azure DevOps diff accuracy** - Fixed issue where diffs were not being correctly parsed or displayed on Azure DevOps. Diffs are now properly formatted and aligned with line numbers, ensuring accurate code review feedback.
 
 ## [1.8.0] - 2026-01-06

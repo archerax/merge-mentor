@@ -74,11 +74,34 @@ PRE-EXISTING ISSUE DETECTION:
 - **Focus EXCLUSIVELY on new issues introduced in this PR**
 - Do NOT flag existing code issues that were already present before this PR
 
-IMPORTANT: The "line" field must reference a line number that appears in the diff above.
-- For added lines (starting with +), use the NEW line number (right side of the diff)
-- For context lines (no prefix), use the NEW line number
-- For removed lines (starting with -), do NOT create findings - focus on what was added/changed
-- Line numbers should match the @@ hunk headers in the diff (e.g., @@ -10,5 +15,7 @@ means new lines start at 15)
+CRITICAL LINE NUMBER INSTRUCTIONS - READ CAREFULLY:
+The "line" field MUST be the absolute line number in the NEW version of the file (after changes are applied).
+
+HOW TO CALCULATE LINE NUMBERS FROM GIT DIFFS:
+1. Find the @@ hunk header for the section containing your issue
+   - Format: @@ -oldStart,oldCount +newStart,newCount @@
+   - The +newStart is the starting line number in the NEW file
+   - Example: @@ -80,5 +155,7 @@ means the new section starts at line 155
+
+2. Count lines from +newStart:
+   - Lines starting with " " (space/context): count and increment line number
+   - Lines starting with "+": count and increment line number (these are ADDED lines)
+   - Lines starting with "-": DO NOT count (these are removed from old version)
+
+3. CONCRETE EXAMPLE:
+   @@ -80,5 +155,7 @@ .footer {
+     text-align: center;        ← Line 155 (context, has space prefix)
+   }                           ← Line 156 (context)
+   
+  -.logo {                     ← NOT COUNTED (removed, has - prefix)
+  -  animation: logo-spin;     ← NOT COUNTED (removed)
+  +.logo-fixed {               ← Line 157 (added, has + prefix)
+  +  animation: broken-spin;   ← Line 158 (added, has + prefix) ← USE THIS LINE NUMBER!
+   }                           ← Line 159 (context)
+
+4. If you find an issue in "animation: broken-spin" above, report line 158, NOT line 83 or any other number
+
+VERIFICATION: Your line number should be >= +newStart from the hunk header containing your finding.
 ${
   existingCommentsContext
     ? `
@@ -283,10 +306,34 @@ PRE-EXISTING ISSUE DETECTION:
 - **Focus EXCLUSIVELY on new issues introduced in this PR**
 - Do NOT flag existing code issues that were already present before this PR
 
-LINE NUMBER REQUIREMENTS:
-- The "line" field must reference a line number from the diff
-- For added lines (starting with +), use the NEW line number (right side of the diff)
-- Line numbers should match the @@ hunk headers (e.g., @@ -10,5 +15,7 @@ means new lines start at 15)
+CRITICAL LINE NUMBER INSTRUCTIONS - READ CAREFULLY:
+The "line" field MUST be the absolute line number in the NEW version of the file (after changes are applied).
+
+HOW TO CALCULATE LINE NUMBERS FROM GIT DIFFS:
+1. Find the @@ hunk header for the section containing your issue
+   - Format: @@ -oldStart,oldCount +newStart,newCount @@
+   - The +newStart is the starting line number in the NEW file
+   - Example: @@ -80,5 +155,7 @@ means the new section starts at line 155
+
+2. Count lines from +newStart:
+   - Lines starting with " " (space/context): count and increment line number
+   - Lines starting with "+": count and increment line number (these are ADDED lines)
+   - Lines starting with "-": DO NOT count (these are removed from old version)
+
+3. CONCRETE EXAMPLE:
+   @@ -80,5 +155,7 @@ .footer {
+     text-align: center;        ← Line 155 (context, has space prefix)
+   }                           ← Line 156 (context)
+   
+  -.logo {                     ← NOT COUNTED (removed, has - prefix)
+  -  animation: logo-spin;     ← NOT COUNTED (removed)
+  +.logo-fixed {               ← Line 157 (added, has + prefix)
+  +  animation: broken-spin;   ← Line 158 (added, has + prefix) ← USE THIS LINE NUMBER!
+   }                           ← Line 159 (context)
+
+4. If you find an issue in "animation: broken-spin" above, report line 158, NOT line 83 or any other number
+
+VERIFICATION: Your line number should be >= +newStart from the hunk header containing your finding.
 ${
   existingCommentsContext
     ? `
