@@ -127,19 +127,33 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
       const baseCommitId = lastIteration.commonRefCommit.commitId;
       const headCommitId = lastIteration.sourceRefCommit.commitId;
+      const iterationId = lastIteration.id;
+
+      if (!iterationId) {
+        this.logger.warn({ prNumber }, "Missing iteration ID");
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
 
       this.logger.info(
         {
           prNumber,
           repositoryId,
+          iterationId,
           baseCommitId,
           headCommitId,
         },
-        "Fetching commit diffs via REST API"
+        "Fetching PR iteration changes via REST API"
       );
 
-      // Fetch diffs directly using REST API
-      const diffs = await this.fetchCommitDiffsViaREST(repositoryId, baseCommitId, headCommitId);
+      // Fetch all changed files using PR Iteration Changes API (includes all files across all commits)
+      const diffs = await this.fetchPRIterationChanges(
+        repositoryId,
+        prNumber,
+        iterationId,
+        baseCommitId,
+        headCommitId
+      );
 
       this.auditLogger.logPRFilesFetch(prNumber, "azure", diffs.length);
       return diffs;
@@ -156,60 +170,44 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   /**
-   * Fetches commit diffs directly via Azure DevOps REST API.
-   * This bypasses the Node SDK which has issues with file content retrieval.
-   * Uses the Commits API to get actual diff content.
+   * Page size for paginated API requests.
    */
-  private async fetchCommitDiffsViaREST(
+  private readonly CHANGES_PAGE_SIZE = 100;
+
+  /**
+   * Fetches all PR iteration changes via Azure DevOps REST API with pagination.
+   * Uses the Pull Request Iteration Changes API which returns ALL files changed
+   * across ALL commits in the PR, not just a single commit.
+   */
+  private async fetchPRIterationChanges(
     repositoryId: string,
+    prNumber: number,
+    iterationId: number,
     baseCommitId: string,
-    targetCommitId: string
+    headCommitId: string
   ): Promise<PRFile[]> {
-    // Azure DevOps Commits API provides actual diff content
-    // We'll get the changes for the target commit and use baseCommit as the diff base
-    const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/commits/${targetCommitId}/changes?api-version=7.0`;
+    // Fetch all changes with pagination
+    const allChanges = await this.fetchAllIterationChanges(repositoryId, prNumber, iterationId);
 
-    this.logger.info({ baseCommitId, targetCommitId }, "Fetching commit changes via REST API");
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error(
-        { status: response.status, statusText: response.statusText, errorText },
-        "Failed to fetch commit changes via REST API"
-      );
-      throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = (await response.json()) as {
-      changes?: Array<{
-        item?: { path?: string; objectId?: string; gitObjectType?: string };
-        changeType?: string;
-      }>;
-    };
-
-    if (!data.changes || data.changes.length === 0) {
-      this.logger.info("No changes found in commit");
+    if (allChanges.length === 0) {
+      this.logger.info("No changes found in PR iteration");
       return [];
     }
 
-    this.logger.info({ changesCount: data.changes.length }, "Received changes from Commits API");
+    this.logger.info(
+      { changesCount: allChanges.length },
+      "Total changes fetched from PR Iteration Changes API"
+    );
 
     // Filter out folder changes and process files
     const files: PRFile[] = [];
-    for (const change of data.changes) {
+    for (const change of allChanges) {
       const item = change.item;
       if (!item?.path || item.gitObjectType === "tree") {
         continue; // Skip folders
       }
 
-      const status = this.mapCommitChangeTypeToStatus(change.changeType);
+      const status = this.mapIterationChangeTypeToStatus(change.changeType);
       const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
 
       // Fetch file content at both commits and generate diff
@@ -217,7 +215,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         repositoryId,
         path,
         baseCommitId,
-        targetCommitId,
+        headCommitId,
         status
       );
 
@@ -232,6 +230,103 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
 
     return files;
+  }
+
+  /**
+   * Fetches all iteration changes with pagination support.
+   * Azure DevOps API uses $top and $skip for pagination on the iteration changes endpoint.
+   */
+  private async fetchAllIterationChanges(
+    repositoryId: string,
+    prNumber: number,
+    iterationId: number
+  ): Promise<
+    Array<{
+      item?: { path?: string; objectId?: string; gitObjectType?: string };
+      changeType?: number;
+    }>
+  > {
+    const allChanges: Array<{
+      item?: { path?: string; objectId?: string; gitObjectType?: string };
+      changeType?: number;
+    }> = [];
+
+    let skip = 0;
+    let hasMoreResults = true;
+
+    this.logger.info(
+      { prNumber, iterationId },
+      "Fetching PR iteration changes via REST API with pagination"
+    );
+
+    while (hasMoreResults) {
+      // Use PR Iteration Changes API - returns all files changed in the PR
+      const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/pullRequests/${prNumber}/iterations/${iterationId}/changes?$top=${this.CHANGES_PAGE_SIZE}&$skip=${skip}&api-version=7.0`;
+
+      this.logger.debug({ skip, top: this.CHANGES_PAGE_SIZE }, "Fetching iteration changes page");
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error(
+          { status: response.status, statusText: response.statusText, errorText },
+          "Failed to fetch PR iteration changes via REST API"
+        );
+        throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as {
+        changeEntries?: Array<{
+          item?: { path?: string; objectId?: string; gitObjectType?: string };
+          changeType?: number;
+        }>;
+      };
+
+      const pageChanges = data.changeEntries || [];
+      allChanges.push(...pageChanges);
+
+      this.logger.debug(
+        { pageSize: pageChanges.length, totalSoFar: allChanges.length },
+        "Received iteration changes page"
+      );
+
+      // Check if we need to fetch more pages
+      // If we got fewer results than requested, we've reached the end
+      if (pageChanges.length < this.CHANGES_PAGE_SIZE) {
+        hasMoreResults = false;
+      } else {
+        skip += this.CHANGES_PAGE_SIZE;
+      }
+    }
+
+    return allChanges;
+  }
+
+  /**
+   * Maps PR iteration change type (numeric) to FileStatus.
+   * Azure DevOps iteration changes use numeric change types.
+   */
+  private mapIterationChangeTypeToStatus(changeType?: number): FileStatus {
+    // Azure DevOps VersionControlChangeType enum values
+    // See: https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-iteration-changes
+    switch (changeType) {
+      case 1: // Add
+        return "added";
+      case 2: // Edit
+        return "modified";
+      case 8: // Rename
+        return "renamed";
+      case 16: // Delete
+        return "deleted";
+      default:
+        return "modified";
+    }
   }
 
   /**
@@ -360,24 +455,6 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
 
     return data.content;
-  }
-
-  /**
-   * Maps commit change type string to FileStatus.
-   */
-  private mapCommitChangeTypeToStatus(changeType?: string): FileStatus {
-    switch (changeType?.toLowerCase()) {
-      case "add":
-        return "added";
-      case "edit":
-        return "modified";
-      case "delete":
-        return "deleted";
-      case "rename":
-        return "renamed";
-      default:
-        return "modified";
-    }
   }
 
   /**

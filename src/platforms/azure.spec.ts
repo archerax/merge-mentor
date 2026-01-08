@@ -139,17 +139,17 @@ describe("AzureDevOpsAdapter", () => {
         },
       ]);
 
-      // Mock fetch for Commits API (changes list)
+      // Mock fetch for PR Iteration Changes API (changeEntries with numeric changeType)
       mockFetch.mockImplementationOnce(() =>
         createMockResponse(true, 200, {
-          changes: [
+          changeEntries: [
             {
               item: { path: "/src/test.ts", objectId: "obj123", gitObjectType: "blob" },
-              changeType: "edit",
+              changeType: 2, // Edit
             },
             {
               item: { path: "/README.md", objectId: "obj456", gitObjectType: "blob" },
-              changeType: "add",
+              changeType: 1, // Add
             },
           ],
         })
@@ -221,16 +221,10 @@ describe("AzureDevOpsAdapter", () => {
         repository: { id: "repo-uuid-123" },
       });
 
+      // Missing id field returns empty result
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
         { sourceRefCommit: { commitId: "source123" }, commonRefCommit: { commitId: "base123" } },
       ]);
-
-      // Mock fetch to return empty changes
-      mockFetch.mockImplementationOnce(() =>
-        createMockResponse(true, 200, {
-          changes: [],
-        })
-      );
 
       const result = await adapter.getPRFiles(123);
 
@@ -254,15 +248,15 @@ describe("AzureDevOpsAdapter", () => {
         },
       ]);
 
-      // Mock Commits API to return changes with invalid items
+      // Mock PR Iteration Changes API to return changes with invalid items
       mockFetch.mockImplementationOnce(() =>
         createMockResponse(true, 200, {
-          changes: [
+          changeEntries: [
             { item: null },
             { item: { path: null } },
             {
               item: { path: "/valid.ts", objectId: "obj789", gitObjectType: "blob" },
-              changeType: "edit",
+              changeType: 2, // Edit
             },
           ],
         })
@@ -329,7 +323,9 @@ describe("AzureDevOpsAdapter", () => {
         },
       ]);
 
-      mockFetch.mockImplementationOnce(() => createMockResponse(true, 200, { changes: null }));
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, { changeEntries: null })
+      );
 
       const result = await adapter.getPRFiles(123);
 
@@ -353,29 +349,29 @@ describe("AzureDevOpsAdapter", () => {
         },
       ]);
 
-      // Mock Commits API with different change types
+      // Mock PR Iteration Changes API with different change types (numeric)
       mockFetch.mockImplementationOnce(() =>
         createMockResponse(true, 200, {
-          changes: [
+          changeEntries: [
             {
               item: { path: "/added.ts", objectId: "a1", gitObjectType: "blob" },
-              changeType: "add",
+              changeType: 1, // Add
             },
             {
               item: { path: "/modified.ts", objectId: "m1", gitObjectType: "blob" },
-              changeType: "edit",
+              changeType: 2, // Edit
             },
             {
               item: { path: "/renamed.ts", objectId: "r1", gitObjectType: "blob" },
-              changeType: "rename",
+              changeType: 8, // Rename
             },
             {
               item: { path: "/deleted.ts", objectId: "d1", gitObjectType: "blob" },
-              changeType: "delete",
+              changeType: 16, // Delete
             },
             {
               item: { path: "/unknown.ts", objectId: "u1", gitObjectType: "blob" },
-              changeType: "unknown",
+              changeType: 999, // Unknown - should default to modified
             },
           ],
         })
@@ -419,6 +415,134 @@ describe("AzureDevOpsAdapter", () => {
       expect(result[4].status).toBe("modified");
 
       consoleWarnSpy.mockRestore();
+    });
+
+    it("handles pagination when there are more files than page size", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // Generate 150 files to test pagination (page size is 100)
+      const firstPageChanges = Array.from({ length: 100 }, (_, i) => ({
+        item: { path: `/src/file${i}.ts`, objectId: `obj${i}`, gitObjectType: "blob" },
+        changeType: 2, // Edit (numeric)
+      }));
+
+      const secondPageChanges = Array.from({ length: 50 }, (_, i) => ({
+        item: { path: `/src/file${100 + i}.ts`, objectId: `obj${100 + i}`, gitObjectType: "blob" },
+        changeType: 2, // Edit (numeric)
+      }));
+
+      // First page - returns 100 items (signals more pages exist)
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: firstPageChanges,
+        })
+      );
+
+      // Second page - returns 50 items (less than page size, signals end)
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: secondPageChanges,
+        })
+      );
+
+      // Mock Items API calls for all 150 files (base + target for each modified file)
+      // Each file needs 2 fetch calls: base version and target version
+      for (let i = 0; i < 150; i++) {
+        // Base version
+        mockFetch.mockImplementationOnce(() =>
+          createMockResponse(true, 200, { content: `// Base content for file${i}` })
+        );
+        // Target version
+        mockFetch.mockImplementationOnce(() =>
+          createMockResponse(true, 200, { content: `// Modified content for file${i}` })
+        );
+      }
+
+      const result = await adapter.getPRFiles(123);
+
+      // Should have all 150 files
+      expect(result).toHaveLength(150);
+      expect(result[0].filename).toBe("src/file0.ts");
+      expect(result[99].filename).toBe("src/file99.ts");
+      expect(result[100].filename).toBe("src/file100.ts");
+      expect(result[149].filename).toBe("src/file149.ts");
+
+      // Verify pagination URLs were called with correct parameters
+      // First call: $skip=0, $top=100
+      expect(mockFetch.mock.calls[0][0]).toContain("$top=100");
+      expect(mockFetch.mock.calls[0][0]).toContain("$skip=0");
+
+      // Second call: $skip=100, $top=100
+      expect(mockFetch.mock.calls[1][0]).toContain("$top=100");
+      expect(mockFetch.mock.calls[1][0]).toContain("$skip=100");
+    });
+
+    it("stops pagination when receiving empty page", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // Return exactly 100 files on first page
+      const firstPageChanges = Array.from({ length: 100 }, (_, i) => ({
+        item: { path: `/src/file${i}.ts`, objectId: `obj${i}`, gitObjectType: "blob" },
+        changeType: 1, // Add (numeric)
+      }));
+
+      // First page - returns exactly 100 items
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: firstPageChanges,
+        })
+      );
+
+      // Second page - returns empty (edge case: exactly 100 files total)
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: [],
+        })
+      );
+
+      // Mock Items API calls for all 100 files (target only for added files)
+      for (let i = 0; i < 100; i++) {
+        mockFetch.mockImplementationOnce(() =>
+          createMockResponse(true, 200, { content: `// Content for file${i}` })
+        );
+      }
+
+      const result = await adapter.getPRFiles(123);
+
+      // Should have all 100 files
+      expect(result).toHaveLength(100);
+
+      // Should have made 2 pagination calls (first page + second empty page)
+      const paginationCalls = mockFetch.mock.calls.filter((call) =>
+        call[0].includes("/changes?")
+      );
+      expect(paginationCalls).toHaveLength(2);
     });
   });
 
@@ -697,14 +821,14 @@ describe("AzureDevOpsAdapter", () => {
         },
       ]);
 
-      // Mock Commits API
+      // Mock PR Iteration Changes API
       mockFetch.mockImplementationOnce(() =>
         createMockResponse(true, 200, {
-          changes: [
+          changeEntries: [
             {
               changeTrackingId: 1,
               item: { path: "/test.ts", gitObjectType: "blob" },
-              changeType: "edit",
+              changeType: 2, // Edit (numeric)
             },
           ],
         })
