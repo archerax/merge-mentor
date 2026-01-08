@@ -321,9 +321,9 @@ export class CommentManager {
     const confidenceEmoji = this.getConfidenceEmoji(finding.confidence ?? "medium");
 
     const findingId = filename ? this.generateFindingId(filename, finding) : "";
-    const idMarker = findingId ? `<!-- finding-id: ${findingId} -->\n` : "";
+    const idMarker = findingId ? `\n<!-- finding-id: ${findingId} -->` : "";
 
-    return `${idMarker}### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
+    return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
 **Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}  
 **Confidence**: ${confidenceEmoji} ${(finding.confidence ?? "medium").charAt(0).toUpperCase() + (finding.confidence ?? "medium").slice(1)}  
@@ -335,7 +335,7 @@ export class CommentManager {
 ${finding.suggestion}
 
 ---
-*${this.botIdentifier} Code Review*`;
+*Code Review*${idMarker}`;
   }
 
   /**

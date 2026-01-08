@@ -64,7 +64,7 @@ describe("CommentManager", () => {
       expect(result).toContain("Security Issue");
       expect(result).toContain("SQL injection vulnerability");
       expect(result).toContain("Use parameterized queries");
-      expect(result).toContain("[AI Code Review Bot]");
+      expect(result).toContain("Code Review");
     });
 
     test.each([
@@ -278,7 +278,7 @@ describe("CommentManager", () => {
     it("should resolve comments that are no longer relevant", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[AI Code Review Bot]\n\nbug issue", path: "test.ts", line: 10 },
+        { id: 1, body: "bug issue", path: "test.ts", line: 10 },
       ];
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult({ overallAssessment: "All good" });
@@ -295,7 +295,7 @@ describe("CommentManager", () => {
       const existingComments: ExistingComment[] = [
         {
           id: 1,
-          body: "[AI Code Review Bot]\n\nbug issue",
+          body: "bug issue",
           path: "test.ts",
           line: 10,
           isResolved: true,
@@ -367,7 +367,7 @@ describe("CommentManager", () => {
     it("should not resolve comments without path", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[AI Code Review Bot]\n\nGeneral comment" },
+        { id: 1, body: "General comment" },
       ];
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult();
@@ -381,8 +381,8 @@ describe("CommentManager", () => {
     it("should match comments correctly by category and line", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[AI Code Review Bot]\n\nbug at line 10", path: "test.ts", line: 10 },
-        { id: 2, body: "[AI Code Review Bot]\n\nsecurity at line 20", path: "test.ts", line: 20 },
+        { id: 1, body: "bug at line 10", path: "test.ts", line: 10 },
+        { id: 2, body: "security at line 20", path: "test.ts", line: 20 },
       ];
       const fileResults: FileReviewResult[] = [
         {
@@ -433,7 +433,7 @@ describe("CommentManager", () => {
       const existingComments: ExistingComment[] = [
         {
           id: 1,
-          body: "[AI Code Review Bot]\n\n### Bug Issue\nNull check missing",
+          body: "### Bug Issue\nNull check missing",
           path: "test.ts",
           line: 10,
         },
@@ -457,7 +457,7 @@ describe("CommentManager", () => {
     it("should use model's resolution reason in resolution comment", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[AI Code Review Bot]\n\nOld issue", path: "test.ts", line: 10 },
+        { id: 1, body: "Old issue", path: "test.ts", line: 10 },
       ];
       const fileResults: FileReviewResult[] = [
         {
@@ -480,7 +480,7 @@ describe("CommentManager", () => {
       const existingComments: ExistingComment[] = [
         {
           id: 1,
-          body: "[AI Code Review Bot]\n\nOld issue",
+          body: "Old issue",
           path: "test.ts",
           line: 10,
           isResolved: true,
@@ -656,7 +656,7 @@ describe("CommentManager", () => {
         },
       });
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\nbug issue", path: "test.ts", line: 10 },
+        { id: 1, body: "bug issue", path: "test.ts", line: 10 },
       ];
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult();
@@ -681,7 +681,7 @@ describe("CommentManager", () => {
         },
       });
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\nbug issue", path: "test.ts", line: 10 },
+        { id: 1, body: "bug issue", path: "test.ts", line: 10 },
       ];
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult();
