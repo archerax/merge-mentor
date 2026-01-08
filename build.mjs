@@ -20,6 +20,7 @@ async function buildProject() {
       format: "esm",
       target: "node20",
       minify: isProduction,
+      sourcemap: !isProduction,
       keepNames: false,
       legalComments: "none",
       logLevel: "info",
