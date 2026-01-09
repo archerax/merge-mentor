@@ -335,7 +335,7 @@ export class CommentManager {
 ${finding.suggestion}
 
 ---
-*Code Review*${idMarker}`;
+${this.botIdentifier}${idMarker}`;
   }
 
   /**

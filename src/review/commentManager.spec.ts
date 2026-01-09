@@ -64,7 +64,7 @@ describe("CommentManager", () => {
       expect(result).toContain("Security Issue");
       expect(result).toContain("SQL injection vulnerability");
       expect(result).toContain("Use parameterized queries");
-      expect(result).toContain("Code Review");
+      expect(result).toContain("[AI Code Review Bot]");
     });
 
     test.each([
