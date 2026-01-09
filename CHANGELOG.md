@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MM_ environment variable prefix** - All environment variables now use the `MM_` prefix to avoid conflicts with other applications (e.g., `MM_GITHUB_TOKEN` instead of `GITHUB_TOKEN`). Old unprefixed variables are still supported for backward compatibility but are deprecated.
+- **Comprehensive CLI parameters** - Every environment variable now has a corresponding command-line parameter (e.g., `--github-token`, `--azure-token`, `--copilot-model`). CLI parameters always override environment variables.
+- **CLI parameter documentation** - All CLI help text now shows the corresponding environment variable name for each parameter.
+
+### Changed
+
+- **Environment variable naming** - Standardized all variable names with `MM_` prefix:
+  - `DEFAULT_PLATFORM` → `MM_PLATFORM`
+  - `GITHUB_TOKEN` → `MM_GITHUB_TOKEN`
+  - `AZURE_DEVOPS_*` → `MM_AZURE_*` (simplified naming)
+  - `BOT_COMMENT_IDENTIFIER` → `MM_COMMENT_IDENTIFIER`
+  - `*_TIMEOUT_MS` → `MM_*_TIMEOUT` (removed _MS suffix for consistency)
+  - `SKIP_PREEXISTING_ISSUES` → `MM_SKIP_EXISTING_ISSUES` (improved clarity)
+  - And more (see README for complete mapping)
+
+### Deprecated
+
+- **Old environment variable names** - All unprefixed environment variables (e.g., `GITHUB_TOKEN`, `AZURE_DEVOPS_TOKEN`) are deprecated in favor of `MM_` prefixed versions. Old names still work for backward compatibility.
+
 ### Fixed
 
 - **Comment line number accuracy** - Enhanced AI prompts with explicit, step-by-step instructions on how to calculate line numbers from git diffs. Includes concrete examples showing how to parse hunk headers (e.g., `@@ -80,5 +155,7 @@`) and count through diff lines correctly. This significantly reduces instances where comments are placed on incorrect line numbers (e.g., line 83 instead of line 158).

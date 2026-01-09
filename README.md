@@ -8,11 +8,17 @@ Automated code review bot powered by AI CLI tools. Supports multiple AI provider
 # Install globally
 npm install -g merge-mentor
 
-# Run a review (dry-run mode)
-GITHUB_TOKEN=your_token \
-GITHUB_REPO_OWNER=owner \
-GITHUB_REPO_NAME=repo \
+# Run a review (dry-run mode) - using environment variables
+MM_GITHUB_TOKEN=your_token \
+MM_GITHUB_REPO_OWNER=owner \
+MM_GITHUB_REPO_NAME=repo \
 merge-mentor review --pr 123
+
+# Or use command-line parameters (no env vars needed)
+merge-mentor review --pr 123 \
+  --github-token your_token \
+  --github-repo-owner owner \
+  --github-repo-name repo
 
 # Post comments to PR
 merge-mentor review --pr 123 --write
@@ -75,29 +81,33 @@ npx merge-mentor --help
 
 ## Configuration
 
-Configure merge-mentor using environment variables or command-line parameters.
+Configure merge-mentor using environment variables or command-line parameters. **Command-line parameters always override environment variables.**
+
+### Environment Variables
+
+All environment variables are now prefixed with `MM_` to avoid conflicts with other applications. The old unprefixed variables are still supported for backward compatibility but are deprecated.
 
 ### GitHub Configuration
 
 **Linux/macOS:**
 ```bash
-export GITHUB_TOKEN=your_personal_access_token
-export GITHUB_REPO_OWNER=username_or_org
-export GITHUB_REPO_NAME=repository_name
-export DEFAULT_PLATFORM=github
+export MM_GITHUB_TOKEN=your_personal_access_token
+export MM_GITHUB_REPO_OWNER=username_or_org
+export MM_GITHUB_REPO_NAME=repository_name
+export MM_PLATFORM=github
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:GITHUB_TOKEN="your_personal_access_token"
-$env:GITHUB_REPO_OWNER="username_or_org"
-$env:GITHUB_REPO_NAME="repository_name"
-$env:DEFAULT_PLATFORM="github"
+$env:MM_GITHUB_TOKEN="your_personal_access_token"
+$env:MM_GITHUB_REPO_OWNER="username_or_org"
+$env:MM_GITHUB_REPO_NAME="repository_name"
+$env:MM_PLATFORM="github"
 ```
 
 **Windows (Command Prompt):**
 ```cmd
-set GITHUB_TOKEN=your_personal_access_token
+set MM_GITHUB_TOKEN=your_personal_access_token
 set GITHUB_REPO_OWNER=username_or_org
 set GITHUB_REPO_NAME=repository_name
 set DEFAULT_PLATFORM=github
@@ -139,37 +149,45 @@ set DEFAULT_PLATFORM=azure
 **Linux/macOS:**
 ```bash
 # Select AI provider (copilot, opencode, or cursor)
-export AI_PROVIDER=copilot
+export MM_AI_PROVIDER=copilot
 
 # Copilot-specific settings
-export COPILOT_MODEL=gpt-5.2
-export COPILOT_TIMEOUT_MS=180000
+export MM_COPILOT_MODEL=gpt-5.2
+export MM_COPILOT_TIMEOUT=180000
 
 # OpenCode-specific settings (when using --provider opencode)
-export OPENCODE_MODEL=claude-sonnet-4.5
-export OPENCODE_TIMEOUT_MS=180000
+export MM_OPENCODE_MODEL=claude-sonnet-4.5
+export MM_OPENCODE_TIMEOUT=180000
 
 # Cursor-specific settings (when using --provider cursor)
-export CURSOR_MODEL=gpt-5
-export CURSOR_TIMEOUT_MS=180000
+export MM_CURSOR_MODEL=gpt-5
+export MM_CURSOR_TIMEOUT=180000
 ```
 
 **Windows (PowerShell):**
 ```powershell
 # Select AI provider
-$env:AI_PROVIDER="copilot"
+$env:MM_AI_PROVIDER="copilot"
 
 # Copilot settings
-$env:COPILOT_MODEL="gpt-5.2"
-$env:COPILOT_TIMEOUT_MS="180000"
+$env:MM_COPILOT_MODEL="gpt-5.2"
+$env:MM_COPILOT_TIMEOUT="180000"
 
 # OpenCode settings
-$env:OPENCODE_MODEL="claude-sonnet-4.5"
-$env:OPENCODE_TIMEOUT_MS="180000"
+$env:MM_OPENCODE_MODEL="claude-sonnet-4.5"
+$env:MM_OPENCODE_TIMEOUT="180000"
 
 # Cursor settings
-$env:CURSOR_MODEL="gpt-5"
-$env:CURSOR_TIMEOUT_MS="180000"
+$env:MM_CURSOR_MODEL="gpt-5"
+$env:MM_CURSOR_TIMEOUT="180000"
+```
+
+**Or use command-line parameters:**
+```bash
+merge-mentor review --pr 123 \
+  --provider opencode \
+  --opencode-model claude-sonnet-4.5 \
+  --opencode-timeout 180000
 ```
 
 ### Optional Settings
@@ -177,12 +195,15 @@ $env:CURSOR_TIMEOUT_MS="180000"
 **Linux/macOS:**
 ```bash
 # Comment filtering
-export MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
-export SKIP_PREEXISTING_ISSUES=true
-export POST_RESOLUTION_COMMENTS=true
+export MM_MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
+export MM_SKIP_EXISTING_ISSUES=true
+export MM_POST_RESOLUTION_COMMENTS=true
 
 # Multi-run mode
-export REVIEW_RUNS=1  # 1-5 runs
+export MM_REVIEW_RUNS=1  # 1-5 runs
+
+# Bot identifier
+export MM_COMMENT_IDENTIFIER="[merge-mentor]"
 
 # Logging
 export LOG_LEVEL=info  # debug, info, warn, or error
@@ -190,6 +211,16 @@ export LOG_DIR=.merge-mentor/logs  # optional, defaults to .merge-mentor/logs
 
 # Audit logging (enabled by default for security/compliance)
 export AUDIT_LOGGING_ENABLED=true
+```
+
+**Or use command-line parameters:**
+```bash
+merge-mentor review --pr 123 \
+  --min-comment-confidence medium \
+  --skip-existing-issues true \
+  --post-resolution-comments true \
+  --runs 3 \
+  --comment-identifier "[custom-bot]"
 ```
 
 ### Audit Logging
@@ -236,17 +267,17 @@ Audit logs can be filtered and analyzed for:
 
 ### Token Permissions
 
-**GitHub Token**:
+**GitHub Token** (set via `MM_GITHUB_TOKEN` or `--github-token`):
 - `repo` scope (full control of private repositories)
 - Or `public_repo` for public repositories only
 
-**Azure DevOps PAT**:
+**Azure DevOps PAT** (set via `MM_AZURE_TOKEN` or `--azure-token`):
 - Code: Read & Write
 - Pull Request Threads: Read & Write
 
 ### Available Models
 
-**Copilot CLI**: Configure via `COPILOT_MODEL` environment variable.
+**Copilot CLI**: Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
 - `claude-opus-4.5`
@@ -261,12 +292,41 @@ Audit logs can be filtered and analyzed for:
 - `gpt-4.1`
 - `gemini-3-pro-preview`
 
-**OpenCode CLI**: Configure via `OPENCODE_MODEL` environment variable.
+**OpenCode CLI**: Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
 - Check OpenCode documentation for supported models
 
-**Cursor CLI**: Configure via `CURSOR_MODEL` environment variable.
+**Cursor CLI**: Configure via `MM_CURSOR_MODEL` environment variable or `--cursor-model` CLI parameter.
 - Supports multiple AI models (GPT-5, Claude 4 Sonnet, Claude 4 Opus)
 - Check Cursor CLI documentation for latest supported models
+
+### Backward Compatibility
+
+The old unprefixed environment variables are still supported but deprecated:
+
+| Old Variable | New Variable (MM_ prefixed) |
+|--------------|----------------------------|
+| `DEFAULT_PLATFORM` | `MM_PLATFORM` |
+| `GITHUB_TOKEN` | `MM_GITHUB_TOKEN` |
+| `GITHUB_REPO_OWNER` | `MM_GITHUB_REPO_OWNER` |
+| `GITHUB_REPO_NAME` | `MM_GITHUB_REPO_NAME` |
+| `AZURE_DEVOPS_TOKEN` | `MM_AZURE_TOKEN` |
+| `AZURE_DEVOPS_ORG` | `MM_AZURE_ORG` |
+| `AZURE_DEVOPS_PROJECT` | `MM_AZURE_PROJECT` |
+| `AZURE_DEVOPS_REPO` | `MM_AZURE_REPO` |
+| `BOT_COMMENT_IDENTIFIER` | `MM_COMMENT_IDENTIFIER` |
+| `AI_PROVIDER` | `MM_AI_PROVIDER` |
+| `COPILOT_MODEL` | `MM_COPILOT_MODEL` |
+| `COPILOT_TIMEOUT_MS` | `MM_COPILOT_TIMEOUT` |
+| `OPENCODE_MODEL` | `MM_OPENCODE_MODEL` |
+| `OPENCODE_TIMEOUT_MS` | `MM_OPENCODE_TIMEOUT` |
+| `CURSOR_MODEL` | `MM_CURSOR_MODEL` |
+| `CURSOR_TIMEOUT_MS` | `MM_CURSOR_TIMEOUT` |
+| `MIN_COMMENT_CONFIDENCE` | `MM_MIN_COMMENT_CONFIDENCE` |
+| `SKIP_PREEXISTING_ISSUES` | `MM_SKIP_EXISTING_ISSUES` |
+| `POST_RESOLUTION_COMMENTS` | `MM_POST_RESOLUTION_COMMENTS` |
+| `REVIEW_RUNS` | `MM_REVIEW_RUNS` |
+
+**Note:** MM_ prefixed variables take precedence if both are set.
 
 ## Usage
 
@@ -295,14 +355,50 @@ merge-mentor review --pr 123 --verbose false
 
 ### Command Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pr <number>` | Pull request number (required) | - |
-| `--platform <github\|azure>` | Platform to use | `github` |
-| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `copilot` |
-| `--write` | Post comments (otherwise dry-run with markdown report) | `false` |
-| `--verbose` | Enable verbose output | `true` |
-| `--runs <1-5>` | Number of review passes | `1` |
+**Core Options:**
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--pr <number>` | Pull request number (required) | - | - |
+| `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
+| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--write` | Post comments (otherwise dry-run) | - | `false` |
+| `--verbose` | Enable verbose output | - | `true` |
+| `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
+
+**GitHub Configuration:**
+| Option | Description | Env Variable |
+|--------|-------------|--------------|
+| `--github-token <token>` | GitHub personal access token | `MM_GITHUB_TOKEN` |
+| `--github-repo-owner <owner>` | GitHub repository owner | `MM_GITHUB_REPO_OWNER` |
+| `--github-repo-name <name>` | GitHub repository name | `MM_GITHUB_REPO_NAME` |
+
+**Azure DevOps Configuration:**
+| Option | Description | Env Variable |
+|--------|-------------|--------------|
+| `--azure-token <token>` | Azure DevOps PAT | `MM_AZURE_TOKEN` |
+| `--azure-org <org>` | Azure DevOps organization | `MM_AZURE_ORG` |
+| `--azure-project <project>` | Azure DevOps project | `MM_AZURE_PROJECT` |
+| `--azure-repo <repo>` | Azure DevOps repository | `MM_AZURE_REPO` |
+
+**AI Provider Configuration:**
+| Option | Description | Env Variable |
+|--------|-------------|--------------|
+| `--copilot-model <model>` | Copilot model name | `MM_COPILOT_MODEL` |
+| `--copilot-timeout <ms>` | Copilot timeout in ms | `MM_COPILOT_TIMEOUT` |
+| `--opencode-model <model>` | OpenCode model name | `MM_OPENCODE_MODEL` |
+| `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
+| `--cursor-model <model>` | Cursor model name | `MM_CURSOR_MODEL` |
+| `--cursor-timeout <ms>` | Cursor timeout in ms | `MM_CURSOR_TIMEOUT` |
+
+**Comment Filtering:**
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--min-comment-confidence <level>` | Minimum confidence (high, medium, low) | `MM_MIN_COMMENT_CONFIDENCE` | `high` |
+| `--skip-existing-issues <bool>` | Skip pre-existing issues (true/false) | `MM_SKIP_EXISTING_ISSUES` | `true` |
+| `--post-resolution-comments <bool>` | Post resolution comments (true/false) | `MM_POST_RESOLUTION_COMMENTS` | `true` |
+| `--comment-identifier <id>` | Bot comment identifier | `MM_COMMENT_IDENTIFIER` | `[merge-mentor]` |
+
+**Note:** Command-line parameters always override environment variables.
 
 ## Key Features Explained
 
@@ -311,7 +407,9 @@ merge-mentor review --pr 123 --verbose false
 Only high-confidence issues are posted by default to reduce noise:
 
 ```bash
-export MIN_COMMENT_CONFIDENCE=high  # high (default), medium, or low
+export MM_MIN_COMMENT_CONFIDENCE=high  # high (default), medium, or low
+# Or use CLI parameter:
+merge-mentor review --pr 123 --min-comment-confidence medium
 ```
 
 ### Pre-Existing Issue Detection
@@ -319,7 +417,9 @@ export MIN_COMMENT_CONFIDENCE=high  # high (default), medium, or low
 Skips issues that existed before the PR:
 
 ```bash
-export SKIP_PREEXISTING_ISSUES=true  # default
+export MM_SKIP_EXISTING_ISSUES=true  # default
+# Or use CLI parameter:
+merge-mentor review --pr 123 --skip-existing-issues true
 ```
 
 ### Auto-Resolution with Explanations
@@ -327,7 +427,9 @@ export SKIP_PREEXISTING_ISSUES=true  # default
 When code is fixed, the bot resolves comments with an explanation:
 
 ```bash
-export POST_RESOLUTION_COMMENTS=true  # default
+export MM_POST_RESOLUTION_COMMENTS=true  # default
+# Or use CLI parameter:
+merge-mentor review --pr 123 --post-resolution-comments true
 ```
 
 ### Multi-Run Mode

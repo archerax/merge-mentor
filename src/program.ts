@@ -18,6 +18,28 @@ export interface ReviewOptions {
   write: boolean;
   verbose: boolean;
   runs?: number;
+  // GitHub config
+  githubToken?: string;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  // Azure config
+  azureToken?: string;
+  azureOrg?: string;
+  azureProject?: string;
+  azureRepo?: string;
+  // Bot config
+  commentIdentifier?: string;
+  // AI provider config
+  copilotModel?: string;
+  copilotTimeout?: number;
+  opencodeModel?: string;
+  opencodeTimeout?: number;
+  cursorModel?: string;
+  cursorTimeout?: number;
+  // Comment filtering
+  minCommentConfidence?: string;
+  skipExistingIssues?: string;
+  postResolutionComments?: string;
 }
 
 export interface ReviewExecutionResult {
@@ -41,7 +63,28 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     "Review command initiated"
   );
 
-  const config = loadConfig();
+  const config = loadConfig({
+    platform: options.platform,
+    githubToken: options.githubToken,
+    githubRepoOwner: options.githubRepoOwner,
+    githubRepoName: options.githubRepoName,
+    azureToken: options.azureToken,
+    azureOrg: options.azureOrg,
+    azureProject: options.azureProject,
+    azureRepo: options.azureRepo,
+    commentIdentifier: options.commentIdentifier,
+    aiProvider: options.provider,
+    copilotModel: options.copilotModel,
+    copilotTimeout: options.copilotTimeout,
+    opencodeModel: options.opencodeModel,
+    opencodeTimeout: options.opencodeTimeout,
+    cursorModel: options.cursorModel,
+    cursorTimeout: options.cursorTimeout,
+    minCommentConfidence: options.minCommentConfidence,
+    skipExistingIssues: options.skipExistingIssues,
+    postResolutionComments: options.postResolutionComments,
+    reviewRuns: options.runs,
+  });
   const platform = (options.platform || config.defaultPlatform) as Platform;
 
   if (!["github", "azure"].includes(platform)) {
@@ -374,13 +417,13 @@ program
   .command("review")
   .description("Review a pull request")
   .requiredOption("--pr <number>", "Pull request number", parseInt)
-  .option("--platform <platform>", "Platform (github or azure)", "github")
-  .option("--provider <provider>", "AI provider (copilot, opencode, or cursor)")
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
+  .option("--provider <provider>", "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER")
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
   .option(
     "--runs <number>",
-    "Number of review runs (1-5). Multiple runs aggregate findings for thoroughness.",
+    "Number of review runs (1-5). Env: MM_REVIEW_RUNS",
     (value) => {
       const parsed = Number.parseInt(value, 10);
       if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
@@ -389,9 +432,52 @@ program
       return parsed;
     }
   )
+  // GitHub options
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  // Azure options
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  // Bot config
+  .option("--comment-identifier <id>", "Bot comment identifier. Env: MM_COMMENT_IDENTIFIER")
+  // AI provider config
+  .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
+  .option("--copilot-timeout <ms>", "Copilot timeout in ms. Env: MM_COPILOT_TIMEOUT", parseInt)
+  .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
+  .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
+  .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
+  .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
+  // Comment filtering
+  .option("--min-comment-confidence <level>", "Minimum confidence (high, medium, low). Env: MM_MIN_COMMENT_CONFIDENCE")
+  .option("--skip-existing-issues <bool>", "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES")
+  .option("--post-resolution-comments <bool>", "Post resolution comments (true/false). Env: MM_POST_RESOLUTION_COMMENTS")
   .action(async (options: ReviewOptions) => {
     try {
-      const config = loadConfig();
+      const config = loadConfig({
+        platform: options.platform,
+        githubToken: options.githubToken,
+        githubRepoOwner: options.githubRepoOwner,
+        githubRepoName: options.githubRepoName,
+        azureToken: options.azureToken,
+        azureOrg: options.azureOrg,
+        azureProject: options.azureProject,
+        azureRepo: options.azureRepo,
+        commentIdentifier: options.commentIdentifier,
+        aiProvider: options.provider,
+        copilotModel: options.copilotModel,
+        copilotTimeout: options.copilotTimeout,
+        opencodeModel: options.opencodeModel,
+        opencodeTimeout: options.opencodeTimeout,
+        cursorModel: options.cursorModel,
+        cursorTimeout: options.cursorTimeout,
+        minCommentConfidence: options.minCommentConfidence,
+        skipExistingIssues: options.skipExistingIssues,
+        postResolutionComments: options.postResolutionComments,
+        reviewRuns: options.runs,
+      });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
 
       const { result, adapter, platform } = await executeReview(options);
