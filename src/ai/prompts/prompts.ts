@@ -77,31 +77,29 @@ PRE-EXISTING ISSUE DETECTION:
 CRITICAL LINE NUMBER INSTRUCTIONS - READ CAREFULLY:
 The "line" field MUST be the absolute line number in the NEW version of the file (after changes are applied).
 
-HOW TO CALCULATE LINE NUMBERS FROM GIT DIFFS:
-1. Find the @@ hunk header for the section containing your issue
-   - Format: @@ -oldStart,oldCount +newStart,newCount @@
-   - The +newStart is the starting line number in the NEW file
-   - Example: @@ -80,5 +155,7 @@ means the new section starts at line 155
+The diffs have PRE-CALCULATED LINE NUMBERS for easy reference.
 
-2. Count lines from +newStart:
-   - Lines starting with " " (space/context): count and increment line number
-   - Lines starting with "+": count and increment line number (these are ADDED lines)
-   - Lines starting with "-": DO NOT count (these are removed from old version)
+DIFF FORMAT:
+Each line shows: [PREFIX][LINE_NUMBER] | [CONTENT]
+- PREFIX is: " " (context), "+" (added), or "-" (removed)
+- LINE_NUMBER is the line number in the NEW file (or "-" for removed lines)
 
-3. CONCRETE EXAMPLE:
-   @@ -80,5 +155,7 @@ .footer {
-     text-align: center;        ← Line 155 (context, has space prefix)
-   }                           ← Line 156 (context)
-   
-  -.logo {                     ← NOT COUNTED (removed, has - prefix)
-  -  animation: logo-spin;     ← NOT COUNTED (removed)
-  +.logo-fixed {               ← Line 157 (added, has + prefix)
-  +  animation: broken-spin;   ← Line 158 (added, has + prefix) ← USE THIS LINE NUMBER!
-   }                           ← Line 159 (context)
+EXAMPLE:
+@@ -80,5 +155,7 @@ .footer {
+    155 | text-align: center;      ← Context line at line 155
+    156 | }                        ← Context line at line 156
+    157 |                          ← Empty context line at line 157
+-     - | .logo {                   ← Removed line (no line number)
+-     - |   animation: logo-spin;   ← Removed line (no line number)
++   158 | .logo-fixed {             ← ADDED at line 158 - USE THIS NUMBER!
++   159 |   animation: broken-spin; ← ADDED at line 159
+    160 | }                        ← Context line at line 160
 
-4. If you find an issue in "animation: broken-spin" above, report line 158, NOT line 83 or any other number
-
-VERIFICATION: Your line number should be >= +newStart from the hunk header containing your finding.
+HOW TO USE:
+- Read the line number directly from the diff - no counting needed!
+- For "animation: broken-spin" above, report line 159
+- Only lines with "+" prefix are newly added code
+- Lines with "-" prefix were removed and cannot be commented on
 ${
   existingCommentsContext
     ? `
@@ -309,31 +307,29 @@ PRE-EXISTING ISSUE DETECTION:
 CRITICAL LINE NUMBER INSTRUCTIONS - READ CAREFULLY:
 The "line" field MUST be the absolute line number in the NEW version of the file (after changes are applied).
 
-HOW TO CALCULATE LINE NUMBERS FROM GIT DIFFS:
-1. Find the @@ hunk header for the section containing your issue
-   - Format: @@ -oldStart,oldCount +newStart,newCount @@
-   - The +newStart is the starting line number in the NEW file
-   - Example: @@ -80,5 +155,7 @@ means the new section starts at line 155
+The diffs have PRE-CALCULATED LINE NUMBERS for easy reference.
 
-2. Count lines from +newStart:
-   - Lines starting with " " (space/context): count and increment line number
-   - Lines starting with "+": count and increment line number (these are ADDED lines)
-   - Lines starting with "-": DO NOT count (these are removed from old version)
+DIFF FORMAT:
+Each line shows: [PREFIX][LINE_NUMBER] | [CONTENT]
+- PREFIX is: " " (context), "+" (added), or "-" (removed)
+- LINE_NUMBER is the line number in the NEW file (or "-" for removed lines)
 
-3. CONCRETE EXAMPLE:
-   @@ -80,5 +155,7 @@ .footer {
-     text-align: center;        ← Line 155 (context, has space prefix)
-   }                           ← Line 156 (context)
-   
-  -.logo {                     ← NOT COUNTED (removed, has - prefix)
-  -  animation: logo-spin;     ← NOT COUNTED (removed)
-  +.logo-fixed {               ← Line 157 (added, has + prefix)
-  +  animation: broken-spin;   ← Line 158 (added, has + prefix) ← USE THIS LINE NUMBER!
-   }                           ← Line 159 (context)
+EXAMPLE:
+@@ -80,5 +155,7 @@ .footer {
+    155 | text-align: center;      ← Context line at line 155
+    156 | }                        ← Context line at line 156
+    157 |                          ← Empty context line at line 157
+-     - | .logo {                   ← Removed line (no line number)
+-     - |   animation: logo-spin;   ← Removed line (no line number)
++   158 | .logo-fixed {             ← ADDED at line 158 - USE THIS NUMBER!
++   159 |   animation: broken-spin; ← ADDED at line 159
+    160 | }                        ← Context line at line 160
 
-4. If you find an issue in "animation: broken-spin" above, report line 158, NOT line 83 or any other number
-
-VERIFICATION: Your line number should be >= +newStart from the hunk header containing your finding.
+HOW TO USE:
+- Read the line number directly from the diff - no counting needed!
+- For "animation: broken-spin" above, report line 159
+- Only lines with "+" prefix are newly added code
+- Lines with "-" prefix were removed and cannot be commented on
 ${
   existingCommentsContext
     ? `

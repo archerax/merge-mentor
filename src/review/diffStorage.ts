@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createChildLogger } from "../logger.js";
 import type { PRFile } from "../platforms/types.js";
+import { convertToNumberedDiff } from "../utils/diffFormatter.js";
 
 /** Entry for a single file in the diff manifest. */
 export interface DiffFileEntry {
@@ -119,8 +120,9 @@ export class DiffStorage {
         await fs.mkdir(parentDir, { recursive: true });
       }
 
-      // Write the diff content
-      await fs.writeFile(fullPath, file.patch, "utf-8");
+      // Write the diff content with pre-calculated line numbers
+      const numberedDiff = convertToNumberedDiff(file.patch);
+      await fs.writeFile(fullPath, numberedDiff, "utf-8");
 
       entries.push({
         filename: file.filename,

@@ -6,6 +6,7 @@ import type {
 import * as Diff from "diff";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
+import { DIFF_CONTEXT_LINES } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
@@ -380,14 +381,15 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         "Fetched file contents for diff generation"
       );
 
-      // Generate unified diff using the diff library
+      // Generate unified diff using the diff library with extended context
       const structuredDiff = Diff.structuredPatch(
         filePath,
         filePath,
         baseContent,
         targetContent,
         "",
-        ""
+        "",
+        { context: DIFF_CONTEXT_LINES }
       );
 
       // Format as git-style unified diff

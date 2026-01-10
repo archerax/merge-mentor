@@ -48,16 +48,17 @@ describe("AI Prompts", () => {
       expect(prompt).toContain('"suggestion"');
     });
 
-    it("should include explicit line number calculation instructions", () => {
+    it("should include explicit line number instructions for pre-calculated format", () => {
       const prompt = buildFileReviewPrompt("test.ts", "diff");
 
       expect(prompt).toContain("CRITICAL LINE NUMBER INSTRUCTIONS");
-      expect(prompt).toContain("HOW TO CALCULATE LINE NUMBERS FROM GIT DIFFS");
-      expect(prompt).toContain("+newStart is the starting line number");
-      expect(prompt).toContain("CONCRETE EXAMPLE");
+      expect(prompt).toContain("PRE-CALCULATED LINE NUMBERS");
+      expect(prompt).toContain("DIFF FORMAT");
+      expect(prompt).toContain("[PREFIX][LINE_NUMBER] | [CONTENT]");
+      expect(prompt).toContain("EXAMPLE");
       expect(prompt).toContain("@@ -80,5 +155,7 @@");
-      expect(prompt).toContain("Line 158");
-      expect(prompt).toContain("VERIFICATION");
+      expect(prompt).toContain("line 159");
+      expect(prompt).toContain("Read the line number directly from the diff");
     });
   });
 
