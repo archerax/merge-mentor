@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Token usage tracking** - Captures and logs detailed token usage statistics from AI provider executions. When using GitHub Copilot CLI, the audit logs now include:
+  - Input tokens consumed
+  - Output tokens generated
+  - Cached tokens read (reduces costs)
+  - Premium API requests count
+  - Model used for the request
+  - API processing time
+  - Total wall-clock time
+  This data helps track AI costs, identify optimization opportunities, and monitor performance across review runs.
 - **MM_ environment variable prefix** - All environment variables now use the `MM_` prefix to avoid conflicts with other applications (e.g., `MM_GITHUB_TOKEN` instead of `GITHUB_TOKEN`). Old unprefixed variables are still supported for backward compatibility but are deprecated.
 - **Comprehensive CLI parameters** - Every environment variable now has a corresponding command-line parameter (e.g., `--github-token`, `--azure-token`, `--copilot-model`). CLI parameters always override environment variables.
 - **CLI parameter documentation** - All CLI help text now shows the corresponding environment variable name for each parameter.

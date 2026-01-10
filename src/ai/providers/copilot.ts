@@ -13,7 +13,7 @@ import type {
   FindingConfidence,
   ResolvedComment,
 } from "../../platforms/types.js";
-import type { AIProviderClient, AIProviderOptions, AIResponse } from "../types.js";
+import type { AIProviderClient, AIProviderOptions, AIResponse, TokenUsage } from "../types.js";
 
 /** Raw finding structure from Copilot JSON response. */
 interface RawFileFinding {
@@ -107,15 +107,31 @@ export class CopilotProvider implements AIProviderClient {
           if (prompt.length > PROMPT_LENGTH_THRESHOLD) {
             tempFile = await this.createTempPromptFile(prompt);
             const shortPrompt = `Please follow the instructions in @${path.basename(tempFile)}`;
-            const raw = await this.runCli(shortPrompt, tempFile);
-            const parsed = this.parseJsonResponse(raw);
-            this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
-            return { raw, parsed };
+            const { stdout, stderr } = await this.runCli(shortPrompt, tempFile);
+            const parsed = this.parseJsonResponse(stdout);
+            const tokenUsage = this.parseTokenUsage(stderr);
+            this.auditLogger.logAIProviderExecution(
+              "copilot",
+              promptType,
+              this.model,
+              "success",
+              undefined,
+              tokenUsage
+            );
+            return { raw: stdout, parsed, tokenUsage };
           } else {
-            const raw = await this.runCli(prompt);
-            const parsed = this.parseJsonResponse(raw);
-            this.auditLogger.logAIProviderExecution("copilot", promptType, this.model, "success");
-            return { raw, parsed };
+            const { stdout, stderr } = await this.runCli(prompt);
+            const parsed = this.parseJsonResponse(stdout);
+            const tokenUsage = this.parseTokenUsage(stderr);
+            this.auditLogger.logAIProviderExecution(
+              "copilot",
+              promptType,
+              this.model,
+              "success",
+              undefined,
+              tokenUsage
+            );
+            return { raw: stdout, parsed, tokenUsage };
           }
         } catch (error) {
           lastError = error as Error;
@@ -166,7 +182,10 @@ export class CopilotProvider implements AIProviderClient {
     }
   }
 
-  private runCli(prompt: string, tempFilePath?: string): Promise<string> {
+  private runCli(
+    prompt: string,
+    tempFilePath?: string
+  ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
@@ -206,7 +225,7 @@ export class CopilotProvider implements AIProviderClient {
         const stderr = Buffer.concat(errorChunks).toString("utf-8");
 
         if (code === 0) {
-          resolve(stdout);
+          resolve({ stdout, stderr });
         } else if (code === null) {
           reject(
             new CopilotCliError(
@@ -258,6 +277,101 @@ export class CopilotProvider implements AIProviderClient {
       );
       throw new JsonParseError((error as Error).message, raw);
     }
+  }
+
+  /**
+   * Parses token usage statistics from Copilot CLI stderr output.
+   *
+   * Example output:
+   * ```
+   * Total usage est:       0 Premium requests
+   * Total duration (API):  21s
+   * Total duration (wall): 26s
+   * Usage by model:
+   *     gpt-5-mini           33.0k input, 773 output, 22.0k cache read (Est. 0 Premium requests)
+   * ```
+   *
+   * @param stderr - Stderr output from Copilot CLI
+   * @returns Parsed token usage statistics, or undefined if not found
+   */
+  private parseTokenUsage(stderr: string): TokenUsage | undefined {
+    if (!stderr || stderr.trim().length === 0) {
+      return undefined;
+    }
+
+    try {
+      let premiumRequests: number | undefined;
+      let durationApiSeconds: number | undefined;
+      let durationWallSeconds: number | undefined;
+      let model: string | undefined;
+      let inputTokens: number | undefined;
+      let outputTokens: number | undefined;
+      let cachedTokens: number | undefined;
+
+      // Parse premium requests: "Total usage est:       0 Premium requests"
+      const premiumMatch = stderr.match(/Total usage est:\s+(\d+)\s+Premium requests/);
+      if (premiumMatch) {
+        premiumRequests = Number.parseInt(premiumMatch[1], 10);
+      }
+
+      // Parse API duration: "Total duration (API):  21s"
+      const apiDurationMatch = stderr.match(/Total duration \(API\):\s+(\d+)s/);
+      if (apiDurationMatch) {
+        durationApiSeconds = Number.parseInt(apiDurationMatch[1], 10);
+      }
+
+      // Parse wall duration: "Total duration (wall): 26s"
+      const wallDurationMatch = stderr.match(/Total duration \(wall\):\s+(\d+)s/);
+      if (wallDurationMatch) {
+        durationWallSeconds = Number.parseInt(wallDurationMatch[1], 10);
+      }
+
+      // Parse usage by model: "gpt-5-mini           33.0k input, 773 output, 22.0k cache read"
+      const usageMatch = stderr.match(
+        /^\s+([a-z0-9-]+)\s+([\d.]+[kKmM]?)\s+input,\s+(\d+)\s+output(?:,\s+([\d.]+[kKmM]?)\s+cache read)?/m
+      );
+      if (usageMatch) {
+        model = usageMatch[1];
+        inputTokens = this.parseTokenCount(usageMatch[2]);
+        outputTokens = Number.parseInt(usageMatch[3], 10);
+        if (usageMatch[4]) {
+          cachedTokens = this.parseTokenCount(usageMatch[4]);
+        }
+      }
+
+      // Return undefined if no usage data was found
+      if (inputTokens === undefined && outputTokens === undefined) {
+        return undefined;
+      }
+
+      // Return TokenUsage object with all parsed data
+      return {
+        inputTokens: inputTokens ?? 0,
+        outputTokens: outputTokens ?? 0,
+        cachedTokens,
+        premiumRequests,
+        model,
+        durationApiSeconds,
+        durationWallSeconds,
+      };
+    } catch (error) {
+      this.logger.warn({ error: (error as Error).message, stderr }, "Failed to parse token usage");
+      return undefined;
+    }
+  }
+
+  /**
+   * Parses token count strings like "33.0k" or "22.0k" into numbers.
+   */
+  private parseTokenCount(value: string): number {
+    const num = Number.parseFloat(value);
+    if (value.toLowerCase().includes("k")) {
+      return Math.round(num * 1000);
+    }
+    if (value.toLowerCase().includes("m")) {
+      return Math.round(num * 1000000);
+    }
+    return Math.round(num);
   }
 
   private delay(ms: number): Promise<void> {

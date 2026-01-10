@@ -111,6 +111,74 @@ describe("AuditLogger", () => {
     });
   });
 
+  describe("logAIProviderExecution", () => {
+    it("logs AI provider execution with token usage", () => {
+      const logger = new AuditLogger();
+      const logEventSpy = vi.spyOn(logger, "logEvent");
+
+      const tokenUsage = {
+        inputTokens: 33000,
+        outputTokens: 773,
+        cachedTokens: 22000,
+        premiumRequests: 0,
+        model: "gpt-5-mini",
+        durationApiSeconds: 21,
+        durationWallSeconds: 26,
+      };
+
+      logger.logAIProviderExecution(
+        "copilot",
+        "file-review",
+        "gpt-5-mini",
+        "success",
+        undefined,
+        tokenUsage
+      );
+
+      expect(logEventSpy).toHaveBeenCalledWith(
+        "ai.provider.execute",
+        {
+          type: "copilot",
+          id: "copilot:file-review",
+          details: { provider: "copilot", model: "gpt-5-mini" },
+        },
+        "Execute copilot prompt: file-review",
+        "success",
+        {
+          provider: "copilot",
+          promptType: "file-review",
+          model: "gpt-5-mini",
+          tokenUsage,
+        },
+        undefined
+      );
+    });
+
+    it("logs AI provider execution without token usage", () => {
+      const logger = new AuditLogger();
+      const logEventSpy = vi.spyOn(logger, "logEvent");
+
+      logger.logAIProviderExecution("opencode", "cross-file-review", "model-x", "success");
+
+      expect(logEventSpy).toHaveBeenCalledWith(
+        "ai.provider.execute",
+        {
+          type: "copilot",
+          id: "opencode:cross-file-review",
+          details: { provider: "opencode", model: "model-x" },
+        },
+        "Execute opencode prompt: cross-file-review",
+        "success",
+        {
+          provider: "opencode",
+          promptType: "cross-file-review",
+          model: "model-x",
+        },
+        undefined
+      );
+    });
+  });
+
   describe("logReviewComplete", () => {
     it("logs successful review with stats", () => {
       const logger = new AuditLogger();

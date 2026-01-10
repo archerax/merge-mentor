@@ -24,7 +24,7 @@ function cleanEnv(): void {
   delete process.env.OPENCODE_TIMEOUT_MS;
   delete process.env.CURSOR_MODEL;
   delete process.env.CURSOR_TIMEOUT_MS;
-  
+
   // New MM_ prefixed names
   delete process.env.MM_PLATFORM;
   delete process.env.MM_GITHUB_TOKEN;

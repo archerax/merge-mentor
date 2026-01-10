@@ -539,9 +539,7 @@ describe("AzureDevOpsAdapter", () => {
       expect(result).toHaveLength(100);
 
       // Should have made 2 pagination calls (first page + second empty page)
-      const paginationCalls = mockFetch.mock.calls.filter((call) =>
-        call[0].includes("/changes?")
-      );
+      const paginationCalls = mockFetch.mock.calls.filter((call) => call[0].includes("/changes?"));
       expect(paginationCalls).toHaveLength(2);
     });
   });

@@ -340,4 +340,115 @@ describe("CopilotProvider", () => {
       expect(result.findings[0].category).toBe("design");
     });
   });
+
+  describe("parseTokenUsage", () => {
+    it("parses complete token usage stats from stderr", async () => {
+      const provider = createCopilotProvider();
+      const mockResponse = { findings: [] };
+      const stderr = `Total usage est:       0 Premium requests
+Total duration (API):  21s
+Total duration (wall): 26s
+Total code changes:    0 lines added, 0 lines removed
+Usage by model:
+    gpt-5-mini           33.0k input, 773 output, 22.0k cache read (Est. 0 Premium requests)`;
+
+      const mockProcess = createMockProcess({
+        stdout: JSON.stringify(mockResponse),
+        stderr,
+        exitCode: 0,
+      });
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const promise = provider.executePrompt("test prompt");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.tokenUsage).toEqual({
+        inputTokens: 33000,
+        outputTokens: 773,
+        cachedTokens: 22000,
+        premiumRequests: 0,
+        model: "gpt-5-mini",
+        durationApiSeconds: 21,
+        durationWallSeconds: 26,
+      });
+    });
+
+    it("parses token usage without cache reads", async () => {
+      const provider = createCopilotProvider();
+      const mockResponse = { findings: [] };
+      const stderr = `Total usage est:       5 Premium requests
+Total duration (API):  15s
+Total duration (wall): 18s
+Usage by model:
+    gpt-5                120.5k input, 1500 output (Est. 5 Premium requests)`;
+
+      const mockProcess = createMockProcess({
+        stdout: JSON.stringify(mockResponse),
+        stderr,
+        exitCode: 0,
+      });
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const promise = provider.executePrompt("test prompt");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.tokenUsage).toEqual({
+        inputTokens: 120500,
+        outputTokens: 1500,
+        cachedTokens: undefined,
+        premiumRequests: 5,
+        model: "gpt-5",
+        durationApiSeconds: 15,
+        durationWallSeconds: 18,
+      });
+    });
+
+    it("returns undefined when stderr has no token usage", async () => {
+      const provider = createCopilotProvider();
+      const mockResponse = { findings: [] };
+
+      const mockProcess = createMockProcess({
+        stdout: JSON.stringify(mockResponse),
+        stderr: "",
+        exitCode: 0,
+      });
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const promise = provider.executePrompt("test prompt");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.tokenUsage).toBeUndefined();
+    });
+
+    it("parses partial token usage data", async () => {
+      const provider = createCopilotProvider();
+      const mockResponse = { findings: [] };
+      const stderr = `Usage by model:
+    claude-opus          50k input, 200 output`;
+
+      const mockProcess = createMockProcess({
+        stdout: JSON.stringify(mockResponse),
+        stderr,
+        exitCode: 0,
+      });
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const promise = provider.executePrompt("test prompt");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.tokenUsage).toEqual({
+        inputTokens: 50000,
+        outputTokens: 200,
+        cachedTokens: undefined,
+        premiumRequests: undefined,
+        model: "claude-opus",
+        durationApiSeconds: undefined,
+        durationWallSeconds: undefined,
+      });
+    });
+  });
 });

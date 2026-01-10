@@ -263,14 +263,29 @@ export class AuditLogger {
     promptType: string,
     model?: string,
     result: "success" | "failure" = "success",
-    error?: string
+    error?: string,
+    tokenUsage?: {
+      inputTokens: number;
+      outputTokens: number;
+      cachedTokens?: number;
+      premiumRequests?: number;
+      model?: string;
+      durationApiSeconds?: number;
+      durationWallSeconds?: number;
+    }
   ): void {
+    const metadata: Record<string, unknown> = { provider, promptType, model };
+
+    if (tokenUsage) {
+      metadata.tokenUsage = tokenUsage;
+    }
+
     this.logEvent(
       "ai.provider.execute",
       { type: "copilot", id: `${provider}:${promptType}`, details: { provider, model } },
       `Execute ${provider} prompt: ${promptType}`,
       result,
-      { provider, promptType, model },
+      metadata,
       error
     );
   }

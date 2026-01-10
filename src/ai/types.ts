@@ -3,10 +3,22 @@ import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types
 /** Supported AI provider types. */
 export type AIProviderType = "copilot" | "opencode" | "cursor";
 
+/** Token usage statistics from AI provider execution. */
+export interface TokenUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cachedTokens?: number;
+  readonly premiumRequests?: number;
+  readonly model?: string;
+  readonly durationApiSeconds?: number;
+  readonly durationWallSeconds?: number;
+}
+
 /** Response from executing an AI prompt. */
 export interface AIResponse {
   readonly raw: string;
   readonly parsed: unknown;
+  readonly tokenUsage?: TokenUsage;
 }
 
 /** Options for configuring AI providers. */

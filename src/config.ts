@@ -73,10 +73,10 @@ function getEnvWithPrefix(key: string): string | undefined {
     OPENCODE_TIMEOUT: "OPENCODE_TIMEOUT_MS",
     CURSOR_TIMEOUT: "CURSOR_TIMEOUT_MS",
   };
-  
+
   const newKey = `MM_${key}`;
   const oldKey = oldKeyMapping[key] ?? key;
-  
+
   return process.env[newKey] ?? process.env[oldKey];
 }
 
@@ -93,15 +93,27 @@ function getEnvWithPrefix(key: string): string | undefined {
  * ```
  */
 export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
-  const copilotTimeoutMs = cliOverrides?.copilotTimeout ?? getEnvWithPrefix("COPILOT_TIMEOUT")
-    ? Number.parseInt(cliOverrides?.copilotTimeout?.toString() ?? getEnvWithPrefix("COPILOT_TIMEOUT")!, 10)
-    : undefined;
-  const opencodeTimeoutMs = cliOverrides?.opencodeTimeout ?? getEnvWithPrefix("OPENCODE_TIMEOUT")
-    ? Number.parseInt(cliOverrides?.opencodeTimeout?.toString() ?? getEnvWithPrefix("OPENCODE_TIMEOUT")!, 10)
-    : undefined;
-  const cursorTimeoutMs = cliOverrides?.cursorTimeout ?? getEnvWithPrefix("CURSOR_TIMEOUT")
-    ? Number.parseInt(cliOverrides?.cursorTimeout?.toString() ?? getEnvWithPrefix("CURSOR_TIMEOUT")!, 10)
-    : undefined;
+  const copilotTimeoutMs =
+    (cliOverrides?.copilotTimeout ?? getEnvWithPrefix("COPILOT_TIMEOUT"))
+      ? Number.parseInt(
+          cliOverrides?.copilotTimeout?.toString() ?? getEnvWithPrefix("COPILOT_TIMEOUT")!,
+          10
+        )
+      : undefined;
+  const opencodeTimeoutMs =
+    (cliOverrides?.opencodeTimeout ?? getEnvWithPrefix("OPENCODE_TIMEOUT"))
+      ? Number.parseInt(
+          cliOverrides?.opencodeTimeout?.toString() ?? getEnvWithPrefix("OPENCODE_TIMEOUT")!,
+          10
+        )
+      : undefined;
+  const cursorTimeoutMs =
+    (cliOverrides?.cursorTimeout ?? getEnvWithPrefix("CURSOR_TIMEOUT"))
+      ? Number.parseInt(
+          cliOverrides?.cursorTimeout?.toString() ?? getEnvWithPrefix("CURSOR_TIMEOUT")!,
+          10
+        )
+      : undefined;
 
   const minConfidence = validateMinConfidence(
     cliOverrides?.minCommentConfidence ?? getEnvWithPrefix("MIN_COMMENT_CONFIDENCE")
@@ -114,7 +126,8 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
   );
 
   return {
-    defaultPlatform: ((cliOverrides?.platform ?? getEnvWithPrefix("PLATFORM")) as Platform) || "github",
+    defaultPlatform:
+      ((cliOverrides?.platform ?? getEnvWithPrefix("PLATFORM")) as Platform) || "github",
     github: {
       token: cliOverrides?.githubToken ?? getEnvWithPrefix("GITHUB_TOKEN") ?? "",
       owner: cliOverrides?.githubRepoOwner ?? getEnvWithPrefix("GITHUB_REPO_OWNER") ?? "",
@@ -126,7 +139,8 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
       project: cliOverrides?.azureProject ?? getEnvWithPrefix("AZURE_PROJECT") ?? "",
       repo: cliOverrides?.azureRepo ?? getEnvWithPrefix("AZURE_REPO") ?? "",
     },
-    botCommentIdentifier: cliOverrides?.commentIdentifier ?? getEnvWithPrefix("COMMENT_IDENTIFIER") ?? "[merge-mentor]",
+    botCommentIdentifier:
+      cliOverrides?.commentIdentifier ?? getEnvWithPrefix("COMMENT_IDENTIFIER") ?? "[merge-mentor]",
     aiProvider,
     copilotModel: cliOverrides?.copilotModel ?? getEnvWithPrefix("COPILOT_MODEL"),
     copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
@@ -136,8 +150,11 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
     commentFilter: {
       minConfidence,
-      skipPreExisting: (cliOverrides?.skipExistingIssues ?? getEnvWithPrefix("SKIP_EXISTING_ISSUES")) !== "false",
-      postResolutionComments: (cliOverrides?.postResolutionComments ?? getEnvWithPrefix("POST_RESOLUTION_COMMENTS")) !== "false",
+      skipPreExisting:
+        (cliOverrides?.skipExistingIssues ?? getEnvWithPrefix("SKIP_EXISTING_ISSUES")) !== "false",
+      postResolutionComments:
+        (cliOverrides?.postResolutionComments ?? getEnvWithPrefix("POST_RESOLUTION_COMMENTS")) !==
+        "false",
     },
     reviewRuns,
   };
@@ -210,26 +227,47 @@ function validateAIProvider(value: string | undefined): AIProviderType {
 export function validateConfig(config: Config, platform: Platform): void {
   if (platform === "github") {
     if (!config.github.token) {
-      throw new ConfigurationError("MM_GITHUB_TOKEN", "Required for GitHub platform. Set via MM_GITHUB_TOKEN env var or --github-token CLI flag.");
+      throw new ConfigurationError(
+        "MM_GITHUB_TOKEN",
+        "Required for GitHub platform. Set via MM_GITHUB_TOKEN env var or --github-token CLI flag."
+      );
     }
     if (!config.github.owner) {
-      throw new ConfigurationError("MM_GITHUB_REPO_OWNER", "Required for GitHub platform. Set via MM_GITHUB_REPO_OWNER env var or --github-repo-owner CLI flag.");
+      throw new ConfigurationError(
+        "MM_GITHUB_REPO_OWNER",
+        "Required for GitHub platform. Set via MM_GITHUB_REPO_OWNER env var or --github-repo-owner CLI flag."
+      );
     }
     if (!config.github.repo) {
-      throw new ConfigurationError("MM_GITHUB_REPO_NAME", "Required for GitHub platform. Set via MM_GITHUB_REPO_NAME env var or --github-repo-name CLI flag.");
+      throw new ConfigurationError(
+        "MM_GITHUB_REPO_NAME",
+        "Required for GitHub platform. Set via MM_GITHUB_REPO_NAME env var or --github-repo-name CLI flag."
+      );
     }
   } else if (platform === "azure") {
     if (!config.azure.token) {
-      throw new ConfigurationError("MM_AZURE_TOKEN", "Required for Azure DevOps platform. Set via MM_AZURE_TOKEN env var or --azure-token CLI flag.");
+      throw new ConfigurationError(
+        "MM_AZURE_TOKEN",
+        "Required for Azure DevOps platform. Set via MM_AZURE_TOKEN env var or --azure-token CLI flag."
+      );
     }
     if (!config.azure.org) {
-      throw new ConfigurationError("MM_AZURE_ORG", "Required for Azure DevOps platform. Set via MM_AZURE_ORG env var or --azure-org CLI flag.");
+      throw new ConfigurationError(
+        "MM_AZURE_ORG",
+        "Required for Azure DevOps platform. Set via MM_AZURE_ORG env var or --azure-org CLI flag."
+      );
     }
     if (!config.azure.project) {
-      throw new ConfigurationError("MM_AZURE_PROJECT", "Required for Azure DevOps platform. Set via MM_AZURE_PROJECT env var or --azure-project CLI flag.");
+      throw new ConfigurationError(
+        "MM_AZURE_PROJECT",
+        "Required for Azure DevOps platform. Set via MM_AZURE_PROJECT env var or --azure-project CLI flag."
+      );
     }
     if (!config.azure.repo) {
-      throw new ConfigurationError("MM_AZURE_REPO", "Required for Azure DevOps platform. Set via MM_AZURE_REPO env var or --azure-repo CLI flag.");
+      throw new ConfigurationError(
+        "MM_AZURE_REPO",
+        "Required for Azure DevOps platform. Set via MM_AZURE_REPO env var or --azure-repo CLI flag."
+      );
     }
   }
 }

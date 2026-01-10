@@ -418,20 +418,19 @@ program
   .description("Review a pull request")
   .requiredOption("--pr <number>", "Pull request number", parseInt)
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
-  .option("--provider <provider>", "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER")
+  .option(
+    "--provider <provider>",
+    "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER"
+  )
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
-  .option(
-    "--runs <number>",
-    "Number of review runs (1-5). Env: MM_REVIEW_RUNS",
-    (value) => {
-      const parsed = Number.parseInt(value, 10);
-      if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
-        throw new Error("--runs must be a number between 1 and 5");
-      }
-      return parsed;
+  .option("--runs <number>", "Number of review runs (1-5). Env: MM_REVIEW_RUNS", (value) => {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
+      throw new Error("--runs must be a number between 1 and 5");
     }
-  )
+    return parsed;
+  })
   // GitHub options
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
@@ -451,9 +450,18 @@ program
   .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
   .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
   // Comment filtering
-  .option("--min-comment-confidence <level>", "Minimum confidence (high, medium, low). Env: MM_MIN_COMMENT_CONFIDENCE")
-  .option("--skip-existing-issues <bool>", "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES")
-  .option("--post-resolution-comments <bool>", "Post resolution comments (true/false). Env: MM_POST_RESOLUTION_COMMENTS")
+  .option(
+    "--min-comment-confidence <level>",
+    "Minimum confidence (high, medium, low). Env: MM_MIN_COMMENT_CONFIDENCE"
+  )
+  .option(
+    "--skip-existing-issues <bool>",
+    "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
+  )
+  .option(
+    "--post-resolution-comments <bool>",
+    "Post resolution comments (true/false). Env: MM_POST_RESOLUTION_COMMENTS"
+  )
   .action(async (options: ReviewOptions) => {
     try {
       const config = loadConfig({

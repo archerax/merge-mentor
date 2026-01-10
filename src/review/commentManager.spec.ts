@@ -366,9 +366,7 @@ describe("CommentManager", () => {
 
     it("should not resolve comments without path", () => {
       const manager = createCommentManager();
-      const existingComments: ExistingComment[] = [
-        { id: 1, body: "General comment" },
-      ];
+      const existingComments: ExistingComment[] = [{ id: 1, body: "General comment" }];
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult();
 

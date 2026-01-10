@@ -167,7 +167,16 @@ Comprehensive audit logging is implemented for security and compliance requireme
 - `comment.resolve` - Resolving comment threads
 
 **AI/LLM Operations**:
-- `copilot.execute` - Executing Copilot CLI prompts
+- `copilot.execute` - Executing Copilot CLI prompts (deprecated, use `ai.provider.execute`)
+- `ai.provider.execute` - Executing AI provider CLI prompts (supports Copilot, OpenCode, Cursor)
+  - Includes token usage statistics when available:
+    - `inputTokens`: Number of input tokens consumed
+    - `outputTokens`: Number of output tokens generated
+    - `cachedTokens`: Number of cached tokens read (optional)
+    - `premiumRequests`: Number of premium API requests (optional)
+    - `model`: Model used for the request
+    - `durationApiSeconds`: API processing time in seconds (optional)
+    - `durationWallSeconds`: Total wall-clock time in seconds (optional)
 
 **Review Lifecycle**:
 - `review.start` - Starting a PR review
