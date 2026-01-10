@@ -2,7 +2,20 @@ import { ConfigurationError } from "../errors/index.js";
 import { CopilotProvider } from "./providers/copilot.js";
 import { CursorProvider } from "./providers/cursor.js";
 import { OpenCodeProvider } from "./providers/opencode.js";
+import { OpenAIProvider, type OpenAIProviderOptions } from "./providers/openai.js";
 import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./types.js";
+
+/**
+ * Type guard to check if options contain OpenAI-specific properties.
+ */
+function isOpenAIOptions(options: unknown): options is OpenAIProviderOptions {
+  return (
+    typeof options === "object" &&
+    options !== null &&
+    "apiKey" in options &&
+    typeof (options as OpenAIProviderOptions).apiKey === "string"
+  );
+}
 
 /**
  * Creates an AI provider instance based on the specified type.
@@ -22,11 +35,14 @@ import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./type
  *
  * // Create a Cursor provider
  * const cursor = createAIProvider("cursor", { model: "gpt-5" });
+ *
+ * // Create an OpenAI provider (requires apiKey)
+ * const openai = createAIProvider("openai", { apiKey: "sk-...", model: "gpt-4o" });
  * ```
  */
 export function createAIProvider(
   type: AIProviderType,
-  options?: AIProviderOptions
+  options?: AIProviderOptions | OpenAIProviderOptions
 ): AIProviderClient {
   switch (type) {
     case "copilot":
@@ -35,10 +51,18 @@ export function createAIProvider(
       return new OpenCodeProvider(options);
     case "cursor":
       return new CursorProvider(options);
+    case "openai":
+      if (!isOpenAIOptions(options)) {
+        throw new ConfigurationError(
+          "OPENAI_API_KEY",
+          "OpenAI provider requires apiKey. Set via MM_OPENAI_API_KEY or OPENAI_API_KEY environment variable."
+        );
+      }
+      return new OpenAIProvider(options);
     default:
       throw new ConfigurationError(
         "AI_PROVIDER",
-        `Unsupported AI provider: ${type as string}. Valid options are: copilot, opencode, cursor`
+        `Unsupported AI provider: ${type as string}. Valid options are: copilot, opencode, cursor, openai`
       );
   }
 }

@@ -4,6 +4,9 @@ import {
   CopilotCliError,
   JsonParseError,
   MergeMentorError,
+  OpenAIAuthenticationError,
+  OpenAIProviderError,
+  OpenAIRateLimitError,
   PlatformApiError,
   ValidationError,
 } from "./index.js";
@@ -94,6 +97,69 @@ describe("Error Classes", () => {
       expect(error.message).toBe("Validation failed for email: Invalid email format");
       expect(error.name).toBe("ValidationError");
       expect(error.field).toBe("email");
+    });
+  });
+
+  describe("OpenAIProviderError", () => {
+    it("creates error with message only", () => {
+      const error = new OpenAIProviderError("API call failed");
+
+      expect(error.message).toBe("API call failed");
+      expect(error.name).toBe("OpenAIProviderError");
+      expect(error.statusCode).toBeUndefined();
+      expect(error.cause).toBeUndefined();
+    });
+
+    it("creates error with status code", () => {
+      const error = new OpenAIProviderError("Server error", 500);
+
+      expect(error.message).toBe("Server error");
+      expect(error.statusCode).toBe(500);
+    });
+
+    it("creates error with cause", () => {
+      const cause = new Error("Network failure");
+      const error = new OpenAIProviderError("API call failed", 503, cause);
+
+      expect(error.message).toBe("API call failed");
+      expect(error.statusCode).toBe(503);
+      expect(error.cause).toBe(cause);
+    });
+  });
+
+  describe("OpenAIAuthenticationError", () => {
+    it("creates error with default message", () => {
+      const error = new OpenAIAuthenticationError();
+
+      expect(error.message).toBe("OpenAI authentication failed");
+      expect(error.name).toBe("OpenAIAuthenticationError");
+      expect(error.statusCode).toBe(401);
+    });
+
+    it("creates error with custom message", () => {
+      const error = new OpenAIAuthenticationError("Invalid API key");
+
+      expect(error.message).toBe("Invalid API key");
+      expect(error.statusCode).toBe(401);
+    });
+  });
+
+  describe("OpenAIRateLimitError", () => {
+    it("creates error with default message", () => {
+      const error = new OpenAIRateLimitError();
+
+      expect(error.message).toBe("OpenAI rate limit exceeded");
+      expect(error.name).toBe("OpenAIRateLimitError");
+      expect(error.statusCode).toBe(429);
+      expect(error.retryAfter).toBeUndefined();
+    });
+
+    it("creates error with custom message and retry-after", () => {
+      const error = new OpenAIRateLimitError("Too many requests", 60);
+
+      expect(error.message).toBe("Too many requests");
+      expect(error.statusCode).toBe(429);
+      expect(error.retryAfter).toBe(60);
     });
   });
 });

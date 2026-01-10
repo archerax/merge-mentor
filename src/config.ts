@@ -50,6 +50,11 @@ export interface Config {
   readonly opencodeTimeoutMs?: number;
   readonly cursorModel?: string;
   readonly cursorTimeoutMs?: number;
+  readonly openaiApiKey?: string;
+  readonly openaiModel?: string;
+  readonly openaiTimeoutMs?: number;
+  readonly openaiBaseUrl?: string;
+  readonly openaiMaxRetries?: number;
   readonly commentFilter: CommentFilterConfig;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
@@ -72,6 +77,7 @@ function getEnvWithPrefix(key: string): string | undefined {
     COPILOT_TIMEOUT: "COPILOT_TIMEOUT_MS",
     OPENCODE_TIMEOUT: "OPENCODE_TIMEOUT_MS",
     CURSOR_TIMEOUT: "CURSOR_TIMEOUT_MS",
+    OPENAI_TIMEOUT: "OPENAI_TIMEOUT_MS",
   };
 
   const newKey = `MM_${key}`;
@@ -114,6 +120,20 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
           10
         )
       : undefined;
+  const openaiTimeoutMs =
+    (cliOverrides?.openaiTimeout ?? getEnvWithPrefix("OPENAI_TIMEOUT"))
+      ? Number.parseInt(
+          cliOverrides?.openaiTimeout?.toString() ?? getEnvWithPrefix("OPENAI_TIMEOUT")!,
+          10
+        )
+      : undefined;
+  const openaiMaxRetries =
+    (cliOverrides?.openaiMaxRetries ?? getEnvWithPrefix("OPENAI_MAX_RETRIES"))
+      ? Number.parseInt(
+          cliOverrides?.openaiMaxRetries?.toString() ?? getEnvWithPrefix("OPENAI_MAX_RETRIES")!,
+          10
+        )
+      : undefined;
 
   const minConfidence = validateMinConfidence(
     cliOverrides?.minCommentConfidence ?? getEnvWithPrefix("MIN_COMMENT_CONFIDENCE")
@@ -148,6 +168,11 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
     cursorModel: cliOverrides?.cursorModel ?? getEnvWithPrefix("CURSOR_MODEL"),
     cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
+    openaiApiKey: cliOverrides?.openaiApiKey ?? getEnvWithPrefix("OPENAI_API_KEY"),
+    openaiModel: cliOverrides?.openaiModel ?? getEnvWithPrefix("OPENAI_MODEL"),
+    openaiTimeoutMs: openaiTimeoutMs && openaiTimeoutMs > 0 ? openaiTimeoutMs : undefined,
+    openaiBaseUrl: cliOverrides?.openaiBaseUrl ?? getEnvWithPrefix("OPENAI_BASE_URL"),
+    openaiMaxRetries: openaiMaxRetries && openaiMaxRetries > 0 ? openaiMaxRetries : undefined,
     commentFilter: {
       minConfidence,
       skipPreExisting:
@@ -178,6 +203,11 @@ export interface CliOverrides {
   readonly opencodeTimeout?: number;
   readonly cursorModel?: string;
   readonly cursorTimeout?: number;
+  readonly openaiApiKey?: string;
+  readonly openaiModel?: string;
+  readonly openaiTimeout?: number;
+  readonly openaiBaseUrl?: string;
+  readonly openaiMaxRetries?: number;
   readonly minCommentConfidence?: string;
   readonly skipExistingIssues?: string;
   readonly postResolutionComments?: string;
@@ -204,7 +234,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor"];
+  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor", "openai"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

@@ -36,6 +36,11 @@ export interface ReviewOptions {
   opencodeTimeout?: number;
   cursorModel?: string;
   cursorTimeout?: number;
+  openaiApiKey?: string;
+  openaiModel?: string;
+  openaiTimeout?: number;
+  openaiBaseUrl?: string;
+  openaiMaxRetries?: number;
   // Comment filtering
   minCommentConfidence?: string;
   skipExistingIssues?: string;
@@ -80,6 +85,11 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     opencodeTimeout: options.opencodeTimeout,
     cursorModel: options.cursorModel,
     cursorTimeout: options.cursorTimeout,
+    openaiApiKey: options.openaiApiKey,
+    openaiModel: options.openaiModel,
+    openaiTimeout: options.openaiTimeout,
+    openaiBaseUrl: options.openaiBaseUrl,
+    openaiMaxRetries: options.openaiMaxRetries,
     minCommentConfidence: options.minCommentConfidence,
     skipExistingIssues: options.skipExistingIssues,
     postResolutionComments: options.postResolutionComments,
@@ -94,10 +104,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "opencode", "cursor"].includes(aiProvider)) {
+  if (!["copilot", "opencode", "cursor", "openai"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", or "cursor".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", "cursor", or "openai".`
     );
   }
 
@@ -116,6 +126,13 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
   // Select provider-specific model and timeout
   let aiModel: string | undefined;
   let aiTimeoutMs: number | undefined;
+  let openaiOptions:
+    | {
+        apiKey: string;
+        baseUrl?: string;
+        maxRetries?: number;
+      }
+    | undefined;
 
   switch (aiProvider) {
     case "opencode":
@@ -125,6 +142,15 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     case "cursor":
       aiModel = config.cursorModel;
       aiTimeoutMs = config.cursorTimeoutMs;
+      break;
+    case "openai":
+      aiModel = config.openaiModel;
+      aiTimeoutMs = config.openaiTimeoutMs;
+      openaiOptions = {
+        apiKey: config.openaiApiKey ?? "",
+        baseUrl: config.openaiBaseUrl,
+        maxRetries: config.openaiMaxRetries,
+      };
       break;
     default:
       aiModel = config.copilotModel;
@@ -138,6 +164,9 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     aiTimeoutMs,
     commentFilter: config.commentFilter,
     reviewRuns,
+    openaiApiKey: openaiOptions?.apiKey,
+    openaiBaseUrl: openaiOptions?.baseUrl,
+    openaiMaxRetries: openaiOptions?.maxRetries,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -420,7 +449,7 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
   .option(
     "--provider <provider>",
-    "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER"
+    "AI provider (copilot, opencode, cursor, or openai). Env: MM_AI_PROVIDER"
   )
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
@@ -449,6 +478,11 @@ program
   .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
   .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
   .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
+  .option("--openai-api-key <key>", "OpenAI API key. Env: MM_OPENAI_API_KEY")
+  .option("--openai-model <model>", "OpenAI model name (default: gpt-4o). Env: MM_OPENAI_MODEL")
+  .option("--openai-timeout <ms>", "OpenAI timeout in ms. Env: MM_OPENAI_TIMEOUT", parseInt)
+  .option("--openai-base-url <url>", "OpenAI API base URL (for Azure Foundry). Env: MM_OPENAI_BASE_URL")
+  .option("--openai-max-retries <n>", "OpenAI max retry attempts. Env: MM_OPENAI_MAX_RETRIES", parseInt)
   // Comment filtering
   .option(
     "--min-comment-confidence <level>",
@@ -481,6 +515,11 @@ program
         opencodeTimeout: options.opencodeTimeout,
         cursorModel: options.cursorModel,
         cursorTimeout: options.cursorTimeout,
+        openaiApiKey: options.openaiApiKey,
+        openaiModel: options.openaiModel,
+        openaiTimeout: options.openaiTimeout,
+        openaiBaseUrl: options.openaiBaseUrl,
+        openaiMaxRetries: options.openaiMaxRetries,
         minCommentConfidence: options.minCommentConfidence,
         skipExistingIssues: options.skipExistingIssues,
         postResolutionComments: options.postResolutionComments,

@@ -53,6 +53,12 @@ export interface ReviewEngineOptions {
   readonly commentFilter?: CommentFilterConfig;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
+  /** OpenAI API key (required for OpenAI provider) */
+  readonly openaiApiKey?: string;
+  /** OpenAI base URL (for Azure Foundry compatibility) */
+  readonly openaiBaseUrl?: string;
+  /** OpenAI max retries */
+  readonly openaiMaxRetries?: number;
 }
 
 /**
@@ -94,10 +100,22 @@ export class ReviewEngine {
     const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
     const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
 
-    this.provider = createAIProvider(resolvedProviderType, {
-      model,
-      timeoutMs,
-    });
+    // Build provider options - include OpenAI-specific options when applicable
+    const providerOptions =
+      resolvedProviderType === "openai"
+        ? {
+            model,
+            timeoutMs,
+            apiKey: resolvedOptions?.openaiApiKey ?? "",
+            baseUrl: resolvedOptions?.openaiBaseUrl,
+            maxRetries: resolvedOptions?.openaiMaxRetries,
+          }
+        : {
+            model,
+            timeoutMs,
+          };
+
+    this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       filterConfig: resolvedOptions?.commentFilter,
     });

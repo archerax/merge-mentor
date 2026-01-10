@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, and Cursor CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, Cursor CLI, and OpenAI API. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -29,13 +29,16 @@ merge-mentor review --pr 123 --provider opencode --write
 # Use Cursor CLI
 merge-mentor review --pr 123 --provider cursor --write
 
+# Use OpenAI API (requires API key)
+MM_OPENAI_API_KEY=sk-... merge-mentor review --pr 123 --provider openai --write
+
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
 ```
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
+- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, Cursor CLI, and OpenAI API
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Inline Comments** - Posts feedback on specific lines of code
@@ -64,6 +67,14 @@ npx merge-mentor review --pr 123
     # Install Cursor CLI
     curl https://cursor.com/install -fsS | bash
     # Ensure cursor-agent is in your PATH
+    ```
+  - **OpenAI API** (no CLI installation needed):
+    ```bash
+    # Just set your API key
+    export MM_OPENAI_API_KEY=sk-your-api-key
+    # Or use Azure Foundry (OpenAI-compatible endpoint)
+    export MM_OPENAI_API_KEY=your-azure-key
+    export MM_OPENAI_BASE_URL=https://your-foundry.azure.com/v1
     ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
@@ -148,7 +159,7 @@ set DEFAULT_PLATFORM=azure
 
 **Linux/macOS:**
 ```bash
-# Select AI provider (copilot, opencode, or cursor)
+# Select AI provider (copilot, opencode, cursor, or openai)
 export MM_AI_PROVIDER=copilot
 
 # Copilot-specific settings
@@ -162,6 +173,14 @@ export MM_OPENCODE_TIMEOUT=180000
 # Cursor-specific settings (when using --provider cursor)
 export MM_CURSOR_MODEL=gpt-5
 export MM_CURSOR_TIMEOUT=180000
+
+# OpenAI-specific settings (when using --provider openai)
+export MM_OPENAI_API_KEY=sk-your-api-key
+export MM_OPENAI_MODEL=gpt-4o
+export MM_OPENAI_TIMEOUT=180000
+# Optional: Custom base URL for Azure Foundry
+export MM_OPENAI_BASE_URL=https://your-foundry.azure.com/v1
+export MM_OPENAI_MAX_RETRIES=3
 ```
 
 **Windows (PowerShell):**
@@ -180,6 +199,11 @@ $env:MM_OPENCODE_TIMEOUT="180000"
 # Cursor settings
 $env:MM_CURSOR_MODEL="gpt-5"
 $env:MM_CURSOR_TIMEOUT="180000"
+
+# OpenAI settings
+$env:MM_OPENAI_API_KEY="sk-your-api-key"
+$env:MM_OPENAI_MODEL="gpt-4o"
+$env:MM_OPENAI_TIMEOUT="180000"
 ```
 
 **Or use command-line parameters:**
@@ -188,6 +212,12 @@ merge-mentor review --pr 123 \
   --provider opencode \
   --opencode-model claude-sonnet-4.5 \
   --opencode-timeout 180000
+
+# OpenAI example
+merge-mentor review --pr 123 \
+  --provider openai \
+  --openai-api-key sk-your-key \
+  --openai-model gpt-4o
 ```
 
 ### Optional Settings
@@ -299,6 +329,28 @@ Audit logs can be filtered and analyzed for:
 - Supports multiple AI models (GPT-5, Claude 4 Sonnet, Claude 4 Opus)
 - Check Cursor CLI documentation for latest supported models
 
+**OpenAI API**: Configure via `MM_OPENAI_MODEL` environment variable or `--openai-model` CLI parameter.
+- `gpt-4o` (default)
+- `gpt-4o-mini`
+- `gpt-4-turbo`
+- `gpt-4`
+- `gpt-3.5-turbo`
+- Any model available on your OpenAI account or Azure Foundry deployment
+
+### Azure Foundry Compatibility
+
+OpenAI provider supports Azure Foundry (OpenAI-compatible endpoints):
+
+```bash
+# Azure Foundry configuration
+export MM_OPENAI_API_KEY="your-azure-api-key"
+export MM_OPENAI_BASE_URL="https://your-foundry.azure.com/v1"
+export MM_OPENAI_MODEL="gpt-4"
+
+# Run review
+merge-mentor review --pr 123 --provider openai --write
+```
+
 ### Backward Compatibility
 
 The old unprefixed environment variables are still supported but deprecated:
@@ -321,6 +373,11 @@ The old unprefixed environment variables are still supported but deprecated:
 | `OPENCODE_TIMEOUT_MS` | `MM_OPENCODE_TIMEOUT` |
 | `CURSOR_MODEL` | `MM_CURSOR_MODEL` |
 | `CURSOR_TIMEOUT_MS` | `MM_CURSOR_TIMEOUT` |
+| `OPENAI_API_KEY` | `MM_OPENAI_API_KEY` |
+| `OPENAI_MODEL` | `MM_OPENAI_MODEL` |
+| `OPENAI_TIMEOUT_MS` | `MM_OPENAI_TIMEOUT` |
+| `OPENAI_BASE_URL` | `MM_OPENAI_BASE_URL` |
+| `OPENAI_MAX_RETRIES` | `MM_OPENAI_MAX_RETRIES` |
 | `MIN_COMMENT_CONFIDENCE` | `MM_MIN_COMMENT_CONFIDENCE` |
 | `SKIP_PREEXISTING_ISSUES` | `MM_SKIP_EXISTING_ISSUES` |
 | `POST_RESOLUTION_COMMENTS` | `MM_POST_RESOLUTION_COMMENTS` |
@@ -360,7 +417,7 @@ merge-mentor review --pr 123 --verbose false
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--provider <copilot\|opencode\|cursor\|openai>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
@@ -389,6 +446,11 @@ merge-mentor review --pr 123 --verbose false
 | `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
 | `--cursor-model <model>` | Cursor model name | `MM_CURSOR_MODEL` |
 | `--cursor-timeout <ms>` | Cursor timeout in ms | `MM_CURSOR_TIMEOUT` |
+| `--openai-api-key <key>` | OpenAI API key | `MM_OPENAI_API_KEY` |
+| `--openai-model <model>` | OpenAI model name (default: gpt-4o) | `MM_OPENAI_MODEL` |
+| `--openai-timeout <ms>` | OpenAI timeout in ms | `MM_OPENAI_TIMEOUT` |
+| `--openai-base-url <url>` | OpenAI base URL (for Azure Foundry) | `MM_OPENAI_BASE_URL` |
+| `--openai-max-retries <n>` | OpenAI max retry attempts | `MM_OPENAI_MAX_RETRIES` |
 
 **Comment Filtering:**
 | Option | Description | Env Variable | Default |
@@ -590,6 +652,7 @@ Increase timeout for large PRs:
 export COPILOT_TIMEOUT_MS=300000  # 5 minutes (for Copilot)
 export OPENCODE_TIMEOUT_MS=300000  # 5 minutes (for OpenCode)
 export CURSOR_TIMEOUT_MS=300000  # 5 minutes (for Cursor)
+export OPENAI_TIMEOUT_MS=300000  # 5 minutes (for OpenAI)
 ```
 
 ### Exit Codes
@@ -602,6 +665,6 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 
 ---
 
-**Version**: 1.6.0  
+**Version**: 1.9.0  
 **Author**: archerax  
 **Documentation**: Included in npm package
