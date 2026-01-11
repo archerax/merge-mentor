@@ -3,8 +3,8 @@ import { ConfigurationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
 import { CopilotProvider } from "./providers/copilot.js";
 import { CursorProvider } from "./providers/cursor.js";
-import { OpenCodeProvider } from "./providers/opencode.js";
 import { OpenAIProvider } from "./providers/openai.js";
+import { OpenCodeProvider } from "./providers/opencode.js";
 
 describe("createAIProvider", () => {
   it("should create CopilotProvider for 'copilot' type", () => {

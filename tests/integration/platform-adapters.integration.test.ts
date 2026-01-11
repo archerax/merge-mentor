@@ -93,8 +93,15 @@ const mockGitApi = {
     sourceRefName: "refs/heads/feature/test",
     lastMergeSourceCommit: { commitId: "source-sha" },
     lastMergeTargetCommit: { commitId: "target-sha" },
+    repository: { id: "repo-id" },
   }),
-  getPullRequestIterations: vi.fn().mockResolvedValue([{ id: 1 }]),
+  getPullRequestIterations: vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      sourceRefCommit: { commitId: "head-sha" },
+      commonRefCommit: { commitId: "base-sha" },
+    },
+  ]),
   getPullRequestIterationChanges: vi.fn().mockResolvedValue({
     changeEntries: [
       {
@@ -132,6 +139,36 @@ const mockGitApi = {
   ]),
   createThread: vi.fn().mockResolvedValue({ id: 3002 }),
 };
+
+// Mock global fetch for Azure DevOps REST API calls
+const mockFetch = vi.fn().mockImplementation((url) => {
+  if (typeof url === "string" && url.includes("/changes?")) {
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          changeEntries: [
+            {
+              changeType: 2, // Edit
+              item: { path: "/src/app.ts", objectId: "blob-sha", gitObjectType: "blob" },
+            },
+          ],
+        }),
+    });
+  }
+  if (typeof url === "string" && url.includes("/items?")) {
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          content: "const x = 1;\nconst y = 2;\n",
+        }),
+    });
+  }
+  return Promise.resolve({ ok: false, status: 404, statusText: "Not Found" });
+});
+
+vi.stubGlobal("fetch", mockFetch);
 
 // Mock Azure DevOps API
 vi.mock("azure-devops-node-api", () => ({

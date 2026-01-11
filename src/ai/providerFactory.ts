@@ -1,8 +1,8 @@
 import { ConfigurationError } from "../errors/index.js";
 import { CopilotProvider } from "./providers/copilot.js";
 import { CursorProvider } from "./providers/cursor.js";
-import { OpenCodeProvider } from "./providers/opencode.js";
 import { OpenAIProvider, type OpenAIProviderOptions } from "./providers/openai.js";
+import { OpenCodeProvider } from "./providers/opencode.js";
 import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./types.js";
 
 /**

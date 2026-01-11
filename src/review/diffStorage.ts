@@ -116,9 +116,7 @@ export class DiffStorage {
 
       // Ensure parent directory exists for nested paths
       const parentDir = path.dirname(fullPath);
-      if (parentDir !== diffDir) {
-        await fs.mkdir(parentDir, { recursive: true });
-      }
+      await fs.mkdir(parentDir, { recursive: true });
 
       // Write the diff content with pre-calculated line numbers
       const numberedDiff = convertToNumberedDiff(file.patch);
