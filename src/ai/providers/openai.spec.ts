@@ -59,9 +59,7 @@ describe("OpenAIProvider", () => {
   describe("constructor", () => {
     it("throws error when API key is missing", () => {
       expect(() => new OpenAIProvider({ apiKey: "" })).toThrow(OpenAIAuthenticationError);
-      expect(() => new OpenAIProvider({ apiKey: "" })).toThrow(
-        "OpenAI API key is required"
-      );
+      expect(() => new OpenAIProvider({ apiKey: "" })).toThrow("OpenAI API key is required");
     });
 
     it("creates provider with valid API key", () => {
@@ -90,7 +88,7 @@ describe("OpenAIProvider", () => {
     it("executes prompt and returns parsed response", async () => {
       const provider = createOpenAIProvider();
       const mockResponse = { findings: [] };
-      
+
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: JSON.stringify(mockResponse) } }],
         usage: { prompt_tokens: 100, completion_tokens: 50 },
@@ -109,19 +107,17 @@ describe("OpenAIProvider", () => {
 
     it("throws error when response content is empty", async () => {
       const provider = createOpenAIProvider();
-      
+
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: null } }],
       });
 
-      await expect(provider.executePrompt("test")).rejects.toThrow(
-        "Empty response from OpenAI"
-      );
+      await expect(provider.executePrompt("test")).rejects.toThrow("Empty response from OpenAI");
     });
 
     it("throws error when response has no JSON object", async () => {
       const provider = createOpenAIProvider();
-      
+
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: "No JSON here" } }],
       });
@@ -137,15 +133,17 @@ describe("OpenAIProvider", () => {
       const apiError = { status: 401, message: "Invalid API key", headers: {} };
       mockCreate.mockRejectedValueOnce(apiError);
 
-      await expect(provider.executePrompt("test")).rejects.toThrow(
-        OpenAIAuthenticationError
-      );
+      await expect(provider.executePrompt("test")).rejects.toThrow(OpenAIAuthenticationError);
     });
 
     it("handles rate limit error (429)", async () => {
       const provider = createOpenAIProvider();
       // Create an error object that matches OpenAI's APIError shape
-      const apiError = { status: 429, message: "Rate limit exceeded", headers: { "retry-after": "60" } };
+      const apiError = {
+        status: 429,
+        message: "Rate limit exceeded",
+        headers: { "retry-after": "60" },
+      };
       mockCreate.mockRejectedValueOnce(apiError);
 
       await expect(provider.executePrompt("test")).rejects.toThrow(OpenAIRateLimitError);
@@ -170,7 +168,7 @@ describe("OpenAIProvider", () => {
     it("extracts JSON from markdown code blocks", async () => {
       const provider = createOpenAIProvider();
       const mockResponse = { findings: [{ line: 1, message: "test" }] };
-      
+
       mockCreate.mockResolvedValueOnce({
         choices: [
           {
@@ -188,7 +186,7 @@ describe("OpenAIProvider", () => {
     it("uses custom model when specified", async () => {
       const provider = createOpenAIProvider({ model: "gpt-4-turbo" });
       const mockResponse = { findings: [] };
-      
+
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: JSON.stringify(mockResponse) } }],
         usage: { prompt_tokens: 100, completion_tokens: 50 },
@@ -383,9 +381,7 @@ describe("OpenAIProvider", () => {
       const response = createAIResponse({
         file_results: {
           "src/app.ts": {
-            findings: [
-              { line: 10, severity: "high", category: "bug", message: "Bug found" },
-            ],
+            findings: [{ line: 10, severity: "high", category: "bug", message: "Bug found" }],
           },
           "src/utils.ts": {
             findings: [],

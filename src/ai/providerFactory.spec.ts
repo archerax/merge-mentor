@@ -32,15 +32,11 @@ describe("createAIProvider", () => {
 
   it("should throw ConfigurationError for 'openai' type without apiKey", () => {
     expect(() => createAIProvider("openai")).toThrow(ConfigurationError);
-    expect(() => createAIProvider("openai")).toThrow(
-      "OpenAI provider requires apiKey"
-    );
+    expect(() => createAIProvider("openai")).toThrow("OpenAI provider requires apiKey");
   });
 
   it("should throw ConfigurationError for 'openai' type with empty apiKey", () => {
-    expect(() => createAIProvider("openai", { apiKey: "" })).toThrow(
-      "OpenAI API key is required"
-    );
+    expect(() => createAIProvider("openai", { apiKey: "" })).toThrow("OpenAI API key is required");
   });
 
   it("should pass options to CopilotProvider", () => {

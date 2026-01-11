@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  convertToNumberedDiff,
-  formatNumberedDiff,
-  parseAndNumberDiff,
-} from "./diffFormatter.js";
+import { convertToNumberedDiff, formatNumberedDiff, parseAndNumberDiff } from "./diffFormatter.js";
 
 describe("diffFormatter", () => {
   describe("parseAndNumberDiff", () => {

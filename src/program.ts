@@ -481,8 +481,15 @@ program
   .option("--openai-api-key <key>", "OpenAI API key. Env: MM_OPENAI_API_KEY")
   .option("--openai-model <model>", "OpenAI model name (default: gpt-4o). Env: MM_OPENAI_MODEL")
   .option("--openai-timeout <ms>", "OpenAI timeout in ms. Env: MM_OPENAI_TIMEOUT", parseInt)
-  .option("--openai-base-url <url>", "OpenAI API base URL (for Azure Foundry). Env: MM_OPENAI_BASE_URL")
-  .option("--openai-max-retries <n>", "OpenAI max retry attempts. Env: MM_OPENAI_MAX_RETRIES", parseInt)
+  .option(
+    "--openai-base-url <url>",
+    "OpenAI API base URL (for Azure Foundry). Env: MM_OPENAI_BASE_URL"
+  )
+  .option(
+    "--openai-max-retries <n>",
+    "OpenAI max retry attempts. Env: MM_OPENAI_MAX_RETRIES",
+    parseInt
+  )
   // Comment filtering
   .option(
     "--min-comment-confidence <level>",
