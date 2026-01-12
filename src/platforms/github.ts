@@ -170,7 +170,7 @@ export class GitHubAdapter implements PlatformAdapter {
           owner: this.owner,
           repo: this.repo,
           pull_number: prNumber,
-          body: `${this.botIdentifier}\n\n${body}`,
+          body,
           commit_id: pr.head.sha,
           path,
           line,
@@ -208,7 +208,7 @@ export class GitHubAdapter implements PlatformAdapter {
           owner: this.owner,
           repo: this.repo,
           issue_number: prNumber,
-          body: `${this.botIdentifier}\n\n${body}`,
+          body,
         })
       );
       this.auditLogger.logGeneralCommentPost(prNumber, "github", "success");
@@ -233,7 +233,7 @@ export class GitHubAdapter implements PlatformAdapter {
           owner: this.owner,
           repo: this.repo,
           comment_id: id,
-          body: `${this.botIdentifier}\n\n${body}`,
+          body,
         })
       );
       this.logger.info({ commentId: id, type: "review" }, "Comment updated successfully");
@@ -252,7 +252,7 @@ export class GitHubAdapter implements PlatformAdapter {
             owner: this.owner,
             repo: this.repo,
             comment_id: id,
-            body: `${this.botIdentifier}\n\n${body}`,
+            body,
           })
         );
         this.logger.info({ commentId: id, type: "issue" }, "Comment updated successfully");

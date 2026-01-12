@@ -513,7 +513,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const thread: GitPullRequestCommentThread = {
         comments: [
           {
-            content: `${this.botIdentifier}\n\n${body}`,
+            content: body,
             commentType: AzureCommentType.TEXT,
           } as Comment,
         ],
@@ -549,7 +549,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const thread: GitPullRequestCommentThread = {
         comments: [
           {
-            content: `${this.botIdentifier}\n\n${body}`,
+            content: body,
             commentType: AzureCommentType.TEXT,
           } as Comment,
         ],

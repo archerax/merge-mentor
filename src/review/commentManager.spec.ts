@@ -253,6 +253,16 @@ describe("CommentManager", () => {
       expect(result).toContain("- Add unit tests");
       expect(result).toContain("- Update documentation");
     });
+
+    it("should include bot identifier at the end", () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult();
+
+      const result = manager.formatSummaryComment(fileResults, crossFileResult);
+
+      expect(result).toContain("---\n[AI Code Review Bot]");
+    });
   });
 
   describe("determineActions", () => {

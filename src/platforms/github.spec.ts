@@ -294,7 +294,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         pull_number: 123,
-        body: "<!-- merge-mentor -->\n\nFix this issue",
+        body: "Fix this issue",
         commit_id: "abc123",
         path: "src/test.ts",
         line: 10,
@@ -313,7 +313,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         issue_number: 123,
-        body: "<!-- merge-mentor -->\n\nOverall feedback",
+        body: "Overall feedback",
       });
     });
   });
@@ -329,7 +329,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 456,
-        body: "<!-- merge-mentor -->\n\nUpdated message",
+        body: "Updated message",
       });
     });
 
@@ -345,7 +345,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 456,
-        body: "<!-- merge-mentor -->\n\nUpdated message",
+        body: "Updated message",
       });
 
       consoleWarnSpy.mockRestore();
@@ -361,7 +361,7 @@ describe("GitHubAdapter", () => {
         owner: "test-owner",
         repo: "test-repo",
         comment_id: 789,
-        body: "<!-- merge-mentor -->\n\nMessage",
+        body: "Message",
       });
     });
   });

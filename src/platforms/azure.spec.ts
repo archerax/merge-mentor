@@ -665,7 +665,7 @@ describe("AzureDevOpsAdapter", () => {
         {
           comments: [
             {
-              content: "<!-- merge-mentor -->\n\nFix this",
+              content: "Fix this",
               commentType: 1,
             },
           ],
@@ -704,7 +704,7 @@ describe("AzureDevOpsAdapter", () => {
         {
           comments: [
             {
-              content: "<!-- merge-mentor -->\n\nOverall feedback",
+              content: "Overall feedback",
               commentType: 1,
             },
           ],

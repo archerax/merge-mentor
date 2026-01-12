@@ -361,6 +361,9 @@ ${this.botIdentifier}${idMarker}`;
     summary += this.buildCrossFileFindingsSection(crossFileResult);
     summary += this.buildRecommendationsSection(crossFileResult);
 
+    // Append bot identifier
+    summary += `\n---\n${this.botIdentifier}`;
+
     return summary;
   }
 
