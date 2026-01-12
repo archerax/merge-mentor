@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Chain of Thought (CoT) Reasoning** - AI prompts now instruct models to perform a step-by-step analysis of code changes before outputting structured results. This "thinking" phase improves review quality by reducing false positives and encouraging deeper architectural consideration.
+- **Robust Markdown JSON Parsing** - Enhanced the AI response parser to prioritize extracting JSON from markdown code blocks (\`\`\`json ... \`\`\`). This enables a seamless mix of free-text analysis and structured findings, providing better support for advanced "reasoning" models.
+
 ## [1.9.0] - 2026-01-11
 
 ### Added
