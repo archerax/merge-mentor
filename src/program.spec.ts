@@ -509,6 +509,23 @@ describe("CLI", () => {
       );
     });
 
+    it("generates markdown report in write mode with AI provider", () => {
+      const result = createMockReviewResult();
+      const mockAdapterWithId = {
+        ...mockAdapter,
+        getProjectIdentifier: () => "test-owner-test-repo",
+      };
+
+      displayResults(result, false, mockAdapterWithId as any, "github", "copilot");
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Detailed markdown report generated:")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Github-test-owner-test-repo-PR42-review-report.md")
+      );
+    });
+
     it("displays comment errors in write mode", () => {
       const result = createMockReviewResult({
         commentErrors: ["Failed to post comment on line 10", "Network error"],
@@ -752,7 +769,7 @@ describe("CLI", () => {
         },
       });
 
-      const report = generateMarkdownReport(result, "copilot");
+      const report = generateMarkdownReport(result, "copilot", true);
 
       expect(report).toContain("# Code Review Report - PR #123");
       expect(report).toContain("**PR Title:** Test PR");
@@ -797,7 +814,7 @@ describe("CLI", () => {
         },
       });
 
-      const report = generateMarkdownReport(result, "opencode");
+      const report = generateMarkdownReport(result, "opencode", true);
 
       expect(report).toContain("# Code Review Report - PR #42"); // Use the actual PR number from mock
       expect(report).toContain("**AI Provider:** opencode");
@@ -822,11 +839,19 @@ describe("CLI", () => {
         ],
       });
 
-      const report = generateMarkdownReport(result, "cursor");
+      const report = generateMarkdownReport(result, "cursor", true);
 
       expect(report).toContain("## ✅ Resolved Issues");
       expect(report).toContain("1. **Line 5:** Issue was fixed by adding validation");
       expect(report).toContain("2. **Line 15:** Error handling was improved");
+    });
+
+    it("generates a report with correct header for non-dry-run mode", () => {
+      const result = createMockReviewResult({});
+      const report = generateMarkdownReport(result, "openai", false);
+
+      expect(report).toContain("### 📝 Review Actions");
+      expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");
     });
   });
 });

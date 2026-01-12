@@ -180,9 +180,13 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 }
 
 /**
- * Generate a markdown report for dry-run mode.
+ * Generate a markdown report for the review.
  */
-export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProviderType): string {
+export function generateMarkdownReport(
+  result: ReviewResult,
+  aiProvider: AIProviderType,
+  dryRun: boolean
+): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
@@ -204,8 +208,9 @@ export function generateMarkdownReport(result: ReviewResult, aiProvider: AIProvi
   report += `  - File-specific issues: ${totalIssues}\n`;
   report += `  - Cross-file issues: ${crossFileIssues}\n\n`;
 
-  // Dry-run actions summary
-  report += `### 📝 Planned Actions (Dry-Run)\n\n`;
+  // Review actions summary
+  const actionHeader = dryRun ? "### 📝 Planned Actions (Dry-Run)" : "### 📝 Review Actions";
+  report += `${actionHeader}\n\n`;
   report += `- Comments to Create: ${result.commentsCreated}\n`;
   report += `- Comments to Update: ${result.commentsUpdated}\n`;
   report += `- Comments to Resolve: ${result.commentsResolved}\n\n`;
@@ -385,33 +390,6 @@ export function displayResults(
     console.log(`  Comments to Create: ${result.commentsCreated}`);
     console.log(`  Comments to Update: ${result.commentsUpdated}`);
     console.log(`  Comments to Resolve: ${result.commentsResolved}`);
-
-    // Generate and save markdown report
-    if (aiProvider && adapter && platform) {
-      try {
-        const markdownReport = generateMarkdownReport(result, aiProvider);
-        const reportDir = join(process.cwd(), ".merge-mentor", "reports");
-
-        // Generate unique report filename using platform and project
-        const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
-        const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
-        const reportFile = join(reportDir, `${prIdentifier}-review-report.md`);
-
-        // Ensure directory exists
-        mkdirSync(reportDir, { recursive: true });
-
-        // Write the report
-        writeFileSync(reportFile, markdownReport, "utf-8");
-
-        console.log("");
-        console.log("📄 Detailed markdown report generated:");
-        console.log(`  ${reportFile}`);
-      } catch (error) {
-        logger.warn({ error: (error as Error).message }, "Failed to generate markdown report");
-        console.log("");
-        console.log("⚠️  Failed to generate markdown report - see logs for details");
-      }
-    }
   } else {
     console.log(`Comments Created: ${result.commentsCreated}`);
     console.log(`Comments Updated: ${result.commentsUpdated}`);
@@ -421,6 +399,33 @@ export function displayResults(
       result.commentErrors.forEach((err, i) => {
         console.log(`  ${i + 1}. ${err}`);
       });
+    }
+  }
+
+  // Generate and save markdown report
+  if (aiProvider && adapter && platform) {
+    try {
+      const markdownReport = generateMarkdownReport(result, aiProvider, dryRun);
+      const reportDir = join(process.cwd(), ".merge-mentor", "reports");
+
+      // Generate unique report filename using platform and project
+      const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
+      const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
+      const reportFile = join(reportDir, `${prIdentifier}-review-report.md`);
+
+      // Ensure directory exists
+      mkdirSync(reportDir, { recursive: true });
+
+      // Write the report
+      writeFileSync(reportFile, markdownReport, "utf-8");
+
+      console.log("");
+      console.log("📄 Detailed markdown report generated:");
+      console.log(`  ${reportFile}`);
+    } catch (error) {
+      logger.warn({ error: (error as Error).message }, "Failed to generate markdown report");
+      console.log("");
+      console.log("⚠️  Failed to generate markdown report - see logs for details");
     }
   }
   console.log(`${"=".repeat(60)}\n`);
