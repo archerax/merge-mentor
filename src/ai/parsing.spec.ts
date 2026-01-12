@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CopilotProvider } from "./providers/copilot.js";
-import { CopilotCliError } from "../errors/index.js";
 
 // Mock dependencies
 vi.mock("child_process", () => ({
@@ -20,11 +19,7 @@ vi.mock("node:fs/promises", () => ({
 const mockSpawn = vi.mocked(spawn);
 const mockFs = vi.mocked(fs);
 
-function createMockProcess(options: {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-}): any {
+function createMockProcess(options: { stdout?: string; stderr?: string; exitCode?: number }): any {
   return {
     stdin: null,
     stdout: {
@@ -64,21 +59,21 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
 
   it("parses JSON correctly when embedded in markdown code blocks", async () => {
     const provider = new CopilotProvider();
-    const cotResponse = 
+    const cotResponse =
       "Here is my analysis:\n" +
       "1. The code looks okay but has a bug in line 10.\n" +
       "2. I recommend fixing it.\n\n" +
       "```json\n" +
       "{\n" +
-      "  \"findings\": [\n" +
+      '  "findings": [\n' +
       "    {\n" +
-      "      \"line\": 10,\n" +
-      "      \"severity\": \"high\",\n" +
-      "      \"category\": \"bug\",\n" +
-      "      \"message\": \"Potential null pointer\",\n" +
-      "      \"suggestion\": \"Add null check\",\n" +
-      "      \"confidence\": \"high\",\n" +
-      "      \"isPreExisting\": false\n" +
+      '      "line": 10,\n' +
+      '      "severity": "high",\n' +
+      '      "category": "bug",\n' +
+      '      "message": "Potential null pointer",\n' +
+      '      "suggestion": "Add null check",\n' +
+      '      "confidence": "high",\n' +
+      '      "isPreExisting": false\n' +
       "    }\n" +
       "  ]\n" +
       "}\n" +
@@ -111,12 +106,8 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
 
   it("falls back to standard JSON parsing if no markdown block is found", async () => {
     const provider = new CopilotProvider();
-    const standardResponse = 
-      "Some text before.\n" +
-      "{\n" +
-      "  \"findings\": []\n" +
-      "}\n" +
-      "Some text after.\n";
+    const standardResponse =
+      "Some text before.\n" + "{\n" + '  "findings": []\n' + "}\n" + "Some text after.\n";
 
     const mockProcess = createMockProcess({
       stdout: standardResponse,
@@ -133,7 +124,7 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
 
   it("handles mixed content with multiple code blocks (takes the first json block)", async () => {
     const provider = new CopilotProvider();
-    const complexResponse = 
+    const complexResponse =
       "Analysis:\n" +
       "```\n" +
       "some code snippet\n" +
@@ -141,7 +132,7 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "Findings:\n" +
       "```json\n" +
       "{\n" +
-      "  \"findings\": [{ \"message\": \"First finding\" }]\n" +
+      '  "findings": [{ "message": "First finding" }]\n' +
       "}\n" +
       "```\n\n" +
       "More text.\n";
@@ -164,12 +155,8 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
   it("handles malformed markdown but valid JSON by falling back", async () => {
     const provider = new CopilotProvider();
     // Markdown block is not closed properly or has wrong tag, but JSON is valid
-    const messyResponse = 
-      "```json\n" +
-      "{\n" +
-      "  \"findings\": []\n" +
-      "}\n" +
-      "(missing closing ticks)\n";
+    const messyResponse =
+      "```json\n" + "{\n" + '  "findings": []\n' + "}\n" + "(missing closing ticks)\n";
 
     const mockProcess = createMockProcess({
       stdout: messyResponse,

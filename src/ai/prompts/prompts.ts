@@ -97,7 +97,8 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${existingCommentsContext
+${
+  existingCommentsContext
     ? `
 RESOLVED COMMENT DETECTION:
 - Review the EXISTING COMMENTS listed above
@@ -105,7 +106,8 @@ RESOLVED COMMENT DETECTION:
 - An issue is resolved if the problematic code was removed, corrected, or the concern no longer applies
 - Include resolved comments in the "resolved_comments" array with the original line number and brief reason
 `
-    : ""}
+    : ""
+}
 Respond with your analysis and findings.
 
 FORMAT:
@@ -127,8 +129,9 @@ The potential issue here is that...
       "confidence": "high|medium|low",
       "isPreExisting": false
     }
-  ]${existingCommentsContext
-    ? `, 
+  ]${
+    existingCommentsContext
+      ? `, 
   "resolved_comments": [
     {
       "line": <original_line_number>,
@@ -136,8 +139,8 @@ The potential issue here is that...
     }
   ]
 `
-    : ""
-}
+      : ""
+  }
 \`\`\`
 
 If there are no issues, use: {"findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}} inside the JSON block.`;
@@ -342,14 +345,16 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${existingCommentsContext
+${
+  existingCommentsContext
     ? `
 RESOLVED COMMENT DETECTION:
 - Review the EXISTING COMMENTS listed above
 - For each existing comment, check if the issue has been FIXED in the current diff
 - Include resolved comments in the "resolved_comments" array with the original line number and brief reason
 `
-    : ""}
+    : ""
+}
 Respond with your analysis and findings.
 
 FORMAT:
@@ -372,8 +377,9 @@ Analysis of the changes...
           "confidence": "high|medium|low",
           "isPreExisting": false
         }
-      ]${existingCommentsContext
-        ? `, 
+      ]${
+        existingCommentsContext
+          ? `, 
       "resolved_comments": [
         {
           "line": <original_line_number>,
@@ -381,7 +387,7 @@ Analysis of the changes...
         }
       ]
 `
-        : ""
+          : ""
       }
     },
     "path/to/file2.ts": {
@@ -393,5 +399,5 @@ Analysis of the changes...
 \`\`\`
 
 IMPORTANT: Include an entry for EVERY file listed above, even if it has no findings (use empty arrays).
-If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : "" }}`;
+If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}}`;
 }
