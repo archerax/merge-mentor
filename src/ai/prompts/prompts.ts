@@ -21,7 +21,7 @@ export function buildFileReviewPrompt(
     ? `\n${existingCommentsContext}\n\nIMPORTANT: Review the existing comments above. Do NOT flag the same issues again, even if worded differently. Focus on finding NEW issues not already covered by existing comments.\n`
     : "";
 
-  return `You are an expert code reviewer analyzing changes made by senior developers. Focus on substantive issues that would impact correctness, security, or maintainability.
+  return `You are an expert code reviewer analyzing changes. Be thorough and strict. Focus on substantive issues that would impact correctness, security, or maintainability.
 ${contextSection}${commentsSection}
 FILE: ${filename}
 DIFF:
@@ -43,20 +43,17 @@ FOCUS ON SUBSTANTIVE ISSUES:
 - Critical architectural concerns: tight coupling, violated principles
 
 DO NOT flag:
-- Obvious best practices that any senior developer knows (e.g., "breaking changes may occur")
-- Stylistic preferences unless they violate established patterns in the codebase
-- Trivial suggestions that don't materially improve the code
-- Well-known trade-offs without explaining why the choice is problematic in this context
-- Documentation for self-evident code
+- Purely stylistic preferences (e.g., whitespace, variable naming) unless they severely violate established patterns
+- Documentation for completely self-evident code (e.g., getters/setters)
 - Syntax or compilation issues (assume all code compiles and is valid syntax)
-- Language features you're unfamiliar with (they may be newer language features)
+- Language features you're unfamiliar with
 
 GUIDELINES:
-- Only report findings if you can explain a specific negative consequence
-- Assume the developer is experienced and made intentional choices
-- If suggesting a change, explain the concrete benefit, not just what's "better"
-- Skip findings about configuration or dependency updates unless there's a specific compatibility issue
-- Focus on "what could go wrong" not "what could be different"
+- Report findings even if they seem minor, if they impact code quality or maintainability
+- Do not assume the developer made the best choice; verify the logic and implementation details
+- If suggesting a change, explain the concrete benefit
+- Focus on correctness, security, performance, and best practices
+- Be thorough and strict; it is better to flag a potential issue than to miss a real bug
 
 GOAL: Find ALL substantive issues in a single comprehensive review, not just a sample.
 
@@ -163,7 +160,7 @@ export function buildCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged in existing comments. Focus on system-level concerns not already covered.\n`
     : "";
 
-  return `You are an expert code reviewer performing a holistic analysis of a pull request by experienced developers.
+  return `You are an expert code reviewer performing a holistic analysis of a pull request. Be thorough and strict.
 
 PR TITLE: ${prDetails.title}
 PR DESCRIPTION: ${prDetails.description || "No description provided"}
@@ -191,15 +188,13 @@ FOCUS ON HIGH-LEVEL SUBSTANTIVE ISSUES:
 DO NOT flag:
 - Issues already caught in individual file reviews (avoid duplication)
 - General suggestions without specific actionable improvements
-- Best practices that are obvious to experienced developers
-- Documentation for standard patterns
 - Syntax or compilation issues (assume all code compiles and is valid syntax)
-- Language features you're unfamiliar with (they may be newer language features)
+- Language features you're unfamiliar with
 
 GUIDELINES:
-- Only provide recommendations that would prevent production issues or significantly improve maintainability
-- Assume the team has good reasons for their choices unless there's clear evidence of a problem
-- Focus on what could fail or cause confusion, not what could be "nicer"
+- Provide recommendations that improve architectural integrity, maintainability, or prevent issues
+- Evaluate choices critically; do not assume the current approach is optimal
+- Focus on potential failures, confusion, and architectural alignment
 - ONLY analyze the actual files listed in CHANGED FILES SUMMARY - ignore any files mentioned in PR title/description that aren't in the changed files list
 
 GOAL: Perform ONE thorough architectural review that catches all system-level concerns.
@@ -251,7 +246,7 @@ export function buildBatchedFileReviewPrompt(
     ? `\n${existingCommentsContext}\n\nIMPORTANT: Review the existing comments above. Do NOT flag the same issues again, even if worded differently. Focus on finding NEW issues not already covered by existing comments.\n`
     : "";
 
-  return `You are an expert code reviewer analyzing changes made by senior developers. Focus on substantive issues that would impact correctness, security, or maintainability.
+  return `You are an expert code reviewer analyzing changes. Be thorough and strict. Focus on substantive issues that would impact correctness, security, or maintainability.
 
 BATCHED REVIEW MODE: Review ALL files listed below. Each file has its diff stored in a separate file that you can read.
 
@@ -279,17 +274,16 @@ FOCUS ON SUBSTANTIVE ISSUES:
 - Critical architectural concerns: tight coupling, violated principles
 
 DO NOT flag:
-- Obvious best practices that any senior developer knows
-- Stylistic preferences unless they violate established patterns
-- Trivial suggestions that don't materially improve the code
-- Documentation for self-evident code
+- Purely stylistic preferences (e.g., whitespace, variable naming) unless they severely violate established patterns
+- Documentation for completely self-evident code (e.g., getters/setters)
 - Syntax or compilation issues (assume all code compiles and is valid syntax)
-- Language features you're unfamiliar with (they may be newer language features)
+- Language features you're unfamiliar with
 
 GUIDELINES:
-- Only report findings if you can explain a specific negative consequence
-- Assume the developer is experienced and made intentional choices
-- Focus on "what could go wrong" not "what could be different"
+- Report findings even if they seem minor, if they impact code quality or maintainability
+- Do not assume the developer made the best choice; verify the logic and implementation details
+- Focus on correctness, security, performance, and best practices
+- Be thorough and strict; it is better to flag a potential issue than to miss a real bug
 
 CONFIDENCE SCORING:
 - "high": You are certain this is an issue AND it was introduced in this PR
