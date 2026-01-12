@@ -62,7 +62,7 @@ interface RawBatchedFileReviewResponse {
  * Threshold for prompt length - prompts longer than this will use temp files.
  * CLI arguments have platform-specific limits (typically 8KB-128KB).
  */
-const PROMPT_LENGTH_THRESHOLD = 4000;
+const PROMPT_LENGTH_THRESHOLD = 100;
 
 /**
  * AI provider implementation for GitHub Copilot CLI.

@@ -104,7 +104,7 @@ describe("CopilotProvider", () => {
 
     it("uses temp file for long prompts", async () => {
       const provider = createCopilotProvider();
-      const longPrompt = "a".repeat(5000); // Exceeds PROMPT_LENGTH_THRESHOLD
+      const longPrompt = "a".repeat(200); // Exceeds PROMPT_LENGTH_THRESHOLD (100)
       const mockResponse = { findings: [] };
       const mockProcess = createMockProcess({
         stdout: JSON.stringify(mockResponse),
@@ -139,7 +139,7 @@ describe("CopilotProvider", () => {
 
     it("cleans up temp file even on failure", async () => {
       const provider = createCopilotProvider();
-      const longPrompt = "a".repeat(5000);
+      const longPrompt = "a".repeat(200);
       const mockProcess = createMockProcess({
         stderr: "CLI error",
         exitCode: 1,
