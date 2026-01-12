@@ -445,7 +445,7 @@ program
   .description(
     "Automated code review bot using AI providers (Copilot CLI, OpenCode CLI, Cursor CLI)"
   )
-  .version("1.4.0");
+  .version("1.10.0");
 
 program
   .command("review")
