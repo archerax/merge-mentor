@@ -97,8 +97,7 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${
-  existingCommentsContext
+${existingCommentsContext
     ? `
 RESOLVED COMMENT DETECTION:
 - Review the EXISTING COMMENTS listed above
@@ -106,9 +105,17 @@ RESOLVED COMMENT DETECTION:
 - An issue is resolved if the problematic code was removed, corrected, or the concern no longer applies
 - Include resolved comments in the "resolved_comments" array with the original line number and brief reason
 `
-    : ""
-}
-Respond ONLY with valid JSON in this exact format:
+    : ""}
+Respond with your analysis and findings.
+
+FORMAT:
+1. ANALYSIS: Think through the changes step-by-step. Analyze logic, security, and performance implications.
+2. JSON: Output the findings in a STRICT JSON format wrapped in a markdown code block.
+
+Example Response:
+This change introduces a new user validation logic...
+The potential issue here is that...
+\`\`\`json
 {
   "findings": [
     {
@@ -120,20 +127,20 @@ Respond ONLY with valid JSON in this exact format:
       "confidence": "high|medium|low",
       "isPreExisting": false
     }
-  ]${
-    existingCommentsContext
-      ? `,
+  ]${existingCommentsContext
+    ? `, 
   "resolved_comments": [
     {
       "line": <original_line_number>,
       "reason": "Brief explanation of why this issue is now resolved"
     }
-  ]`
-      : ""
-  }
+  ]
+`
+    : ""
 }
+\`\`\`
 
-If there are no issues, return: {"findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}}`;
+If there are no issues, use: {"findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}} inside the JSON block.`;
 }
 
 /**
@@ -199,7 +206,16 @@ GUIDELINES:
 
 GOAL: Perform ONE thorough architectural review that catches all system-level concerns.
 
-Respond ONLY with valid JSON in this exact format:
+Respond with your analysis and findings.
+
+FORMAT:
+1. ANALYSIS: Think through the architecture and integration risks step-by-step.
+2. JSON: Output the findings in a STRICT JSON format wrapped in a markdown code block.
+
+Example Response:
+The architectural changes in this PR introduce...
+One concern is the circular dependency between...
+\`\`\`json
 {
   "overall_assessment": "Summary of the PR quality",
   "findings": [
@@ -211,7 +227,9 @@ Respond ONLY with valid JSON in this exact format:
     }
   ],
   "recommendations": ["Recommendation 1", "Recommendation 2"]
-}`;
+}
+\`\`\`
+`;
 }
 
 /**
@@ -324,17 +342,23 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${
-  existingCommentsContext
+${existingCommentsContext
     ? `
 RESOLVED COMMENT DETECTION:
 - Review the EXISTING COMMENTS listed above
 - For each existing comment, check if the issue has been FIXED in the current diff
 - Include resolved comments in the "resolved_comments" array with the original line number and brief reason
 `
-    : ""
-}
-Respond ONLY with valid JSON in this exact format:
+    : ""}
+Respond with your analysis and findings.
+
+FORMAT:
+1. ANALYSIS: Think through the changes step-by-step. Analyze logic, security, and performance implications.
+2. JSON: Output the findings in a STRICT JSON format wrapped in a markdown code block.
+
+Example Response:
+Analysis of the changes...
+\`\`\`json
 {
   "file_results": {
     "path/to/file1.ts": {
@@ -348,16 +372,16 @@ Respond ONLY with valid JSON in this exact format:
           "confidence": "high|medium|low",
           "isPreExisting": false
         }
-      ]${
-        existingCommentsContext
-          ? `,
+      ]${existingCommentsContext
+        ? `, 
       "resolved_comments": [
         {
           "line": <original_line_number>,
           "reason": "Brief explanation of why this issue is now resolved"
         }
-      ]`
-          : ""
+      ]
+`
+        : ""
       }
     },
     "path/to/file2.ts": {
@@ -366,7 +390,8 @@ Respond ONLY with valid JSON in this exact format:
     }
   }
 }
+\`\`\`
 
 IMPORTANT: Include an entry for EVERY file listed above, even if it has no findings (use empty arrays).
-If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""} }`;
+If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : "" }}`;
 }

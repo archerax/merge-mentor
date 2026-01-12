@@ -249,6 +249,29 @@ export class CopilotProvider implements AIProviderClient {
       "Parsing JSON response"
     );
 
+    // Try to extract JSON from markdown code blocks first
+    const markdownMatch = raw.match(/```json\n([\s\S]*?)\n```/);
+    if (markdownMatch) {
+      this.logger.debug(
+        {
+          jsonLength: markdownMatch[1].length,
+          jsonPreview: markdownMatch[1].substring(0, 300),
+        },
+        "Extracted JSON from markdown code block"
+      );
+      try {
+        const parsed = JSON.parse(markdownMatch[1]);
+        this.logger.debug({ parsedKeys: Object.keys(parsed) }, "JSON parsing successful");
+        return parsed;
+      } catch (error) {
+        this.logger.warn(
+          { error: (error as Error).message },
+          "Failed to parse JSON from markdown block, falling back to regex"
+        );
+      }
+    }
+
+    // Fallback: finding the first '{' and last '}'
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       this.logger.error({ fullResponse: raw }, "No JSON object found in response");
@@ -260,7 +283,7 @@ export class CopilotProvider implements AIProviderClient {
         jsonLength: jsonMatch[0].length,
         jsonPreview: jsonMatch[0].substring(0, 300),
       },
-      "Extracted JSON for parsing"
+      "Extracted JSON for parsing (regex fallback)"
     );
 
     try {
