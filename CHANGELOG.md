@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-01-12
+
 ### Added
 
 - **Chain of Thought (CoT) Reasoning** - AI prompts now instruct models to perform a step-by-step analysis of code changes before outputting structured results. This "thinking" phase improves review quality by reducing false positives and encouraging deeper architectural consideration.

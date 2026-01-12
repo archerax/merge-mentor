@@ -40,7 +40,12 @@ describe("AI Prompts", () => {
     it("should include JSON response format instructions", () => {
       const prompt = buildFileReviewPrompt("test.ts", "diff");
 
-      expect(prompt).toContain("Respond ONLY with valid JSON");
+      expect(prompt).toContain("Respond with your analysis and findings.");
+      expect(prompt).toContain("FORMAT:");
+      expect(prompt).toContain("1. ANALYSIS:");
+      expect(prompt).toContain("2. JSON:");
+      expect(prompt).toContain("Example Response:");
+      expect(prompt).toContain("```json");
       expect(prompt).toContain('"findings"');
       expect(prompt).toContain('"severity"');
       expect(prompt).toContain('"category"');
