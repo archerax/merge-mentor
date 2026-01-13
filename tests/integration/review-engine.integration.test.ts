@@ -45,6 +45,26 @@ vi.mock("../../src/logger.js", () => ({
   }),
 }));
 
+// Mock DiffStorage to avoid file system operations
+vi.mock("../../src/review/diffStorage.js", () => {
+  const mockInstance = {
+    storeDiffs: vi.fn().mockResolvedValue({
+      diffDir: "/tmp/mock-diff-dir",
+      manifest: {
+        prIdentifier: "mock-pr",
+        files: [],
+        createdAt: new Date().toISOString(),
+      },
+    }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    DiffStorage: function DiffStorage() {
+      return mockInstance;
+    },
+  };
+});
+
 describe("ReviewEngine Integration", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
 

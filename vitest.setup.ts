@@ -19,12 +19,10 @@ vi.mock("pino", () => {
   };
 });
 
-// Mock child_process spawn globally for integration tests to avoid invoking the real Copilot CLI
-// Source imports use both "node:child_process" and "child_process" in different files, so mock both
-vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
-vi.mock("child_process", () => ({ spawn: vi.fn() }));
+// Note: child_process and node:child_process mocks are defined in individual test files
+// that need them, not globally, to avoid mock state leakage with isolate: false
 
 // Clean up after all tests complete
 afterAll(async () => {
-  // No need to cleanup mocked logger or child_process mocks
+  // No need to cleanup mocked logger
 });

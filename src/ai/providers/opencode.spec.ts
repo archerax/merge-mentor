@@ -2,7 +2,8 @@ import type { ChildProcess } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock must be at top level before any imports that use it
-vi.mock("child_process", () => ({
+// Use "node:child_process" to match the import in opencode.ts
+vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
 
@@ -61,6 +62,7 @@ describe("OpenCodeProvider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   describe("parseFileReview", () => {

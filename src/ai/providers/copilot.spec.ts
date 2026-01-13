@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock must be at top level before any imports that use it
-vi.mock("child_process", () => ({
+// Use "node:child_process" to match the import in copilot.ts
+vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
 

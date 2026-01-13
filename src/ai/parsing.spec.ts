@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CopilotProvider } from "./providers/copilot.js";
 
-// Mock dependencies
-vi.mock("child_process", () => ({
+// Mock dependencies - use "node:child_process" to match the import in copilot.ts
+vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
 
@@ -55,6 +55,7 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it("parses JSON correctly when embedded in markdown code blocks", async () => {

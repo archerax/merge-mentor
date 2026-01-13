@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.spec.ts"],
-    isolate: false,
+    isolate: true,
     pool: "threads",
     sequence: {
       concurrent: false,
