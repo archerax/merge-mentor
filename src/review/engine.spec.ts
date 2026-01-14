@@ -294,7 +294,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "Test issue",
               suggestion: "Fix it",
-  
+
               isPreExisting: false,
             },
           ],
@@ -322,11 +322,11 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [createPRFile()];
       const existingComments: ExistingComment[] = [
-        { 
-          id: 1, 
-          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->", 
-          path: "test.ts", 
-          line: 2 
+        {
+          id: 1,
+          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->",
+          path: "test.ts",
+          line: 2,
         },
       ];
 
@@ -497,7 +497,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "Test issue",
               suggestion: "Fix it",
-  
+
               isPreExisting: false,
             },
           ],
@@ -551,7 +551,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "New message",
               suggestion: "Fix",
-  
+
               isPreExisting: false,
             },
           ],

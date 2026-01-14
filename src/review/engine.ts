@@ -45,6 +45,8 @@ export interface ReviewEngineOptions {
   readonly copilotModel?: string;
   /** @deprecated Use aiTimeoutMs instead */
   readonly copilotTimeoutMs?: number;
+  /** Copilot GitHub token for CLI authentication */
+  readonly copilotToken?: string;
   /** Model to use for the AI provider */
   readonly aiModel?: string;
   /** Timeout in milliseconds for AI provider operations */
@@ -113,6 +115,7 @@ export class ReviewEngine {
         : {
             model,
             timeoutMs,
+            token: resolvedProviderType === "copilot" ? resolvedOptions?.copilotToken : undefined,
           };
 
     this.provider = createAIProvider(resolvedProviderType, providerOptions);

@@ -43,11 +43,7 @@ function createTestConfig(): Config {
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
     aiProvider: "copilot",
-    commentFilter: {
-      minConfidence: "high",
-      skipPreExisting: true,
-      postResolutionComments: true,
-    },
+    skipPreExisting: true,
     reviewRuns: 1,
   };
 }

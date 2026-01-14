@@ -90,8 +90,7 @@ describe("CursorProvider", () => {
         category: "bug",
         message: "Potential null pointer",
         suggestion: "Add null check",
-        confidence: "medium", // Default when not provided
-        isPreExisting: false, // Default when not provided
+        isPreExisting: false,
       });
     });
 
@@ -139,58 +138,6 @@ describe("CursorProvider", () => {
       const result = provider.parseFileReview("test.ts", response);
 
       expect(result.findings[0].category).toBe("quality");
-    });
-
-    it("should parse resolved_comments from response", () => {
-      const provider = createCursorProvider();
-      const response = createAIResponse({
-        findings: [],
-        resolved_comments: [
-          { line: 10, reason: "Null check was added" },
-          { line: 25, reason: "Issue was refactored away" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.resolvedComments).toBeDefined();
-      expect(result.resolvedComments).toHaveLength(2);
-      expect(result.resolvedComments![0]).toEqual({
-        line: 10,
-        reason: "Null check was added",
-      });
-    });
-
-    it("should handle empty resolved_comments array", () => {
-      const provider = createCursorProvider();
-      const response = createAIResponse({
-        findings: [],
-        resolved_comments: [],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.resolvedComments).toBeUndefined();
-    });
-
-    it("should handle confidence values", () => {
-      const provider = createCursorProvider();
-      const response = createAIResponse({
-        findings: [
-          {
-            line: 1,
-            severity: "high",
-            category: "bug",
-            message: "test",
-            suggestion: "fix",
-            confidence: "high",
-          },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.findings[0].confidence).toBe("high");
     });
 
     it("should handle isPreExisting flag", () => {

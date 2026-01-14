@@ -1,72 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
-import { buildCrossFilePrompt, buildFileReviewPrompt, buildFilesSummary } from "./prompts.js";
+import { buildCrossFilePrompt, buildFilesSummary } from "./prompts.js";
 
 describe("AI Prompts", () => {
-  describe("buildFileReviewPrompt", () => {
-    it("should include the filename and diff", () => {
-      const prompt = buildFileReviewPrompt("src/test.ts", '@@ -1,3 +1,4 @@\n+console.log("test");');
-
-      expect(prompt).toContain("FILE: src/test.ts");
-      expect(prompt).toContain("@@ -1,3 +1,4 @@");
-      expect(prompt).toContain('console.log("test")');
-    });
-
-    it("should include all files context when provided", () => {
-      const filesContext = "- package.json (modified, +2/-1)\n- pnpm-lock.yaml (modified, +15/-10)";
-      const prompt = buildFileReviewPrompt("src/test.ts", "diff", filesContext);
-
-      expect(prompt).toContain("FILES CHANGED IN THIS PR:");
-      expect(prompt).toContain("package.json");
-      expect(prompt).toContain("pnpm-lock.yaml");
-    });
-
-    it("should not include files context section when not provided", () => {
-      const prompt = buildFileReviewPrompt("src/test.ts", "diff");
-
-      expect(prompt).not.toContain("FILES CHANGED IN THIS PR:");
-    });
-
-    it("should include review criteria", () => {
-      const prompt = buildFileReviewPrompt("test.ts", "diff");
-
-      expect(prompt).toContain("FOCUS ON SUBSTANTIVE ISSUES");
-      expect(prompt).toContain("Actual bugs");
-      expect(prompt).toContain("Security vulnerabilities");
-      expect(prompt).toContain("Performance problems");
-      expect(prompt).toContain("Breaking changes");
-    });
-
-    it("should include JSON response format instructions", () => {
-      const prompt = buildFileReviewPrompt("test.ts", "diff");
-
-      expect(prompt).toContain("Respond with your analysis and findings.");
-      expect(prompt).toContain("FORMAT:");
-      expect(prompt).toContain("1. ANALYSIS:");
-      expect(prompt).toContain("2. JSON:");
-      expect(prompt).toContain("Example Response:");
-      expect(prompt).toContain("```json");
-      expect(prompt).toContain('"findings"');
-      expect(prompt).toContain('"severity"');
-      expect(prompt).toContain('"category"');
-      expect(prompt).toContain('"message"');
-      expect(prompt).toContain('"suggestion"');
-    });
-
-    it("should include explicit line number instructions for pre-calculated format", () => {
-      const prompt = buildFileReviewPrompt("test.ts", "diff");
-
-      expect(prompt).toContain("CRITICAL LINE NUMBER INSTRUCTIONS");
-      expect(prompt).toContain("PRE-CALCULATED LINE NUMBERS");
-      expect(prompt).toContain("DIFF FORMAT");
-      expect(prompt).toContain("[PREFIX][LINE_NUMBER] | [CONTENT]");
-      expect(prompt).toContain("EXAMPLE");
-      expect(prompt).toContain("@@ -80,5 +155,7 @@");
-      expect(prompt).toContain("line 159");
-      expect(prompt).toContain("Read the line number directly from the diff");
-    });
-  });
-
   describe("buildCrossFilePrompt", () => {
     const prDetails: PRDetails = {
       number: 123,

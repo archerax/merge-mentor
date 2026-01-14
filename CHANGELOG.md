@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **BREAKING**: Removed file-by-file review mode (now uses batched review exclusively)
+  - Removed `buildFileReviewPrompt` function from prompts
+  - Removed `formatFileCommentsContext` function from comment context
+  - All reviews now use batched mode for better performance and consistency
+- **BREAKING**: Removed backward compatibility for old environment variable names
+  - Must now use `MM_` prefix for all environment variables
+  - Removed support for unprefixed variables (e.g., `GITHUB_TOKEN`, `DEFAULT_PLATFORM`, `AZURE_DEVOPS_*`)
+  - Updated all documentation to reflect MM_ prefixed variables only
+
+### Changed
+- Simplified configuration by requiring MM_ prefix for all environment variables
+- Updated tests to use only MM_ prefixed environment variables
+- Cleaned up integration tests by removing deprecated feature tests
+
 ## [1.10.0] - 2026-01-12
 
 ### Added

@@ -26,6 +26,7 @@ export interface AIProviderOptions {
   readonly maxRetries?: number;
   readonly timeoutMs?: number;
   readonly model?: string;
+  readonly token?: string;
 }
 
 /**

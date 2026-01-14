@@ -96,7 +96,7 @@ Configure merge-mentor using environment variables or command-line parameters. *
 
 ### Environment Variables
 
-All environment variables are now prefixed with `MM_` to avoid conflicts with other applications. The old unprefixed variables are still supported for backward compatibility but are deprecated.
+All environment variables use the `MM_` prefix to avoid conflicts with other applications.
 
 ### GitHub Configuration
 
@@ -119,38 +119,38 @@ $env:MM_PLATFORM="github"
 **Windows (Command Prompt):**
 ```cmd
 set MM_GITHUB_TOKEN=your_personal_access_token
-set GITHUB_REPO_OWNER=username_or_org
-set GITHUB_REPO_NAME=repository_name
-set DEFAULT_PLATFORM=github
+set MM_GITHUB_REPO_OWNER=username_or_org
+set MM_GITHUB_REPO_NAME=repository_name
+set MM_PLATFORM=github
 ```
 
 ### Azure DevOps Configuration
 
 **Linux/macOS:**
 ```bash
-export AZURE_DEVOPS_TOKEN=your_pat
-export AZURE_DEVOPS_ORG=organization_name
-export AZURE_DEVOPS_PROJECT=project_name
-export AZURE_DEVOPS_REPO=repository_name
-export DEFAULT_PLATFORM=azure
+export MM_AZURE_TOKEN=your_pat
+export MM_AZURE_ORG=organization_name
+export MM_AZURE_PROJECT=project_name
+export MM_AZURE_REPO=repository_name
+export MM_PLATFORM=azure
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:AZURE_DEVOPS_TOKEN="your_pat"
-$env:AZURE_DEVOPS_ORG="organization_name"
-$env:AZURE_DEVOPS_PROJECT="project_name"
-$env:AZURE_DEVOPS_REPO="repository_name"
-$env:DEFAULT_PLATFORM="azure"
+$env:MM_AZURE_TOKEN="your_pat"
+$env:MM_AZURE_ORG="organization_name"
+$env:MM_AZURE_PROJECT="project_name"
+$env:MM_AZURE_REPO="repository_name"
+$env:MM_PLATFORM="azure"
 ```
 
 **Windows (Command Prompt):**
 ```cmd
-set AZURE_DEVOPS_TOKEN=your_pat
-set AZURE_DEVOPS_ORG=organization_name
-set AZURE_DEVOPS_PROJECT=project_name
-set AZURE_DEVOPS_REPO=repository_name
-set DEFAULT_PLATFORM=azure
+set MM_AZURE_TOKEN=your_pat
+set MM_AZURE_ORG=organization_name
+set MM_AZURE_PROJECT=project_name
+set MM_AZURE_REPO=repository_name
+set MM_PLATFORM=azure
 ```
 
 ### AI Provider Configuration
@@ -350,40 +350,6 @@ export MM_OPENAI_MODEL="gpt-4"
 # Run review
 merge-mentor review --pr 123 --provider openai --write
 ```
-
-### Backward Compatibility
-
-The old unprefixed environment variables are still supported but deprecated:
-
-| Old Variable | New Variable (MM_ prefixed) |
-|--------------|----------------------------|
-| `DEFAULT_PLATFORM` | `MM_PLATFORM` |
-| `GITHUB_TOKEN` | `MM_GITHUB_TOKEN` |
-| `GITHUB_REPO_OWNER` | `MM_GITHUB_REPO_OWNER` |
-| `GITHUB_REPO_NAME` | `MM_GITHUB_REPO_NAME` |
-| `AZURE_DEVOPS_TOKEN` | `MM_AZURE_TOKEN` |
-| `AZURE_DEVOPS_ORG` | `MM_AZURE_ORG` |
-| `AZURE_DEVOPS_PROJECT` | `MM_AZURE_PROJECT` |
-| `AZURE_DEVOPS_REPO` | `MM_AZURE_REPO` |
-| `BOT_COMMENT_IDENTIFIER` | `MM_COMMENT_IDENTIFIER` |
-| `AI_PROVIDER` | `MM_AI_PROVIDER` |
-| `COPILOT_MODEL` | `MM_COPILOT_MODEL` |
-| `COPILOT_TIMEOUT_MS` | `MM_COPILOT_TIMEOUT` |
-| `OPENCODE_MODEL` | `MM_OPENCODE_MODEL` |
-| `OPENCODE_TIMEOUT_MS` | `MM_OPENCODE_TIMEOUT` |
-| `CURSOR_MODEL` | `MM_CURSOR_MODEL` |
-| `CURSOR_TIMEOUT_MS` | `MM_CURSOR_TIMEOUT` |
-| `OPENAI_API_KEY` | `MM_OPENAI_API_KEY` |
-| `OPENAI_MODEL` | `MM_OPENAI_MODEL` |
-| `OPENAI_TIMEOUT_MS` | `MM_OPENAI_TIMEOUT` |
-| `OPENAI_BASE_URL` | `MM_OPENAI_BASE_URL` |
-| `OPENAI_MAX_RETRIES` | `MM_OPENAI_MAX_RETRIES` |
-| `MIN_COMMENT_CONFIDENCE` | `MM_MIN_COMMENT_CONFIDENCE` |
-| `SKIP_PREEXISTING_ISSUES` | `MM_SKIP_EXISTING_ISSUES` |
-| `POST_RESOLUTION_COMMENTS` | `MM_POST_RESOLUTION_COMMENTS` |
-| `REVIEW_RUNS` | `MM_REVIEW_RUNS` |
-
-**Note:** MM_ prefixed variables take precedence if both are set.
 
 ## Usage
 
@@ -599,10 +565,10 @@ steps:
         --write
     displayName: Run Review
     env:
-      AZURE_DEVOPS_TOKEN: $(AZURE_DEVOPS_TOKEN)
-      AZURE_DEVOPS_ORG: $(System.TeamFoundationCollectionUri)
-      AZURE_DEVOPS_PROJECT: $(System.TeamProject)
-      AZURE_DEVOPS_REPO: $(Build.Repository.Name)
+      MM_AZURE_TOKEN: $(AZURE_DEVOPS_TOKEN)
+      MM_AZURE_ORG: $(System.TeamFoundationCollectionUri)
+      MM_AZURE_PROJECT: $(System.TeamProject)
+      MM_AZURE_REPO: $(Build.Repository.Name)
 ```
 
 ## Logging
@@ -649,9 +615,11 @@ merge-mentor creates several directories in your project root for different purp
 ### Timeout errors
 Increase timeout for large PRs:
 ```bash
-export COPILOT_TIMEOUT_MS=300000  # 5 minutes (for Copilot)
-export OPENCODE_TIMEOUT_MS=300000  # 5 minutes (for OpenCode)
-export CURSOR_TIMEOUT_MS=300000  # 5 minutes (for Cursor)
+export MM_COPILOT_TIMEOUT=300000  # 5 minutes (for Copilot)
+export MM_OPENCODE_TIMEOUT=300000  # 5 minutes (for OpenCode)
+export MM_CURSOR_TIMEOUT=300000  # 5 minutes (for Cursor)
+export MM_OPENAI_TIMEOUT=300000  # 5 minutes (for OpenAI)
+```
 export OPENAI_TIMEOUT_MS=300000  # 5 minutes (for OpenAI)
 ```
 

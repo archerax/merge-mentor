@@ -4,26 +4,26 @@ import { ConfigurationError } from "./errors/index.js";
 
 function cleanEnv(): void {
   // Old names (for backward compatibility testing)
-  delete process.env.DEFAULT_PLATFORM;
-  delete process.env.GITHUB_TOKEN;
-  delete process.env.GITHUB_REPO_OWNER;
-  delete process.env.GITHUB_REPO_NAME;
-  delete process.env.AZURE_DEVOPS_TOKEN;
-  delete process.env.AZURE_DEVOPS_ORG;
-  delete process.env.AZURE_DEVOPS_PROJECT;
-  delete process.env.AZURE_DEVOPS_REPO;
-  delete process.env.BOT_COMMENT_IDENTIFIER;
+  delete process.env.MM_PLATFORM;
+  delete process.env.MM_GITHUB_TOKEN;
+  delete process.env.MM_GITHUB_REPO_OWNER;
+  delete process.env.MM_GITHUB_REPO_NAME;
+  delete process.env.MM_AZURE_TOKEN;
+  delete process.env.MM_AZURE_ORG;
+  delete process.env.MM_AZURE_PROJECT;
+  delete process.env.MM_AZURE_REPO;
+  delete process.env.MM_COMMENT_IDENTIFIER;
   delete process.env.MIN_COMMENT_CONFIDENCE;
-  delete process.env.SKIP_PREEXISTING_ISSUES;
+  delete process.env.MM_SKIP_EXISTING_ISSUES;
   delete process.env.POST_RESOLUTION_COMMENTS;
-  delete process.env.REVIEW_RUNS;
-  delete process.env.AI_PROVIDER;
-  delete process.env.COPILOT_MODEL;
-  delete process.env.COPILOT_TIMEOUT_MS;
-  delete process.env.OPENCODE_MODEL;
-  delete process.env.OPENCODE_TIMEOUT_MS;
-  delete process.env.CURSOR_MODEL;
-  delete process.env.CURSOR_TIMEOUT_MS;
+  delete process.env.MM_REVIEW_RUNS;
+  delete process.env.MM_AI_PROVIDER;
+  delete process.env.MM_COPILOT_MODEL;
+  delete process.env.MM_COPILOT_TIMEOUT;
+  delete process.env.MM_OPENCODE_MODEL;
+  delete process.env.MM_OPENCODE_TIMEOUT;
+  delete process.env.MM_CURSOR_MODEL;
+  delete process.env.MM_CURSOR_TIMEOUT;
 
   // New MM_ prefixed names
   delete process.env.MM_PLATFORM;
@@ -80,15 +80,15 @@ describe("Config", () => {
 
     it("should load values from environment variables", () => {
       setEnv({
-        DEFAULT_PLATFORM: "azure",
-        GITHUB_TOKEN: "gh-token",
-        GITHUB_REPO_OWNER: "owner",
-        GITHUB_REPO_NAME: "repo",
-        AZURE_DEVOPS_TOKEN: "az-token",
-        AZURE_DEVOPS_ORG: "org",
-        AZURE_DEVOPS_PROJECT: "project",
-        AZURE_DEVOPS_REPO: "az-repo",
-        BOT_COMMENT_IDENTIFIER: "[Custom Bot]",
+        MM_PLATFORM: "azure",
+        MM_GITHUB_TOKEN: "gh-token",
+        MM_GITHUB_REPO_OWNER: "owner",
+        MM_GITHUB_REPO_NAME: "repo",
+        MM_AZURE_TOKEN: "az-token",
+        MM_AZURE_ORG: "org",
+        MM_AZURE_PROJECT: "project",
+        MM_AZURE_REPO: "az-repo",
+        MM_COMMENT_IDENTIFIER: "[Custom Bot]",
       });
 
       const config = loadConfig();
@@ -106,7 +106,7 @@ describe("Config", () => {
 
     it("should load skipPreExisting setting from environment variable", () => {
       setEnv({
-        SKIP_PREEXISTING_ISSUES: "false",
+        MM_SKIP_EXISTING_ISSUES: "false",
       });
 
       const config = loadConfig();
@@ -122,9 +122,9 @@ describe("Config", () => {
       expect(config.skipPreExisting).toBe(true);
     });
 
-    it("should load REVIEW_RUNS from environment", () => {
+    it("should load MM_REVIEW_RUNS from environment", () => {
       setEnv({
-        REVIEW_RUNS: "3",
+        MM_REVIEW_RUNS: "3",
       });
 
       const config = loadConfig();
@@ -132,9 +132,9 @@ describe("Config", () => {
       expect(config.reviewRuns).toBe(3);
     });
 
-    it("should default REVIEW_RUNS to 1 for invalid values", () => {
+    it("should default MM_REVIEW_RUNS to 1 for invalid values", () => {
       setEnv({
-        REVIEW_RUNS: "invalid",
+        MM_REVIEW_RUNS: "invalid",
       });
 
       const config = loadConfig();
@@ -142,9 +142,9 @@ describe("Config", () => {
       expect(config.reviewRuns).toBe(1);
     });
 
-    it("should default REVIEW_RUNS to 1 for values below range", () => {
+    it("should default MM_REVIEW_RUNS to 1 for values below range", () => {
       setEnv({
-        REVIEW_RUNS: "0",
+        MM_REVIEW_RUNS: "0",
       });
 
       const config = loadConfig();
@@ -152,9 +152,9 @@ describe("Config", () => {
       expect(config.reviewRuns).toBe(1);
     });
 
-    it("should default REVIEW_RUNS to 1 for values above range", () => {
+    it("should default MM_REVIEW_RUNS to 1 for values above range", () => {
       setEnv({
-        REVIEW_RUNS: "10",
+        MM_REVIEW_RUNS: "10",
       });
 
       const config = loadConfig();
@@ -162,17 +162,17 @@ describe("Config", () => {
       expect(config.reviewRuns).toBe(1);
     });
 
-    it("should accept REVIEW_RUNS at boundary values", () => {
-      setEnv({ REVIEW_RUNS: "1" });
+    it("should accept MM_REVIEW_RUNS at boundary values", () => {
+      setEnv({ MM_REVIEW_RUNS: "1" });
       expect(loadConfig().reviewRuns).toBe(1);
 
-      setEnv({ REVIEW_RUNS: "5" });
+      setEnv({ MM_REVIEW_RUNS: "5" });
       expect(loadConfig().reviewRuns).toBe(5);
     });
 
-    it("should load COPILOT_TIMEOUT_MS from environment", () => {
+    it("should load MM_COPILOT_TIMEOUT from environment", () => {
       setEnv({
-        COPILOT_TIMEOUT_MS: "60000",
+        MM_COPILOT_TIMEOUT: "60000",
       });
 
       const config = loadConfig();
@@ -180,9 +180,9 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBe(60000);
     });
 
-    it("should ignore COPILOT_TIMEOUT_MS when zero or negative", () => {
+    it("should ignore MM_COPILOT_TIMEOUT when zero or negative", () => {
       setEnv({
-        COPILOT_TIMEOUT_MS: "0",
+        MM_COPILOT_TIMEOUT: "0",
       });
 
       const config = loadConfig();
@@ -190,9 +190,9 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
-    it("should ignore COPILOT_TIMEOUT_MS when negative", () => {
+    it("should ignore MM_COPILOT_TIMEOUT when negative", () => {
       setEnv({
-        COPILOT_TIMEOUT_MS: "-1000",
+        MM_COPILOT_TIMEOUT: "-1000",
       });
 
       const config = loadConfig();
@@ -200,15 +200,15 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
-    it("should default COPILOT_TIMEOUT_MS to undefined when not set", () => {
+    it("should default MM_COPILOT_TIMEOUT to undefined when not set", () => {
       const config = loadConfig();
 
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
-    it("should load COPILOT_MODEL from environment", () => {
+    it("should load MM_COPILOT_MODEL from environment", () => {
       setEnv({
-        COPILOT_MODEL: "gpt-4-turbo",
+        MM_COPILOT_MODEL: "gpt-4-turbo",
       });
 
       const config = loadConfig();
@@ -216,9 +216,9 @@ describe("Config", () => {
       expect(config.copilotModel).toBe("gpt-4-turbo");
     });
 
-    it("should load AI_PROVIDER from environment", () => {
+    it("should load MM_AI_PROVIDER from environment", () => {
       setEnv({
-        AI_PROVIDER: "opencode",
+        MM_AI_PROVIDER: "opencode",
       });
 
       const config = loadConfig();
@@ -226,9 +226,9 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("opencode");
     });
 
-    it("should default AI_PROVIDER to copilot for invalid values", () => {
+    it("should default MM_AI_PROVIDER to copilot for invalid values", () => {
       setEnv({
-        AI_PROVIDER: "invalid",
+        MM_AI_PROVIDER: "invalid",
       });
 
       const config = loadConfig();
@@ -236,20 +236,20 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("copilot");
     });
 
-    it("should accept all valid AI_PROVIDER values", () => {
-      setEnv({ AI_PROVIDER: "copilot" });
+    it("should accept all valid MM_AI_PROVIDER values", () => {
+      setEnv({ MM_AI_PROVIDER: "copilot" });
       expect(loadConfig().aiProvider).toBe("copilot");
 
-      setEnv({ AI_PROVIDER: "opencode" });
+      setEnv({ MM_AI_PROVIDER: "opencode" });
       expect(loadConfig().aiProvider).toBe("opencode");
 
-      setEnv({ AI_PROVIDER: "cursor" });
+      setEnv({ MM_AI_PROVIDER: "cursor" });
       expect(loadConfig().aiProvider).toBe("cursor");
     });
 
-    it("should load OPENCODE_MODEL from environment", () => {
+    it("should load MM_OPENCODE_MODEL from environment", () => {
       setEnv({
-        OPENCODE_MODEL: "claude-3.5-sonnet",
+        MM_OPENCODE_MODEL: "claude-3.5-sonnet",
       });
 
       const config = loadConfig();
@@ -257,9 +257,9 @@ describe("Config", () => {
       expect(config.opencodeModel).toBe("claude-3.5-sonnet");
     });
 
-    it("should load OPENCODE_TIMEOUT_MS from environment", () => {
+    it("should load MM_OPENCODE_TIMEOUT from environment", () => {
       setEnv({
-        OPENCODE_TIMEOUT_MS: "120000",
+        MM_OPENCODE_TIMEOUT: "120000",
       });
 
       const config = loadConfig();
@@ -267,9 +267,9 @@ describe("Config", () => {
       expect(config.opencodeTimeoutMs).toBe(120000);
     });
 
-    it("should ignore OPENCODE_TIMEOUT_MS when zero or negative", () => {
+    it("should ignore MM_OPENCODE_TIMEOUT when zero or negative", () => {
       setEnv({
-        OPENCODE_TIMEOUT_MS: "0",
+        MM_OPENCODE_TIMEOUT: "0",
       });
 
       const config = loadConfig();
@@ -277,9 +277,9 @@ describe("Config", () => {
       expect(config.opencodeTimeoutMs).toBeUndefined();
     });
 
-    it("should load CURSOR_MODEL from environment", () => {
+    it("should load MM_CURSOR_MODEL from environment", () => {
       setEnv({
-        CURSOR_MODEL: "gpt-5",
+        MM_CURSOR_MODEL: "gpt-5",
       });
 
       const config = loadConfig();
@@ -287,9 +287,9 @@ describe("Config", () => {
       expect(config.cursorModel).toBe("gpt-5");
     });
 
-    it("should load CURSOR_TIMEOUT_MS from environment", () => {
+    it("should load MM_CURSOR_TIMEOUT from environment", () => {
       setEnv({
-        CURSOR_TIMEOUT_MS: "180000",
+        MM_CURSOR_TIMEOUT: "180000",
       });
 
       const config = loadConfig();
@@ -297,28 +297,14 @@ describe("Config", () => {
       expect(config.cursorTimeoutMs).toBe(180000);
     });
 
-    it("should ignore CURSOR_TIMEOUT_MS when zero or negative", () => {
+    it("should ignore MM_CURSOR_TIMEOUT when zero or negative", () => {
       setEnv({
-        CURSOR_TIMEOUT_MS: "0",
+        MM_CURSOR_TIMEOUT: "0",
       });
 
       const config = loadConfig();
 
       expect(config.cursorTimeoutMs).toBeUndefined();
-    });
-
-    it("should prefer MM_ prefixed environment variables over unprefixed", () => {
-      setEnv({
-        MM_GITHUB_TOKEN: "mm-token",
-        GITHUB_TOKEN: "old-token",
-        MM_PLATFORM: "azure",
-        DEFAULT_PLATFORM: "github",
-      });
-
-      const config = loadConfig();
-
-      expect(config.github.token).toBe("mm-token");
-      expect(config.defaultPlatform).toBe("azure");
     });
 
     it("should support all MM_ prefixed environment variables", () => {

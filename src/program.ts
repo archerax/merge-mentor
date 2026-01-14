@@ -30,6 +30,7 @@ export interface ReviewOptions {
   // Bot config
   commentIdentifier?: string;
   // AI provider config
+  copilotToken?: string;
   copilotModel?: string;
   copilotTimeout?: number;
   opencodeModel?: string;
@@ -158,6 +159,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     verbose: options.verbose,
     aiModel,
     aiTimeoutMs,
+    copilotToken: config.copilotToken,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
     openaiApiKey: openaiOptions?.apiKey,
@@ -290,16 +292,6 @@ export function generateMarkdownReport(
     report += `## 💡 Recommendations\n\n`;
     result.crossFileResult.recommendations.forEach((rec, index) => {
       report += `${index + 1}. ${rec}\n`;
-    });
-    report += `\n`;
-  }
-
-  // Resolved comments (if any)
-  const resolvedComments = result.fileResults.flatMap((fr) => fr.resolvedComments || []);
-  if (resolvedComments.length > 0) {
-    report += `## ✅ Resolved Issues\n\n`;
-    resolvedComments.forEach((resolved, index) => {
-      report += `${index + 1}. **Line ${resolved.line}:** ${resolved.reason}\n`;
     });
     report += `\n`;
   }
@@ -469,6 +461,7 @@ program
   // Bot config
   .option("--comment-identifier <id>", "Bot comment identifier. Env: MM_COMMENT_IDENTIFIER")
   // AI provider config
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
   .option("--copilot-timeout <ms>", "Copilot timeout in ms. Env: MM_COPILOT_TIMEOUT", parseInt)
   .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
@@ -505,6 +498,7 @@ program
         azureRepo: options.azureRepo,
         commentIdentifier: options.commentIdentifier,
         aiProvider: options.provider,
+        copilotToken: options.copilotToken,
         copilotModel: options.copilotModel,
         copilotTimeout: options.copilotTimeout,
         opencodeModel: options.opencodeModel,

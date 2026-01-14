@@ -10,8 +10,6 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-  FindingConfidence,
-  ResolvedComment,
 } from "../../platforms/types.js";
 import type { AIProviderClient, AIProviderOptions, AIResponse, TokenUsage } from "../types.js";
 
@@ -22,7 +20,6 @@ interface RawFileFinding {
   category?: unknown;
   message?: unknown;
   suggestion?: unknown;
-  confidence?: unknown;
   isPreExisting?: unknown;
 }
 
@@ -34,16 +31,9 @@ interface RawCrossFileFinding {
   affected_files?: unknown[];
 }
 
-/** Raw resolved comment from Copilot JSON response. */
-interface RawResolvedComment {
-  line?: unknown;
-  reason?: unknown;
-}
-
 /** Raw file review response from Copilot. */
 interface RawFileReviewResponse {
   findings?: RawFileFinding[];
-  resolved_comments?: RawResolvedComment[];
 }
 
 /** Raw cross-file review response from Copilot. */
@@ -72,6 +62,7 @@ export class CopilotProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly token?: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotProvider" });
   private readonly tempDir: string;
@@ -80,6 +71,7 @@ export class CopilotProvider implements AIProviderClient {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.token = options?.token;
     this.tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
   }
 
@@ -202,11 +194,13 @@ export class CopilotProvider implements AIProviderClient {
 
       // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
       // Node.js will automatically handle .exe extension on Windows
+      const env = this.token ? { ...process.env, GITHUB_TOKEN: this.token } : process.env;
       const proc = spawn("copilot", args, {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
         shell: false, // Explicit shell: false ensures consistent cross-platform behavior
         cwd: tempFilePath ? this.tempDir : undefined, // Run from temp dir to use relative paths
+        env,
       });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
@@ -411,7 +405,6 @@ export class CopilotProvider implements AIProviderClient {
   parseFileReview(filename: string, response: AIResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
     const findings: FileFinding[] = [];
-    const resolvedComments: ResolvedComment[] = [];
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
@@ -421,27 +414,14 @@ export class CopilotProvider implements AIProviderClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
-          confidence: this.validateConfidence(finding.confidence),
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
-      }
-    }
-
-    if (Array.isArray(data.resolved_comments)) {
-      for (const resolved of data.resolved_comments) {
-        if (typeof resolved.line === "number" && resolved.line > 0) {
-          resolvedComments.push({
-            line: resolved.line,
-            reason: String(resolved.reason || "Issue addressed"),
-          });
-        }
       }
     }
 
     return {
       filename,
       findings,
-      resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
     };
   }
 
@@ -520,7 +500,6 @@ export class CopilotProvider implements AIProviderClient {
 
       const rawFileData = fileData as RawFileReviewResponse;
       const findings: FileFinding[] = [];
-      const resolvedComments: ResolvedComment[] = [];
 
       this.logger.debug(
         {
@@ -539,21 +518,9 @@ export class CopilotProvider implements AIProviderClient {
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
-            confidence: this.validateConfidence(finding.confidence),
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });
-        }
-      }
-
-      if (Array.isArray(rawFileData.resolved_comments)) {
-        for (const resolved of rawFileData.resolved_comments) {
-          if (typeof resolved.line === "number" && resolved.line > 0) {
-            resolvedComments.push({
-              line: resolved.line,
-              reason: String(resolved.reason || "Issue addressed"),
-            });
-          }
         }
       }
 
@@ -561,7 +528,6 @@ export class CopilotProvider implements AIProviderClient {
         {
           filename,
           findingsCount: findings.length,
-          resolvedCommentsCount: resolvedComments.length,
         },
         "Final file review result"
       );
@@ -569,7 +535,6 @@ export class CopilotProvider implements AIProviderClient {
       results.push({
         filename,
         findings,
-        resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
       });
     }
 
@@ -615,13 +580,5 @@ export class CopilotProvider implements AIProviderClient {
     return validCategories.includes(stringValue as (typeof validCategories)[number])
       ? (stringValue as CrossFileFinding["category"])
       : "design";
-  }
-
-  private validateConfidence(value: unknown): FindingConfidence {
-    const validConfidences = ["high", "medium", "low"] as const;
-    const stringValue = String(value);
-    return validConfidences.includes(stringValue as (typeof validConfidences)[number])
-      ? (stringValue as FindingConfidence)
-      : "medium";
   }
 }

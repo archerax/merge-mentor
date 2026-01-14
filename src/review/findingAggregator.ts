@@ -3,7 +3,6 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-  ResolvedComment,
 } from "../platforms/types.js";
 
 /**
@@ -25,19 +24,6 @@ function generateCrossFileFindingFingerprint(finding: CrossFileFinding): string 
 }
 
 /**
- * Compares two confidence levels and returns the higher one.
- */
-function higherConfidence(
-  a: FileFinding["confidence"],
-  b: FileFinding["confidence"]
-): FileFinding["confidence"] {
-  const order: Record<string, number> = { high: 3, medium: 2, low: 1 };
-  const aVal = order[a || "low"] || 0;
-  const bVal = order[b || "low"] || 0;
-  return aVal >= bVal ? a : b;
-}
-
-/**
  * Aggregates findings from multiple review runs to deduplicate and merge results.
  */
 export class FindingAggregator {
@@ -56,8 +42,6 @@ export class FindingAggregator {
 
     // Map: filename -> Map<fingerprint, best finding>
     const fileFindings = new Map<string, Map<string, FileFinding>>();
-    // Map: filename -> Map<line, resolved comment>
-    const fileResolved = new Map<string, Map<number, ResolvedComment>>();
 
     for (const run of runs) {
       for (const fileResult of run) {
@@ -72,26 +56,6 @@ export class FindingAggregator {
 
           if (!existing) {
             findingsMap.set(fingerprint, finding);
-          } else {
-            // Keep finding with higher confidence
-            const bestConfidence = higherConfidence(existing.confidence, finding.confidence);
-            if (bestConfidence === finding.confidence && bestConfidence !== existing.confidence) {
-              findingsMap.set(fingerprint, finding);
-            }
-          }
-        }
-
-        // Aggregate resolved comments
-        if (fileResult.resolvedComments) {
-          if (!fileResolved.has(fileResult.filename)) {
-            fileResolved.set(fileResult.filename, new Map());
-          }
-          const resolvedMap = fileResolved.get(fileResult.filename)!;
-          for (const resolved of fileResult.resolvedComments) {
-            // Keep the first resolution reason we find for each line
-            if (!resolvedMap.has(resolved.line)) {
-              resolvedMap.set(resolved.line, resolved);
-            }
           }
         }
       }
@@ -100,13 +64,9 @@ export class FindingAggregator {
     // Convert back to FileReviewResult array
     const results: FileReviewResult[] = [];
     for (const [filename, findingsMap] of fileFindings) {
-      const resolvedMap = fileResolved.get(filename);
-      const resolvedComments = resolvedMap ? Array.from(resolvedMap.values()) : undefined;
       results.push({
         filename,
         findings: Array.from(findingsMap.values()),
-        resolvedComments:
-          resolvedComments && resolvedComments.length > 0 ? resolvedComments : undefined,
       });
     }
 

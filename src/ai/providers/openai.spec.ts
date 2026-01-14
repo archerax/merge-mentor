@@ -209,7 +209,6 @@ describe("OpenAIProvider", () => {
             category: "bug",
             message: "Potential null pointer",
             suggestion: "Add null check",
-            confidence: "high",
             isPreExisting: false,
           },
         ],
@@ -225,27 +224,7 @@ describe("OpenAIProvider", () => {
         category: "bug",
         message: "Potential null pointer",
         suggestion: "Add null check",
-        confidence: "high",
         isPreExisting: false,
-      });
-    });
-
-    it("handles resolved comments", () => {
-      const provider = createOpenAIProvider();
-      const response = createAIResponse({
-        findings: [],
-        resolved_comments: [
-          { line: 5, reason: "Issue was fixed" },
-          { line: 10, reason: "Code was refactored" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.resolvedComments).toHaveLength(2);
-      expect(result.resolvedComments?.[0]).toEqual({
-        line: 5,
-        reason: "Issue was fixed",
       });
     });
 
@@ -258,19 +237,6 @@ describe("OpenAIProvider", () => {
       const result = provider.parseFileReview("test.ts", response);
 
       expect(result.findings[0].severity).toBe("medium");
-    });
-
-    it("normalizes invalid confidence values", () => {
-      const provider = createOpenAIProvider();
-      const response = createAIResponse({
-        findings: [
-          { line: 1, severity: "high", category: "bug", message: "test", confidence: "invalid" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.findings[0].confidence).toBe("medium");
     });
 
     it("normalizes invalid category values", () => {
@@ -291,24 +257,6 @@ describe("OpenAIProvider", () => {
       const result = provider.parseFileReview("test.ts", response);
 
       expect(result.findings).toEqual([]);
-      expect(result.resolvedComments).toBeUndefined();
-    });
-
-    it("filters out resolved comments with invalid line numbers", () => {
-      const provider = createOpenAIProvider();
-      const response = createAIResponse({
-        findings: [],
-        resolved_comments: [
-          { line: 0, reason: "Invalid" },
-          { line: -5, reason: "Also invalid" },
-          { line: 10, reason: "Valid" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.resolvedComments).toHaveLength(1);
-      expect(result.resolvedComments?.[0].line).toBe(10);
     });
   });
 
@@ -414,26 +362,6 @@ describe("OpenAIProvider", () => {
       const results = provider.parseBatchedFileReview(response);
 
       expect(results).toEqual([]);
-    });
-
-    it("handles resolved comments in batched review", () => {
-      const provider = createOpenAIProvider();
-      const response = createAIResponse({
-        file_results: {
-          "src/app.ts": {
-            findings: [],
-            resolved_comments: [{ line: 5, reason: "Fixed" }],
-          },
-        },
-      });
-
-      const results = provider.parseBatchedFileReview(response);
-
-      expect(results[0].resolvedComments).toHaveLength(1);
-      expect(results[0].resolvedComments?.[0]).toEqual({
-        line: 5,
-        reason: "Fixed",
-      });
     });
 
     it("handles multiple files with various findings", () => {

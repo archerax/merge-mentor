@@ -97,11 +97,7 @@ export class CommentManager {
 
     // Resolve comments that are no longer relevant
     for (const comment of existingComments) {
-      if (
-        !matchedExistingIds.has(comment.id) &&
-        !comment.isResolved &&
-        comment.path
-      ) {
+      if (!matchedExistingIds.has(comment.id) && !comment.isResolved && comment.path) {
         actions.push({
           type: "resolve",
           existingCommentId: comment.id,

@@ -33,6 +33,7 @@ export interface Config {
   readonly botCommentIdentifier: string;
   /** AI provider to use for code reviews. Default: copilot */
   readonly aiProvider: AIProviderType;
+  readonly copilotToken?: string;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
   readonly opencodeModel?: string;
@@ -51,32 +52,6 @@ export interface Config {
 }
 
 /**
- * Gets environment variable value with MM_ prefix fallback.
- * Tries MM_ prefixed version first, then falls back to old unprefixed names for backward compatibility.
- */
-function getEnvWithPrefix(key: string): string | undefined {
-  // Mapping from new keys to old keys for backward compatibility
-  const oldKeyMapping: Record<string, string> = {
-    PLATFORM: "DEFAULT_PLATFORM",
-    AZURE_TOKEN: "AZURE_DEVOPS_TOKEN",
-    AZURE_ORG: "AZURE_DEVOPS_ORG",
-    AZURE_PROJECT: "AZURE_DEVOPS_PROJECT",
-    AZURE_REPO: "AZURE_DEVOPS_REPO",
-    COMMENT_IDENTIFIER: "BOT_COMMENT_IDENTIFIER",
-    SKIP_EXISTING_ISSUES: "SKIP_PREEXISTING_ISSUES",
-    COPILOT_TIMEOUT: "COPILOT_TIMEOUT_MS",
-    OPENCODE_TIMEOUT: "OPENCODE_TIMEOUT_MS",
-    CURSOR_TIMEOUT: "CURSOR_TIMEOUT_MS",
-    OPENAI_TIMEOUT: "OPENAI_TIMEOUT_MS",
-  };
-
-  const newKey = `MM_${key}`;
-  const oldKey = oldKeyMapping[key] ?? key;
-
-  return process.env[newKey] ?? process.env[oldKey];
-}
-
-/**
  * Loads configuration from environment variables or CLI overrides.
  *
  * @param cliOverrides - Optional CLI parameter overrides
@@ -90,78 +65,76 @@ function getEnvWithPrefix(key: string): string | undefined {
  */
 export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
   const copilotTimeoutMs =
-    (cliOverrides?.copilotTimeout ?? getEnvWithPrefix("COPILOT_TIMEOUT"))
+    (cliOverrides?.copilotTimeout ?? process.env.MM_COPILOT_TIMEOUT)
       ? Number.parseInt(
-          cliOverrides?.copilotTimeout?.toString() ?? getEnvWithPrefix("COPILOT_TIMEOUT")!,
+          cliOverrides?.copilotTimeout?.toString() ?? process.env.MM_COPILOT_TIMEOUT!,
           10
         )
       : undefined;
   const opencodeTimeoutMs =
-    (cliOverrides?.opencodeTimeout ?? getEnvWithPrefix("OPENCODE_TIMEOUT"))
+    (cliOverrides?.opencodeTimeout ?? process.env.MM_OPENCODE_TIMEOUT)
       ? Number.parseInt(
-          cliOverrides?.opencodeTimeout?.toString() ?? getEnvWithPrefix("OPENCODE_TIMEOUT")!,
+          cliOverrides?.opencodeTimeout?.toString() ?? process.env.MM_OPENCODE_TIMEOUT!,
           10
         )
       : undefined;
   const cursorTimeoutMs =
-    (cliOverrides?.cursorTimeout ?? getEnvWithPrefix("CURSOR_TIMEOUT"))
+    (cliOverrides?.cursorTimeout ?? process.env.MM_CURSOR_TIMEOUT)
       ? Number.parseInt(
-          cliOverrides?.cursorTimeout?.toString() ?? getEnvWithPrefix("CURSOR_TIMEOUT")!,
+          cliOverrides?.cursorTimeout?.toString() ?? process.env.MM_CURSOR_TIMEOUT!,
           10
         )
       : undefined;
   const openaiTimeoutMs =
-    (cliOverrides?.openaiTimeout ?? getEnvWithPrefix("OPENAI_TIMEOUT"))
+    (cliOverrides?.openaiTimeout ?? process.env.MM_OPENAI_TIMEOUT)
       ? Number.parseInt(
-          cliOverrides?.openaiTimeout?.toString() ?? getEnvWithPrefix("OPENAI_TIMEOUT")!,
+          cliOverrides?.openaiTimeout?.toString() ?? process.env.MM_OPENAI_TIMEOUT!,
           10
         )
       : undefined;
   const openaiMaxRetries =
-    (cliOverrides?.openaiMaxRetries ?? getEnvWithPrefix("OPENAI_MAX_RETRIES"))
+    (cliOverrides?.openaiMaxRetries ?? process.env.MM_OPENAI_MAX_RETRIES)
       ? Number.parseInt(
-          cliOverrides?.openaiMaxRetries?.toString() ?? getEnvWithPrefix("OPENAI_MAX_RETRIES")!,
+          cliOverrides?.openaiMaxRetries?.toString() ?? process.env.MM_OPENAI_MAX_RETRIES!,
           10
         )
       : undefined;
 
   const reviewRuns = validateReviewRuns(
-    cliOverrides?.reviewRuns?.toString() ?? getEnvWithPrefix("REVIEW_RUNS")
+    cliOverrides?.reviewRuns?.toString() ?? process.env.MM_REVIEW_RUNS
   );
-  const aiProvider = validateAIProvider(
-    cliOverrides?.aiProvider ?? getEnvWithPrefix("AI_PROVIDER")
-  );
+  const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? process.env.MM_AI_PROVIDER);
 
   return {
-    defaultPlatform:
-      ((cliOverrides?.platform ?? getEnvWithPrefix("PLATFORM")) as Platform) || "github",
+    defaultPlatform: ((cliOverrides?.platform ?? process.env.MM_PLATFORM) as Platform) || "github",
     github: {
-      token: cliOverrides?.githubToken ?? getEnvWithPrefix("GITHUB_TOKEN") ?? "",
-      owner: cliOverrides?.githubRepoOwner ?? getEnvWithPrefix("GITHUB_REPO_OWNER") ?? "",
-      repo: cliOverrides?.githubRepoName ?? getEnvWithPrefix("GITHUB_REPO_NAME") ?? "",
+      token: cliOverrides?.githubToken ?? process.env.MM_GITHUB_TOKEN ?? "",
+      owner: cliOverrides?.githubRepoOwner ?? process.env.MM_GITHUB_REPO_OWNER ?? "",
+      repo: cliOverrides?.githubRepoName ?? process.env.MM_GITHUB_REPO_NAME ?? "",
     },
     azure: {
-      token: cliOverrides?.azureToken ?? getEnvWithPrefix("AZURE_TOKEN") ?? "",
-      org: cliOverrides?.azureOrg ?? getEnvWithPrefix("AZURE_ORG") ?? "",
-      project: cliOverrides?.azureProject ?? getEnvWithPrefix("AZURE_PROJECT") ?? "",
-      repo: cliOverrides?.azureRepo ?? getEnvWithPrefix("AZURE_REPO") ?? "",
+      token: cliOverrides?.azureToken ?? process.env.MM_AZURE_TOKEN ?? "",
+      org: cliOverrides?.azureOrg ?? process.env.MM_AZURE_ORG ?? "",
+      project: cliOverrides?.azureProject ?? process.env.MM_AZURE_PROJECT ?? "",
+      repo: cliOverrides?.azureRepo ?? process.env.MM_AZURE_REPO ?? "",
     },
     botCommentIdentifier:
-      cliOverrides?.commentIdentifier ?? getEnvWithPrefix("COMMENT_IDENTIFIER") ?? "[merge-mentor]",
+      cliOverrides?.commentIdentifier ?? process.env.MM_COMMENT_IDENTIFIER ?? "[merge-mentor]",
     aiProvider,
-    copilotModel: cliOverrides?.copilotModel ?? getEnvWithPrefix("COPILOT_MODEL"),
+    copilotToken: cliOverrides?.copilotToken ?? process.env.MM_COPILOT_TOKEN,
+    copilotModel: cliOverrides?.copilotModel ?? process.env.MM_COPILOT_MODEL,
     copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
-    opencodeModel: cliOverrides?.opencodeModel ?? getEnvWithPrefix("OPENCODE_MODEL"),
+    opencodeModel: cliOverrides?.opencodeModel ?? process.env.MM_OPENCODE_MODEL,
     opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
-    cursorModel: cliOverrides?.cursorModel ?? getEnvWithPrefix("CURSOR_MODEL"),
+    cursorModel: cliOverrides?.cursorModel ?? process.env.MM_CURSOR_MODEL,
     cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
-    openaiApiKey: cliOverrides?.openaiApiKey ?? getEnvWithPrefix("OPENAI_API_KEY"),
-    openaiModel: cliOverrides?.openaiModel ?? getEnvWithPrefix("OPENAI_MODEL"),
+    openaiApiKey: cliOverrides?.openaiApiKey ?? process.env.MM_OPENAI_API_KEY,
+    openaiModel: cliOverrides?.openaiModel ?? process.env.MM_OPENAI_MODEL,
     openaiTimeoutMs: openaiTimeoutMs && openaiTimeoutMs > 0 ? openaiTimeoutMs : undefined,
-    openaiBaseUrl: cliOverrides?.openaiBaseUrl ?? getEnvWithPrefix("OPENAI_BASE_URL"),
+    openaiBaseUrl: cliOverrides?.openaiBaseUrl ?? process.env.MM_OPENAI_BASE_URL,
     openaiMaxRetries: openaiMaxRetries && openaiMaxRetries > 0 ? openaiMaxRetries : undefined,
     skipPreExisting:
-      (cliOverrides?.skipExistingIssues ?? getEnvWithPrefix("SKIP_EXISTING_ISSUES")) !== "false",
+      (cliOverrides?.skipExistingIssues ?? process.env.MM_SKIP_EXISTING_ISSUES) !== "false",
     reviewRuns,
   };
 }
@@ -178,6 +151,7 @@ export interface CliOverrides {
   readonly azureRepo?: string;
   readonly commentIdentifier?: string;
   readonly aiProvider?: string;
+  readonly copilotToken?: string;
   readonly copilotModel?: string;
   readonly copilotTimeout?: number;
   readonly opencodeModel?: string;

@@ -14,7 +14,6 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
     category: "bug",
     message: "Test issue found",
     suggestion: "Fix it",
-    confidence: "high",
     isPreExisting: false,
     ...overrides,
   };
@@ -101,97 +100,6 @@ describe("FindingAggregator", () => {
       expect(result).toHaveLength(2);
       expect(result.find((r) => r.filename === "file1.ts")).toBeDefined();
       expect(result.find((r) => r.filename === "file2.ts")).toBeDefined();
-    });
-
-    it("keeps finding with highest confidence when duplicates found", () => {
-      const aggregator = new FindingAggregator();
-      const lowConfidence = createFileFinding({
-        line: 10,
-        category: "bug",
-        message: "Same issue",
-        confidence: "low",
-      });
-      const highConfidence = createFileFinding({
-        line: 10,
-        category: "bug",
-        message: "Same issue",
-        confidence: "high",
-      });
-
-      const run1 = [createFileReviewResult("file.ts", [lowConfidence])];
-      const run2 = [createFileReviewResult("file.ts", [highConfidence])];
-
-      const result = aggregator.aggregateFileFindings([run1, run2]);
-
-      expect(result[0].findings[0].confidence).toBe("high");
-    });
-
-    it("keeps first finding when confidence is equal", () => {
-      const aggregator = new FindingAggregator();
-      const finding1 = createFileFinding({
-        line: 10,
-        category: "bug",
-        message: "Same issue",
-        confidence: "medium",
-        suggestion: "First suggestion",
-      });
-      const finding2 = createFileFinding({
-        line: 10,
-        category: "bug",
-        message: "Same issue",
-        confidence: "medium",
-        suggestion: "Second suggestion",
-      });
-
-      const run1 = [createFileReviewResult("file.ts", [finding1])];
-      const run2 = [createFileReviewResult("file.ts", [finding2])];
-
-      const result = aggregator.aggregateFileFindings([run1, run2]);
-
-      expect(result[0].findings[0].suggestion).toBe("First suggestion");
-    });
-
-    it("handles findings with undefined confidence", () => {
-      const aggregator = new FindingAggregator();
-      const findingNoConfidence = createFileFinding({
-        line: 10,
-        message: "Same issue",
-        confidence: undefined,
-      });
-      const findingWithConfidence = createFileFinding({
-        line: 10,
-        message: "Same issue",
-        confidence: "medium",
-      });
-
-      const run1 = [createFileReviewResult("file.ts", [findingNoConfidence])];
-      const run2 = [createFileReviewResult("file.ts", [findingWithConfidence])];
-
-      const result = aggregator.aggregateFileFindings([run1, run2]);
-
-      expect(result[0].findings[0].confidence).toBe("medium");
-    });
-
-    it("handles findings with invalid confidence values", () => {
-      const aggregator = new FindingAggregator();
-      const finding1 = createFileFinding({
-        line: 10,
-        message: "Same issue",
-        confidence: "invalid" as any,
-      });
-      const finding2 = createFileFinding({
-        line: 10,
-        message: "Same issue",
-        confidence: "high",
-      });
-
-      const run1 = [createFileReviewResult("file.ts", [finding1])];
-      const run2 = [createFileReviewResult("file.ts", [finding2])];
-
-      const result = aggregator.aggregateFileFindings([run1, run2]);
-
-      // Should prefer the valid confidence
-      expect(result[0].findings[0].confidence).toBe("high");
     });
 
     it("aggregates findings from three runs", () => {
@@ -355,71 +263,6 @@ describe("FindingAggregator", () => {
 
       // Should be deduplicated regardless of file order
       expect(result.findings).toHaveLength(1);
-    });
-
-    it("aggregates resolved comments from multiple runs", () => {
-      const aggregator = new FindingAggregator();
-
-      const run1 = [
-        {
-          filename: "file.ts",
-          findings: [],
-          resolvedComments: [
-            { line: 10, reason: "Fixed in run 1" },
-            { line: 20, reason: "Fixed in run 1" },
-          ],
-        },
-      ];
-
-      const run2 = [
-        {
-          filename: "file.ts",
-          findings: [],
-          resolvedComments: [
-            { line: 10, reason: "Different reason for same line" },
-            { line: 30, reason: "Fixed in run 2" },
-          ],
-        },
-      ];
-
-      const result = aggregator.aggregateFileFindings([run1, run2]);
-
-      expect(result[0].resolvedComments).toHaveLength(3);
-      // Should keep first resolution reason for line 10
-      expect(result[0].resolvedComments?.find((r) => r.line === 10)?.reason).toBe("Fixed in run 1");
-    });
-
-    it("handles file results without resolved comments", () => {
-      const aggregator = new FindingAggregator();
-
-      const run1 = [
-        {
-          filename: "file.ts",
-          findings: [createFileFinding()],
-          // No resolvedComments field
-        },
-      ];
-
-      const result = aggregator.aggregateFileFindings([run1]);
-
-      expect(result[0].resolvedComments).toBeUndefined();
-    });
-
-    it("merges resolved comments from files without findings", () => {
-      const aggregator = new FindingAggregator();
-
-      const run1 = [
-        {
-          filename: "file.ts",
-          findings: [],
-          resolvedComments: [{ line: 10, reason: "Fixed" }],
-        },
-      ];
-
-      const result = aggregator.aggregateFileFindings([run1]);
-
-      expect(result[0].resolvedComments).toHaveLength(1);
-      expect(result[0].resolvedComments![0].line).toBe(10);
     });
   });
 });

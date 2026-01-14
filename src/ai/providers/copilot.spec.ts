@@ -225,7 +225,6 @@ describe("CopilotProvider", () => {
             category: "bug",
             message: "Potential null pointer",
             suggestion: "Add null check",
-            confidence: "high",
             isPreExisting: false,
           },
         ],
@@ -241,27 +240,7 @@ describe("CopilotProvider", () => {
         category: "bug",
         message: "Potential null pointer",
         suggestion: "Add null check",
-        confidence: "high",
         isPreExisting: false,
-      });
-    });
-
-    it("handles resolved comments", () => {
-      const provider = createCopilotProvider();
-      const response = createAIResponse({
-        findings: [],
-        resolved_comments: [
-          { line: 5, reason: "Issue was fixed" },
-          { line: 10, reason: "Code was refactored" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.resolvedComments).toHaveLength(2);
-      expect(result.resolvedComments?.[0]).toEqual({
-        line: 5,
-        reason: "Issue was fixed",
       });
     });
 
@@ -274,19 +253,6 @@ describe("CopilotProvider", () => {
       const result = provider.parseFileReview("test.ts", response);
 
       expect(result.findings[0].severity).toBe("medium");
-    });
-
-    it("normalizes invalid confidence values", () => {
-      const provider = createCopilotProvider();
-      const response = createAIResponse({
-        findings: [
-          { line: 1, severity: "high", category: "bug", message: "test", confidence: "invalid" },
-        ],
-      });
-
-      const result = provider.parseFileReview("test.ts", response);
-
-      expect(result.findings[0].confidence).toBe("medium");
     });
   });
 

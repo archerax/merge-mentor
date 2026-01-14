@@ -811,27 +811,6 @@ describe("CLI", () => {
       expect(report).not.toContain("## 💡 Recommendations");
     });
 
-    it("includes resolved comments when present", () => {
-      const result = createMockReviewResult({
-        fileResults: [
-          {
-            filename: "test.ts",
-            findings: [],
-            resolvedComments: [
-              { line: 5, reason: "Issue was fixed by adding validation" },
-              { line: 15, reason: "Error handling was improved" },
-            ],
-          },
-        ],
-      });
-
-      const report = generateMarkdownReport(result, "cursor", true);
-
-      expect(report).toContain("## ✅ Resolved Issues");
-      expect(report).toContain("1. **Line 5:** Issue was fixed by adding validation");
-      expect(report).toContain("2. **Line 15:** Error handling was improved");
-    });
-
     it("generates a report with correct header for non-dry-run mode", () => {
       const result = createMockReviewResult({});
       const report = generateMarkdownReport(result, "openai", false);

@@ -14,8 +14,6 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-  FindingConfidence,
-  ResolvedComment,
 } from "../../platforms/types.js";
 import type { AIProviderClient, AIProviderOptions, AIResponse, TokenUsage } from "../types.js";
 
@@ -26,7 +24,6 @@ interface RawFileFinding {
   category?: unknown;
   message?: unknown;
   suggestion?: unknown;
-  confidence?: unknown;
   isPreExisting?: unknown;
 }
 
@@ -38,16 +35,9 @@ interface RawCrossFileFinding {
   affected_files?: unknown[];
 }
 
-/** Raw resolved comment from OpenAI JSON response. */
-interface RawResolvedComment {
-  line?: unknown;
-  reason?: unknown;
-}
-
 /** Raw file review response from OpenAI. */
 interface RawFileReviewResponse {
   findings?: RawFileFinding[];
-  resolved_comments?: RawResolvedComment[];
 }
 
 /** Raw cross-file review response from OpenAI. */
@@ -304,7 +294,6 @@ export class OpenAIProvider implements AIProviderClient {
   parseFileReview(filename: string, response: AIResponse): FileReviewResult {
     const data = response.parsed as RawFileReviewResponse;
     const findings: FileFinding[] = [];
-    const resolvedComments: ResolvedComment[] = [];
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
@@ -314,27 +303,14 @@ export class OpenAIProvider implements AIProviderClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
-          confidence: this.validateConfidence(finding.confidence),
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
-      }
-    }
-
-    if (Array.isArray(data.resolved_comments)) {
-      for (const resolved of data.resolved_comments) {
-        if (typeof resolved.line === "number" && resolved.line > 0) {
-          resolvedComments.push({
-            line: resolved.line,
-            reason: String(resolved.reason || "Issue addressed"),
-          });
-        }
       }
     }
 
     return {
       filename,
       findings,
-      resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
     };
   }
 
@@ -412,7 +388,6 @@ export class OpenAIProvider implements AIProviderClient {
 
       const rawFileData = fileData as RawFileReviewResponse;
       const findings: FileFinding[] = [];
-      const resolvedComments: ResolvedComment[] = [];
 
       this.logger.debug(
         {
@@ -431,21 +406,9 @@ export class OpenAIProvider implements AIProviderClient {
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
-            confidence: this.validateConfidence(finding.confidence),
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });
-        }
-      }
-
-      if (Array.isArray(rawFileData.resolved_comments)) {
-        for (const resolved of rawFileData.resolved_comments) {
-          if (typeof resolved.line === "number" && resolved.line > 0) {
-            resolvedComments.push({
-              line: resolved.line,
-              reason: String(resolved.reason || "Issue addressed"),
-            });
-          }
         }
       }
 
@@ -453,7 +416,6 @@ export class OpenAIProvider implements AIProviderClient {
         {
           filename,
           findingsCount: findings.length,
-          resolvedCommentsCount: resolvedComments.length,
         },
         "Final file review result"
       );
@@ -461,7 +423,6 @@ export class OpenAIProvider implements AIProviderClient {
       results.push({
         filename,
         findings,
-        resolvedComments: resolvedComments.length > 0 ? resolvedComments : undefined,
       });
     }
 
@@ -507,13 +468,5 @@ export class OpenAIProvider implements AIProviderClient {
     return validCategories.includes(stringValue as (typeof validCategories)[number])
       ? (stringValue as CrossFileFinding["category"])
       : "design";
-  }
-
-  private validateConfidence(value: unknown): FindingConfidence {
-    const validConfidences = ["high", "medium", "low"] as const;
-    const stringValue = String(value);
-    return validConfidences.includes(stringValue as (typeof validConfidences)[number])
-      ? (stringValue as FindingConfidence)
-      : "medium";
   }
 }

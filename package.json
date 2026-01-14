@@ -7,8 +7,8 @@
     "merge-mentor": "dist/cli.js"
   },
   "scripts": {
-    "build": "cross-env NODE_ENV=production node build.mjs",
-    "build:dev": "node build.mjs",
+    "build": "tsc --noEmit && cross-env NODE_ENV=production node build.mjs",
+    "build:dev": "tsc --noEmit && node build.mjs",
     "review": "node dist/cli.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
