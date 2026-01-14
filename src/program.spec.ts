@@ -59,11 +59,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     botCommentIdentifier: "[merge-mentor]",
     aiProvider: "copilot",
     copilotModel: "gpt-4",
-    commentFilter: {
-      minConfidence: "high",
-      skipPreExisting: true,
-      postResolutionComments: true,
-    },
+    skipPreExisting: true,
     reviewRuns: 1,
     ...overrides,
   };
@@ -348,13 +344,9 @@ describe("CLI", () => {
       );
     });
 
-    it("passes comment filter config to ReviewEngine", async () => {
+    it("passes skipPreExisting config to ReviewEngine", async () => {
       const customConfig = createMockConfig({
-        commentFilter: {
-          minConfidence: "medium",
-          skipPreExisting: false,
-          postResolutionComments: false,
-        },
+        skipPreExisting: false,
       });
       vi.mocked(loadConfig).mockReturnValue(customConfig);
 
@@ -371,11 +363,7 @@ describe("CLI", () => {
         "[merge-mentor]",
         "copilot",
         expect.objectContaining({
-          commentFilter: {
-            minConfidence: "medium",
-            skipPreExisting: false,
-            postResolutionComments: false,
-          },
+          skipPreExisting: false,
         })
       );
     });
@@ -750,7 +738,6 @@ describe("CLI", () => {
                 category: "bug",
                 message: "Potential null pointer exception",
                 suggestion: "Add null check",
-                confidence: "high",
               },
             ],
           },
@@ -791,7 +778,6 @@ describe("CLI", () => {
       expect(report).toContain("#### 1. Line 10 🟠 🐛");
       expect(report).toContain("**Severity:** HIGH");
       expect(report).toContain("**Category:** bug");
-      expect(report).toContain("**Confidence:** high 🟢");
       expect(report).toContain("**Issue:** Potential null pointer exception");
       expect(report).toContain("**Suggestion:** Add null check");
       expect(report).toContain("## 🔗 Cross-File Issues");

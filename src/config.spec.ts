@@ -74,9 +74,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("");
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
       expect(config.aiProvider).toBe("copilot");
-      expect(config.commentFilter.minConfidence).toBe("high");
-      expect(config.commentFilter.skipPreExisting).toBe(true);
-      expect(config.commentFilter.postResolutionComments).toBe(true);
+      expect(config.skipPreExisting).toBe(true);
       expect(config.reviewRuns).toBe(1);
     });
 
@@ -106,38 +104,22 @@ describe("Config", () => {
       expect(config.botCommentIdentifier).toBe("[Custom Bot]");
     });
 
-    it("should load comment filter settings from environment variables", () => {
+    it("should load skipPreExisting setting from environment variable", () => {
       setEnv({
-        MIN_COMMENT_CONFIDENCE: "medium",
         SKIP_PREEXISTING_ISSUES: "false",
-        POST_RESOLUTION_COMMENTS: "false",
       });
 
       const config = loadConfig();
 
-      expect(config.commentFilter.minConfidence).toBe("medium");
-      expect(config.commentFilter.skipPreExisting).toBe(false);
-      expect(config.commentFilter.postResolutionComments).toBe(false);
+      expect(config.skipPreExisting).toBe(false);
     });
 
-    it("should default to high confidence for invalid MIN_COMMENT_CONFIDENCE", () => {
-      setEnv({
-        MIN_COMMENT_CONFIDENCE: "invalid",
-      });
+    it("should default skipPreExisting to true when not set", () => {
+      setEnv({});
 
       const config = loadConfig();
 
-      expect(config.commentFilter.minConfidence).toBe("high");
-    });
-
-    it("should accept low as MIN_COMMENT_CONFIDENCE", () => {
-      setEnv({
-        MIN_COMMENT_CONFIDENCE: "low",
-      });
-
-      const config = loadConfig();
-
-      expect(config.commentFilter.minConfidence).toBe("low");
+      expect(config.skipPreExisting).toBe(true);
     });
 
     it("should load REVIEW_RUNS from environment", () => {
@@ -373,9 +355,7 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("opencode");
       expect(config.copilotModel).toBe("gpt-5");
       expect(config.copilotTimeoutMs).toBe(60000);
-      expect(config.commentFilter.minConfidence).toBe("low");
-      expect(config.commentFilter.skipPreExisting).toBe(false);
-      expect(config.commentFilter.postResolutionComments).toBe(false);
+      expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(3);
     });
 
@@ -411,9 +391,7 @@ describe("Config", () => {
         aiProvider: "cursor",
         copilotModel: "gpt-5.2",
         copilotTimeout: 90000,
-        minCommentConfidence: "medium",
         skipExistingIssues: "false",
-        postResolutionComments: "true",
         reviewRuns: 5,
       });
 
@@ -429,9 +407,7 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("cursor");
       expect(config.copilotModel).toBe("gpt-5.2");
       expect(config.copilotTimeoutMs).toBe(90000);
-      expect(config.commentFilter.minConfidence).toBe("medium");
-      expect(config.commentFilter.skipPreExisting).toBe(false);
-      expect(config.commentFilter.postResolutionComments).toBe(true);
+      expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(5);
     });
   });

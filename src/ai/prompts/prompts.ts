@@ -22,6 +22,15 @@ export function buildFileReviewPrompt(
     : "";
 
   return `You are an expert code reviewer analyzing changes. Be thorough and strict. Focus on substantive issues that would impact correctness, security, or maintainability.
+
+CLEAN CODE PRINCIPLES:
+- Prioritize clarity and simplicity over cleverness
+- Flag code that is unnecessarily complex or hard to understand
+- Encourage meaningful names that reveal intent
+- Identify functions that do too much (should have single responsibility)
+- Suggest breaking down large, complex functions
+- Flag duplicate code that should be extracted
+- Recommend proper error handling and validation
 ${contextSection}${commentsSection}
 FILE: ${filename}
 DIFF:
@@ -57,12 +66,6 @@ GUIDELINES:
 
 GOAL: Find ALL substantive issues in a single comprehensive review, not just a sample.
 
-CONFIDENCE SCORING:
-- "high": You are certain this is an issue AND it was introduced in this PR (in added/modified lines)
-- "medium": You believe this is likely an issue, but there's some uncertainty
-- "low": You suspect this might be an issue, but you're not confident
-- Only report findings with "high" or "medium" confidence
-
 PRE-EXISTING ISSUE DETECTION:
 - **CRITICAL**: Only flag issues that are NEW in this PR - introduced by added/modified lines (marked with +)
 - If an issue exists in removed lines (starting with -), it is pre-existing - set isPreExisting to true
@@ -97,17 +100,7 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${
-  existingCommentsContext
-    ? `
-RESOLVED COMMENT DETECTION:
-- Review the EXISTING COMMENTS listed above
-- For each existing comment, check if the issue has been FIXED in the current diff
-- An issue is resolved if the problematic code was removed, corrected, or the concern no longer applies
-- Include resolved comments in the "resolved_comments" array with the original line number and brief reason
-`
-    : ""
-}
+
 Respond with your analysis and findings.
 
 FORMAT:
@@ -126,24 +119,12 @@ The potential issue here is that...
       "category": "bug|security|performance|quality|documentation",
       "message": "Description of the issue",
       "suggestion": "Recommended fix or improvement",
-      "confidence": "high|medium|low",
       "isPreExisting": false
     }
-  ]${
-    existingCommentsContext
-      ? `, 
-  "resolved_comments": [
-    {
-      "line": <original_line_number>,
-      "reason": "Brief explanation of why this issue is now resolved"
-    }
   ]
-`
-      : ""
-  }
 \`\`\`
 
-If there are no issues, use: {"findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}} inside the JSON block.`;
+If there are no issues, use: {"findings": []} inside the JSON block.`;
 }
 
 /**
@@ -269,6 +250,15 @@ export function buildBatchedFileReviewPrompt(
 
   return `You are an expert code reviewer analyzing changes. Be thorough and strict. Focus on substantive issues that would impact correctness, security, or maintainability.
 
+CLEAN CODE PRINCIPLES:
+- Prioritize clarity and simplicity over cleverness
+- Flag code that is unnecessarily complex or hard to understand
+- Encourage meaningful names that reveal intent
+- Identify functions that do too much (should have single responsibility)
+- Suggest breaking down large, complex functions
+- Flag duplicate code that should be extracted
+- Recommend proper error handling and validation
+
 BATCHED REVIEW MODE: Review ALL files listed below. Each file has its diff stored in a separate file that you can read.
 
 FILES TO REVIEW:
@@ -306,12 +296,6 @@ GUIDELINES:
 - Focus on correctness, security, performance, and best practices
 - Be thorough and strict; it is better to flag a potential issue than to miss a real bug
 
-CONFIDENCE SCORING:
-- "high": You are certain this is an issue AND it was introduced in this PR
-- "medium": You believe this is likely an issue, but there's some uncertainty
-- "low": You suspect this might be an issue, but you're not confident
-- Only report findings with "high" or "medium" confidence
-
 PRE-EXISTING ISSUE DETECTION:
 - **CRITICAL**: Only flag issues that are NEW in this PR - introduced by added/modified lines (marked with +)
 - If an issue exists in removed lines (starting with -), set isPreExisting to true
@@ -345,16 +329,7 @@ HOW TO USE:
 - For "animation: broken-spin" above, report line 159
 - Only lines with "+" prefix are newly added code
 - Lines with "-" prefix were removed and cannot be commented on
-${
-  existingCommentsContext
-    ? `
-RESOLVED COMMENT DETECTION:
-- Review the EXISTING COMMENTS listed above
-- For each existing comment, check if the issue has been FIXED in the current diff
-- Include resolved comments in the "resolved_comments" array with the original line number and brief reason
-`
-    : ""
-}
+
 Respond with your analysis and findings.
 
 FORMAT:
@@ -374,30 +349,17 @@ Analysis of the changes...
           "category": "bug|security|performance|quality|documentation",
           "message": "Description of the issue",
           "suggestion": "Recommended fix or improvement",
-          "confidence": "high|medium|low",
-          "isPreExisting": false
-        }
-      ]${
-        existingCommentsContext
-          ? `, 
-      "resolved_comments": [
-        {
-          "line": <original_line_number>,
-          "reason": "Brief explanation of why this issue is now resolved"
+              "isPreExisting": false
         }
       ]
-`
-          : ""
-      }
     },
     "path/to/file2.ts": {
-      "findings": [],
-      "resolved_comments": []
+      "findings": []
     }
   }
 }
 \`\`\`
 
 IMPORTANT: Include an entry for EVERY file listed above, even if it has no findings (use empty arrays).
-If a file has no issues, use: "filename": { "findings": []${existingCommentsContext ? ', "resolved_comments": []' : ""}}`;
+If a file has no issues, use: "filename": { "findings": []}`;
 }

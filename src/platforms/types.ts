@@ -24,9 +24,6 @@ export interface PRFile {
 /** Severity levels for code review findings. */
 export type FindingSeverity = "critical" | "high" | "medium" | "low";
 
-/** Confidence levels for findings. */
-export type FindingConfidence = "high" | "medium" | "low";
-
 /** Categories of code review findings. */
 export type FindingCategory =
   | "bug"
@@ -45,8 +42,6 @@ export interface FileFinding {
   readonly category: FindingCategory;
   readonly message: string;
   readonly suggestion: string;
-  /** Confidence level that this issue exists and was introduced in this PR. */
-  readonly confidence?: FindingConfidence;
   /** Whether this issue existed before the PR (in the base branch). */
   readonly isPreExisting?: boolean;
 }
@@ -59,20 +54,10 @@ export interface CrossFileFinding {
   readonly affectedFiles: readonly string[];
 }
 
-/** A resolved comment identified by the model. */
-export interface ResolvedComment {
-  /** Line number where the original comment was */
-  readonly line: number;
-  /** Brief reason why the issue is resolved */
-  readonly reason: string;
-}
-
 /** Result of reviewing a single file. */
 export interface FileReviewResult {
   readonly filename: string;
   readonly findings: readonly FileFinding[];
-  /** Comments identified as resolved by the model (issue no longer present) */
-  readonly resolvedComments?: readonly ResolvedComment[];
 }
 
 /** Result of cross-file analysis. */

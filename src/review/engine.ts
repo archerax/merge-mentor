@@ -6,7 +6,6 @@ import {
   buildFilesSummary,
 } from "../ai/prompts/prompts.js";
 import { getAuditLogger } from "../audit/index.js";
-import type { CommentFilterConfig } from "../config.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
@@ -50,7 +49,8 @@ export interface ReviewEngineOptions {
   readonly aiModel?: string;
   /** Timeout in milliseconds for AI provider operations */
   readonly aiTimeoutMs?: number;
-  readonly commentFilter?: CommentFilterConfig;
+  /** Skip pre-existing issues (issues not introduced in this PR). */
+  readonly skipPreExisting?: boolean;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
   /** OpenAI API key (required for OpenAI provider) */
@@ -117,7 +117,7 @@ export class ReviewEngine {
 
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
-      filterConfig: resolvedOptions?.commentFilter,
+      skipPreExisting: resolvedOptions?.skipPreExisting,
     });
     this.stateCache = new ReviewStateCache();
     this.options = resolvedOptions ?? {};
@@ -130,7 +130,7 @@ export class ReviewEngine {
         aiModel: model,
         aiTimeoutMs: timeoutMs,
         dryRun: resolvedOptions?.dryRun,
-        commentFilter: resolvedOptions?.commentFilter,
+        skipPreExisting: resolvedOptions?.skipPreExisting,
         reviewRuns: resolvedOptions?.reviewRuns ?? 1,
       },
       "ReviewEngine initialized"

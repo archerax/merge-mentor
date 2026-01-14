@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import type { AIProviderType } from "./ai/types.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
-import { CATEGORY_EMOJI, CONFIDENCE_EMOJI, SEVERITY_EMOJI } from "./constants.js";
+import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "./constants.js";
 import { logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
@@ -42,9 +42,7 @@ export interface ReviewOptions {
   openaiBaseUrl?: string;
   openaiMaxRetries?: number;
   // Comment filtering
-  minCommentConfidence?: string;
   skipExistingIssues?: string;
-  postResolutionComments?: string;
 }
 
 export interface ReviewExecutionResult {
@@ -90,9 +88,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     openaiTimeout: options.openaiTimeout,
     openaiBaseUrl: options.openaiBaseUrl,
     openaiMaxRetries: options.openaiMaxRetries,
-    minCommentConfidence: options.minCommentConfidence,
     skipExistingIssues: options.skipExistingIssues,
-    postResolutionComments: options.postResolutionComments,
     reviewRuns: options.runs,
   });
   const platform = (options.platform || config.defaultPlatform) as Platform;
@@ -162,7 +158,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     verbose: options.verbose,
     aiModel,
     aiTimeoutMs,
-    commentFilter: config.commentFilter,
+    skipPreExisting: config.skipPreExisting,
     reviewRuns,
     openaiApiKey: openaiOptions?.apiKey,
     openaiBaseUrl: openaiOptions?.baseUrl,
@@ -252,14 +248,10 @@ export function generateMarkdownReport(
         fileResult.findings.forEach((finding, index) => {
           const severityEmoji = SEVERITY_EMOJI[finding.severity];
           const categoryEmoji = CATEGORY_EMOJI[finding.category];
-          const confidenceEmoji = finding.confidence ? CONFIDENCE_EMOJI[finding.confidence] : "";
 
           report += `#### ${index + 1}. Line ${finding.line} ${severityEmoji} ${categoryEmoji}\n\n`;
           report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
           report += `**Category:** ${finding.category}  \n`;
-          if (finding.confidence) {
-            report += `**Confidence:** ${finding.confidence} ${confidenceEmoji}  \n`;
-          }
           if (finding.isPreExisting) {
             report += `**Pre-existing:** Yes ⚠️  \n`;
           }
@@ -497,16 +489,8 @@ program
   )
   // Comment filtering
   .option(
-    "--min-comment-confidence <level>",
-    "Minimum confidence (high, medium, low). Env: MM_MIN_COMMENT_CONFIDENCE"
-  )
-  .option(
     "--skip-existing-issues <bool>",
     "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
-  )
-  .option(
-    "--post-resolution-comments <bool>",
-    "Post resolution comments (true/false). Env: MM_POST_RESOLUTION_COMMENTS"
   )
   .action(async (options: ReviewOptions) => {
     try {
@@ -532,9 +516,7 @@ program
         openaiTimeout: options.openaiTimeout,
         openaiBaseUrl: options.openaiBaseUrl,
         openaiMaxRetries: options.openaiMaxRetries,
-        minCommentConfidence: options.minCommentConfidence,
         skipExistingIssues: options.skipExistingIssues,
-        postResolutionComments: options.postResolutionComments,
         reviewRuns: options.runs,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;

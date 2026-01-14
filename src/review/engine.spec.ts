@@ -294,7 +294,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "Test issue",
               suggestion: "Fix it",
-              confidence: "high",
+  
               isPreExisting: false,
             },
           ],
@@ -322,27 +322,33 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [createPRFile()];
       const existingComments: ExistingComment[] = [
-        { id: 1, body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message", path: "test.ts", line: 2 },
+        { 
+          id: 1, 
+          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->", 
+          path: "test.ts", 
+          line: 2 
+        },
       ];
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue(existingComments);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 2,
-            severity: "high",
-            category: "bug",
-            message: "Updated issue",
-            suggestion: "Fix it",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "Updated issue",
+              suggestion: "Fix it",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
@@ -391,7 +397,7 @@ describe("ReviewEngine", () => {
       const existingComments: ExistingComment[] = [
         {
           id: 1,
-          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix",
+          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->",
           path: "test.ts",
           line: 2,
         },
@@ -401,20 +407,21 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue(existingComments);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 2,
-            severity: "high",
-            category: "bug",
-            message: "New message",
-            suggestion: "Fix",
-            confidence: "high",
-            isPreExisting: false,
-          },
-        ],
-      });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "New message",
+              suggestion: "Fix",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
@@ -490,7 +497,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "Test issue",
               suggestion: "Fix it",
-              confidence: "high",
+  
               isPreExisting: false,
             },
           ],
@@ -544,7 +551,7 @@ describe("ReviewEngine", () => {
               category: "bug",
               message: "New message",
               suggestion: "Fix",
-              confidence: "high",
+  
               isPreExisting: false,
             },
           ],
@@ -596,7 +603,7 @@ describe("ReviewEngine", () => {
             category: "bug",
             message: "Issue on invalid line",
             suggestion: "Fix it",
-            confidence: "high",
+
             isPreExisting: false,
           },
         ],

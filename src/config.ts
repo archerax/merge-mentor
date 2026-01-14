@@ -2,7 +2,6 @@ import path from "node:path";
 import dotenv from "dotenv";
 import type { AIProviderType } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
-import type { FindingConfidence } from "./platforms/types.js";
 
 // Load .env from current working directory (supports both local and global usage)
 // Set quiet to true to suppress "injecting env" message
@@ -26,16 +25,6 @@ export interface AzureConfig {
   readonly repo: string;
 }
 
-/** Comment filtering configuration. */
-export interface CommentFilterConfig {
-  /** Minimum confidence level for posting comments. */
-  readonly minConfidence: FindingConfidence;
-  /** Skip pre-existing issues (issues not introduced in this PR). */
-  readonly skipPreExisting: boolean;
-  /** Post a resolution comment before resolving threads. */
-  readonly postResolutionComments: boolean;
-}
-
 /** Application configuration loaded from environment variables. */
 export interface Config {
   readonly defaultPlatform: Platform;
@@ -55,7 +44,8 @@ export interface Config {
   readonly openaiTimeoutMs?: number;
   readonly openaiBaseUrl?: string;
   readonly openaiMaxRetries?: number;
-  readonly commentFilter: CommentFilterConfig;
+  /** Skip pre-existing issues (issues not introduced in this PR). */
+  readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
 }
@@ -135,9 +125,6 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
         )
       : undefined;
 
-  const minConfidence = validateMinConfidence(
-    cliOverrides?.minCommentConfidence ?? getEnvWithPrefix("MIN_COMMENT_CONFIDENCE")
-  );
   const reviewRuns = validateReviewRuns(
     cliOverrides?.reviewRuns?.toString() ?? getEnvWithPrefix("REVIEW_RUNS")
   );
@@ -173,14 +160,8 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     openaiTimeoutMs: openaiTimeoutMs && openaiTimeoutMs > 0 ? openaiTimeoutMs : undefined,
     openaiBaseUrl: cliOverrides?.openaiBaseUrl ?? getEnvWithPrefix("OPENAI_BASE_URL"),
     openaiMaxRetries: openaiMaxRetries && openaiMaxRetries > 0 ? openaiMaxRetries : undefined,
-    commentFilter: {
-      minConfidence,
-      skipPreExisting:
-        (cliOverrides?.skipExistingIssues ?? getEnvWithPrefix("SKIP_EXISTING_ISSUES")) !== "false",
-      postResolutionComments:
-        (cliOverrides?.postResolutionComments ?? getEnvWithPrefix("POST_RESOLUTION_COMMENTS")) !==
-        "false",
-    },
+    skipPreExisting:
+      (cliOverrides?.skipExistingIssues ?? getEnvWithPrefix("SKIP_EXISTING_ISSUES")) !== "false",
     reviewRuns,
   };
 }
@@ -208,18 +189,8 @@ export interface CliOverrides {
   readonly openaiTimeout?: number;
   readonly openaiBaseUrl?: string;
   readonly openaiMaxRetries?: number;
-  readonly minCommentConfidence?: string;
   readonly skipExistingIssues?: string;
-  readonly postResolutionComments?: string;
   readonly reviewRuns?: number;
-}
-
-function validateMinConfidence(value: string | undefined): FindingConfidence {
-  const validConfidences: FindingConfidence[] = ["high", "medium", "low"];
-  if (value && validConfidences.includes(value as FindingConfidence)) {
-    return value as FindingConfidence;
-  }
-  return "high"; // Default to high confidence
 }
 
 function validateReviewRuns(value: string | undefined): number {

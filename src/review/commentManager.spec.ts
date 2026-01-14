@@ -28,7 +28,6 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
     category: "bug",
     message: "Test message",
     suggestion: "Test suggestion",
-    confidence: "high",
     isPreExisting: false,
     ...overrides,
   };
@@ -462,7 +461,7 @@ describe("CommentManager", () => {
       expect(resolveActions[0].existingCommentId).toBe(1);
     });
 
-    it("should use model's resolution reason in resolution comment", () => {
+    it.skip("should use model's resolution reason in resolution comment (feature removed)", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
         { id: 1, body: "Old issue", path: "test.ts", line: 10 },
@@ -531,8 +530,8 @@ describe("CommentManager", () => {
     });
   });
 
-  describe("confidence filtering", () => {
-    it("should skip low confidence findings when minConfidence is high", () => {
+  describe("confidence filtering (feature removed)", () => {
+    it.skip("should skip low confidence findings when minConfidence is high", () => {
       const manager = new CommentManager("[Bot]", {
         filterConfig: {
           minConfidence: "high",
@@ -560,7 +559,7 @@ describe("CommentManager", () => {
       expect(createActions).toHaveLength(0);
     });
 
-    it("should include medium confidence findings when minConfidence is medium", () => {
+    it.skip("should include medium confidence findings when minConfidence is medium", () => {
       const manager = new CommentManager("[Bot]", {
         filterConfig: {
           minConfidence: "medium",
@@ -590,11 +589,7 @@ describe("CommentManager", () => {
 
     it("should skip pre-existing issues when skipPreExisting is true", () => {
       const manager = new CommentManager("[Bot]", {
-        filterConfig: {
-          minConfidence: "high",
-          skipPreExisting: true,
-          postResolutionComments: true,
-        },
+        skipPreExisting: true,
       });
       const fileResults: FileReviewResult[] = [
         {
@@ -618,11 +613,7 @@ describe("CommentManager", () => {
 
     it("should include pre-existing issues when skipPreExisting is false", () => {
       const manager = new CommentManager("[Bot]", {
-        filterConfig: {
-          minConfidence: "high",
-          skipPreExisting: false,
-          postResolutionComments: true,
-        },
+        skipPreExisting: false,
       });
       const fileResults: FileReviewResult[] = [
         {
@@ -644,7 +635,7 @@ describe("CommentManager", () => {
       expect(createActions).toHaveLength(1);
     });
 
-    it("should include confidence in formatted comment", () => {
+    it.skip("should include confidence in formatted comment (feature removed)", () => {
       const manager = new CommentManager("[Bot]");
       const finding = createFileFinding({
         confidence: "high",
@@ -655,7 +646,7 @@ describe("CommentManager", () => {
       expect(result).toContain("**Confidence**: 🟢 High");
     });
 
-    it("should add resolution comment before resolving when postResolutionComments is true", () => {
+    it.skip("should add resolution comment before resolving when postResolutionComments is true (feature removed)", () => {
       const manager = new CommentManager("[Bot]", {
         filterConfig: {
           minConfidence: "high",
@@ -680,7 +671,7 @@ describe("CommentManager", () => {
       expect(resolveActions).toHaveLength(1);
     });
 
-    it("should not add resolution comment when postResolutionComments is false", () => {
+    it.skip("should not add resolution comment when postResolutionComments is false (feature removed)", () => {
       const manager = new CommentManager("[Bot]", {
         filterConfig: {
           minConfidence: "high",
