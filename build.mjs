@@ -18,7 +18,7 @@ async function buildProject() {
       keepNames: false,
       legalComments: "none",
       logLevel: "info",
-      packages: "external"
+      packages: "external",
     });
 
     console.log("✓ Build completed successfully");

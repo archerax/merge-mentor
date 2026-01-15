@@ -225,6 +225,8 @@ describe("OpenAIProvider", () => {
         message: "Potential null pointer",
         suggestion: "Add null check",
         isPreExisting: false,
+        confidence: "high",
+        reasoning: undefined,
       });
     });
 
@@ -285,6 +287,8 @@ describe("OpenAIProvider", () => {
         category: "design",
         message: "Consider refactoring",
         affectedFiles: ["file1.ts", "file2.ts"],
+        confidence: "high",
+        reasoning: undefined,
       });
       expect(result.recommendations).toEqual(["Add more tests"]);
     });

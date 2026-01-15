@@ -171,7 +171,7 @@ export function createTestConfig(overrides?: Partial<Config>): Config {
 /**
  * Mock for child_process.spawn used by CopilotClient.
  */
-function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>) {
+function _createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>) {
   return vi.fn((_command: string, _args: string[]) => {
     const stdout = {
       on: vi.fn((event: string, callback: (data: Buffer) => void) => {
@@ -205,14 +205,14 @@ function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>) {
 /**
  * Creates expected review results for assertions.
  */
-function getExpectedFileResults(): FileReviewResult[] {
+function _getExpectedFileResults(): FileReviewResult[] {
   return sampleFileReviewResults;
 }
 
-function getExpectedCrossFileResult(): CrossFileReviewResult {
+function _getExpectedCrossFileResult(): CrossFileReviewResult {
   return sampleCrossFileResult;
 }
 
-function getExpectedExistingComments(): ExistingComment[] {
+function _getExpectedExistingComments(): ExistingComment[] {
   return sampleExistingComments;
 }

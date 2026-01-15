@@ -9,7 +9,6 @@
   "scripts": {
     "build": "tsc --noEmit && cross-env NODE_ENV=production node build.mjs",
     "build:dev": "tsc --noEmit && node build.mjs",
-    "review": "node dist/cli.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,13 +16,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:coverage": "vitest run --config vitest.integration.config.ts --coverage",
     "test:all": "vitest run && vitest run --config vitest.integration.config.ts",
-    "lint": "biome lint src",
-    "lint:fix": "biome lint --write src",
-    "format": "biome format --write src",
-    "format:check": "biome format src",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && biome check src && npm run test",
-    "knip": "knip"
+    "lint": "biome check && knip",
+    "lint:fix": "biome check --write && knip --fix"
   },
   "keywords": [
     "code-review",

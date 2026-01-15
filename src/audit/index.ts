@@ -1,2 +1,1 @@
-;
-export {  getAuditLogger,  } from "./auditLogger.js";
+export { getAuditLogger } from "./auditLogger.js";

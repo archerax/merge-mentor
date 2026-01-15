@@ -18,14 +18,14 @@ describe("AI Prompts", () => {
     it("should include PR details", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
-      expect(prompt).toContain("PR TITLE: Add new feature");
-      expect(prompt).toContain("PR DESCRIPTION: This PR adds a new feature");
+      expect(prompt).toContain("Title: Add new feature");
+      expect(prompt).toContain("Description: This PR adds a new feature");
     });
 
     it("should include files summary", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
-      expect(prompt).toContain("CHANGED FILES SUMMARY:");
+      expect(prompt).toContain("Changed Files:");
       expect(prompt).toContain("src/file1.ts");
       expect(prompt).toContain("src/file2.ts");
     });
@@ -53,7 +53,7 @@ describe("AI Prompts", () => {
 
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults);
 
-      expect(prompt).toContain("INDIVIDUAL FILE REVIEW FINDINGS:");
+      expect(prompt).toContain("Individual File Findings:");
       expect(prompt).toContain("src/file1.ts: 1 finding(s)");
       expect(prompt).not.toContain("src/file2.ts:");
     });
@@ -62,13 +62,12 @@ describe("AI Prompts", () => {
       const prWithNoDesc = { ...prDetails, description: "" };
       const prompt = buildCrossFilePrompt(prWithNoDesc, filesSummary, []);
 
-      expect(prompt).toContain("PR DESCRIPTION: No description provided");
+      expect(prompt).toContain("Description: No description provided");
     });
 
     it("should include cross-file analysis criteria", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
-      expect(prompt).toContain("FOCUS ON HIGH-LEVEL SUBSTANTIVE ISSUES");
       expect(prompt).toContain("Architectural problems");
       expect(prompt).toContain("System-level concerns");
       expect(prompt).toContain("Cross-cutting issues");

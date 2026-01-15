@@ -91,6 +91,8 @@ describe("CursorProvider", () => {
         message: "Potential null pointer",
         suggestion: "Add null check",
         isPreExisting: false,
+        confidence: "high",
+        reasoning: undefined,
       });
     });
 
@@ -186,6 +188,8 @@ describe("CursorProvider", () => {
         category: "architecture",
         message: "Consider separating concerns",
         affectedFiles: ["src/a.ts", "src/b.ts"],
+        confidence: "high",
+        reasoning: undefined,
       });
       expect(result.recommendations).toEqual(["Add more tests", "Update docs"]);
     });

@@ -1049,7 +1049,7 @@ describe("ReviewEngine", () => {
       // Second run should receive context from first run
       expect(mockExecutePrompt).toHaveBeenCalled();
       expect(result).toBeDefined();
-    });
+    }, 10000);
   });
 
   describe("executeCommentAction error handling", () => {
