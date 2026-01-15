@@ -3,7 +3,7 @@
  * This helps AI models accurately identify line numbers without manual counting.
  */
 
-export interface NumberedLine {
+interface NumberedLine {
   /** Line number in the new file (undefined for deleted lines) */
   newLineNumber: number | undefined;
   /** The type of line: added, removed, or context */

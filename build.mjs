@@ -1,6 +1,4 @@
-#!/usr/bin/env node
 import { build } from "esbuild";
-import { glob } from "glob";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -8,22 +6,19 @@ async function buildProject() {
   try {
     console.log(`Building for ${isProduction ? "production" : "development"}...`);
 
-    const entryPoints = await glob("src/**/*.ts", {
-      ignore: ["**/*.spec.ts", "**/*.test.ts"],
-    });
-
     await build({
-      entryPoints,
+      entryPoints: ["src/cli.ts"],
       outdir: "dist",
-      bundle: false,
+      bundle: true,
       platform: "node",
       format: "esm",
-      target: "node20",
+      target: "node24",
       minify: isProduction,
       sourcemap: !isProduction,
       keepNames: false,
       legalComments: "none",
       logLevel: "info",
+      packages: "external"
     });
 
     console.log("✓ Build completed successfully");

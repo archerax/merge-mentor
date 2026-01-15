@@ -94,7 +94,7 @@ export function createMockPlatformAdapter(options?: {
  * Creates a mock CopilotClient for testing.
  * Uses vi.mock to intercept the actual CopilotClient.
  */
-export interface MockCopilotBehavior {
+interface MockCopilotBehavior {
   fileReviewResponses?: Map<string, string>;
   crossFileResponse?: string;
   shouldFail?: boolean;
@@ -104,7 +104,7 @@ export interface MockCopilotBehavior {
 /**
  * Sets up Copilot CLI mock via child_process spawn.
  */
-export function setupCopilotMock(behavior?: MockCopilotBehavior) {
+function setupCopilotMock(behavior?: MockCopilotBehavior) {
   const responses: string[] = [];
   let responseIndex = 0;
 
@@ -171,7 +171,7 @@ export function createTestConfig(overrides?: Partial<Config>): Config {
 /**
  * Mock for child_process.spawn used by CopilotClient.
  */
-export function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>) {
+function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>) {
   return vi.fn((_command: string, _args: string[]) => {
     const stdout = {
       on: vi.fn((event: string, callback: (data: Buffer) => void) => {
@@ -205,14 +205,14 @@ export function createSpawnMock(copilotMock: ReturnType<typeof setupCopilotMock>
 /**
  * Creates expected review results for assertions.
  */
-export function getExpectedFileResults(): FileReviewResult[] {
+function getExpectedFileResults(): FileReviewResult[] {
   return sampleFileReviewResults;
 }
 
-export function getExpectedCrossFileResult(): CrossFileReviewResult {
+function getExpectedCrossFileResult(): CrossFileReviewResult {
   return sampleCrossFileResult;
 }
 
-export function getExpectedExistingComments(): ExistingComment[] {
+function getExpectedExistingComments(): ExistingComment[] {
   return sampleExistingComments;
 }
