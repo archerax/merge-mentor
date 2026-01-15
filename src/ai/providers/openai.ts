@@ -21,17 +21,21 @@ import type { AIProviderClient, AIProviderOptions, AIResponse, TokenUsage } from
 interface RawFileFinding {
   line?: unknown;
   severity?: unknown;
+  confidence?: unknown;
   category?: unknown;
   message?: unknown;
   suggestion?: unknown;
+  reasoning?: unknown;
   isPreExisting?: unknown;
 }
 
 /** Raw cross-file finding from OpenAI JSON response. */
 interface RawCrossFileFinding {
   severity?: unknown;
+  confidence?: unknown;
   category?: unknown;
   message?: unknown;
+  reasoning?: unknown;
   affected_files?: unknown[];
 }
 
@@ -300,9 +304,11 @@ export class OpenAIProvider implements AIProviderClient {
         findings.push({
           line: typeof finding.line === "number" ? finding.line : 0,
           severity: this.validateSeverity(finding.severity),
+          confidence: this.validateConfidence(finding.confidence),
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
+          reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
       }
@@ -328,8 +334,10 @@ export class OpenAIProvider implements AIProviderClient {
       for (const finding of data.findings) {
         findings.push({
           severity: this.validateSeverity(finding.severity),
+          confidence: this.validateConfidence(finding.confidence),
           category: this.validateCrossFileCategory(finding.category),
           message: String(finding.message || ""),
+          reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
           affectedFiles: Array.isArray(finding.affected_files)
             ? finding.affected_files.map(String)
             : [],
@@ -403,9 +411,11 @@ export class OpenAIProvider implements AIProviderClient {
           findings.push({
             line: typeof finding.line === "number" ? finding.line : 0,
             severity: this.validateSeverity(finding.severity),
+            confidence: this.validateConfidence(finding.confidence),
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
+            reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });
@@ -443,6 +453,14 @@ export class OpenAIProvider implements AIProviderClient {
     return validSeverities.includes(stringValue as (typeof validSeverities)[number])
       ? (stringValue as FileFinding["severity"])
       : "medium";
+  }
+
+  private validateConfidence(value: unknown): FileFinding["confidence"] {
+    const validConfidence = ["high", "medium", "low"] as const;
+    const stringValue = String(value);
+    return validConfidence.includes(stringValue as (typeof validConfidence)[number])
+      ? (stringValue as FileFinding["confidence"])
+      : "high";
   }
 
   private validateCategory(value: unknown): FileFinding["category"] {

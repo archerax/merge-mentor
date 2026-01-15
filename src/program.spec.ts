@@ -82,6 +82,7 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
         findings: [
           {
             severity: "medium",
+            confidence: "high",
             category: "quality",
             message: "Issue 1",
             line: 10,
@@ -94,6 +95,7 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
         findings: [
           {
             severity: "low",
+            confidence: "high",
             category: "quality",
             message: "Issue 2",
             line: 20,
@@ -542,6 +544,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "critical",
+                confidence: "high",
                 category: "security",
                 message: "Issue 1",
                 line: 1,
@@ -549,6 +552,7 @@ describe("CLI", () => {
               },
               {
                 severity: "high",
+                confidence: "high",
                 category: "quality",
                 message: "Issue 2",
                 line: 2,
@@ -561,6 +565,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "medium",
+                confidence: "high",
                 category: "quality",
                 message: "Issue 3",
                 line: 3,
@@ -586,6 +591,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "critical",
+                confidence: "high",
                 category: "security",
                 message: "Critical issue",
                 line: 10,
@@ -607,6 +613,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "high",
+                confidence: "high",
                 category: "quality",
                 message: "High issue",
                 line: 10,
@@ -614,6 +621,7 @@ describe("CLI", () => {
               },
               {
                 severity: "medium",
+                confidence: "high",
                 category: "quality",
                 message: "Medium issue",
                 line: 20,
@@ -657,6 +665,7 @@ describe("CLI", () => {
           findings: [
             {
               severity: "critical",
+              confidence: "high",
               category: "architecture",
               message: "Critical cross-file issue",
               affectedFiles: ["file1.ts", "file2.ts"],
@@ -677,6 +686,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "medium",
+                confidence: "high",
                 category: "quality",
                 message: "Medium",
                 line: 1,
@@ -689,6 +699,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "critical",
+                confidence: "high",
                 category: "security",
                 message: "Critical",
                 line: 2,
@@ -701,6 +712,7 @@ describe("CLI", () => {
             findings: [
               {
                 severity: "low",
+                confidence: "high",
                 category: "quality",
                 message: "Low",
                 line: 3,
@@ -735,6 +747,7 @@ describe("CLI", () => {
               {
                 line: 10,
                 severity: "high",
+                confidence: "high",
                 category: "bug",
                 message: "Potential null pointer exception",
                 suggestion: "Add null check",
@@ -747,6 +760,7 @@ describe("CLI", () => {
           findings: [
             {
               severity: "medium",
+              confidence: "high",
               category: "architecture",
               message: "Consider extracting common logic",
               affectedFiles: ["file1.ts", "file2.ts"],

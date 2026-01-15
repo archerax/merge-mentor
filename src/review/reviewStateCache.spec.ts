@@ -36,6 +36,7 @@ describe("ReviewStateCache", () => {
             {
               line: 10,
               severity: "high",
+              confidence: "high",
               category: "bug",
               message: "Test issue",
               suggestion: "Fix it",
@@ -91,6 +92,7 @@ describe("ReviewStateCache", () => {
             {
               line: 5,
               severity: "medium",
+              confidence: "high",
               category: "quality",
               message: "Code quality issue",
               suggestion: "Improve",
@@ -116,6 +118,7 @@ describe("ReviewStateCache", () => {
         findings: [
           {
             severity: "low" as const,
+            confidence: "high" as const,
             category: "documentation" as const,
             message: "Missing tests",
             affectedFiles: ["test.ts"],
@@ -171,6 +174,7 @@ describe("ReviewStateCache", () => {
             {
               line: 1,
               severity: "low",
+              confidence: "high",
               category: "documentation",
               message: "New issue",
               suggestion: "Fix",
@@ -197,6 +201,7 @@ describe("ReviewStateCache", () => {
             {
               line: 20,
               severity: "critical",
+              confidence: "high",
               category: "security",
               message: "Security issue",
               suggestion: "Urgent fix",

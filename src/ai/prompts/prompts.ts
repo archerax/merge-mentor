@@ -22,69 +22,103 @@ export function buildCrossFilePrompt(
     .join("\n");
 
   const commentsSection = existingCommentsContext
-    ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged in existing comments. Focus on system-level concerns not already covered.\n`
+    ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
     : "";
 
-  return `You are an expert code reviewer performing a holistic analysis of a pull request. Be thorough and strict.
+  return `# YOUR ROLE
+Expert code reviewer performing holistic architectural analysis of a pull request.
 
-PR TITLE: ${prDetails.title}
-PR DESCRIPTION: ${prDetails.description || "No description provided"}
+# PR CONTEXT
+Title: ${prDetails.title}
+Description: ${prDetails.description || "No description provided"}
 
-CHANGED FILES SUMMARY:
+Changed Files:
 ${filesSummary}
 
-INDIVIDUAL FILE REVIEW FINDINGS:
+Individual File Findings:
 ${findingsSummary || "No individual issues found"}
 ${commentsSection}
-SYSTEMATIC ANALYSIS CHECKLIST:
-- Error handling: Are errors propagated consistently? Missing try-catch?
-- State management: Any race conditions or inconsistent state updates?
-- Data flow: Complete path from input to output? Missing validations?
-- Dependencies: Circular dependencies? Tight coupling issues?
-- Testing: Are critical paths testable? Integration points covered?
+# CRITICAL RULES
+1. ONLY analyze files in the Changed Files list above - ignore any files mentioned in PR description that aren't actually changed
+2. Do NOT duplicate issues already caught in individual file reviews
+3. Include confidence (high/medium/low) and reasoning for EVERY finding
+4. Focus on system-level and architectural concerns, not individual file issues
+
+# SEVERITY THRESHOLDS
+Use these exact criteria:
+- **critical**: System crash, data loss, security breach, production outage risk
+- **high**: Architectural flaw, major integration issue, widespread impact
+- **medium**: Design concern, maintainability issue, testing gap
+- **low**: Minor improvement opportunity, documentation need
+
+# CONFIDENCE LEVELS
+- **high**: Clear architectural issue with obvious negative impact
+- **medium**: Potential concern that needs verification or context
+- **low**: Suggestion based on general practices, may not apply here
+
+# SYSTEMATIC ANALYSIS CHECKLIST
+- Error handling: Consistent propagation? Missing try-catch patterns?
+- State management: Race conditions? Inconsistent state updates across files?
+- Data flow: Complete path from input to output? Missing cross-file validations?
+- Dependencies: Circular dependencies? Tight coupling between modules?
+- Testing: Integration points covered? Critical paths testable?
 - Security: Authentication/authorization consistent? Input validation complete?
 
-FOCUS ON HIGH-LEVEL SUBSTANTIVE ISSUES:
+# WHAT TO REPORT
 - Architectural problems: poor separation of concerns, circular dependencies, violated design principles
 - System-level concerns: missing error handling patterns, incomplete transaction management
 - Cross-cutting issues: inconsistent approach across files, missing integration points
 - Testing gaps: critical paths without coverage, integration test needs
+- Breaking changes: API incompatibilities across modules
 
-DO NOT flag:
-- Issues already caught in individual file reviews (avoid duplication)
-- General suggestions without specific actionable improvements
-- Syntax or compilation issues (assume all code compiles and is valid syntax)
-- Language features you're unfamiliar with
+# WHAT NOT TO REPORT
+- Issues already in individual file reviews
+- Syntax or compilation errors (assume code compiles)
+- Language features you don't recognize
+- Vague suggestions without specific actionable improvements
 
-GUIDELINES:
-- Provide recommendations that improve architectural integrity, maintainability, or prevent issues
-- Evaluate choices critically; do not assume the current approach is optimal
-- Focus on potential failures, confusion, and architectural alignment
-- ONLY analyze the actual files listed in CHANGED FILES SUMMARY - ignore any files mentioned in PR title/description that aren't in the changed files list
+# EXAMPLES
 
-GOAL: Perform ONE thorough architectural review that catches all system-level concerns.
+✅ REPORT THIS:
+Severity: high, Confidence: high
+Message: "Auth middleware applied inconsistently - /api/users uses it but /api/admin routes bypass it"
+Reasoning: "Security vulnerability where admin endpoints lack authentication that user endpoints have"
 
-Respond with your analysis and findings.
+✅ REPORT THIS:
+Severity: medium, Confidence: high  
+Message: "Transaction management incomplete - database writes in OrderService lack rollback handling"
+Reasoning: "Partial failures could leave database in inconsistent state across order and inventory tables"
 
-FORMAT:
-1. ANALYSIS: Think through the architecture and integration risks step-by-step.
-2. JSON: Output the findings in a STRICT JSON format wrapped in a markdown code block.
+❌ DON'T REPORT:
+Message: "Consider adding unit tests"
+Reason: Too vague, no specific gap identified
 
-Example Response:
-The architectural changes in this PR introduce...
-One concern is the circular dependency between...
+❌ DON'T REPORT:
+Message: "Variable naming could be improved in UserService.ts"
+Reason: Should be caught in individual file review, not architectural concern
+
+# OUTPUT FORMAT
+
+1. ANALYSIS: Think through architecture and integration risks step-by-step
+2. JSON: Strict format in markdown code block
+
+Example:
+Analyzing the PR architecture, I notice the authentication flow spans three files...
+The key risk is the inconsistent error handling pattern where...
 \`\`\`json
 {
-  "overall_assessment": "Summary of the PR quality",
+  "overall_assessment": "Summary of PR quality and main concerns",
   "findings": [
     {
-      "severity": "critical|high|medium|low",
-      "category": "architecture|design|testing|documentation",
-      "message": "Description of the issue",
+      "severity": "high",
+      "confidence": "high",
+      "category": "architecture",
+      "message": "Clear description of the issue",
+      "reasoning": "Why this is a problem and potential impact",
       "affected_files": ["file1.ts", "file2.ts"]
     }
   ],
-  "recommendations": ["Recommendation 1", "Recommendation 2"]
+  "recommendations": ["Specific actionable recommendation 1", "Specific actionable recommendation 2"]
 }
 \`\`\`
 `;
@@ -119,111 +153,136 @@ export function buildBatchedFileReviewPrompt(
     .join("\n");
 
   const commentsSection = existingCommentsContext
-    ? `\n${existingCommentsContext}\n\nIMPORTANT: Review the existing comments above. Do NOT flag the same issues again, even if worded differently. Focus on finding NEW issues not already covered by existing comments.\n`
+    ? `\n${existingCommentsContext}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
     : "";
 
-  return `You are an expert code reviewer analyzing changes. Be thorough and strict. Focus on substantive issues that would impact correctness, security, or maintainability.
+  return `# YOUR ROLE
+Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
 
-CLEAN CODE PRINCIPLES:
-- Prioritize clarity and simplicity over cleverness
-- Flag code that is unnecessarily complex or hard to understand
-- Encourage meaningful names that reveal intent
-- Identify functions that do too much (should have single responsibility)
-- Suggest breaking down large, complex functions
-- Flag duplicate code that should be extracted
-- Recommend proper error handling and validation
+# TASK
+Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
 
-BATCHED REVIEW MODE: Review ALL files listed below. Each file has its diff stored in a separate file that you can read.
-
-FILES TO REVIEW:
+Files to Review:
 ${filesListing}
 ${commentsSection}
-INSTRUCTIONS:
-1. Read each diff file listed above (use the @filename syntax to read them)
-2. Review each file thoroughly
-3. Return a single JSON response with results for ALL files
+# CRITICAL RULES
+1. Only flag NEW issues in added lines (marked with +)
+2. Include confidence (high/medium/low) and reasoning for EVERY finding
+3. Use exact line numbers from diff - they're pre-calculated
+4. Return results for ALL files, even if no findings
+${existingCommentsContext ? "5. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
-COMPREHENSIVE REVIEW APPROACH:
-- Perform multiple mental passes: logic → security → performance → quality
-- Consider edge cases: null/undefined, empty arrays, boundary values, concurrent access
-- Think about "what could go wrong" scenarios exhaustively
-- Don't stop at first issue - scan the entire change thoroughly
-- Consider both what's present and what might be missing
-${existingCommentsContext ? "- AVOID duplicating issues already mentioned in EXISTING COMMENTS above" : ""}
+# SEVERITY THRESHOLDS
+Use these exact criteria:
+- **critical**: Security vulnerability, data loss, system crash, production outage
+- **high**: Logic bug causing incorrect behavior, race condition, unsafe operation
+- **medium**: Performance issue, maintainability concern, missing validation, code smell
+- **low**: Minor improvement, readability suggestion, documentation need
 
-FOCUS ON SUBSTANTIVE ISSUES:
-- Actual bugs: logic errors, race conditions, edge cases not handled
-- Security vulnerabilities: injection flaws, authentication issues, data exposure
-- Performance problems: algorithmic inefficiency, memory leaks, unnecessary operations
-- Breaking changes: API incompatibilities, contract violations
-- Critical architectural concerns: tight coupling, violated principles
+# CONFIDENCE LEVELS
+- **high**: Clear issue with definite negative impact
+- **medium**: Likely issue but needs context or verification
+- **low**: Suggestion based on best practices, may not apply
 
-DO NOT flag:
-- Purely stylistic preferences (e.g., whitespace, variable naming) unless they severely violate established patterns
-- Documentation for completely self-evident code (e.g., getters/setters)
-- Syntax or compilation issues (assume all code compiles and is valid syntax)
-- Language features you're unfamiliar with
+# REVIEW APPROACH
+Perform multiple mental passes through each file:
+1. **Logic**: Correctness, edge cases, error handling
+2. **Security**: Injection flaws, authentication, data exposure
+3. **Performance**: Algorithmic efficiency, memory leaks
+4. **Quality**: Clean code principles, maintainability
 
-GUIDELINES:
-- Report findings even if they seem minor, if they impact code quality or maintainability
-- Do not assume the developer made the best choice; verify the logic and implementation details
-- Focus on correctness, security, performance, and best practices
-- Be thorough and strict; it is better to flag a potential issue than to miss a real bug
+Consider: null/undefined, empty arrays, boundary values, concurrent access, "what could go wrong" scenarios
 
-PRE-EXISTING ISSUE DETECTION:
-- **CRITICAL**: Only flag issues that are NEW in this PR - introduced by added/modified lines (marked with +)
-- If an issue exists in removed lines (starting with -), set isPreExisting to true
-- Only set isPreExisting to false for issues newly introduced in added lines (+)
-- **Focus EXCLUSIVELY on new issues introduced in this PR**
-- Do NOT flag existing code issues that were already present before this PR
+# ALWAYS REPORT
+- **Bugs**: Logic errors, race conditions, unhandled edge cases, off-by-one errors
+- **Security**: Any potential vulnerability, no matter how small
+- **Best practices**: var instead of let/const, magic numbers, poor naming
+- **Code quality**: Functions doing too much, duplicate code, unnecessary complexity
+- **Type safety**: Missing type annotations, unsafe assertions (any, as unknown)
+- **Error handling**: Missing try-catch, unhandled promises, silent failures
+- **Performance**: Algorithmic inefficiency, memory leaks, N+1 queries
+- **Breaking changes**: API incompatibilities, contract violations
 
-CRITICAL LINE NUMBER INSTRUCTIONS - READ CAREFULLY:
-The "line" field MUST be the absolute line number in the NEW version of the file (after changes are applied).
+# NEVER REPORT
+- **Formatting**: Whitespace, indentation (if project has auto-formatter)
+- **Syntax errors**: Assume all code compiles successfully  
+- **Unfamiliar features**: Don't flag language constructs you don't recognize
+- **Obvious documentation**: Getters/setters, self-explanatory functions
+- **Subjective opinions**: Personal preferences without concrete rationale
+- **Existing issues**: Problems in removed lines (-) unless marking as pre-existing
 
-The diffs have PRE-CALCULATED LINE NUMBERS for easy reference.
+# LINE NUMBERS (PRE-CALCULATED)
+Diff format: [+/-/SPACE][NUMBER] | CODE
+- Use NUMBER directly from added lines (+)
+- Example: "+ 159 | const x = 1" → report line 159
+- No counting needed - numbers are ready to use!
 
-DIFF FORMAT:
-Each line shows: [PREFIX][LINE_NUMBER] | [CONTENT]
-- PREFIX is: " " (context), "+" (added), or "-" (removed)
-- LINE_NUMBER is the line number in the NEW file (or "-" for removed lines)
+# EXAMPLES
 
-EXAMPLE:
-@@ -80,5 +155,7 @@ .footer {
-    155 | text-align: center;      ← Context line at line 155
-    156 | }                        ← Context line at line 156
-    157 |                          ← Empty context line at line 157
--     - | .logo {                   ← Removed line (no line number)
--     - |   animation: logo-spin;   ← Removed line (no line number)
-+   158 | .logo-fixed {             ← ADDED at line 158 - USE THIS NUMBER!
-+   159 |   animation: broken-spin; ← ADDED at line 159
-    160 | }                        ← Context line at line 160
+✅ HIGH SEVERITY, HIGH CONFIDENCE - REPORT THIS:
+Line: 45, Message: "Array access without bounds check"
+Reasoning: "users[index] can throw if index >= users.length, causing runtime error"
+Suggestion: "Add bounds check: if (index >= 0 && index < users.length)"
 
-HOW TO USE:
-- Read the line number directly from the diff - no counting needed!
-- For "animation: broken-spin" above, report line 159
-- Only lines with "+" prefix are newly added code
-- Lines with "-" prefix were removed and cannot be commented on
+✅ MEDIUM SEVERITY, HIGH CONFIDENCE - REPORT THIS:
+Line: 23, Message: "Use 'const' instead of 'let' for immutable variable"
+Reasoning: "Variable 'result' is never reassigned, const prevents accidental mutation"
+Suggestion: "Change 'let result = ...' to 'const result = ...'"
 
-Respond with your analysis and findings.
+✅ HIGH SEVERITY, MEDIUM CONFIDENCE - REPORT THIS:
+Line: 67, Message: "Potential race condition in async state update"
+Reasoning: "Multiple async calls to setState without awaiting may cause state inconsistency"
+Suggestion: "Use await or queue state updates"
 
-FORMAT:
-1. ANALYSIS: Think through the changes step-by-step. Analyze logic, security, and performance implications.
-2. JSON: Output the findings in a STRICT JSON format wrapped in a markdown code block.
+❌ LOW CONFIDENCE, VAGUE - DON'T REPORT:
+Message: "Consider refactoring this function"
+Reason: Not specific, no clear issue identified
 
-Example Response:
-Analysis of the changes...
+❌ FORMATTING ISSUE - DON'T REPORT:
+Message: "Add blank line after function declaration"
+Reason: Stylistic preference, not substantive
+
+❌ UNFAMILIAR SYNTAX - DON'T REPORT:
+Message: "This TypeScript syntax looks wrong"
+Reason: Don't flag valid language features you don't recognize
+
+# PRE-EXISTING ISSUES
+- Focus on NEW issues in added lines (+)
+- If issue exists in removed lines (-), set isPreExisting: true
+- Only set isPreExisting: false for newly introduced issues
+
+# OUTPUT FORMAT
+
+1. ANALYSIS: Think step-by-step through logic, security, performance, quality
+2. JSON: Strict format in markdown code block
+
+Example:
+Analyzing file1.ts: The authentication logic adds a new endpoint...
+Key concern: Line 45 accesses array without bounds validation...
 \`\`\`json
 {
   "file_results": {
     "path/to/file1.ts": {
       "findings": [
         {
-          "line": <line_number>,
-          "severity": "critical|high|medium|low",
-          "category": "bug|security|performance|quality|documentation",
-          "message": "Description of the issue",
-          "suggestion": "Recommended fix or improvement",
-              "isPreExisting": false
+          "line": 45,
+          "severity": "high",
+          "confidence": "high",
+          "category": "bug",
+          "message": "Array access without bounds check on user input",
+          "suggestion": "Add validation: if (index >= 0 && index < array.length)",
+          "reasoning": "Runtime error if index out of bounds, user input not validated",
+          "isPreExisting": false
+        },
+        {
+          "line": 52,
+          "severity": "medium",
+          "confidence": "high",
+          "category": "quality",
+          "message": "Use 'const' instead of 'let' for immutable variable",
+          "suggestion": "Change 'let result' to 'const result'",
+          "reasoning": "Variable never reassigned, const prevents accidental mutation",
+          "isPreExisting": false
         }
       ]
     },
@@ -234,6 +293,6 @@ Analysis of the changes...
 }
 \`\`\`
 
-IMPORTANT: Include an entry for EVERY file listed above, even if it has no findings (use empty arrays).
-If a file has no issues, use: "filename": { "findings": []}`;
+REMEMBER: Include entry for EVERY file listed above, even with empty findings array.
+`;
 }

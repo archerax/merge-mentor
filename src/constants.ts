@@ -16,7 +16,7 @@ export const DEFAULT_TIMEOUT_MS = 180000; // 3 minutes
 export const RETRY_DELAY_BASE_MS = 1000;
 
 /** Number of context lines to include in diffs for AI review. */
-export const DIFF_CONTEXT_LINES = 25;
+export const DIFF_CONTEXT_LINES = 50;
 
 /** File extensions to skip during code review. */
 export const SKIP_EXTENSIONS = [

@@ -11,6 +11,7 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
   return {
     line: 10,
     severity: "medium",
+    confidence: "high",
     category: "bug",
     message: "Test issue found",
     suggestion: "Fix it",
@@ -188,6 +189,7 @@ describe("FindingAggregator", () => {
       const aggregator = new FindingAggregator();
       const finding: CrossFileFinding = {
         severity: "high",
+        confidence: "high",
         category: "architecture",
         message: "Circular dependency detected",
         affectedFiles: ["a.ts", "b.ts"],
@@ -205,12 +207,14 @@ describe("FindingAggregator", () => {
       const aggregator = new FindingAggregator();
       const finding1: CrossFileFinding = {
         severity: "high",
+        confidence: "high",
         category: "architecture",
         message: "Issue one",
         affectedFiles: ["a.ts"],
       };
       const finding2: CrossFileFinding = {
         severity: "medium",
+        confidence: "medium",
         category: "design",
         message: "Issue two",
         affectedFiles: ["b.ts"],
@@ -245,12 +249,14 @@ describe("FindingAggregator", () => {
       const aggregator = new FindingAggregator();
       const finding1: CrossFileFinding = {
         severity: "high",
+        confidence: "high",
         category: "architecture",
         message: "Same issue",
         affectedFiles: ["a.ts", "b.ts"],
       };
       const finding2: CrossFileFinding = {
         severity: "high",
+        confidence: "high",
         category: "architecture",
         message: "Same issue",
         affectedFiles: ["b.ts", "a.ts"],

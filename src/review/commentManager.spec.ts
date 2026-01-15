@@ -25,6 +25,7 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
   return {
     line: 10,
     severity: "high",
+    confidence: "high",
     category: "bug",
     message: "Test message",
     suggestion: "Test suggestion",
@@ -50,6 +51,7 @@ describe("CommentManager", () => {
       const manager = createCommentManager();
       const finding = createFileFinding({
         severity: "critical",
+        confidence: "high",
         category: "security",
         message: "SQL injection vulnerability",
         suggestion: "Use parameterized queries",
@@ -205,6 +207,7 @@ describe("CommentManager", () => {
         findings: [
           {
             severity: "high",
+            confidence: "high",
             category: "architecture",
             message: "Circular dependency detected",
             affectedFiles: ["a.ts", "b.ts"],
@@ -227,6 +230,7 @@ describe("CommentManager", () => {
         findings: [
           {
             severity: "medium",
+            confidence: "high",
             category: "design",
             message: "Test finding",
             affectedFiles: [],
@@ -411,6 +415,7 @@ describe("CommentManager", () => {
       const finding = createFileFinding({
         line: 10,
         severity: "high",
+        confidence: "high",
         category: "bug",
         message: "Test message",
         suggestion: "Test suggestion",
@@ -443,6 +448,7 @@ describe("CommentManager", () => {
         findings: [
           {
             severity: "high",
+            confidence: "high",
             category: "architecture",
             message: "Design issue",
             affectedFiles: [],
@@ -508,6 +514,7 @@ describe("CommentManager", () => {
       const finding = createFileFinding({
         line: 10,
         severity: "high",
+        confidence: "high",
         category: "bug",
         message: "Test message",
         isPreExisting: false,

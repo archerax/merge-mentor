@@ -38,6 +38,7 @@ describe("AI Prompts", () => {
             {
               line: 10,
               severity: "high",
+              confidence: "high",
               category: "bug",
               message: "Bug found",
               suggestion: "Fix it",

@@ -35,13 +35,18 @@ export type FindingCategory =
   | "design"
   | "testing";
 
+/** Confidence levels for findings. */
+export type FindingConfidence = "high" | "medium" | "low";
+
 /** A finding from reviewing a specific file. */
 export interface FileFinding {
   readonly line: number;
   readonly severity: FindingSeverity;
+  readonly confidence: FindingConfidence;
   readonly category: FindingCategory;
   readonly message: string;
   readonly suggestion: string;
+  readonly reasoning?: string;
   /** Whether this issue existed before the PR (in the base branch). */
   readonly isPreExisting?: boolean;
 }
@@ -49,8 +54,10 @@ export interface FileFinding {
 /** A finding that spans multiple files. */
 export interface CrossFileFinding {
   readonly severity: FindingSeverity;
+  readonly confidence: FindingConfidence;
   readonly category: FindingCategory;
   readonly message: string;
+  readonly reasoning?: string;
   readonly affectedFiles: readonly string[];
 }
 
