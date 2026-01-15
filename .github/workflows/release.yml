@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -12,55 +12,55 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
-          cache: 'pnpm'
-      
+          node-version: "24.x"
+          cache: "pnpm"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Type check
         run: pnpm typecheck
-      
+
       - name: Lint
         run: pnpm run lint
-      
+
       - name: Run tests
         run: pnpm test:all
-      
+
       - name: Build
         run: pnpm build
-      
+
       - name: Verify build output
         run: |
           test -f dist/cli.js || exit 1
           echo "Build verification passed!"
-      
+
       - name: Extract version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-      
+
       - name: Create NPM package
         run: pnpm pack
-      
+
       - name: Generate release notes
         id: release_notes
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           echo "RELEASE_NAME=v${VERSION}" >> $GITHUB_OUTPUT
-          
+
           # Extract changelog section for this version if it exists
           if grep -q "## \[${VERSION}\]" CHANGELOG.md 2>/dev/null; then
             echo "Found changelog entry for version ${VERSION}"
@@ -70,7 +70,7 @@ jobs:
             echo "" >> release_notes.md
             echo "See CHANGELOG.md for details." >> release_notes.md
           fi
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -82,4 +82,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

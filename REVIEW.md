@@ -159,13 +159,14 @@ src/
 
 ### 1. Node.js Version Requirement Update (January 2026)
 
-**Change**: Updated minimum Node.js version from 20 to 22
+**Change**: Updated minimum Node.js version from 22 to 24
 
-**Reason**: Project features require Node.js 22+ for optimal compatibility and features
+**Reason**: Project now requires Node.js 24+ for optimal compatibility and features
 
 **Updated Files**:
-- `package.json`: `engines.node` set to `>=22.0.0`
+- `package.json`: `engines.node` set to `>=24.0.0`
 - `README.md`: Updated all installation examples and CI/CD configs
+- CI workflows: Removed matrix builds, now using Node 24 on Ubuntu only
 
 ### 2. Comprehensive Audit Logging (December 2025)
 
@@ -610,14 +611,14 @@ function isRateLimitError(error: unknown): error is RateLimitError {
 
 **Triggers**: Push to main/develop, PRs to main/develop
 
-**Job: Test** (Matrix: Node 18, 20, 22)
+**Job: Test** (Node 24 on Ubuntu)
 
 - ✅ Type checking (`tsc --noEmit`)
 - ✅ Linting (`biome lint`)
 - ✅ Format checking (`biome format`)
 - ✅ Test suite with coverage
 - ✅ Build verification
-- ✅ Codecov upload (Node 20 only)
+- ✅ Codecov upload
 
 **Job: Security Audit**
 
@@ -921,7 +922,7 @@ Checked 36 files in 162ms. No fixes applied.
   "homepage": "https://github.com/user/merge-mentor#readme",
   "files": ["dist", "README.md", "LICENSE"],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   }
 }
 ```
@@ -1116,7 +1117,7 @@ const results = await pMap(files, async (file) => reviewFile(file), {
 **Proposed**: Official Docker image
 
 ```dockerfile
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY dist/ ./dist/
 COPY package.json ./

@@ -51,7 +51,7 @@ npx merge-mentor review --pr 123
 
 ## Prerequisites
 
-- **Node.js 22+**
+- **Node.js 24+**
 - **AI CLI Tool** - At least one must be installed and accessible in PATH:
   - **GitHub Copilot CLI** (default):
     ```bash
@@ -527,7 +527,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Install Copilot CLI
         run: npm install -g @githubnext/github-copilot-cli
@@ -553,7 +553,7 @@ pool:
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: "22.x"
+      versionSpec: "24.x"
 
   - script: npm install -g @githubnext/github-copilot-cli
     displayName: Install Copilot CLI

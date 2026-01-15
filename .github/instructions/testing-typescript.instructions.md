@@ -11,6 +11,7 @@ applyTo: **/*.test.ts, **/*.spec.ts, **/*.test.tsx, **/*.spec.tsx
 A unit test validates a single unit of work, checking one specific outcome. Tests must be automated, fast, consistent, isolated, and trustworthy.
 
 A **unit of work** spans from invoking a public method to a measurable end result:
+
 - Returned value from a function
 - Observable state change through public API
 - Interaction with an external dependency
@@ -20,16 +21,19 @@ A unit ranges from a single function to multiple classes working together to pro
 ## Test Quality Attributes
 
 ### Trustworthy
+
 - Tests prove the code works correctly
 - Failures indicate real bugs, not test issues
 - No false positives or negatives
 
 ### Maintainable
+
 - Easy to understand and modify
 - Survives refactoring of production code
 - Minimal coupling to implementation details
 
 ### Readable
+
 - Expresses intent clearly
 - Serves as documentation
 - Reveals what and why, not just how
@@ -56,17 +60,17 @@ test('parseNumsEmptyStr', () => { ... })
 Structure tests into three clear sections:
 
 ```typescript
-test('calculates sum when given multiple comma-separated numbers', () => {
+test("calculates sum when given multiple comma-separated numbers", () => {
   // Arrange - set up test data and dependencies
-  const input = '1,2,3'
-  const parser = new NumberParser()
+  const input = "1,2,3";
+  const parser = new NumberParser();
 
   // Act - invoke the unit of work
-  const result = parser.parseAndSum(input)
+  const result = parser.parseAndSum(input);
 
   // Assert - verify the outcome
-  expect(result).toBe(6)
-})
+  expect(result).toBe(6);
+});
 ```
 
 Separate sections with blank lines. Omit comments when structure is self-evident.
@@ -82,23 +86,23 @@ Use test doubles (stubs, mocks) to isolate the unit under test from dependencies
 ```typescript
 const stubLogger = {
   log: vi.fn(),
-  error: vi.fn()
-}
+  error: vi.fn(),
+};
 ```
 
 **Mock** - verifies interactions occurred correctly:
 
 ```typescript
-test('sends notification when error threshold exceeded', () => {
-  const mockNotifier = { notify: vi.fn() }
-  const service = new ErrorService(mockNotifier)
+test("sends notification when error threshold exceeded", () => {
+  const mockNotifier = { notify: vi.fn() };
+  const service = new ErrorService(mockNotifier);
 
-  service.processError({ severity: 'critical' })
+  service.processError({ severity: "critical" });
 
   expect(mockNotifier.notify).toHaveBeenCalledWith(
-    expect.objectContaining({ severity: 'critical' })
-  )
-})
+    expect.objectContaining({ severity: "critical" }),
+  );
+});
 ```
 
 ### Dependency Injection
@@ -109,12 +113,12 @@ Favor constructor injection for explicit dependency control:
 class UserService {
   constructor(
     private readonly repository: UserRepository,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 }
 
 // Testing becomes straightforward
-const service = new UserService(createStubRepository(), createStubLogger())
+const service = new UserService(createStubRepository(), createStubLogger());
 ```
 
 Use interfaces for abstraction; never inject production dependencies in tests.
@@ -125,20 +129,20 @@ Verify only one interaction per test:
 
 ```typescript
 // Good
-test('logs error when validation fails', () => {
-  const mockLogger = { error: vi.fn() }
-  const validator = new Validator(mockLogger)
+test("logs error when validation fails", () => {
+  const mockLogger = { error: vi.fn() };
+  const validator = new Validator(mockLogger);
 
-  validator.validate(invalidData)
+  validator.validate(invalidData);
 
-  expect(mockLogger.error).toHaveBeenCalled()
-})
+  expect(mockLogger.error).toHaveBeenCalled();
+});
 
 // Avoid - multiple interactions verified
-test('processes order', () => {
-  expect(mockLogger.log).toHaveBeenCalled()
-  expect(mockNotifier.send).toHaveBeenCalled()  // Split into separate tests
-})
+test("processes order", () => {
+  expect(mockLogger.log).toHaveBeenCalled();
+  expect(mockNotifier.send).toHaveBeenCalled(); // Split into separate tests
+});
 ```
 
 ## Avoiding Common Pitfalls
@@ -191,21 +195,21 @@ Don't assert internal implementation details. Test observable behavior:
 
 ```typescript
 // Good - tests public behavior
-test('authenticates user with valid credentials', async () => {
-  const auth = new Authenticator(mockUserStore)
+test("authenticates user with valid credentials", async () => {
+  const auth = new Authenticator(mockUserStore);
 
-  const result = await auth.login('user', 'pass')
+  const result = await auth.login("user", "pass");
 
-  expect(result.success).toBe(true)
-})
+  expect(result.success).toBe(true);
+});
 
 // Avoid - asserting internal method calls
-test('authenticates user', async () => {
-  await auth.login('user', 'pass')
+test("authenticates user", async () => {
+  await auth.login("user", "pass");
 
-  expect(mockHasher.hash).toHaveBeenCalled()  // Implementation detail
-  expect(mockUserStore.find).toHaveBeenCalled()  // May change during refactor
-})
+  expect(mockHasher.hash).toHaveBeenCalled(); // Implementation detail
+  expect(mockUserStore.find).toHaveBeenCalled(); // May change during refactor
+});
 ```
 
 ## Test Organization
@@ -213,6 +217,7 @@ test('authenticates user', async () => {
 ### File Structure
 
 Colocate tests with source files or mirror source structure in test directory:
+
 ```
 src/user-service.ts → src/user-service.test.ts
 ```
@@ -242,16 +247,17 @@ Prefer factory functions over `beforeEach` for clarity:
 ```typescript
 // Good - explicit
 function createTestService() {
-  return new DataService(createStubRepository())
+  return new DataService(createStubRepository());
 }
 
-test('saves data successfully', () => {
-  const service = createTestService()
+test("saves data successfully", () => {
+  const service = createTestService();
   // Self-contained and clear
-})
+});
 ```
 
 Use `beforeEach` only when setup is identical for all tests in a suite. Avoid when:
+
 - Objects used by only some tests
 - Contains complex logic
 - Creates shared mutable state
@@ -269,17 +275,17 @@ Separate them by directory or naming convention. Run unit tests continuously; in
 Use Vitest's error testing utilities:
 
 ```typescript
-test('throws error when file extension is invalid', () => {
-  const parser = new FileParser()
+test("throws error when file extension is invalid", () => {
+  const parser = new FileParser();
 
-  expect(() => parser.parse('file.xyz')).toThrow('Invalid extension')
-})
+  expect(() => parser.parse("file.xyz")).toThrow("Invalid extension");
+});
 
-test('rejects promise when network fails', async () => {
-  const client = new ApiClient(failingConnection)
+test("rejects promise when network fails", async () => {
+  const client = new ApiClient(failingConnection);
 
-  await expect(client.fetch()).rejects.toThrow('Network error')
-})
+  await expect(client.fetch()).rejects.toThrow("Network error");
+});
 ```
 
 ## Async Testing
@@ -288,16 +294,16 @@ Always await promises:
 
 ```typescript
 // Good
-test('fetches user data', async () => {
-  const user = await service.getUser(123)
-  expect(user.name).toBe('Alice')
-})
+test("fetches user data", async () => {
+  const user = await service.getUser(123);
+  expect(user.name).toBe("Alice");
+});
 
 // Avoid
-test('fetches user data', () => {
-  service.getUser(123)  // Not awaited
-  expect(user.name).toBe('Alice')  // Runs before completion
-})
+test("fetches user data", () => {
+  service.getUser(123); // Not awaited
+  expect(user.name).toBe("Alice"); // Runs before completion
+});
 ```
 
 ## Parameterized Tests
@@ -306,13 +312,13 @@ Use `test.each` for testing multiple inputs:
 
 ```typescript
 test.each([
-  ['', 0],
-  ['5', 5],
-  ['1,2', 3],
-  ['1,2,3', 6]
+  ["", 0],
+  ["5", 5],
+  ["1,2", 3],
+  ["1,2,3", 6],
 ])('parseAndSum("%s") returns %i', (input, expected) => {
-  expect(parseAndSum(input)).toBe(expected)
-})
+  expect(parseAndSum(input)).toBe(expected);
+});
 ```
 
 ## Variable Naming
@@ -321,14 +327,14 @@ Use meaningful names:
 
 ```typescript
 // Good
-const invalidEmail = 'not-an-email'
-const validator = new EmailValidator()
-const result = validator.validate(invalidEmail)
+const invalidEmail = "not-an-email";
+const validator = new EmailValidator();
+const result = validator.validate(invalidEmail);
 
 // Avoid
-const e = 'not-an-email'
-const v = new EmailValidator()
-const r = v.validate(e)
+const e = "not-an-email";
+const v = new EmailValidator();
+const r = v.validate(e);
 ```
 
 ## Assertion Best Practices
@@ -339,14 +345,14 @@ Use the most specific matcher available:
 
 ```typescript
 // Good
-expect(result).toBeNull()
-expect(items).toHaveLength(3)
-expect(user).toEqual({ name: 'Alice', age: 30 })
+expect(result).toBeNull();
+expect(items).toHaveLength(3);
+expect(user).toEqual({ name: "Alice", age: 30 });
 
 // Avoid - less specific
-expect(result === null).toBe(true)
-expect(items.length).toBe(3)
-expect(JSON.stringify(user)).toBe(JSON.stringify({ name: 'Alice', age: 30 }))
+expect(result === null).toBe(true);
+expect(items.length).toBe(3);
+expect(JSON.stringify(user)).toBe(JSON.stringify({ name: "Alice", age: 30 }));
 ```
 
 ### Object Matching
@@ -387,6 +393,7 @@ expect(response).toEqual({
 ## Legacy Code
 
 When adding tests to untested code:
+
 1. Write integration tests capturing current behavior
 2. Introduce interfaces breaking dependencies
 3. Add unit tests during refactoring
@@ -406,72 +413,75 @@ When adding tests to untested code:
 ## Example: Complete Test File
 
 ```typescript
-import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { UserService } from './user-service'
-import type { UserRepository } from './user-repository'
-import type { EmailService } from './email-service'
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { UserService } from "./user-service";
+import type { UserRepository } from "./user-repository";
+import type { EmailService } from "./email-service";
 
 function createStubRepository(): UserRepository {
   return {
     find: vi.fn(),
     save: vi.fn(),
-    delete: vi.fn()
-  }
+    delete: vi.fn(),
+  };
 }
 
 function createStubEmailService(): EmailService {
   return {
-    send: vi.fn().mockResolvedValue(undefined)
-  }
+    send: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
-describe('UserService', () => {
-  describe('createUser', () => {
-    test('saves user with normalized email', async () => {
-      const repository = createStubRepository()
-      const service = new UserService(repository, createStubEmailService())
+describe("UserService", () => {
+  describe("createUser", () => {
+    test("saves user with normalized email", async () => {
+      const repository = createStubRepository();
+      const service = new UserService(repository, createStubEmailService());
 
-      await service.createUser({ email: 'Alice@Example.com', name: 'Alice' })
+      await service.createUser({ email: "Alice@Example.com", name: "Alice" });
 
       expect(repository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: 'alice@example.com'
-        })
-      )
-    })
+          email: "alice@example.com",
+        }),
+      );
+    });
 
-    test('sends welcome email after creation', async () => {
-      const emailService = createStubEmailService()
-      const service = new UserService(createStubRepository(), emailService)
+    test("sends welcome email after creation", async () => {
+      const emailService = createStubEmailService();
+      const service = new UserService(createStubRepository(), emailService);
 
-      await service.createUser({ email: 'alice@example.com', name: 'Alice' })
+      await service.createUser({ email: "alice@example.com", name: "Alice" });
 
       expect(emailService.send).toHaveBeenCalledWith({
-        to: 'alice@example.com',
-        template: 'welcome'
-      })
-    })
+        to: "alice@example.com",
+        template: "welcome",
+      });
+    });
 
-    test('throws error when email is invalid', async () => {
-      const service = new UserService(createStubRepository(), createStubEmailService())
+    test("throws error when email is invalid", async () => {
+      const service = new UserService(
+        createStubRepository(),
+        createStubEmailService(),
+      );
 
       await expect(
-        service.createUser({ email: 'invalid', name: 'Alice' })
-      ).rejects.toThrow('Invalid email')
-    })
-  })
+        service.createUser({ email: "invalid", name: "Alice" }),
+      ).rejects.toThrow("Invalid email");
+    });
+  });
 
-  describe('deleteUser', () => {
-    test('removes user from repository', async () => {
-      const repository = createStubRepository()
-      const service = new UserService(repository, createStubEmailService())
+  describe("deleteUser", () => {
+    test("removes user from repository", async () => {
+      const repository = createStubRepository();
+      const service = new UserService(repository, createStubEmailService());
 
-      await service.deleteUser(123)
+      await service.deleteUser(123);
 
-      expect(repository.delete).toHaveBeenCalledWith(123)
-    })
-  })
-})
+      expect(repository.delete).toHaveBeenCalledWith(123);
+    });
+  });
+});
 ```
 
 ## Key Principles Summary
