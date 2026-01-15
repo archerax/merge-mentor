@@ -22,7 +22,8 @@
     "format": "biome format --write src",
     "format:check": "biome format src",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && biome check src && npm run test"
+    "check": "npm run typecheck && biome check src && npm run test",
+    "knip": "knip"
   },
   "keywords": [
     "code-review",
@@ -51,20 +52,21 @@
   ],
   "dependencies": {
     "@octokit/rest": "^22.0.1",
-    "@types/node": "^25.0.2",
     "azure-devops-node-api": "^15.1.1",
     "commander": "^14.0.2",
     "diff": "^8.0.2",
     "dotenv": "^17.2.3",
     "openai": "^6.16.0",
-    "pino": "^10.1.0",
-    "typescript": "^5.9.3"
+    "pino": "^10.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.10",
+    "@types/node": "^25.0.2",
     "@vitest/coverage-v8": "^4.0.16",
     "cross-env": "^10.1.0",
     "esbuild": "^0.27.2",
+    "knip": "^5.81.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.16"
   }
 }
