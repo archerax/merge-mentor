@@ -251,12 +251,3 @@ export function createEmptyReviewResponse(): string {
     findings: [],
   });
 }
-
-/** Create empty cross-file response. */
-export function createEmptyCrossFileResponse(): string {
-  return JSON.stringify({
-    overall_assessment: "No significant issues found.",
-    findings: [],
-    recommendations: [],
-  });
-}
