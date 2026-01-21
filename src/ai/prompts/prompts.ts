@@ -8,13 +8,15 @@ import type { DiffManifest } from "../../review/diffStorage.js";
  * @param filesSummary - Summary of changed files
  * @param fileReviewResults - Results from individual file reviews
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
+ * @param repoContext - Optional repository-specific coding standards and guidelines
  * @returns Formatted prompt for Copilot CLI
  */
 export function buildCrossFilePrompt(
   prDetails: PRDetails,
   filesSummary: string,
   fileReviewResults: readonly FileReviewResult[],
-  existingCommentsContext?: string
+  existingCommentsContext?: string,
+  repoContext?: string
 ): string {
   const findingsSummary = fileReviewResults
     .filter((r) => r.findings.length > 0)
@@ -25,9 +27,23 @@ export function buildCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
     : "";
 
+  const repoContextSection = repoContext
+    ? `
+---
+# REPOSITORY-SPECIFIC GUIDELINES
+
+The following standards are specific to this project.
+**These take precedence over generic best practices.**
+
+${repoContext}
+
+---
+`
+    : "";
+
   return `# YOUR ROLE
 Expert code reviewer performing holistic architectural analysis of a pull request.
-
+${repoContextSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}
@@ -142,11 +158,13 @@ export function buildFilesSummary(files: readonly PRFile[]): string {
  *
  * @param manifest - Manifest describing stored diff files
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
+ * @param repoContext - Optional repository-specific coding standards and guidelines
  * @returns Formatted prompt for batched review
  */
 export function buildBatchedFileReviewPrompt(
   manifest: DiffManifest,
-  existingCommentsContext?: string
+  existingCommentsContext?: string,
+  repoContext?: string
 ): string {
   const filesListing = manifest.files
     .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${f.diffPath}`)
@@ -156,15 +174,54 @@ export function buildBatchedFileReviewPrompt(
     ? `\n${existingCommentsContext}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
     : "";
 
+  const repoContextSection = repoContext
+    ? `
+---
+# REPOSITORY-SPECIFIC GUIDELINES
+
+The following standards are specific to this project.
+**These take precedence over generic best practices.**
+
+${repoContext}
+
+---
+`
+    : "";
+
   return `# YOUR ROLE
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
-
+${repoContextSection}
 # TASK
 Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
 
 Files to Review:
 ${filesListing}
 ${commentsSection}
+# MANDATORY ANALYSIS STRUCTURE
+
+Before providing JSON, document your analysis:
+
+## Pass 1: Surface Scan
+Line-by-line observations of suspicious patterns
+
+## Pass 2: Security Deep Dive
+- Authentication/authorization analysis
+- Input validation completeness
+- Data exposure risks
+
+## Pass 3: Logic Analysis
+- Edge case handling
+- Error path completeness
+- State management correctness
+
+## Pass 4: Performance Review
+- Algorithmic complexity
+- Resource leak risks
+- Scalability concerns
+
+## Findings Summary
+Only after completing all passes above, list findings.
+
 # CRITICAL RULES
 1. Only flag NEW issues in added lines (marked with +)
 2. Include confidence (high/medium/low) and reasoning for EVERY finding

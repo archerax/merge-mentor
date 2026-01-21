@@ -22,6 +22,7 @@ import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js"
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
+import { type RepoContext, RepoManager } from "./repoManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 /** Result of a complete PR review. */
@@ -55,12 +56,6 @@ export interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
-  /** OpenAI API key (required for OpenAI provider) */
-  readonly openaiApiKey?: string;
-  /** OpenAI base URL (for Azure Foundry compatibility) */
-  readonly openaiBaseUrl?: string;
-  /** OpenAI max retries */
-  readonly openaiMaxRetries?: number;
 }
 
 /**
@@ -72,6 +67,7 @@ export class ReviewEngine {
   private readonly provider: AIProviderClient;
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
+  private readonly repoManager: RepoManager;
   private readonly options: ReviewEngineOptions;
   private readonly logger = createChildLogger({ component: "ReviewEngine" });
   private readonly auditLogger = getAuditLogger();
@@ -102,27 +98,19 @@ export class ReviewEngine {
     const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
     const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
 
-    // Build provider options - include OpenAI-specific options when applicable
-    const providerOptions =
-      resolvedProviderType === "openai"
-        ? {
-            model,
-            timeoutMs,
-            apiKey: resolvedOptions?.openaiApiKey ?? "",
-            baseUrl: resolvedOptions?.openaiBaseUrl,
-            maxRetries: resolvedOptions?.openaiMaxRetries,
-          }
-        : {
-            model,
-            timeoutMs,
-            token: resolvedProviderType === "copilot" ? resolvedOptions?.copilotToken : undefined,
-          };
+    // Build provider options
+    const providerOptions = {
+      model,
+      timeoutMs,
+      token: resolvedProviderType === "copilot" ? resolvedOptions?.copilotToken : undefined,
+    };
 
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
     });
     this.stateCache = new ReviewStateCache();
+    this.repoManager = new RepoManager();
     this.options = resolvedOptions ?? {};
     this.platformName = platform.constructor.name.toLowerCase().includes("github")
       ? "github"
@@ -175,13 +163,22 @@ export class ReviewEngine {
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prIdentifier);
 
+    // Load repository context (coding standards, guidelines)
+    const repoContext = await this.loadRepoContext(prDetails.baseBranch);
+
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
 
     if (runs === 1) {
       // Single run - use existing logic
-      const reviewData = await this.reviewFiles(prIdentifier, files, existingComments, cachedState);
+      const reviewData = await this.reviewFiles(
+        prIdentifier,
+        files,
+        existingComments,
+        cachedState,
+        repoContext?.content
+      );
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
 
@@ -198,7 +195,8 @@ export class ReviewEngine {
           prDetails,
           files,
           fileResults,
-          existingComments
+          existingComments,
+          repoContext?.content
         );
       }
     } else {
@@ -209,7 +207,8 @@ export class ReviewEngine {
         prDetails,
         files,
         runs,
-        existingComments
+        existingComments,
+        repoContext?.content
       );
       fileResults = aggregated.fileResults;
       crossFileResult = aggregated.crossFileResult;
@@ -283,7 +282,8 @@ export class ReviewEngine {
     prDetails: PRDetails,
     files: PRFile[],
     runs: number,
-    existingComments: readonly ExistingComment[]
+    existingComments: readonly ExistingComment[],
+    repoContext?: string
   ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
     const allFileResults: FileReviewResult[][] = [];
     const allCrossFileResults: CrossFileReviewResult[] = [];
@@ -305,7 +305,13 @@ export class ReviewEngine {
             : this.createSyntheticComments(existingComments, accumulatedFindings);
 
         // Perform file reviews for this run (no caching in multi-run mode)
-        const { fileResults } = await this.reviewFiles(prIdentifier, files, runComments, undefined);
+        const { fileResults } = await this.reviewFiles(
+          prIdentifier,
+          files,
+          runComments,
+          undefined,
+          repoContext
+        );
         const validatedResults = this.validateLineNumbers(fileResults, files);
         allFileResults.push(validatedResults);
 
@@ -317,7 +323,8 @@ export class ReviewEngine {
           prDetails,
           files,
           validatedResults,
-          runComments
+          runComments,
+          repoContext
         );
         allCrossFileResults.push(crossFileResult);
 
@@ -390,11 +397,54 @@ export class ReviewEngine {
     return existingComments;
   }
 
+  /**
+   * Loads repository context (coding standards, guidelines) for review.
+   * Gracefully degrades if context cannot be loaded.
+   */
+  private async loadRepoContext(branch: string): Promise<RepoContext | undefined> {
+    try {
+      this.log("📦 Loading repository context...");
+      this.logger.debug({ branch }, "Loading repository context");
+
+      const repoInfo = this.platform.getRepoInfo();
+      const token = this.platform.getToken();
+
+      const repoPath = await this.repoManager.ensureRepo(repoInfo, branch, token);
+      const context = await this.repoManager.loadRepoContext(repoPath);
+
+      if (context.filesLoaded.length > 0) {
+        this.log(
+          `  ✓ Loaded ${context.filesLoaded.length} context document(s): ${context.filesLoaded.join(", ")}`
+        );
+        this.logger.info(
+          {
+            filesLoaded: context.filesLoaded,
+            contentLength: context.content.length,
+          },
+          "Repository context loaded successfully"
+        );
+        return context;
+      }
+
+      this.log("  → No context documents found in repository");
+      this.logger.info({ repoPath }, "No repository context files found");
+      return undefined;
+    } catch (error) {
+      this.log(`  ⚠️ Could not load repository context: ${(error as Error).message}`);
+      this.logger.warn(
+        { error: (error as Error).message },
+        "Failed to load repository context, continuing without it"
+      );
+      return undefined;
+    }
+  }
+
   private async reviewFiles(
     prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>
+    cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
+    repoContext?: string
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     // Filter out files that should be skipped
     const filesToReview: PRFile[] = [];
@@ -438,7 +488,8 @@ export class ReviewEngine {
     const batchedResults = await this.reviewFilesBatched(
       prIdentifier,
       filesToReview,
-      existingComments
+      existingComments,
+      repoContext
     );
 
     // Combine cached and new results
@@ -458,7 +509,8 @@ export class ReviewEngine {
   private async reviewFilesBatched(
     prIdentifier: string,
     files: PRFile[],
-    existingComments: readonly ExistingComment[]
+    existingComments: readonly ExistingComment[],
+    repoContext?: string
   ): Promise<FileReviewResult[]> {
     const diffStorage = new DiffStorage();
 
@@ -480,9 +532,13 @@ export class ReviewEngine {
         "Stored diffs for batched review"
       );
 
-      // Build batched prompt
+      // Build batched prompt with repo context
       const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildBatchedFileReviewPrompt(manifest, commentsContext || undefined);
+      const prompt = buildBatchedFileReviewPrompt(
+        manifest,
+        commentsContext || undefined,
+        repoContext
+      );
 
       this.logger.debug("Copying diffs to temp directory for Copilot access");
       // Copy diff files to temp directory so Copilot CLI can access them
@@ -494,6 +550,7 @@ export class ReviewEngine {
           promptLength: prompt.length,
           promptPreview: prompt.substring(0, 2000),
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
+          hasRepoContext: !!repoContext,
         },
         "Batched prompt being sent"
       );
@@ -676,7 +733,8 @@ export class ReviewEngine {
     prDetails: PRDetails,
     files: PRFile[],
     fileResults: readonly FileReviewResult[],
-    existingComments: readonly ExistingComment[]
+    existingComments: readonly ExistingComment[],
+    repoContext?: string
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
     this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
@@ -684,7 +742,13 @@ export class ReviewEngine {
     try {
       const filesSummary = buildFilesSummary(files);
       const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildCrossFilePrompt(prDetails, filesSummary, fileResults, commentsContext);
+      const prompt = buildCrossFilePrompt(
+        prDetails,
+        filesSummary,
+        fileResults,
+        commentsContext,
+        repoContext
+      );
       const response = await this.provider.executePrompt(prompt);
       const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);

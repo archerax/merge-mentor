@@ -40,11 +40,6 @@ export interface Config {
   readonly opencodeTimeoutMs?: number;
   readonly cursorModel?: string;
   readonly cursorTimeoutMs?: number;
-  readonly openaiApiKey?: string;
-  readonly openaiModel?: string;
-  readonly openaiTimeoutMs?: number;
-  readonly openaiBaseUrl?: string;
-  readonly openaiMaxRetries?: number;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
@@ -85,20 +80,6 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
           10
         )
       : undefined;
-  const openaiTimeoutMs =
-    (cliOverrides?.openaiTimeout ?? process.env.MM_OPENAI_TIMEOUT)
-      ? Number.parseInt(
-          cliOverrides?.openaiTimeout?.toString() ?? process.env.MM_OPENAI_TIMEOUT!,
-          10
-        )
-      : undefined;
-  const openaiMaxRetries =
-    (cliOverrides?.openaiMaxRetries ?? process.env.MM_OPENAI_MAX_RETRIES)
-      ? Number.parseInt(
-          cliOverrides?.openaiMaxRetries?.toString() ?? process.env.MM_OPENAI_MAX_RETRIES!,
-          10
-        )
-      : undefined;
 
   const reviewRuns = validateReviewRuns(
     cliOverrides?.reviewRuns?.toString() ?? process.env.MM_REVIEW_RUNS
@@ -128,11 +109,6 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
     cursorModel: cliOverrides?.cursorModel ?? process.env.MM_CURSOR_MODEL,
     cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
-    openaiApiKey: cliOverrides?.openaiApiKey ?? process.env.MM_OPENAI_API_KEY,
-    openaiModel: cliOverrides?.openaiModel ?? process.env.MM_OPENAI_MODEL,
-    openaiTimeoutMs: openaiTimeoutMs && openaiTimeoutMs > 0 ? openaiTimeoutMs : undefined,
-    openaiBaseUrl: cliOverrides?.openaiBaseUrl ?? process.env.MM_OPENAI_BASE_URL,
-    openaiMaxRetries: openaiMaxRetries && openaiMaxRetries > 0 ? openaiMaxRetries : undefined,
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? process.env.MM_SKIP_EXISTING_ISSUES) !== "false",
     reviewRuns,
@@ -158,11 +134,6 @@ export interface CliOverrides {
   readonly opencodeTimeout?: number;
   readonly cursorModel?: string;
   readonly cursorTimeout?: number;
-  readonly openaiApiKey?: string;
-  readonly openaiModel?: string;
-  readonly openaiTimeout?: number;
-  readonly openaiBaseUrl?: string;
-  readonly openaiMaxRetries?: number;
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
 }
@@ -179,7 +150,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor", "openai"];
+  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

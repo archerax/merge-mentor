@@ -4,12 +4,12 @@ This file contains instructions for AI agents working on this codebase.
 
 ## Project Overview
 
-merge-mentor is an automated code review tool that supports multiple AI providers (GitHub Copilot CLI, OpenCode CLI, Cursor CLI, OpenAI API) to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
+merge-mentor is an automated code review tool that supports multiple AI providers (GitHub Copilot CLI, OpenCode CLI, Cursor CLI) to perform comprehensive code reviews on pull requests from GitHub and Azure DevOps repositories. It provides inline comments, general feedback, and summary reports directly on PRs.
 
 **Distribution**: Can be installed globally via npm/npx or used as a local development tool. Configuration (`.env` file) and logs are always relative to the current working directory, not the installation directory.
 
 **Key Features**:
-- Multi-provider support (Copilot CLI, OpenCode CLI, Cursor CLI, OpenAI API)
+- Multi-provider support (Copilot CLI, OpenCode CLI, Cursor CLI)
 - Confidence-based comment filtering (only posts high-confidence issues by default)
 - Pre-existing issue detection (skips issues not introduced in this PR)
 - Resolution comments (explains why comments are being resolved)
@@ -35,7 +35,6 @@ src/
 │       ├── copilot.ts  # GitHub Copilot CLI provider implementation
 │       ├── cursor.ts   # Cursor CLI provider implementation
 │       ├── opencode.ts # OpenCode CLI provider implementation
-│       └── openai.ts   # OpenAI API provider implementation (SDK-based)
 ├── audit/
 │   ├── auditLogger.ts  # Audit logging for security/compliance tracking
 │   └── index.ts        # Audit module exports
@@ -86,12 +85,6 @@ There are two types of providers:
    - Reference diff files on disk (`@filename.diff`)
    - CLI handles authentication and rate limiting
 
-2. **SDK-based providers** (OpenAI):
-   - Use official SDK for direct API calls
-   - Pass diff content directly in request body
-   - Application handles authentication via API key
-   - SDK handles automatic retries and rate limiting
-
 ### Adding a New CLI-Based Provider
 
 1. Create `src/ai/providers/newprovider.ts` implementing `AIProviderClient`
@@ -102,20 +95,6 @@ There are two types of providers:
 6. Add CLI option validation in `src/cli.ts` and `src/program.ts`
 7. Add tests in `src/ai/providers/newprovider.spec.ts`
 
-### Adding a New SDK-Based Provider
-
-1. Add npm package dependency (e.g., `pnpm add openai`)
-2. Create `src/ai/providers/newprovider.ts` implementing `AIProviderClient`
-3. Add provider-specific error classes in `src/errors/index.ts`
-4. Add provider-specific options interface extending `AIProviderOptions`
-5. Export from `src/ai/index.ts`
-6. Add case to `createAIProvider()` with validation for required options (e.g., API key)
-7. Add configuration in `src/config.ts` (apiKey, model, timeout, baseUrl env vars)
-8. Update `ReviewEngineOptions` in `src/review/engine.ts` to pass provider-specific options
-9. Add CLI options and validation in `src/cli.ts` and `src/program.ts`
-10. Add tests in `src/ai/providers/newprovider.spec.ts`
-
-## Deduplication Strategy
 
 ### Problem
 LLM non-determinism causes duplicate comments when:

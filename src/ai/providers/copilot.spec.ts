@@ -242,7 +242,7 @@ describe("CopilotProvider", () => {
         suggestion: "Add null check",
         isPreExisting: false,
         confidence: "high",
-        reasoning: undefined,
+        reasoning: "Reasoning not provided by the model.",
       });
     });
 
@@ -284,7 +284,7 @@ describe("CopilotProvider", () => {
         message: "Consider refactoring",
         affectedFiles: ["file1.ts", "file2.ts"],
         confidence: "high",
-        reasoning: undefined,
+        reasoning: "Reasoning not provided by the model.",
       });
       expect(result.recommendations).toEqual(["Add more tests"]);
     });

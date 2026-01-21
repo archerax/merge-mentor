@@ -42,6 +42,7 @@ describe("AI Prompts", () => {
               category: "bug",
               message: "Bug found",
               suggestion: "Fix it",
+              reasoning: "This is a bug because the code does not handle edge cases.",
             },
           ],
         },

@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, Cursor CLI, and OpenAI API. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, and Cursor CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -29,16 +29,13 @@ merge-mentor review --pr 123 --provider opencode --write
 # Use Cursor CLI
 merge-mentor review --pr 123 --provider cursor --write
 
-# Use OpenAI API (requires API key)
-MM_OPENAI_API_KEY=sk-... merge-mentor review --pr 123 --provider openai --write
-
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
 ```
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, Cursor CLI, and OpenAI API
+- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Inline Comments** - Posts feedback on specific lines of code
@@ -67,14 +64,6 @@ npx merge-mentor review --pr 123
     # Install Cursor CLI
     curl https://cursor.com/install -fsS | bash
     # Ensure cursor-agent is in your PATH
-    ```
-  - **OpenAI API** (no CLI installation needed):
-    ```bash
-    # Just set your API key
-    export MM_OPENAI_API_KEY=sk-your-api-key
-    # Or use Azure Foundry (OpenAI-compatible endpoint)
-    export MM_OPENAI_API_KEY=your-azure-key
-    export MM_OPENAI_BASE_URL=https://your-foundry.azure.com/v1
     ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
@@ -199,12 +188,6 @@ $env:MM_OPENCODE_TIMEOUT="180000"
 # Cursor settings
 $env:MM_CURSOR_MODEL="gpt-5"
 $env:MM_CURSOR_TIMEOUT="180000"
-
-# OpenAI settings
-$env:MM_OPENAI_API_KEY="sk-your-api-key"
-$env:MM_OPENAI_MODEL="gpt-4o"
-$env:MM_OPENAI_TIMEOUT="180000"
-```
 
 **Or use command-line parameters:**
 ```bash
@@ -412,11 +395,6 @@ merge-mentor review --pr 123 --verbose false
 | `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
 | `--cursor-model <model>` | Cursor model name | `MM_CURSOR_MODEL` |
 | `--cursor-timeout <ms>` | Cursor timeout in ms | `MM_CURSOR_TIMEOUT` |
-| `--openai-api-key <key>` | OpenAI API key | `MM_OPENAI_API_KEY` |
-| `--openai-model <model>` | OpenAI model name (default: gpt-4o) | `MM_OPENAI_MODEL` |
-| `--openai-timeout <ms>` | OpenAI timeout in ms | `MM_OPENAI_TIMEOUT` |
-| `--openai-base-url <url>` | OpenAI base URL (for Azure Foundry) | `MM_OPENAI_BASE_URL` |
-| `--openai-max-retries <n>` | OpenAI max retry attempts | `MM_OPENAI_MAX_RETRIES` |
 
 **Comment Filtering:**
 | Option | Description | Env Variable | Default |

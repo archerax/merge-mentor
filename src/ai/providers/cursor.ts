@@ -223,7 +223,9 @@ export class CursorProvider implements AIProviderClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
-          reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
+          reasoning: finding.reasoning
+            ? String(finding.reasoning)
+            : "Reasoning not provided by the model.",
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
       }
@@ -252,7 +254,9 @@ export class CursorProvider implements AIProviderClient {
           confidence: this.validateConfidence(finding.confidence),
           category: this.validateCrossFileCategory(finding.category),
           message: String(finding.message || ""),
-          reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
+          reasoning: finding.reasoning
+            ? String(finding.reasoning)
+            : "Reasoning not provided by the model.",
           affectedFiles: Array.isArray(finding.affected_files)
             ? finding.affected_files.map(String)
             : [],
@@ -294,7 +298,9 @@ export class CursorProvider implements AIProviderClient {
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
-            reasoning: finding.reasoning ? String(finding.reasoning) : undefined,
+            reasoning: finding.reasoning
+              ? String(finding.reasoning)
+              : "Reasoning not provided by the model.",
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });

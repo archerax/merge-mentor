@@ -469,4 +469,28 @@ describe("GitHubAdapter", () => {
       );
     });
   });
+
+  describe("getRepoInfo", () => {
+    it("returns correct repository information for GitHub", () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+
+      const repoInfo = adapter.getRepoInfo();
+
+      expect(repoInfo).toEqual({
+        owner: "test-owner",
+        repo: "test-repo",
+        platform: "github",
+      });
+    });
+  });
+
+  describe("getToken", () => {
+    it("returns the authentication token", () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+
+      const token = adapter.getToken();
+
+      expect(token).toBe("test-token");
+    });
+  });
 });

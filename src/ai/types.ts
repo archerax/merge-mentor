@@ -1,7 +1,7 @@
 import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types.js";
 
 /** Supported AI provider types. */
-export type AIProviderType = "copilot" | "opencode" | "cursor" | "openai";
+export type AIProviderType = "copilot" | "opencode" | "cursor";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {

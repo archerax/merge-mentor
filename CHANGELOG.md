@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **BREAKING**: Removed OpenAI API provider support
+  - Removed `--provider openai` option and all OpenAI-specific CLI options
+  - Removed `openai` npm dependency and SDK-based provider implementation
+  - OpenAI provider was architecturally incompatible with local repository cloning approach
+  - CLI-based providers (Copilot, OpenCode, Cursor) can now read local files directly
+  - Simplified codebase by focusing on CLI-based providers only
+
 ## [1.11.0] - 2026-01-14
 
 ### Removed

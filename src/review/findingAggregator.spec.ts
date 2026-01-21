@@ -15,6 +15,7 @@ function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
     category: "bug",
     message: "Test issue found",
     suggestion: "Fix it",
+    reasoning: "Test reasoning explaining why this is an issue.",
     isPreExisting: false,
     ...overrides,
   };
@@ -192,6 +193,7 @@ describe("FindingAggregator", () => {
         confidence: "high",
         category: "architecture",
         message: "Circular dependency detected",
+        reasoning: "Module A imports B which imports A.",
         affectedFiles: ["a.ts", "b.ts"],
       };
 
@@ -210,6 +212,7 @@ describe("FindingAggregator", () => {
         confidence: "high",
         category: "architecture",
         message: "Issue one",
+        reasoning: "Reasoning for issue one.",
         affectedFiles: ["a.ts"],
       };
       const finding2: CrossFileFinding = {
@@ -217,6 +220,7 @@ describe("FindingAggregator", () => {
         confidence: "medium",
         category: "design",
         message: "Issue two",
+        reasoning: "Reasoning for issue two.",
         affectedFiles: ["b.ts"],
       };
 
@@ -252,6 +256,7 @@ describe("FindingAggregator", () => {
         confidence: "high",
         category: "architecture",
         message: "Same issue",
+        reasoning: "Reasoning for the same issue.",
         affectedFiles: ["a.ts", "b.ts"],
       };
       const finding2: CrossFileFinding = {
@@ -259,6 +264,7 @@ describe("FindingAggregator", () => {
         confidence: "high",
         category: "architecture",
         message: "Same issue",
+        reasoning: "Reasoning for the same issue.",
         affectedFiles: ["b.ts", "a.ts"],
       };
 

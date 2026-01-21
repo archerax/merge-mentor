@@ -849,4 +849,30 @@ describe("AzureDevOpsAdapter", () => {
       expect(files[0].patch).toContain("+"); // Has addition
     });
   });
+
+  describe("getRepoInfo", () => {
+    it("returns correct repository information for Azure DevOps", () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      const repoInfo = adapter.getRepoInfo();
+
+      expect(repoInfo).toEqual({
+        owner: "test-org",
+        repo: "test-repo",
+        platform: "azure",
+        org: "test-org",
+        project: "test-project",
+      });
+    });
+  });
+
+  describe("getToken", () => {
+    it("returns the authentication token", () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      const token = adapter.getToken();
+
+      expect(token).toBe("test-token");
+    });
+  });
 });

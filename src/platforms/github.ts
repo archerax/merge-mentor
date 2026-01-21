@@ -4,7 +4,14 @@ import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
-import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
+import type {
+  ExistingComment,
+  FileStatus,
+  PlatformAdapter,
+  PRDetails,
+  PRFile,
+  RepoInfo,
+} from "./types.js";
 
 /**
  * Platform adapter for GitHub pull requests.
@@ -13,6 +20,7 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly octokit: Octokit;
   private readonly owner: string;
   private readonly repo: string;
+  private readonly token: string;
   private readonly botIdentifier: string;
   private readonly logger = createChildLogger({ component: "GitHubAdapter" });
   private readonly auditLogger = getAuditLogger();
@@ -21,12 +29,25 @@ export class GitHubAdapter implements PlatformAdapter {
     this.octokit = new Octokit({ auth: config.github.token });
     this.owner = config.github.owner;
     this.repo = config.github.repo;
+    this.token = config.github.token;
     this.botIdentifier = config.botCommentIdentifier;
     this.logger.info({ owner: this.owner, repo: this.repo }, "GitHubAdapter initialized");
   }
 
   getProjectIdentifier(): string {
     return this.repo;
+  }
+
+  getRepoInfo(): RepoInfo {
+    return {
+      owner: this.owner,
+      repo: this.repo,
+      platform: "github",
+    };
+  }
+
+  getToken(): string {
+    return this.token;
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {

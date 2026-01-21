@@ -9,7 +9,14 @@ import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
-import type { ExistingComment, FileStatus, PlatformAdapter, PRDetails, PRFile } from "./types.js";
+import type {
+  ExistingComment,
+  FileStatus,
+  PlatformAdapter,
+  PRDetails,
+  PRFile,
+  RepoInfo,
+} from "./types.js";
 
 /** Azure DevOps change type values. */
 const _AzureChangeType = {
@@ -42,6 +49,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly logger = createChildLogger({ component: "AzureDevOpsAdapter" });
   private readonly token: string;
   private readonly orgUrl: string;
+  private readonly org: string;
 
   constructor(config: Config) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
@@ -51,6 +59,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     this.repoName = config.azure.repo;
     this.botIdentifier = config.botCommentIdentifier;
     this.token = config.azure.token;
+    this.org = config.azure.org;
     this.logger.info(
       { project: this.project, repo: this.repoName },
       "AzureDevOpsAdapter initialized"
@@ -59,6 +68,20 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   getProjectIdentifier(): string {
     return this.project;
+  }
+
+  getRepoInfo(): RepoInfo {
+    return {
+      owner: this.org,
+      repo: this.repoName,
+      platform: "azure",
+      org: this.org,
+      project: this.project,
+    };
+  }
+
+  getToken(): string {
+    return this.token;
   }
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {

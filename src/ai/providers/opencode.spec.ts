@@ -92,7 +92,7 @@ describe("OpenCodeProvider", () => {
         suggestion: "Add null check",
         isPreExisting: false,
         confidence: "high",
-        reasoning: undefined,
+        reasoning: "Reasoning not provided by the model.",
       });
     });
 
@@ -169,7 +169,7 @@ describe("OpenCodeProvider", () => {
         message: "Consider separating concerns",
         affectedFiles: ["src/a.ts", "src/b.ts"],
         confidence: "high",
-        reasoning: undefined,
+        reasoning: "Reasoning not provided by the model.",
       });
       expect(result.recommendations).toEqual(["Add more tests", "Update docs"]);
     });

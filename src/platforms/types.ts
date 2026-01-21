@@ -46,7 +46,11 @@ export interface FileFinding {
   readonly category: FindingCategory;
   readonly message: string;
   readonly suggestion: string;
-  readonly reasoning?: string;
+  /**
+   * Chain-of-thought reasoning explaining why this is an issue.
+   * Must include: evidence from the code, why it matters, and the impact.
+   */
+  readonly reasoning: string;
   /** Whether this issue existed before the PR (in the base branch). */
   readonly isPreExisting?: boolean;
 }
@@ -57,7 +61,12 @@ export interface CrossFileFinding {
   readonly confidence: FindingConfidence;
   readonly category: FindingCategory;
   readonly message: string;
-  readonly reasoning?: string;
+  /**
+   * Chain-of-thought reasoning explaining why this is a cross-file issue.
+   * Must include: evidence from each affected file, why these files are related,
+   * and the impact of the issue across the codebase.
+   */
+  readonly reasoning: string;
   readonly affectedFiles: readonly string[];
 }
 
@@ -97,6 +106,17 @@ export interface CommentAction {
   readonly resolutionReason?: string;
 }
 
+/** Repository information for context loading. */
+export interface RepoInfo {
+  readonly owner: string;
+  readonly repo: string;
+  readonly platform: "github" | "azure";
+  /** For Azure DevOps: organization name */
+  readonly org?: string;
+  /** For Azure DevOps: project name */
+  readonly project?: string;
+}
+
 /**
  * Platform adapter interface for GitHub and Azure DevOps.
  * Implementations handle platform-specific API interactions.
@@ -108,6 +128,18 @@ export interface PlatformAdapter {
    * @returns Project identifier (repo name for GitHub, project name for Azure)
    */
   getProjectIdentifier(): string;
+
+  /**
+   * Gets repository information for cloning and context loading.
+   * @returns Repository information including owner, repo, and platform type
+   */
+  getRepoInfo(): RepoInfo;
+
+  /**
+   * Gets the authentication token for Git operations.
+   * @returns Authentication token
+   */
+  getToken(): string;
 
   /**
    * Retrieves pull request details.

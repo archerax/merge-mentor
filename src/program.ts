@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
 import type { AIProviderType } from "./ai/types.js";
@@ -37,11 +37,6 @@ export interface ReviewOptions {
   opencodeTimeout?: number;
   cursorModel?: string;
   cursorTimeout?: number;
-  openaiApiKey?: string;
-  openaiModel?: string;
-  openaiTimeout?: number;
-  openaiBaseUrl?: string;
-  openaiMaxRetries?: number;
   // Comment filtering
   skipExistingIssues?: string;
 }
@@ -84,11 +79,6 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     opencodeTimeout: options.opencodeTimeout,
     cursorModel: options.cursorModel,
     cursorTimeout: options.cursorTimeout,
-    openaiApiKey: options.openaiApiKey,
-    openaiModel: options.openaiModel,
-    openaiTimeout: options.openaiTimeout,
-    openaiBaseUrl: options.openaiBaseUrl,
-    openaiMaxRetries: options.openaiMaxRetries,
     skipExistingIssues: options.skipExistingIssues,
     reviewRuns: options.runs,
   });
@@ -101,10 +91,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "opencode", "cursor", "openai"].includes(aiProvider)) {
+  if (!["copilot", "opencode", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", "cursor", or "openai".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", or "cursor".`
     );
   }
 
@@ -123,13 +113,6 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
   // Select provider-specific model and timeout
   let aiModel: string | undefined;
   let aiTimeoutMs: number | undefined;
-  let openaiOptions:
-    | {
-        apiKey: string;
-        baseUrl?: string;
-        maxRetries?: number;
-      }
-    | undefined;
 
   switch (aiProvider) {
     case "opencode":
@@ -139,15 +122,6 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     case "cursor":
       aiModel = config.cursorModel;
       aiTimeoutMs = config.cursorTimeoutMs;
-      break;
-    case "openai":
-      aiModel = config.openaiModel;
-      aiTimeoutMs = config.openaiTimeoutMs;
-      openaiOptions = {
-        apiKey: config.openaiApiKey ?? "",
-        baseUrl: config.openaiBaseUrl,
-        maxRetries: config.openaiMaxRetries,
-      };
       break;
     default:
       aiModel = config.copilotModel;
@@ -162,9 +136,6 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     copilotToken: config.copilotToken,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
-    openaiApiKey: openaiOptions?.apiKey,
-    openaiBaseUrl: openaiOptions?.baseUrl,
-    openaiMaxRetries: openaiOptions?.maxRetries,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -438,7 +409,7 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
   .option(
     "--provider <provider>",
-    "AI provider (copilot, opencode, cursor, or openai). Env: MM_AI_PROVIDER"
+    "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER"
   )
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
@@ -468,18 +439,6 @@ program
   .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
   .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
   .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
-  .option("--openai-api-key <key>", "OpenAI API key. Env: MM_OPENAI_API_KEY")
-  .option("--openai-model <model>", "OpenAI model name (default: gpt-4o). Env: MM_OPENAI_MODEL")
-  .option("--openai-timeout <ms>", "OpenAI timeout in ms. Env: MM_OPENAI_TIMEOUT", parseInt)
-  .option(
-    "--openai-base-url <url>",
-    "OpenAI API base URL (for Azure Foundry). Env: MM_OPENAI_BASE_URL"
-  )
-  .option(
-    "--openai-max-retries <n>",
-    "OpenAI max retry attempts. Env: MM_OPENAI_MAX_RETRIES",
-    parseInt
-  )
   // Comment filtering
   .option(
     "--skip-existing-issues <bool>",
@@ -505,11 +464,6 @@ program
         opencodeTimeout: options.opencodeTimeout,
         cursorModel: options.cursorModel,
         cursorTimeout: options.cursorTimeout,
-        openaiApiKey: options.openaiApiKey,
-        openaiModel: options.openaiModel,
-        openaiTimeout: options.openaiTimeout,
-        openaiBaseUrl: options.openaiBaseUrl,
-        openaiMaxRetries: options.openaiMaxRetries,
         skipExistingIssues: options.skipExistingIssues,
         reviewRuns: options.runs,
       });
@@ -539,6 +493,93 @@ program
         },
         "Review failed"
       );
+      console.error(`\n❌ Error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Repository management command
+program
+  .command("repos")
+  .description("Manage cloned repositories for context loading")
+  .option("--list", "List all cloned repositories", false)
+  .option("--clean", "Remove all cloned repositories", false)
+  .option("--clean-repo <name>", "Remove a specific cloned repository")
+  .action((options: { list?: boolean; clean?: boolean; cleanRepo?: string }) => {
+    const reposDir = join(process.cwd(), ".merge-mentor", "repos");
+
+    try {
+      // Ensure repos directory exists
+      mkdirSync(reposDir, { recursive: true });
+
+      if (options.list) {
+        // List all repos
+        const repos = readdirSync(reposDir).filter((name) => {
+          const fullPath = join(reposDir, name);
+          return statSync(fullPath).isDirectory();
+        });
+
+        if (repos.length === 0) {
+          console.log("No cloned repositories found.");
+        } else {
+          console.log(`\n📁 Cloned repositories (${repos.length}):\n`);
+          for (const repo of repos) {
+            const repoPath = join(reposDir, repo);
+            const stats = statSync(repoPath);
+            console.log(`  • ${repo}`);
+            console.log(`    Path: ${repoPath}`);
+            console.log(`    Last modified: ${stats.mtime.toISOString()}`);
+            console.log("");
+          }
+        }
+      } else if (options.clean) {
+        // Clean all repos
+        const repos = readdirSync(reposDir).filter((name) => {
+          const fullPath = join(reposDir, name);
+          return statSync(fullPath).isDirectory();
+        });
+
+        if (repos.length === 0) {
+          console.log("No cloned repositories to clean.");
+        } else {
+          console.log(`\n🧹 Cleaning ${repos.length} repositories...\n`);
+          for (const repo of repos) {
+            const repoPath = join(reposDir, repo);
+            rmSync(repoPath, { recursive: true, force: true });
+            console.log(`  ✓ Removed: ${repo}`);
+          }
+          console.log(`\n✅ Cleaned ${repos.length} repositories.`);
+        }
+      } else if (options.cleanRepo) {
+        // Clean specific repo
+        const repoPath = join(reposDir, options.cleanRepo);
+        try {
+          const stats = statSync(repoPath);
+          if (stats.isDirectory()) {
+            rmSync(repoPath, { recursive: true, force: true });
+            console.log(`✅ Removed repository: ${options.cleanRepo}`);
+          } else {
+            console.error(`❌ Error: "${options.cleanRepo}" is not a directory.`);
+            process.exit(1);
+          }
+        } catch {
+          console.error(`❌ Error: Repository "${options.cleanRepo}" not found.`);
+          process.exit(1);
+        }
+      } else {
+        // No option specified, show help
+        console.log("\nUsage: merge-mentor repos [options]\n");
+        console.log("Options:");
+        console.log("  --list           List all cloned repositories");
+        console.log("  --clean          Remove all cloned repositories");
+        console.log("  --clean-repo <n> Remove a specific cloned repository");
+        console.log("");
+      }
+
+      process.exit(0);
+    } catch (error) {
+      const err = error as Error;
+      logger.error({ error: err.message }, "Repository management failed");
       console.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }

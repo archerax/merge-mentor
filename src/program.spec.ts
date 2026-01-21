@@ -87,6 +87,7 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
             message: "Issue 1",
             line: 10,
             suggestion: "Fix it",
+            reasoning: "This issue affects code quality.",
           },
         ],
       },
@@ -100,6 +101,7 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
             message: "Issue 2",
             line: 20,
             suggestion: "Improve",
+            reasoning: "This could be improved for better readability.",
           },
         ],
       },
@@ -435,7 +437,7 @@ describe("CLI", () => {
       };
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot", "opencode", "cursor", or "openai".'
+        'Invalid AI provider "invalid". Must be "copilot", "opencode", or "cursor".'
       );
     });
   });
@@ -549,6 +551,7 @@ describe("CLI", () => {
                 message: "Issue 1",
                 line: 1,
                 suggestion: "Fix",
+                reasoning: "Critical security issue that needs immediate attention.",
               },
               {
                 severity: "high",
@@ -557,6 +560,7 @@ describe("CLI", () => {
                 message: "Issue 2",
                 line: 2,
                 suggestion: "Fix",
+                reasoning: "High priority quality issue.",
               },
             ],
           },
@@ -570,6 +574,7 @@ describe("CLI", () => {
                 message: "Issue 3",
                 line: 3,
                 suggestion: "Fix",
+                reasoning: "Medium priority quality issue.",
               },
             ],
           },
@@ -596,6 +601,7 @@ describe("CLI", () => {
                 message: "Critical issue",
                 line: 10,
                 suggestion: "Fix now",
+                reasoning: "This is a critical security vulnerability.",
               },
             ],
           },
@@ -618,6 +624,7 @@ describe("CLI", () => {
                 message: "High issue",
                 line: 10,
                 suggestion: "Fix",
+                reasoning: "High priority issue.",
               },
               {
                 severity: "medium",
@@ -626,6 +633,7 @@ describe("CLI", () => {
                 message: "Medium issue",
                 line: 20,
                 suggestion: "Fix",
+                reasoning: "Medium priority issue.",
               },
             ],
           },
@@ -668,6 +676,7 @@ describe("CLI", () => {
               confidence: "high",
               category: "architecture",
               message: "Critical cross-file issue",
+              reasoning: "Multiple modules are tightly coupled in a problematic way.",
               affectedFiles: ["file1.ts", "file2.ts"],
             },
           ],
@@ -691,6 +700,7 @@ describe("CLI", () => {
                 message: "Medium",
                 line: 1,
                 suggestion: "Fix",
+                reasoning: "Medium priority issue.",
               },
             ],
           },
@@ -704,6 +714,7 @@ describe("CLI", () => {
                 message: "Critical",
                 line: 2,
                 suggestion: "Fix",
+                reasoning: "Critical security vulnerability.",
               },
             ],
           },
@@ -717,6 +728,7 @@ describe("CLI", () => {
                 message: "Low",
                 line: 3,
                 suggestion: "Fix",
+                reasoning: "Low priority issue.",
               },
             ],
           },
@@ -751,6 +763,7 @@ describe("CLI", () => {
                 category: "bug",
                 message: "Potential null pointer exception",
                 suggestion: "Add null check",
+                reasoning: "The variable may be null at this point and is not checked.",
               },
             ],
           },
@@ -763,6 +776,7 @@ describe("CLI", () => {
               confidence: "high",
               category: "architecture",
               message: "Consider extracting common logic",
+              reasoning: "Similar logic appears in multiple files.",
               affectedFiles: ["file1.ts", "file2.ts"],
             },
           ],
@@ -827,7 +841,7 @@ describe("CLI", () => {
 
     it("generates a report with correct header for non-dry-run mode", () => {
       const result = createMockReviewResult({});
-      const report = generateMarkdownReport(result, "openai", false);
+      const report = generateMarkdownReport(result, "cursor", false);
 
       expect(report).toContain("### 📝 Review Actions");
       expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");

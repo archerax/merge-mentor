@@ -19,9 +19,30 @@ vi.mock("../ai/index.js", () => ({
   })),
 }));
 
+// Mock the RepoManager to avoid actual git operations
+const mockEnsureRepo = vi.fn().mockResolvedValue("/mock/repo/path");
+const mockLoadRepoContext = vi.fn().mockResolvedValue({
+  content: "",
+  filesLoaded: [],
+  repoPath: "/mock/repo/path",
+});
+
+vi.mock("./repoManager.js", () => ({
+  RepoManager: class MockRepoManager {
+    ensureRepo = mockEnsureRepo;
+    loadRepoContext = mockLoadRepoContext;
+  },
+}));
+
 function createMockPlatform(): PlatformAdapter {
   return {
     getProjectIdentifier: vi.fn().mockReturnValue("test-repo"),
+    getRepoInfo: vi.fn().mockReturnValue({
+      owner: "test-owner",
+      repo: "test-repo",
+      platform: "github",
+    }),
+    getToken: vi.fn().mockReturnValue("test-token"),
     getPRDetails: vi.fn(),
     getPRFiles: vi.fn(),
     getExistingBotComments: vi.fn(),
