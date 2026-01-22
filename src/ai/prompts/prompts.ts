@@ -9,6 +9,7 @@ import type { DiffManifest } from "../../review/diffStorage.js";
  * @param fileReviewResults - Results from individual file reviews
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
  * @param repoContext - Optional repository-specific coding standards and guidelines
+ * @param repoPath - Optional path to cloned repository for workspace access
  * @returns Formatted prompt for Copilot CLI
  */
 export function buildCrossFilePrompt(
@@ -16,7 +17,8 @@ export function buildCrossFilePrompt(
   filesSummary: string,
   fileReviewResults: readonly FileReviewResult[],
   existingCommentsContext?: string,
-  repoContext?: string
+  repoContext?: string,
+  repoPath?: string
 ): string {
   const findingsSummary = fileReviewResults
     .filter((r) => r.findings.length > 0)
@@ -41,9 +43,47 @@ ${repoContext}
 `
     : "";
 
+  const workspaceSection = repoPath
+    ? `
+---
+# WORKSPACE ACCESS ENABLED
+
+You have full access to the repository (not just changed files).
+Your working directory is set to the repository root.
+
+**Use these features extensively:**
+
+- \`@workspace /search <query>\` - Find patterns across all files
+- \`@file:relative/path/to/file.ts\` - Read any file in the repository
+- \`@workspace /find <filename>\` - Locate files by name
+
+**Critical Scenarios:**
+
+1. **Before flagging "missing validation":**
+   \`@workspace /search validation\` to see if it exists elsewhere
+
+2. **Before suggesting "add error handling":**
+   \`@file:src/utils/errorHandler.ts\` to check existing patterns
+
+3. **Before reporting "inconsistent with codebase":**
+   \`@workspace /find similar\` to verify the pattern used
+
+4. **For architectural concerns:**
+   Explore existing modules to understand the system design
+
+**MANDATORY:** Always cross-reference the repository before reporting:
+- "Missing" features (they might exist)
+- "Inconsistent" patterns (verify against actual code)
+- "No error handling" (check shared utilities)
+- Architectural violations (understand the architecture first)
+
+---
+`
+    : "";
+
   return `# YOUR ROLE
 Expert code reviewer performing holistic architectural analysis of a pull request.
-${repoContextSection}
+${repoContextSection}${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}
@@ -159,12 +199,14 @@ export function buildFilesSummary(files: readonly PRFile[]): string {
  * @param manifest - Manifest describing stored diff files
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
  * @param repoContext - Optional repository-specific coding standards and guidelines
+ * @param repoPath - Optional path to cloned repository for workspace access
  * @returns Formatted prompt for batched review
  */
 export function buildBatchedFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoContext?: string
+  repoContext?: string,
+  repoPath?: string
 ): string {
   const filesListing = manifest.files
     .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${f.diffPath}`)
@@ -188,9 +230,47 @@ ${repoContext}
 `
     : "";
 
+  const workspaceSection = repoPath
+    ? `
+---
+# WORKSPACE ACCESS ENABLED
+
+You have full access to the repository (not just changed files).
+Your working directory is set to the repository root.
+
+**Use these features extensively:**
+
+- \`@workspace /search <query>\` - Find patterns across all files
+- \`@file:relative/path/to/file.ts\` - Read any file in the repository
+- \`@workspace /find <filename>\` - Locate files by name
+
+**Critical Scenarios:**
+
+1. **Before flagging "missing validation":**
+   \`@workspace /search validation\` to see if it exists elsewhere
+
+2. **Before suggesting "add error handling":**
+   \`@file:src/utils/errorHandler.ts\` to check existing patterns
+
+3. **Before reporting "inconsistent with codebase":**
+   \`@workspace /find similar\` to verify the pattern used
+
+4. **For architectural concerns:**
+   Explore existing modules to understand the system design
+
+**MANDATORY:** Always cross-reference the repository before reporting:
+- "Missing" features (they might exist)
+- "Inconsistent" patterns (verify against actual code)
+- "No error handling" (check shared utilities)
+- Architectural violations (understand the architecture first)
+
+---
+`
+    : "";
+
   return `# YOUR ROLE
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
-${repoContextSection}
+${repoContextSection}${workspaceSection}
 # TASK
 Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
 

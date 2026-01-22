@@ -29,6 +29,14 @@ export interface AIProviderOptions {
   readonly token?: string;
 }
 
+/** Options for executing a prompt with additional context. */
+export interface ExecutePromptOptions {
+  /** Path to cloned repository for workspace access. */
+  readonly workingDirectory?: string;
+  /** Paths to diff files for @file references. */
+  readonly diffFiles?: string[];
+}
+
 /**
  * Interface for AI provider implementations.
  * All providers must implement this interface for consistent behavior.
@@ -38,9 +46,10 @@ export interface AIProviderClient {
    * Executes a prompt via the AI provider CLI with automatic retries.
    *
    * @param prompt - The prompt to send to the AI provider
+   * @param options - Optional execution context (working directory, diff files)
    * @returns Response containing raw output and parsed JSON
    */
-  executePrompt(prompt: string): Promise<AIResponse>;
+  executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse>;
 
   /**
    * Parses an AI response into a file review result.

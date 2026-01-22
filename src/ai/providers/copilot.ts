@@ -11,7 +11,13 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
-import type { AIProviderClient, AIProviderOptions, AIResponse, TokenUsage } from "../types.js";
+import type {
+  AIProviderClient,
+  AIProviderOptions,
+  AIResponse,
+  ExecutePromptOptions,
+  TokenUsage,
+} from "../types.js";
 
 /** Raw finding structure from Copilot JSON response. */
 interface RawFileFinding {
@@ -83,11 +89,12 @@ export class CopilotProvider implements AIProviderClient {
    * Executes a prompt via Copilot CLI with automatic retries.
    *
    * @param prompt - The prompt to send to Copilot
+   * @param options - Optional execution context (working directory, diff files)
    * @returns Response containing raw output and parsed JSON
    * @throws {ValidationError} When prompt is empty or invalid
    * @throws {CopilotCliError} When CLI execution fails after all retries
    */
-  async executePrompt(prompt: string): Promise<AIResponse> {
+  async executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse> {
     if (!prompt || prompt.trim().length === 0) {
       throw new ValidationError("prompt", "Prompt cannot be empty.");
     }
@@ -103,7 +110,7 @@ export class CopilotProvider implements AIProviderClient {
           if (prompt.length > PROMPT_LENGTH_THRESHOLD) {
             tempFile = await this.createTempPromptFile(prompt);
             const shortPrompt = `Please follow the instructions in @${path.basename(tempFile)}`;
-            const { stdout, stderr } = await this.runCli(shortPrompt, tempFile);
+            const { stdout, stderr } = await this.runCli(shortPrompt, options, tempFile);
             const parsed = this.parseJsonResponse(stdout);
             const tokenUsage = this.parseTokenUsage(stderr);
             this.auditLogger.logAIProviderExecution(
@@ -116,7 +123,7 @@ export class CopilotProvider implements AIProviderClient {
             );
             return { raw: stdout, parsed, tokenUsage };
           } else {
-            const { stdout, stderr } = await this.runCli(prompt);
+            const { stdout, stderr } = await this.runCli(prompt, options);
             const parsed = this.parseJsonResponse(stdout);
             const tokenUsage = this.parseTokenUsage(stderr);
             this.auditLogger.logAIProviderExecution(
@@ -180,6 +187,7 @@ export class CopilotProvider implements AIProviderClient {
 
   private runCli(
     prompt: string,
+    options?: ExecutePromptOptions,
     tempFilePath?: string
   ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
@@ -199,11 +207,18 @@ export class CopilotProvider implements AIProviderClient {
       // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
       // Node.js will automatically handle .exe extension on Windows
       const env = this.token ? { ...process.env, GITHUB_TOKEN: this.token } : process.env;
+
+      // Determine working directory:
+      // 1. If workingDirectory provided in options, use it (enables @workspace access)
+      // 2. If tempFilePath provided, use temp dir (for @file references to temp files)
+      // 3. Otherwise, use current working directory
+      const cwd = options?.workingDirectory ?? (tempFilePath ? this.tempDir : undefined);
+
       const proc = spawn("copilot", args, {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
         shell: false, // Explicit shell: false ensures consistent cross-platform behavior
-        cwd: tempFilePath ? this.tempDir : undefined, // Run from temp dir to use relative paths
+        cwd,
         env,
       });
 

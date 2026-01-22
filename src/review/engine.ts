@@ -177,7 +177,8 @@ export class ReviewEngine {
         files,
         existingComments,
         cachedState,
-        repoContext?.content
+        repoContext?.content,
+        repoContext?.repoPath
       );
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
@@ -196,7 +197,8 @@ export class ReviewEngine {
           files,
           fileResults,
           existingComments,
-          repoContext?.content
+          repoContext?.content,
+          repoContext?.repoPath
         );
       }
     } else {
@@ -208,7 +210,8 @@ export class ReviewEngine {
         files,
         runs,
         existingComments,
-        repoContext?.content
+        repoContext?.content,
+        repoContext?.repoPath
       );
       fileResults = aggregated.fileResults;
       crossFileResult = aggregated.crossFileResult;
@@ -283,7 +286,8 @@ export class ReviewEngine {
     files: PRFile[],
     runs: number,
     existingComments: readonly ExistingComment[],
-    repoContext?: string
+    repoContext?: string,
+    repoPath?: string
   ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
     const allFileResults: FileReviewResult[][] = [];
     const allCrossFileResults: CrossFileReviewResult[] = [];
@@ -310,7 +314,8 @@ export class ReviewEngine {
           files,
           runComments,
           undefined,
-          repoContext
+          repoContext,
+          repoPath
         );
         const validatedResults = this.validateLineNumbers(fileResults, files);
         allFileResults.push(validatedResults);
@@ -324,7 +329,8 @@ export class ReviewEngine {
           files,
           validatedResults,
           runComments,
-          repoContext
+          repoContext,
+          repoPath
         );
         allCrossFileResults.push(crossFileResult);
 
@@ -444,7 +450,8 @@ export class ReviewEngine {
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
-    repoContext?: string
+    repoContext?: string,
+    repoPath?: string
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     // Filter out files that should be skipped
     const filesToReview: PRFile[] = [];
@@ -489,7 +496,8 @@ export class ReviewEngine {
       prIdentifier,
       filesToReview,
       existingComments,
-      repoContext
+      repoContext,
+      repoPath
     );
 
     // Combine cached and new results
@@ -510,7 +518,8 @@ export class ReviewEngine {
     prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    repoContext?: string
+    repoContext?: string,
+    repoPath?: string
   ): Promise<FileReviewResult[]> {
     const diffStorage = new DiffStorage();
 
@@ -537,7 +546,8 @@ export class ReviewEngine {
       const prompt = buildBatchedFileReviewPrompt(
         manifest,
         commentsContext || undefined,
-        repoContext
+        repoContext,
+        repoPath
       );
 
       this.logger.debug("Copying diffs to temp directory for Copilot access");
@@ -551,11 +561,14 @@ export class ReviewEngine {
           promptPreview: prompt.substring(0, 2000),
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
           hasRepoContext: !!repoContext,
+          hasRepoPath: !!repoPath,
         },
         "Batched prompt being sent"
       );
 
-      const response = await this.provider.executePrompt(prompt);
+      const response = await this.provider.executePrompt(prompt, {
+        workingDirectory: repoPath,
+      });
       const results = this.provider.parseBatchedFileReview(response);
 
       // Log individual file results
@@ -734,7 +747,8 @@ export class ReviewEngine {
     files: PRFile[],
     fileResults: readonly FileReviewResult[],
     existingComments: readonly ExistingComment[],
-    repoContext?: string
+    repoContext?: string,
+    repoPath?: string
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
     this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
@@ -747,9 +761,12 @@ export class ReviewEngine {
         filesSummary,
         fileResults,
         commentsContext,
-        repoContext
+        repoContext,
+        repoPath
       );
-      const response = await this.provider.executePrompt(prompt);
+      const response = await this.provider.executePrompt(prompt, {
+        workingDirectory: repoPath,
+      });
       const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
 

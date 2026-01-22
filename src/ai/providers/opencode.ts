@@ -8,7 +8,12 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
-import type { AIProviderClient, AIProviderOptions, AIResponse } from "../types.js";
+import type {
+  AIProviderClient,
+  AIProviderOptions,
+  AIResponse,
+  ExecutePromptOptions,
+} from "../types.js";
 
 /**
  * Error thrown when the OpenCode CLI fails or is unavailable.
@@ -84,11 +89,12 @@ export class OpenCodeProvider implements AIProviderClient {
    * Executes a prompt via OpenCode CLI with automatic retries.
    *
    * @param prompt - The prompt to send to OpenCode
+   * @param options - Optional execution context (working directory, diff files)
    * @returns Response containing raw output and parsed JSON
    * @throws {ValidationError} When prompt is empty or invalid
    * @throws {OpenCodeCliError} When CLI execution fails after all retries
    */
-  async executePrompt(prompt: string): Promise<AIResponse> {
+  async executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse> {
     if (!prompt || prompt.trim().length === 0) {
       throw new ValidationError("prompt", "Prompt cannot be empty");
     }
@@ -98,7 +104,7 @@ export class OpenCodeProvider implements AIProviderClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const raw = await this.runCli(prompt);
+        const raw = await this.runCli(prompt, options);
         const parsed = this.parseJsonResponse(raw);
         this.auditLogger.logAIProviderExecution("opencode", promptType, this.model, "success");
         return { raw, parsed };
@@ -129,7 +135,7 @@ export class OpenCodeProvider implements AIProviderClient {
     return "unknown";
   }
 
-  private runCli(prompt: string): Promise<string> {
+  private runCli(prompt: string, options?: ExecutePromptOptions): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
@@ -144,6 +150,7 @@ export class OpenCodeProvider implements AIProviderClient {
         stdio: ["inherit", "pipe", "pipe"],
         timeout: this.timeoutMs,
         shell: false,
+        cwd: options?.workingDirectory,
       });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
