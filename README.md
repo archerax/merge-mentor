@@ -35,7 +35,8 @@ npx merge-mentor review --pr 123
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
+- **Multi-Provider Support** - Works with GitHub Copilot CLI, Copilot SDK, OpenCode CLI, and Cursor CLI
+- **Streaming Progress** - Real-time feedback during reviews (copilot-sdk only)
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Inline Comments** - Posts feedback on specific lines of code
@@ -148,10 +149,10 @@ set MM_PLATFORM=azure
 
 **Linux/macOS:**
 ```bash
-# Select AI provider (copilot, opencode, cursor, or openai)
+# Select AI provider (copilot, copilot-sdk, opencode, cursor)
 export MM_AI_PROVIDER=copilot
 
-# Copilot-specific settings
+# Copilot-specific settings (for both copilot and copilot-sdk providers)
 export MM_COPILOT_MODEL=gpt-5.2
 export MM_COPILOT_TIMEOUT=180000
 
@@ -162,14 +163,6 @@ export MM_OPENCODE_TIMEOUT=180000
 # Cursor-specific settings (when using --provider cursor)
 export MM_CURSOR_MODEL=gpt-5
 export MM_CURSOR_TIMEOUT=180000
-
-# OpenAI-specific settings (when using --provider openai)
-export MM_OPENAI_API_KEY=sk-your-api-key
-export MM_OPENAI_MODEL=gpt-4o
-export MM_OPENAI_TIMEOUT=180000
-# Optional: Custom base URL for Azure Foundry
-export MM_OPENAI_BASE_URL=https://your-foundry.azure.com/v1
-export MM_OPENAI_MAX_RETRIES=3
 ```
 
 **Windows (PowerShell):**
@@ -188,19 +181,24 @@ $env:MM_OPENCODE_TIMEOUT="180000"
 # Cursor settings
 $env:MM_CURSOR_MODEL="gpt-5"
 $env:MM_CURSOR_TIMEOUT="180000"
+```
 
 **Or use command-line parameters:**
 ```bash
+# Use Copilot SDK (native API, no CLI subprocess)
+merge-mentor review --pr 123 --provider copilot-sdk --write
+
+# Use OpenCode CLI
 merge-mentor review --pr 123 \
   --provider opencode \
   --opencode-model claude-sonnet-4.5 \
   --opencode-timeout 180000
 
-# OpenAI example
+# Use Cursor CLI
 merge-mentor review --pr 123 \
-  --provider openai \
-  --openai-api-key sk-your-key \
-  --openai-model gpt-4o
+  --provider cursor \
+  --cursor-model gpt-5 \
+  --cursor-timeout 180000
 ```
 
 ### Optional Settings
@@ -318,21 +316,32 @@ Audit logs can be filtered and analyzed for:
 - `gpt-4-turbo`
 - `gpt-4`
 - `gpt-3.5-turbo`
-- Any model available on your OpenAI account or Azure Foundry deployment
+- Any model available on your Copilot subscription
 
-### Azure Foundry Compatibility
+### Copilot Provider Options
 
-OpenAI provider supports Azure Foundry (OpenAI-compatible endpoints):
+merge-mentor supports two Copilot providers:
+
+| Provider | Description | Use Case |
+|----------|-------------|----------|
+| `copilot` (default) | Uses Copilot CLI subprocess | Works everywhere Copilot CLI is installed |
+| `copilot-sdk` | Uses native `@github/copilot-sdk` | Better performance, **streaming progress feedback** |
 
 ```bash
-# Azure Foundry configuration
-export MM_OPENAI_API_KEY="your-azure-api-key"
-export MM_OPENAI_BASE_URL="https://your-foundry.azure.com/v1"
-export MM_OPENAI_MODEL="gpt-4"
+# Use CLI-based provider (default)
+merge-mentor review --pr 123 --write
 
-# Run review
-merge-mentor review --pr 123 --provider openai --write
+# Use SDK-based provider (native API, with streaming)
+merge-mentor review --pr 123 --provider copilot-sdk --write
 ```
+
+**Streaming Progress**: When using `copilot-sdk`, you'll see real-time progress indicators during long reviews:
+```
+  Analyzing 8 files...
+  Processing... (5.2s, 150 chunks)
+```
+
+See [STREAMING.md](STREAMING.md) for details.
 
 ## Usage
 
@@ -366,7 +375,7 @@ merge-mentor review --pr 123 --verbose false
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|opencode\|cursor\|openai>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--provider <copilot\|copilot-sdk\|opencode\|cursor>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |

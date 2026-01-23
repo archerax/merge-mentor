@@ -75,3 +75,16 @@ export class ValidationError extends MergeMentorError {
     this.name = "ValidationError";
   }
 }
+
+/**
+ * Error thrown when the Copilot SDK fails.
+ */
+export class CopilotSDKError extends MergeMentorError {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = "CopilotSDKError";
+  }
+}

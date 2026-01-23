@@ -10,6 +10,7 @@ import type { DiffManifest } from "../../review/diffStorage.js";
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
  * @param repoContext - Optional repository-specific coding standards and guidelines
  * @param repoPath - Optional path to cloned repository for workspace access
+ * @param useSdkSyntax - Whether to use SDK-friendly syntax (true) or CLI syntax (false)
  * @returns Formatted prompt for Copilot CLI
  */
 export function buildCrossFilePrompt(
@@ -18,7 +19,8 @@ export function buildCrossFilePrompt(
   fileReviewResults: readonly FileReviewResult[],
   existingCommentsContext?: string,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
+  useSdkSyntax = false
 ): string {
   const findingsSummary = fileReviewResults
     .filter((r) => r.findings.length > 0)
@@ -29,7 +31,7 @@ export function buildCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
     : "";
 
-  const repoContextSection = repoContext
+  const repoContextSection = repoContext && repoContext.trim().length > 0
     ? `
 ---
 # REPOSITORY-SPECIFIC GUIDELINES
@@ -43,8 +45,45 @@ ${repoContext}
 `
     : "";
 
-  const workspaceSection = repoPath
-    ? `
+  const workspaceSection = repoPath && repoPath.trim().length > 0
+    ? useSdkSyntax
+      ? `
+---
+# WORKSPACE ACCESS ENABLED
+
+You have full access to the repository (not just changed files).
+Your working directory is set to the repository root: ${repoPath}
+
+**Available Capabilities:**
+
+You can read any file in the repository by asking to see it. For example:
+- "Show me src/utils/errorHandler.ts"
+- "What's in the authentication module?"
+- "Find all files that handle validation"
+
+**Critical Scenarios:**
+
+1. **Before flagging "missing validation":**
+   Search the repository to see if validation exists elsewhere
+
+2. **Before suggesting "add error handling":**
+   Check if there are existing error handling patterns in the codebase
+
+3. **Before reporting "inconsistent with codebase":**
+   Verify what patterns are actually used in the repository
+
+4. **For architectural concerns:**
+   Explore existing modules to understand the system design
+
+**MANDATORY:** Always cross-reference the repository before reporting:
+- "Missing" features (they might exist elsewhere)
+- "Inconsistent" patterns (verify against actual code)
+- "No error handling" (check shared utilities)
+- Architectural violations (understand the architecture first)
+
+---
+`
+      : `
 ---
 # WORKSPACE ACCESS ENABLED
 
@@ -200,17 +239,23 @@ export function buildFilesSummary(files: readonly PRFile[]): string {
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
  * @param repoContext - Optional repository-specific coding standards and guidelines
  * @param repoPath - Optional path to cloned repository for workspace access
+ * @param useSdkSyntax - Whether to use SDK-friendly syntax (true) or CLI syntax (false)
  * @returns Formatted prompt for batched review
  */
 export function buildBatchedFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
+  useSdkSyntax = false
 ): string {
-  const filesListing = manifest.files
-    .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${f.diffPath}`)
-    .join("\n");
+  const filesListing = useSdkSyntax
+    ? manifest.files
+        .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`)
+        .join("\n")
+    : manifest.files
+        .map((f) => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${f.diffPath}`)
+        .join("\n");
 
   const commentsSection = existingCommentsContext
     ? `\n${existingCommentsContext}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
@@ -231,7 +276,44 @@ ${repoContext}
     : "";
 
   const workspaceSection = repoPath
-    ? `
+    ? useSdkSyntax
+      ? `
+---
+# WORKSPACE ACCESS ENABLED
+
+You have full access to the repository (not just changed files).
+Your working directory is set to the repository root: ${repoPath}
+
+**Available Capabilities:**
+
+You can read any file in the repository by asking to see it. For example:
+- "Show me src/utils/errorHandler.ts"
+- "What's in the authentication module?"
+- "Find all files that handle validation"
+
+**Critical Scenarios:**
+
+1. **Before flagging "missing validation":**
+   Search the repository to see if validation exists elsewhere
+
+2. **Before suggesting "add error handling":**
+   Check if there are existing error handling patterns in the codebase
+
+3. **Before reporting "inconsistent with codebase":**
+   Verify what patterns are actually used in the repository
+
+4. **For architectural concerns:**
+   Explore existing modules to understand the system design
+
+**MANDATORY:** Always cross-reference the repository before reporting:
+- "Missing" features (they might exist)
+- "Inconsistent" patterns (verify against actual code)
+- "No error handling" (check shared utilities)
+- Architectural violations (understand the architecture first)
+
+---
+`
+      : `
 ---
 # WORKSPACE ACCESS ENABLED
 
@@ -272,7 +354,7 @@ Your working directory is set to the repository root.
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
 ${repoContextSection}${workspaceSection}
 # TASK
-Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
+Review ALL files listed below.${useSdkSyntax ? " Each file's diff is attached to this message." : " Each file's diff is stored separately - read using @filename syntax."}
 
 Files to Review:
 ${filesListing}

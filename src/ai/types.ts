@@ -1,7 +1,7 @@
 import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types.js";
 
 /** Supported AI provider types. */
-export type AIProviderType = "copilot" | "opencode" | "cursor";
+export type AIProviderType = "copilot" | "copilot-sdk" | "opencode" | "cursor";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {
@@ -29,12 +29,24 @@ export interface AIProviderOptions {
   readonly token?: string;
 }
 
+/** Callback for streaming content chunks. */
+export type StreamingCallback = (chunk: string) => void;
+
+/** File attachment for SDK-based providers. */
+export interface FileAttachment {
+  readonly type: "file";
+  readonly path: string;
+  readonly displayName?: string;
+}
+
 /** Options for executing a prompt with additional context. */
 export interface ExecutePromptOptions {
   /** Path to cloned repository for workspace access. */
   readonly workingDirectory?: string;
-  /** Paths to diff files for @file references. */
+  /** Paths to diff files for @file references (CLI providers). */
   readonly diffFiles?: string[];
+  /** File attachments for SDK-based providers. */
+  readonly attachments?: FileAttachment[];
 }
 
 /**
@@ -50,6 +62,21 @@ export interface AIProviderClient {
    * @returns Response containing raw output and parsed JSON
    */
   executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse>;
+
+  /**
+   * Executes a prompt with streaming callback for real-time output.
+   * Optional method - only SDK-based providers support streaming.
+   *
+   * @param prompt - The prompt to send to the AI provider
+   * @param onChunk - Callback invoked for each content chunk
+   * @param options - Optional execution context (working directory, diff files)
+   * @returns Response containing full output and parsed JSON
+   */
+  executePromptWithStreaming?(
+    prompt: string,
+    onChunk: StreamingCallback,
+    options?: ExecutePromptOptions
+  ): Promise<AIResponse>;
 
   /**
    * Parses an AI response into a file review result.

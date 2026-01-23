@@ -91,10 +91,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "opencode", "cursor"].includes(aiProvider)) {
+  if (!["copilot", "copilot-sdk", "opencode", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", or "cursor".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", or "cursor".`
     );
   }
 
@@ -409,7 +409,7 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
   .option(
     "--provider <provider>",
-    "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER"
+    "AI provider (copilot, copilot-sdk, opencode, or cursor). Env: MM_AI_PROVIDER"
   )
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)

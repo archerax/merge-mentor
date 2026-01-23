@@ -82,6 +82,53 @@ vi.mock("../../src/ai/index.js", () => ({
   createAIProvider: () => mockCopilotInstance,
 }));
 
+// Mock DiffStorage to prevent file system operations
+const mockDiffStorage = {
+  storeDiffs: vi.fn().mockResolvedValue({
+    diffDir: "/tmp/mock-diffs",
+    manifest: {
+      prIdentifier: "test-owner/test-repo#42",
+      files: [
+        {
+          filename: "src/test.ts",
+          status: "modified",
+          diffPath: "src__test.ts.diff",
+          additions: 10,
+          deletions: 5,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+    },
+  }),
+  cleanup: vi.fn().mockResolvedValue(undefined),
+};
+
+vi.mock("../../src/review/diffStorage.js", () => ({
+  DiffStorage: function DiffStorage() {
+    return mockDiffStorage;
+  },
+}));
+
+// Mock node:fs/promises for dynamic imports in engine.ts
+vi.mock("node:fs/promises", () => ({
+  default: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockResolvedValue("mock diff content"),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    rm: vi.fn().mockResolvedValue(undefined),
+    access: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockResolvedValue([]),
+    stat: vi.fn().mockResolvedValue({ isDirectory: () => false }),
+  },
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue("mock diff content"),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  rm: vi.fn().mockResolvedValue(undefined),
+  access: vi.fn().mockResolvedValue(undefined),
+  readdir: vi.fn().mockResolvedValue([]),
+  stat: vi.fn().mockResolvedValue({ isDirectory: () => false }),
+}));
+
 vi.mock("../../src/config.js", () => ({
   loadConfig: vi.fn().mockReturnValue({
     defaultPlatform: "github",

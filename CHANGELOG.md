@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Streaming Timeout Issue** - Fixed 60-second timeout error when using `copilot-sdk` provider with streaming
+  - Added missing timeout parameter to `sendAndWait()` in `executePromptWithStreaming()`
+  - Streaming now uses same 3-minute timeout as non-streaming mode
+  - Fixes error: "Streaming execution failed: Timeout after 60000ms waiting for session.idle"
+
+### Added
+- **GitHub Copilot SDK Provider** - New native SDK-based provider (`copilot-sdk`) for direct Copilot API access
+  - Uses official `@github/copilot-sdk` package for native API integration
+  - Supports streaming responses via `executePromptWithStreaming()`
+  - Automatic retry with exponential backoff on failures
+  - Configurable timeout via `MM_COPILOT_TIMEOUT_MS` (default: 300000ms)
+  - Graceful session cleanup with `stop()` method
+  - Select with `--provider copilot-sdk` CLI flag
+
+### Changed
+- Extracted shared response parsing into `src/ai/responseParser.ts` module
+  - `parseJsonFromContent()` - robust JSON extraction from markdown code blocks
+  - `parseFileReview()`, `parseCrossFileReview()`, `parseBatchedFileReview()` - shared parsing logic
+  - Used by both CLI and SDK providers
+- Refactored existing `CopilotProvider` to use shared parsing functions
+
 ### Removed
 - **BREAKING**: Removed OpenAI API provider support
   - Removed `--provider openai` option and all OpenAI-specific CLI options

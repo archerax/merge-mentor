@@ -1,5 +1,6 @@
 import { ConfigurationError } from "../errors/index.js";
 import { CopilotProvider } from "./providers/copilot.js";
+import { CopilotSDKProvider } from "./providers/copilotSDK.js";
 import { CursorProvider } from "./providers/cursor.js";
 import { OpenCodeProvider } from "./providers/opencode.js";
 import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./types.js";
@@ -14,8 +15,11 @@ import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./type
  *
  * @example
  * ```typescript
- * // Create a Copilot provider
+ * // Create a Copilot provider (CLI-based, legacy)
  * const copilot = createAIProvider("copilot", { model: "gpt-4o" });
+ *
+ * // Create a Copilot SDK provider (recommended)
+ * const copilotSDK = createAIProvider("copilot-sdk", { model: "gpt-4.1" });
  *
  * // Create an OpenCode provider
  * const opencode = createAIProvider("opencode", { model: "claude-3.5-sonnet" });
@@ -31,6 +35,8 @@ export function createAIProvider(
   switch (type) {
     case "copilot":
       return new CopilotProvider(options);
+    case "copilot-sdk":
+      return new CopilotSDKProvider(options);
     case "opencode":
       return new OpenCodeProvider(options);
     case "cursor":
@@ -38,7 +44,7 @@ export function createAIProvider(
     default:
       throw new ConfigurationError(
         "AI_PROVIDER",
-        `Unsupported AI provider: ${type as string}. Valid options are: copilot, opencode, cursor`
+        `Unsupported AI provider: ${type as string}. Valid options are: copilot, copilot-sdk, opencode, cursor`
       );
   }
 }

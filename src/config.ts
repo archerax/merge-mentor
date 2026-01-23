@@ -150,7 +150,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor"];
+  const validProviders: AIProviderType[] = ["copilot", "copilot-sdk", "opencode", "cursor"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

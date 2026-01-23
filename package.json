@@ -45,6 +45,7 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
+    "@github/copilot-sdk": "^0.1.15",
     "@octokit/rest": "^22.0.1",
     "azure-devops-node-api": "^15.1.2",
     "commander": "^14.0.2",

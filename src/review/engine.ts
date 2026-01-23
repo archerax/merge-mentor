@@ -1,4 +1,10 @@
-import { type AIProviderClient, type AIProviderType, createAIProvider } from "../ai/index.js";
+import {
+  type AIProviderClient,
+  type AIProviderType,
+  type AIResponse,
+  createAIProvider,
+  type ExecutePromptOptions,
+} from "../ai/index.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
 import {
   buildBatchedFileReviewPrompt,
@@ -65,6 +71,7 @@ export interface ReviewEngineOptions {
 export class ReviewEngine {
   private readonly platform: PlatformAdapter;
   private readonly provider: AIProviderClient;
+  private readonly providerType: AIProviderType;
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
   private readonly repoManager: RepoManager;
@@ -106,6 +113,7 @@ export class ReviewEngine {
     };
 
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
+    this.providerType = resolvedProviderType;
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
     });
@@ -177,8 +185,8 @@ export class ReviewEngine {
         files,
         existingComments,
         cachedState,
-        repoContext?.content,
-        repoContext?.repoPath
+        repoContext.content,
+        repoContext.repoPath
       );
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
@@ -197,8 +205,8 @@ export class ReviewEngine {
           files,
           fileResults,
           existingComments,
-          repoContext?.content,
-          repoContext?.repoPath
+          repoContext.content,
+          repoContext.repoPath
         );
       }
     } else {
@@ -210,8 +218,8 @@ export class ReviewEngine {
         files,
         runs,
         existingComments,
-        repoContext?.content,
-        repoContext?.repoPath
+        repoContext.content,
+        repoContext.repoPath
       );
       fileResults = aggregated.fileResults;
       crossFileResult = aggregated.crossFileResult;
@@ -407,7 +415,7 @@ export class ReviewEngine {
    * Loads repository context (coding standards, guidelines) for review.
    * Gracefully degrades if context cannot be loaded.
    */
-  private async loadRepoContext(branch: string): Promise<RepoContext | undefined> {
+  private async loadRepoContext(branch: string): Promise<RepoContext> {
     try {
       this.log("📦 Loading repository context...");
       this.logger.debug({ branch }, "Loading repository context");
@@ -429,19 +437,25 @@ export class ReviewEngine {
           },
           "Repository context loaded successfully"
         );
-        return context;
+      } else {
+        this.log("  → No context documents found in repository");
+        this.logger.info({ repoPath }, "No repository context files found");
       }
 
-      this.log("  → No context documents found in repository");
-      this.logger.info({ repoPath }, "No repository context files found");
-      return undefined;
+      // Always return context (including repoPath) for workspace access
+      return context;
     } catch (error) {
       this.log(`  ⚠️ Could not load repository context: ${(error as Error).message}`);
       this.logger.warn(
         { error: (error as Error).message },
         "Failed to load repository context, continuing without it"
       );
-      return undefined;
+      // Return empty context - still need repoPath for workspace access
+      return {
+        content: "",
+        filesLoaded: [],
+        repoPath: "", // No workspace access on error
+      };
     }
   }
 
@@ -543,16 +557,37 @@ export class ReviewEngine {
 
       // Build batched prompt with repo context
       const commentsContext = formatExistingCommentsContext(existingComments);
+      const useSdkSyntax = this.providerType === "copilot-sdk";
       const prompt = buildBatchedFileReviewPrompt(
         manifest,
         commentsContext || undefined,
         repoContext,
-        repoPath
+        repoPath,
+        useSdkSyntax
       );
 
-      this.logger.debug("Copying diffs to temp directory for Copilot access");
-      // Copy diff files to temp directory so Copilot CLI can access them
-      await this.copyDiffsToTempDir(diffDir, manifest);
+      // For SDK: pass diff files as attachments
+      // For CLI: copy to temp directory for @file access
+      let executeOptions: ExecutePromptOptions;
+
+      if (useSdkSyntax) {
+        // SDK: attach diff files directly
+        executeOptions = {
+          workingDirectory: repoPath,
+          diffFiles: manifest.files.map((f) => f.diffPath),
+        };
+        this.logger.debug(
+          { diffCount: manifest.files.length },
+          "Attaching diff files for SDK provider"
+        );
+      } else {
+        // CLI: copy to temp directory for @file references
+        this.logger.debug("Copying diffs to temp directory for Copilot CLI access");
+        await this.copyDiffsToTempDir(diffDir, manifest);
+        executeOptions = {
+          workingDirectory: repoPath,
+        };
+      }
 
       // Single AI call for all files
       this.logger.debug(
@@ -562,13 +597,17 @@ export class ReviewEngine {
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
           hasRepoContext: !!repoContext,
           hasRepoPath: !!repoPath,
+          useSdkSyntax,
         },
         "Batched prompt being sent"
       );
 
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: repoPath,
-      });
+      // Use streaming if available for real-time progress
+      const response = await this.executePromptWithProgressFeedback(
+        prompt,
+        `  Analyzing ${filesWithPatches.length} files...`,
+        executeOptions
+      );
       const results = this.provider.parseBatchedFileReview(response);
 
       // Log individual file results
@@ -756,17 +795,23 @@ export class ReviewEngine {
     try {
       const filesSummary = buildFilesSummary(files);
       const commentsContext = formatExistingCommentsContext(existingComments);
+      const useSdkSyntax = this.providerType === "copilot-sdk";
       const prompt = buildCrossFilePrompt(
         prDetails,
         filesSummary,
         fileResults,
         commentsContext,
         repoContext,
-        repoPath
+        repoPath,
+        useSdkSyntax
       );
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: repoPath,
-      });
+
+      // Use streaming if available for real-time progress
+      const response = await this.executePromptWithProgressFeedback(
+        prompt,
+        "  Performing cross-file analysis...",
+        { workingDirectory: repoPath }
+      );
       const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
 
@@ -926,6 +971,45 @@ export class ReviewEngine {
       }
     }
     return map;
+  }
+
+  /**
+   * Executes a prompt with streaming progress feedback when available.
+   * Falls back to standard execution if provider doesn't support streaming.
+   */
+  private async executePromptWithProgressFeedback(
+    prompt: string,
+    progressMessage: string,
+    options?: ExecutePromptOptions
+  ): Promise<AIResponse> {
+    // Check if provider supports streaming
+    if (this.provider.executePromptWithStreaming) {
+      this.log(progressMessage);
+      
+      let chunkCount = 0;
+      const startTime = Date.now();
+      
+      return await this.provider.executePromptWithStreaming(
+        prompt,
+        (chunk: string) => {
+          chunkCount++;
+          // Show a progress indicator every 50 chunks to avoid flooding console
+          if (chunkCount % 50 === 0) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            process.stdout.write(`\r  Processing... (${elapsed}s, ${chunkCount} chunks)`);
+          }
+        },
+        options
+      ).finally(() => {
+        // Clear progress line if we showed any
+        if (chunkCount >= 50) {
+          process.stdout.write("\r" + " ".repeat(60) + "\r");
+        }
+      });
+    } else {
+      // Fallback to standard execution
+      return await this.provider.executePrompt(prompt, options);
+    }
   }
 
   private log(message: string): void {
