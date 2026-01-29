@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc --noEmit && cross-env NODE_ENV=production node build.mjs",
     "build:dev": "tsc --noEmit && node build.mjs",
+    "check": "pnpm build && pnpm test && pnpm lint",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -263,8 +263,7 @@ pnpm test:integration # Run integration tests
 pnpm test:all         # Run all tests (unit + integration)
 pnpm lint             # Run linter
 pnpm lint:fix         # Fix lint issues
-pnpm typecheck        # Type check without building
-pnpm check            # Run all checks (typecheck, lint, test)
+pnpm check            # Run all checks (build, test, lint)
 
 # When installed globally or via npx
 merge-mentor review --pr <number> [--platform github|azure] [--write] [--runs 1-5]

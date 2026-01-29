@@ -239,7 +239,7 @@ export class CopilotProvider implements AIProviderClient {
     } finally {
       // Clean up temp file
       if (tempFile) {
-        // DISABLED FOR PROMPT DEBUGGNG PURPOSES - await this.deleteTempFile(tempFile);
+        await this.deleteTempFile(tempFile);
       }
     }
   }

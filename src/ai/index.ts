@@ -1,11 +1,7 @@
 // AI provider abstraction layer exports
 
 // Severity context for context-aware severity scoring
-export {
-  buildSeverityContextSection,
-  type CodeContext,
-  inferCodeContext,
-} from "./prompts/severityContext.js";
+
 // Specialized review prompts
 export {
   buildLogicReviewPrompt,

@@ -6,6 +6,8 @@ import { CopilotProvider } from "./providers/copilot.js";
 // Mock dependencies - use "node:child_process" to match the import in copilot.ts
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
+  // Mock execSync to return a Windows .exe path so tests expect shell: false
+  execSync: vi.fn(() => "C:\\Program Files\\copilot\\copilot.exe"),
 }));
 
 vi.mock("node:fs/promises", () => ({
