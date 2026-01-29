@@ -44,6 +44,8 @@ export interface Config {
   readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
+  /** Use specialized review passes (security, logic, performance). */
+  readonly specialized: boolean;
 }
 
 /**
@@ -85,6 +87,7 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     cliOverrides?.reviewRuns?.toString() ?? process.env.MM_REVIEW_RUNS
   );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? process.env.MM_AI_PROVIDER);
+  const specialized = validateSpecialized(cliOverrides?.specialized, process.env.MM_SPECIALIZED);
 
   return {
     defaultPlatform: ((cliOverrides?.platform ?? process.env.MM_PLATFORM) as Platform) || "github",
@@ -112,6 +115,7 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? process.env.MM_SKIP_EXISTING_ISSUES) !== "false",
     reviewRuns,
+    specialized,
   };
 }
 
@@ -136,6 +140,7 @@ export interface CliOverrides {
   readonly cursorTimeout?: number;
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
+  readonly specialized?: boolean;
 }
 
 function validateReviewRuns(value: string | undefined): number {
@@ -155,6 +160,16 @@ function validateAIProvider(value: string | undefined): AIProviderType {
     return value as AIProviderType;
   }
   return "copilot"; // Default to copilot for backward compatibility
+}
+
+function validateSpecialized(cliValue: boolean | undefined, envValue: string | undefined): boolean {
+  if (cliValue !== undefined) {
+    return cliValue;
+  }
+  if (envValue !== undefined) {
+    return envValue.toLowerCase() === "true";
+  }
+  return false; // Default to false
 }
 
 /**

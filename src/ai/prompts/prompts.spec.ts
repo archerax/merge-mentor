@@ -175,6 +175,17 @@ describe("AI Prompts", () => {
       expect(prompt).toContain("Suggestion actually fixes the root cause");
     });
 
+    it("should include verification documentation requirements", () => {
+      const prompt = buildBatchedFileReviewPrompt(mockManifest);
+
+      expect(prompt).toContain("## Verification Documentation Requirements");
+      expect(prompt).toContain("✓ Confirmation:");
+      expect(prompt).toContain("✓ Context check:");
+      expect(prompt).toContain("✓ Pattern check:");
+      expect(prompt).toContain("✓ Impact assessment:");
+      expect(prompt).toContain("✓ Severity justification:");
+    });
+
     it("should include examples with counter-argument reasoning", () => {
       const prompt = buildBatchedFileReviewPrompt(mockManifest);
 

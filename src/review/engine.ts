@@ -1,4 +1,11 @@
-import { type AIProviderClient, type AIProviderType, createAIProvider } from "../ai/index.js";
+import {
+  type AIProviderClient,
+  type AIProviderType,
+  buildLogicReviewPrompt,
+  buildPerformanceReviewPrompt,
+  buildSecurityReviewPrompt,
+  createAIProvider,
+} from "../ai/index.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
 import {
   buildBatchedFileReviewPrompt,
@@ -56,6 +63,8 @@ export interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
+  /** Use specialized review passes (security, logic, performance). */
+  readonly specialized?: boolean;
 }
 
 /**
@@ -123,6 +132,7 @@ export class ReviewEngine {
         dryRun: resolvedOptions?.dryRun,
         skipPreExisting: resolvedOptions?.skipPreExisting,
         reviewRuns: resolvedOptions?.reviewRuns ?? 1,
+        specialized: resolvedOptions?.specialized ?? false,
       },
       "ReviewEngine initialized"
     );
@@ -155,7 +165,8 @@ export class ReviewEngine {
     const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
 
     const runs = this.options.reviewRuns ?? 1;
-    this.logger.info({ prNumber, prIdentifier, runs }, "Starting PR review");
+    const specialized = this.options.specialized ?? false;
+    this.logger.info({ prNumber, prIdentifier, runs, specialized }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
     this.auditLogger.logReviewStart(prNumber, this.platformName, runs);
 
@@ -170,7 +181,31 @@ export class ReviewEngine {
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
 
-    if (runs === 1) {
+    if (specialized) {
+      // Specialized mode - run parallel security, logic, performance reviews
+      const reviewData = await this.reviewFilesWithSpecialization(
+        prIdentifier,
+        files,
+        existingComments,
+        repoContext?.content,
+        repoContext?.repoPath
+      );
+      fileResults = reviewData.fileResults;
+      filesSkipped = reviewData.filesSkipped;
+
+      // Validate line numbers against actual diff content
+      fileResults = this.validateLineNumbers(fileResults, files);
+
+      // Cross-file analysis
+      crossFileResult = await this.performCrossFileAnalysis(
+        prDetails,
+        files,
+        fileResults,
+        existingComments,
+        repoContext?.content,
+        repoContext?.repoPath
+      );
+    } else if (runs === 1) {
       // Single run - use existing logic
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -368,6 +403,128 @@ export class ReviewEngine {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Reviews files using specialized parallel passes (security, logic, performance).
+   * Each specialized prompt focuses on a single concern for more thorough analysis.
+   */
+  private async reviewFilesWithSpecialization(
+    prIdentifier: string,
+    files: PRFile[],
+    _existingComments: readonly ExistingComment[],
+    repoContext?: string,
+    repoPath?: string
+  ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
+    this.log("Running specialized review passes (security, logic, performance)...");
+    this.logger.info({ prIdentifier }, "Starting specialized review mode");
+
+    // Filter to reviewable files (same as reviewFiles method)
+    const reviewableFiles = files.filter((f) => !this.shouldSkipFile(f));
+
+    if (reviewableFiles.length === 0) {
+      this.log("No reviewable files found");
+      // filesSkipped=0 because no files were cached; files were simply not reviewable
+      return { fileResults: [], filesSkipped: 0 };
+    }
+
+    const filesWithPatches = reviewableFiles.filter((f) => f.patch);
+    if (filesWithPatches.length === 0) {
+      return {
+        fileResults: reviewableFiles.map((f) => ({ filename: f.filename, findings: [] })),
+        // filesSkipped=0 because no files were cached
+        filesSkipped: 0,
+      };
+    }
+
+    // Store diffs for specialized reviews
+    const diffStorage = new DiffStorage();
+    const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
+
+    this.logger.debug(
+      { prIdentifier, fileCount: manifest.files.length, diffDir },
+      "Stored diffs for specialized review"
+    );
+
+    // Copy diffs to repo directory for AI access
+    await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
+
+    // Build specialized prompts
+    const securityPrompt = buildSecurityReviewPrompt(manifest, repoContext, repoPath);
+    const logicPrompt = buildLogicReviewPrompt(manifest, repoContext, repoPath);
+    const performancePrompt = buildPerformanceReviewPrompt(manifest, repoContext, repoPath);
+
+    // Run three parallel reviews
+    this.log("  Running security, logic, and performance reviews in parallel...");
+    const [securityResults, logicResults, performanceResults] = await Promise.all([
+      this.executeSpecializedReview("security", securityPrompt, repoPath),
+      this.executeSpecializedReview("logic", logicPrompt, repoPath),
+      this.executeSpecializedReview("performance", performancePrompt, repoPath),
+    ]);
+
+    // Log results from each pass
+    const securityFindings = securityResults.reduce((sum, r) => sum + r.findings.length, 0);
+    const logicFindings = logicResults.reduce((sum, r) => sum + r.findings.length, 0);
+    const performanceFindings = performanceResults.reduce((sum, r) => sum + r.findings.length, 0);
+
+    this.log(`  Security: ${securityFindings} findings`);
+    this.log(`  Logic: ${logicFindings} findings`);
+    this.log(`  Performance: ${performanceFindings} findings`);
+
+    // Merge and deduplicate results
+    const aggregator = new FindingAggregator();
+    const merged = aggregator.aggregateFileFindings([
+      securityResults,
+      logicResults,
+      performanceResults,
+    ]);
+
+    const totalFindings = merged.reduce((sum, r) => sum + r.findings.length, 0);
+    this.log(`  Total unique findings: ${totalFindings}`);
+
+    // Clean up diffs
+    await diffStorage.cleanup(prIdentifier);
+
+    return {
+      fileResults: merged,
+      // filesSkipped=0 because specialized mode doesn't use caching
+      filesSkipped: 0,
+    };
+  }
+
+  /**
+   * Executes a single specialized review pass.
+   */
+  private async executeSpecializedReview(
+    type: "security" | "logic" | "performance",
+    prompt: string,
+    repoPath?: string
+  ): Promise<FileReviewResult[]> {
+    this.logger.debug({ type, promptLength: prompt.length }, `Starting ${type} review`);
+
+    try {
+      const response = await this.provider.executePrompt(prompt, {
+        workingDirectory: repoPath,
+      });
+      const results = this.provider.parseBatchedFileReview(response);
+
+      this.logger.info(
+        {
+          type,
+          filesReviewed: results.length,
+          totalFindings: results.reduce((sum, r) => sum + r.findings.length, 0),
+        },
+        `Specialized ${type} review completed`
+      );
+
+      return results;
+    } catch (error) {
+      this.logger.error(
+        { type, error: (error as Error).message },
+        `Specialized ${type} review failed`
+      );
+      return [];
+    }
   }
 
   private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {

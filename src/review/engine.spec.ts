@@ -17,6 +17,10 @@ vi.mock("../ai/index.js", () => ({
     parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
     parseBatchedFileReview: (...args: unknown[]) => mockParseBatchedFileReview(...args),
   })),
+  // Specialized prompt builders
+  buildSecurityReviewPrompt: vi.fn(() => "mock security prompt"),
+  buildLogicReviewPrompt: vi.fn(() => "mock logic prompt"),
+  buildPerformanceReviewPrompt: vi.fn(() => "mock performance prompt"),
 }));
 
 // Mock the RepoManager to avoid actual git operations
@@ -1112,6 +1116,245 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
 
       await engine.reviewPR(123);
+    });
+  });
+
+  describe("specialized review mode", () => {
+    it("runs three parallel specialized reviews when specialized option is enabled", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: false,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // Should be called 4 times: 3 specialized reviews + 1 cross-file analysis
+      expect(mockExecutePrompt).toHaveBeenCalledTimes(4);
+    });
+
+    it("aggregates findings from all three specialized reviews", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: false,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+
+      // Each specialized review returns different findings
+      mockParseBatchedFileReview
+        .mockReturnValueOnce([
+          {
+            filename: "test.ts",
+            findings: [
+              {
+                line: 2,
+                severity: "high",
+                category: "security",
+                message: "Security issue",
+                suggestion: "Fix security",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ])
+        .mockReturnValueOnce([
+          {
+            filename: "test.ts",
+            findings: [
+              {
+                line: 3,
+                severity: "medium",
+                category: "bug",
+                message: "Logic bug",
+                suggestion: "Fix bug",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ])
+        .mockReturnValueOnce([
+          {
+            filename: "test.ts",
+            findings: [
+              {
+                line: 4,
+                severity: "low",
+                category: "performance",
+                message: "Performance issue",
+                suggestion: "Optimize",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      // All three findings should be aggregated (3 specialized + 3 comments posted)
+      // Note: findings are deduplicated, so all 3 unique findings should be present
+      expect(result.fileResults.length).toBeGreaterThan(0);
+      const totalFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
+      expect(totalFindings).toBe(3);
+    });
+
+    it("continues when one specialized review fails", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: false,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      // First call fails, others succeed
+      mockExecutePrompt
+        .mockRejectedValueOnce(new Error("Security review failed"))
+        .mockResolvedValue({ raw: "{}", parsed: {} });
+
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "medium",
+              category: "bug",
+              message: "Logic bug",
+              suggestion: "Fix",
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      // Should still complete with results from successful reviews
+      expect(result).toBeDefined();
+      expect(result.filesReviewed).toBe(1);
+    });
+
+    it("returns empty results when no reviewable files", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: false,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "deleted.ts", status: "deleted" })];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "No files to review",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.filesReviewed).toBe(0);
+    });
+
+    it("deduplicates identical findings from different specialized reviews", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: false,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+
+      // All three reviews return the same finding
+      const sameFinding = {
+        line: 2,
+        severity: "high" as const,
+        category: "security",
+        message: "Duplicate finding across reviews",
+        suggestion: "Fix it",
+        isPreExisting: false,
+      };
+
+      mockParseBatchedFileReview.mockReturnValue([
+        { filename: "test.ts", findings: [sameFinding] },
+      ]);
+
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      // Despite 3 reviews returning the same finding, it should be deduplicated to 1
+      const totalFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
+      expect(totalFindings).toBe(1);
+    });
+
+    it("logs specialized review progress in verbose mode", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
+        verbose: true,
+        specialized: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // Should log specialized review messages
+      const specializedLogs = consoleSpy.mock.calls.filter(
+        (call) => call[0] && String(call[0]).includes("specialized")
+      );
+      expect(specializedLogs.length).toBeGreaterThan(0);
+      consoleSpy.mockRestore();
     });
   });
 });

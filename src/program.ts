@@ -19,6 +19,7 @@ export interface ReviewOptions {
   write: boolean;
   verbose: boolean;
   runs?: number;
+  specialized?: boolean;
   // GitHub config
   githubToken?: string;
   githubRepoOwner?: string;
@@ -82,6 +83,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     cursorTimeout: options.cursorTimeout,
     skipExistingIssues: options.skipExistingIssues,
     reviewRuns: options.runs,
+    specialized: options.specialized,
   });
   const platform = (options.platform || config.defaultPlatform) as Platform;
 
@@ -137,6 +139,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     copilotToken: config.copilotToken,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
+    specialized: options.specialized ?? config.specialized,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -421,6 +424,11 @@ program
     }
     return parsed;
   })
+  .option(
+    "--specialized",
+    "Use specialized review passes (security, logic, performance). Env: MM_SPECIALIZED",
+    false
+  )
   // GitHub options
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")

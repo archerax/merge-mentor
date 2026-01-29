@@ -1,5 +1,6 @@
 import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
 import type { DiffManifest } from "../../review/diffStorage.js";
+import { buildSeverityContextSection } from "./severityContext.js";
 
 /**
  * Builds a prompt for cross-file analysis.
@@ -513,7 +514,7 @@ Use these exact criteria:
 - **high**: Logic bug causing incorrect behavior, race condition, unsafe operation
 - **medium**: Performance issue, maintainability concern, missing validation, code smell
 - **low**: Minor improvement, readability suggestion, documentation need
-
+${buildSeverityContextSection()}
 # CONFIDENCE LEVELS
 - **high**: Clear issue with definite negative impact
 - **medium**: Likely issue but needs context or verification

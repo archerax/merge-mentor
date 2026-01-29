@@ -61,6 +61,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     copilotModel: "gpt-4",
     skipPreExisting: true,
     reviewRuns: 1,
+    specialized: false,
     ...overrides,
   };
 }
