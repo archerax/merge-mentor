@@ -138,7 +138,8 @@ export class RepoManager {
 
       for (const entry of entries) {
         if (entry.isFile() && entry.name.endsWith(".instructions.md")) {
-          const relativePath = path.join(".github", "instructions", entry.name);
+          // Normalize to forward slashes for cross-platform consistency
+          const relativePath = path.join(".github", "instructions", entry.name).replace(/\\/g, "/");
 
           // Skip if already loaded
           if (filesLoaded.includes(relativePath)) {

@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { JsonParseError, ValidationError } from "../../errors/index.js";
+import { createChildLogger } from "../../logger.js";
 import type {
   CrossFileFinding,
   CrossFileReviewResult,
@@ -14,6 +15,67 @@ import type {
   AIResponse,
   ExecutePromptOptions,
 } from "../types.js";
+
+/**
+ * Cache for resolved executable paths.
+ */
+const executablePathCache = new Map<string, string>();
+
+/**
+ * Resolves the full path to an executable by searching PATH.
+ * On Windows, returns command name for batch files (requires shell: true).
+ */
+function resolveExecutablePath(command: string): string {
+  const cached = executablePathCache.get(command);
+  if (cached) {
+    return cached;
+  }
+
+  // On Windows, batch files (.bat, .cmd) cannot be executed with shell: false
+  // In this case, just return the command name and we'll use shell: true
+  if (process.platform === "win32") {
+    try {
+      const result = execSync(`where ${command}`, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 5000,
+      }).trim();
+
+      const executablePath = result.split(/\r?\n/)[0].trim();
+
+      // If it's a batch file, return the command name (will use shell: true)
+      if (
+        executablePath.toLowerCase().endsWith(".bat") ||
+        executablePath.toLowerCase().endsWith(".cmd")
+      ) {
+        executablePathCache.set(command, command);
+        return command;
+      }
+
+      executablePathCache.set(command, executablePath);
+      return executablePath;
+    } catch {
+      // If where fails, still try the command name with shell
+      executablePathCache.set(command, command);
+      return command;
+    }
+  }
+
+  // Unix-like systems: resolve the full path
+  try {
+    const result = execSync(`which ${command}`, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 5000,
+    }).trim();
+
+    const executablePath = result.split(/\r?\n/)[0].trim();
+    executablePathCache.set(command, executablePath);
+    return executablePath;
+  } catch {
+    throw new Error(`Command "${command}" not found in PATH`);
+  }
+}
 
 /**
  * Error thrown when the Cursor CLI fails or is unavailable.
@@ -78,6 +140,7 @@ export class CursorProvider implements AIProviderClient {
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
+  private readonly logger = createChildLogger({ component: "CursorProvider" });
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -145,23 +208,53 @@ export class CursorProvider implements AIProviderClient {
         args.push("--model", this.model);
       }
 
-      // Using array-based args with spawn handles escaping correctly on all platforms
-      const proc = spawn("cursor-agent", args, {
-        stdio: ["inherit", "pipe", "pipe"],
-        timeout: this.timeoutMs,
-        shell: false,
-        cwd: options?.workingDirectory,
-      });
+      // Resolve the full path to the cursor-agent executable before spawning.
+      let executablePath: string;
+      try {
+        executablePath = resolveExecutablePath("cursor-agent");
+      } catch {
+        reject(new CursorCliError("Cursor CLI is not installed or not in PATH"));
+        return;
+      }
+
+      // On Windows, batch files require shell: true
+      const needsShell =
+        process.platform === "win32" &&
+        (executablePath === "cursor-agent" || !executablePath.toLowerCase().endsWith(".exe"));
+
+      // When using shell: true, pass command and args as a single string
+      const proc = needsShell
+        ? spawn(
+            executablePath,
+            [
+              args
+                .map((arg) => {
+                  if (arg.includes(" ") || arg.includes("&") || arg.includes("|")) {
+                    return `"${arg.replace(/"/g, '\\"')}"`;
+                  }
+                  return arg;
+                })
+                .join(" "),
+            ],
+            {
+              stdio: ["inherit", "pipe", "pipe"],
+              timeout: this.timeoutMs,
+              shell: true,
+              cwd: options?.workingDirectory,
+            }
+          )
+        : spawn(executablePath, args, {
+            stdio: ["inherit", "pipe", "pipe"],
+            timeout: this.timeoutMs,
+            shell: false,
+            cwd: options?.workingDirectory,
+          });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
       proc.stderr?.on("data", (data: Buffer) => errorChunks.push(data));
 
       proc.on("error", (error) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(new CursorCliError("Cursor CLI is not installed or not in PATH"));
-        } else {
-          reject(new CursorCliError("CLI execution failed", error));
-        }
+        reject(new CursorCliError(`CLI execution failed: ${error.message}`, error));
       });
 
       proc.on("close", (code) => {
@@ -211,6 +304,49 @@ export class CursorProvider implements AIProviderClient {
   }
 
   /**
+   * Validates the quality of reasoning provided by the AI.
+   * Logs warnings for reasoning that doesn't meet verification standards.
+   *
+   * @param reasoning - The reasoning text to validate
+   * @param filename - The file being reviewed (for context in logs)
+   * @param lineOrLocation - Line number or location description (for context in logs)
+   */
+  private validateReasoning(
+    reasoning: string,
+    filename: string,
+    lineOrLocation: string | number
+  ): void {
+    const minLength = 50;
+    const location = typeof lineOrLocation === "number" ? `line ${lineOrLocation}` : lineOrLocation;
+
+    // Check minimum length
+    if (reasoning.length < minLength) {
+      this.logger.warn(
+        {
+          filename,
+          location,
+          reasoningLength: reasoning.length,
+          reasoning: reasoning.substring(0, 100),
+        },
+        `Reasoning too short (need ${minLength}+ chars) - finding may lack proper verification`
+      );
+    }
+
+    // Check for verification keywords
+    const verificationPattern = /verified|checked|confirmed|scanned|✓/i;
+    if (!verificationPattern.test(reasoning)) {
+      this.logger.warn(
+        {
+          filename,
+          location,
+          reasoning: reasoning.substring(0, 150),
+        },
+        "Reasoning lacks verification keywords (verified/checked/confirmed/scanned) - may be low quality"
+      );
+    }
+  }
+
+  /**
    * Parses a Cursor response into a file review result.
    *
    * @param filename - Name of the reviewed file
@@ -223,6 +359,16 @@ export class CursorProvider implements AIProviderClient {
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        // Validate reasoning quality
+        if (finding.reasoning) {
+          const line = typeof finding.line === "number" ? finding.line : "unknown";
+          this.validateReasoning(reasoning, filename, line);
+        }
+
         findings.push({
           line: typeof finding.line === "number" ? finding.line : 0,
           severity: this.validateSeverity(finding.severity),
@@ -230,9 +376,7 @@ export class CursorProvider implements AIProviderClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
-          reasoning: finding.reasoning
-            ? String(finding.reasoning)
-            : "Reasoning not provided by the model.",
+          reasoning,
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
       }
@@ -256,14 +400,24 @@ export class CursorProvider implements AIProviderClient {
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        // Validate reasoning quality
+        if (finding.reasoning) {
+          const affectedFiles = Array.isArray(finding.affected_files)
+            ? finding.affected_files.map(String).join(", ")
+            : "unknown";
+          this.validateReasoning(reasoning, "cross-file", affectedFiles);
+        }
+
         findings.push({
           severity: this.validateSeverity(finding.severity),
           confidence: this.validateConfidence(finding.confidence),
           category: this.validateCrossFileCategory(finding.category),
           message: String(finding.message || ""),
-          reasoning: finding.reasoning
-            ? String(finding.reasoning)
-            : "Reasoning not provided by the model.",
+          reasoning,
           affectedFiles: Array.isArray(finding.affected_files)
             ? finding.affected_files.map(String)
             : [],
@@ -298,6 +452,16 @@ export class CursorProvider implements AIProviderClient {
 
       if (Array.isArray(rawFileData.findings)) {
         for (const finding of rawFileData.findings) {
+          const reasoning = finding.reasoning
+            ? String(finding.reasoning)
+            : "Reasoning not provided by the model.";
+
+          // Validate reasoning quality
+          if (finding.reasoning) {
+            const line = typeof finding.line === "number" ? finding.line : "unknown";
+            this.validateReasoning(reasoning, filename, line);
+          }
+
           findings.push({
             line: typeof finding.line === "number" ? finding.line : 0,
             severity: this.validateSeverity(finding.severity),
@@ -305,9 +469,7 @@ export class CursorProvider implements AIProviderClient {
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
-            reasoning: finding.reasoning
-              ? String(finding.reasoning)
-              : "Reasoning not provided by the model.",
+            reasoning,
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });

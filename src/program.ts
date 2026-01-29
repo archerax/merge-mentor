@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -583,6 +584,74 @@ program
       console.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }
+  });
+
+// Diagnostic command to check AI provider CLI installations
+program
+  .command("doctor")
+  .description("Check AI provider CLI installations and configuration")
+  .option("--provider <provider>", "Check specific provider (copilot, opencode, cursor)")
+  .action((options: { provider?: string }) => {
+    console.log("\n🔍 merge-mentor diagnostics\n");
+    console.log(`Platform: ${process.platform}`);
+    console.log(`Node.js: ${process.version}`);
+    console.log(`CWD: ${process.cwd()}`);
+    console.log(`PATH length: ${(process.env.PATH || process.env.Path || "").length} chars\n`);
+
+    const providersToCheck = options.provider
+      ? [options.provider]
+      : ["copilot", "opencode", "cursor"];
+
+    for (const provider of providersToCheck) {
+      console.log(`\n📦 Checking ${provider} CLI:`);
+
+      try {
+        // Try to get version
+        const versionOutput = execSync(`${provider} --version`, {
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+          timeout: 5000,
+        }).trim();
+        console.log(`  ✅ Installed: ${versionOutput}`);
+
+        // Try to get path
+        const whichCommand = process.platform === "win32" ? "where" : "which";
+        try {
+          const pathOutput = execSync(`${whichCommand} ${provider}`, {
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+            timeout: 5000,
+          }).trim();
+          console.log(`  📍 Location: ${pathOutput}`);
+        } catch {
+          console.log(`  ⚠️  Could not determine installation location`);
+        }
+      } catch (error) {
+        const err = error as Error & { status?: number };
+        console.log(`  ❌ Not found or not working`);
+        if (err.message) {
+          console.log(`     Error: ${err.message.split("\n")[0]}`);
+        }
+      }
+    }
+
+    console.log("\n");
+
+    // Check configuration
+    try {
+      const config = loadConfig({});
+      console.log("⚙️  Configuration:");
+      console.log(`  Default platform: ${config.defaultPlatform}`);
+      console.log(`  AI provider: ${config.aiProvider}`);
+      console.log(`  GitHub token: ${config.github.token ? "✅ Set" : "❌ Not set"}`);
+      console.log(`  Azure token: ${config.azure.token ? "✅ Set" : "❌ Not set"}`);
+      console.log("");
+    } catch (error) {
+      console.log("⚙️  Configuration: ⚠️  Could not load configuration");
+      console.log(`   ${(error as Error).message}\n`);
+    }
+
+    process.exit(0);
   });
 
 export { program };

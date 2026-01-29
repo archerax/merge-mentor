@@ -550,9 +550,9 @@ export class ReviewEngine {
         repoPath
       );
 
-      this.logger.debug("Copying diffs to temp directory for Copilot access");
-      // Copy diff files to temp directory so Copilot CLI can access them
-      await this.copyDiffsToTempDir(diffDir, manifest);
+      this.logger.debug("Copying diffs to repo's .merge-mentor directory for Copilot access");
+      // Copy diff files to repo's .merge-mentor directory so Copilot CLI can access them
+      await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
 
       // Single AI call for all files
       this.logger.debug(
@@ -612,22 +612,33 @@ export class ReviewEngine {
   }
 
   /**
-   * Copy diff files from storage directory to temp directory for Copilot CLI access
+   * Copies diff files to the repo's .merge-mentor directory so Copilot CLI can access them.
+   * If repoPath is not provided, falls back to the global temp directory.
    */
-  private async copyDiffsToTempDir(diffDir: string, manifest: DiffManifest): Promise<void> {
+  private async copyDiffsToRepoDir(
+    diffDir: string,
+    manifest: DiffManifest,
+    repoPath?: string
+  ): Promise<void> {
     const fs = await import("node:fs/promises");
-    const path = await import("node:path");
+    const nodePath = await import("node:path");
 
-    const tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
+    // Use repo's .merge-mentor/diffs directory if repoPath provided, otherwise global temp
+    const targetDir = repoPath
+      ? nodePath.join(repoPath, ".merge-mentor", "diffs")
+      : nodePath.join(process.cwd(), ".merge-mentor", "temp");
 
-    // Ensure temp directory exists
-    await fs.mkdir(tempDir, { recursive: true });
+    // Ensure target directory exists
+    await fs.mkdir(targetDir, { recursive: true });
 
-    this.logger.debug({ fileCount: manifest.files.length }, "Copying diff files to temp directory");
+    this.logger.debug(
+      { fileCount: manifest.files.length, targetDir },
+      "Copying diff files to accessible directory"
+    );
 
     for (const fileEntry of manifest.files) {
-      const sourcePath = path.join(diffDir, fileEntry.diffPath);
-      const destPath = path.join(tempDir, fileEntry.diffPath);
+      const sourcePath = nodePath.join(diffDir, fileEntry.diffPath);
+      const destPath = nodePath.join(targetDir, fileEntry.diffPath);
 
       this.logger.debug(
         { diffPath: fileEntry.diffPath, sourcePath, destPath },

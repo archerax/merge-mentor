@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Use "node:child_process" to match the import in opencode.ts
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
+  execSync: vi.fn(() => "C:\\Program Files\\opencode\\opencode.exe"),
 }));
 
 import { spawn } from "node:child_process";
@@ -276,7 +277,8 @@ describe("OpenCodeProvider", () => {
       const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
-      expect(err.message).toContain("OpenCode CLI is not installed or not in PATH");
+      // Error now comes from process error handler since execSync is mocked to succeed
+      expect(err.message).toContain("CLI execution failed");
     });
 
     it("should throw OpenCodeCliError on process error", async () => {
@@ -355,7 +357,7 @@ describe("OpenCodeProvider", () => {
       await promise;
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        "opencode",
+        expect.any(String), // Resolved executable path
         ["-p", "test prompt", "--model", "claude-3.5-sonnet"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );
@@ -375,7 +377,7 @@ describe("OpenCodeProvider", () => {
       await promise;
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        "opencode",
+        expect.any(String), // Resolved executable path
         ["-p", "test prompt"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );

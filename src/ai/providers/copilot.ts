@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getAuditLogger } from "../../audit/index.js";
@@ -18,6 +18,73 @@ import type {
   ExecutePromptOptions,
   TokenUsage,
 } from "../types.js";
+
+/**
+ * Cache for resolved executable paths.
+ * Avoids repeated `where`/`which` lookups during a session.
+ */
+const executablePathCache = new Map<string, string>();
+
+/**
+ * Resolves the full path to an executable by searching PATH.
+ * Uses `where` on Windows, `which` on Unix-like systems.
+ * Caches results to avoid repeated lookups.
+ *
+ * @param command - The command name to resolve (e.g., "copilot")
+ * @returns The full path to the executable (or original command if not found/Windows batch file)
+ */
+function resolveExecutablePath(command: string): string {
+  const cached = executablePathCache.get(command);
+  if (cached) {
+    return cached;
+  }
+
+  // On Windows, batch files (.bat, .cmd) cannot be executed with shell: false
+  // In this case, just return the command name and we'll use shell: true
+  if (process.platform === "win32") {
+    try {
+      const result = execSync(`where ${command}`, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 5000,
+      }).trim();
+
+      // `where` on Windows may return multiple lines; use the first one
+      const executablePath = result.split(/\r?\n/)[0].trim();
+
+      // If it's a batch file, return the command name (will use shell: true)
+      if (
+        executablePath.toLowerCase().endsWith(".bat") ||
+        executablePath.toLowerCase().endsWith(".cmd")
+      ) {
+        executablePathCache.set(command, command);
+        return command;
+      }
+
+      executablePathCache.set(command, executablePath);
+      return executablePath;
+    } catch {
+      // If where fails, still try the command name with shell
+      executablePathCache.set(command, command);
+      return command;
+    }
+  }
+
+  // Unix-like systems: resolve the full path
+  try {
+    const result = execSync(`which ${command}`, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 5000,
+    }).trim();
+
+    const executablePath = result.split(/\r?\n/)[0].trim();
+    executablePathCache.set(command, executablePath);
+    return executablePath;
+  } catch {
+    throw new Error(`Command "${command}" not found in PATH`);
+  }
+}
 
 /** Raw finding structure from Copilot JSON response. */
 interface RawFileFinding {
@@ -75,14 +142,14 @@ export class CopilotProvider implements AIProviderClient {
   private readonly token?: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotProvider" });
-  private readonly tempDir: string;
+  private readonly defaultTempDir: string;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
     this.token = options?.token;
-    this.tempDir = path.join(process.cwd(), ".merge-mentor", "temp");
+    this.defaultTempDir = path.join(process.cwd(), ".merge-mentor", "temp");
   }
 
   /**
@@ -108,8 +175,13 @@ export class CopilotProvider implements AIProviderClient {
         try {
           // Use temp file for large prompts to avoid CLI argument length limits
           if (prompt.length > PROMPT_LENGTH_THRESHOLD) {
-            tempFile = await this.createTempPromptFile(prompt);
-            const shortPrompt = `Please follow the instructions in @${path.basename(tempFile)}`;
+            // Store temp file inside the workspace if provided, so Copilot CLI can access it
+            tempFile = await this.createTempPromptFile(prompt, options?.workingDirectory);
+            // Use relative path if inside workspace, otherwise absolute path
+            const fileRef = options?.workingDirectory
+              ? `.merge-mentor/temp/${path.basename(tempFile)}`
+              : tempFile;
+            const shortPrompt = `Please follow the instructions in @${fileRef}`;
             const { stdout, stderr } = await this.runCli(shortPrompt, options, tempFile);
             const parsed = this.parseJsonResponse(stdout);
             const tokenUsage = this.parseTokenUsage(stderr);
@@ -138,6 +210,15 @@ export class CopilotProvider implements AIProviderClient {
           }
         } catch (error) {
           lastError = error as Error;
+          this.logger.warn(
+            {
+              attempt: attempt + 1,
+              maxRetries: this.maxRetries,
+              error: lastError.message,
+              willRetry: attempt < this.maxRetries - 1,
+            },
+            "Copilot CLI execution attempt failed"
+          );
           if (attempt < this.maxRetries - 1) {
             await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
           }
@@ -158,7 +239,7 @@ export class CopilotProvider implements AIProviderClient {
     } finally {
       // Clean up temp file
       if (tempFile) {
-        await this.deleteTempFile(tempFile);
+        // DISABLED FOR PROMPT DEBUGGNG PURPOSES - await this.deleteTempFile(tempFile);
       }
     }
   }
@@ -169,10 +250,20 @@ export class CopilotProvider implements AIProviderClient {
     return "unknown";
   }
 
-  private async createTempPromptFile(prompt: string): Promise<string> {
-    await fs.mkdir(this.tempDir, { recursive: true });
+  /**
+   * Creates a temporary file for the prompt.
+   * When workspaceDir is provided, creates the file inside the workspace's .merge-mentor directory
+   * so that Copilot CLI can access it via @file reference.
+   */
+  private async createTempPromptFile(prompt: string, workspaceDir?: string): Promise<string> {
+    // If workspaceDir is provided, store temp files inside the repo so Copilot can access them
+    const tempDir = workspaceDir
+      ? path.join(workspaceDir, ".merge-mentor", "temp")
+      : this.defaultTempDir;
+
+    await fs.mkdir(tempDir, { recursive: true });
     const filename = `prompt-${Date.now()}-${Math.random().toString(36).substring(7)}.md`;
-    const filepath = path.join(this.tempDir, filename);
+    const filepath = path.join(tempDir, filename);
     await fs.writeFile(filepath, prompt, "utf-8");
     return filepath;
   }
@@ -205,32 +296,94 @@ export class CopilotProvider implements AIProviderClient {
       }
 
       // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
-      // Node.js will automatically handle .exe extension on Windows
       const env = this.token ? { ...process.env, GITHUB_TOKEN: this.token } : process.env;
 
       // Determine working directory:
-      // 1. If workingDirectory provided in options, use it (enables @workspace access)
-      // 2. If tempFilePath provided, use temp dir (for @file references to temp files)
-      // 3. Otherwise, use current working directory
-      const cwd = options?.workingDirectory ?? (tempFilePath ? this.tempDir : undefined);
+      // - If workingDirectory provided in options, use it (enables @workspace access to cloned repo)
+      // - Otherwise, use current working directory
+      // Note: We now use absolute paths for @file references, so temp files work regardless of cwd
+      const cwd = options?.workingDirectory;
 
-      const proc = spawn("copilot", args, {
-        stdio: ["inherit", "pipe", "pipe"],
-        timeout: this.timeoutMs,
-        shell: false, // Explicit shell: false ensures consistent cross-platform behavior
-        cwd,
-        env,
-      });
+      // Resolve the full path to the copilot executable before spawning.
+      // This ensures the command is found even when cwd is different from the current process.
+      let executablePath: string;
+      try {
+        executablePath = resolveExecutablePath("copilot");
+      } catch {
+        reject(new CopilotCliError("Copilot CLI is not installed or not in PATH."));
+        return;
+      }
+
+      this.logger.debug(
+        {
+          command: executablePath,
+          args: args,
+          cwd: cwd || process.cwd(),
+          hasToken: !!this.token,
+          model: this.model,
+          tempFilePath,
+        },
+        "Spawning Copilot CLI process"
+      );
+
+      // On Windows, batch files (.bat, .cmd) require shell: true
+      // If executablePath is just the command name (e.g., "copilot"), use shell: true
+      // If it's a full path to an .exe, use shell: false
+      const needsShell =
+        process.platform === "win32" &&
+        (executablePath === "copilot" || !executablePath.toLowerCase().endsWith(".exe"));
+
+      // When using shell: true, pass command and args as a single string to avoid
+      // DEP0190 warning and ensure proper escaping
+      const proc = needsShell
+        ? spawn(
+            executablePath,
+            [
+              args
+                .map((arg) => {
+                  // Quote arguments that contain spaces or special characters
+                  if (arg.includes(" ") || arg.includes("&") || arg.includes("|")) {
+                    return `"${arg.replace(/"/g, '\\"')}"`;
+                  }
+                  return arg;
+                })
+                .join(" "),
+            ],
+            {
+              stdio: ["inherit", "pipe", "pipe"],
+              timeout: this.timeoutMs,
+              shell: true,
+              cwd,
+              env,
+            }
+          )
+        : spawn(executablePath, args, {
+            stdio: ["inherit", "pipe", "pipe"],
+            timeout: this.timeoutMs,
+            shell: false,
+            cwd,
+            env,
+          });
 
       proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
       proc.stderr?.on("data", (data: Buffer) => errorChunks.push(data));
 
       proc.on("error", (error) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(new CopilotCliError("Copilot CLI is not installed or not in PATH."));
-        } else {
-          reject(new CopilotCliError("CLI execution failed.", error));
-        }
+        const errorCode = (error as NodeJS.ErrnoException).code;
+
+        this.logger.error(
+          {
+            error: error.message,
+            errorCode,
+            command: executablePath,
+            args: args,
+            cwd: cwd || process.cwd(),
+            platform: process.platform,
+          },
+          "Copilot CLI process error"
+        );
+
+        reject(new CopilotCliError(`CLI execution failed: ${error.message}`, error));
       });
 
       proc.on("close", (code) => {
@@ -410,6 +563,49 @@ export class CopilotProvider implements AIProviderClient {
     return Math.round(num);
   }
 
+  /**
+   * Validates the quality of reasoning provided by the AI.
+   * Logs warnings for reasoning that doesn't meet verification standards.
+   *
+   * @param reasoning - The reasoning text to validate
+   * @param filename - The file being reviewed (for context in logs)
+   * @param lineOrLocation - Line number or location description (for context in logs)
+   */
+  private validateReasoning(
+    reasoning: string,
+    filename: string,
+    lineOrLocation: string | number
+  ): void {
+    const minLength = 50;
+    const location = typeof lineOrLocation === "number" ? `line ${lineOrLocation}` : lineOrLocation;
+
+    // Check minimum length
+    if (reasoning.length < minLength) {
+      this.logger.warn(
+        {
+          filename,
+          location,
+          reasoningLength: reasoning.length,
+          reasoning: reasoning.substring(0, 100),
+        },
+        `Reasoning too short (need ${minLength}+ chars) - finding may lack proper verification`
+      );
+    }
+
+    // Check for verification keywords
+    const verificationPattern = /verified|checked|confirmed|scanned|✓/i;
+    if (!verificationPattern.test(reasoning)) {
+      this.logger.warn(
+        {
+          filename,
+          location,
+          reasoning: reasoning.substring(0, 150),
+        },
+        "Reasoning lacks verification keywords (verified/checked/confirmed/scanned) - may be low quality"
+      );
+    }
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -427,6 +623,16 @@ export class CopilotProvider implements AIProviderClient {
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        // Validate reasoning quality
+        if (finding.reasoning) {
+          const line = typeof finding.line === "number" ? finding.line : "unknown";
+          this.validateReasoning(reasoning, filename, line);
+        }
+
         findings.push({
           line: typeof finding.line === "number" ? finding.line : 0,
           severity: this.validateSeverity(finding.severity),
@@ -434,9 +640,7 @@ export class CopilotProvider implements AIProviderClient {
           category: this.validateCategory(finding.category),
           message: String(finding.message || ""),
           suggestion: String(finding.suggestion || ""),
-          reasoning: finding.reasoning
-            ? String(finding.reasoning)
-            : "Reasoning not provided by the model.",
+          reasoning,
           isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
         });
       }
@@ -460,14 +664,24 @@ export class CopilotProvider implements AIProviderClient {
 
     if (Array.isArray(data.findings)) {
       for (const finding of data.findings) {
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        // Validate reasoning quality
+        if (finding.reasoning) {
+          const affectedFiles = Array.isArray(finding.affected_files)
+            ? finding.affected_files.map(String).join(", ")
+            : "unknown";
+          this.validateReasoning(reasoning, "cross-file", affectedFiles);
+        }
+
         findings.push({
           severity: this.validateSeverity(finding.severity),
           confidence: this.validateConfidence(finding.confidence),
           category: this.validateCrossFileCategory(finding.category),
           message: String(finding.message || ""),
-          reasoning: finding.reasoning
-            ? String(finding.reasoning)
-            : "Reasoning not provided by the model.",
+          reasoning,
           affectedFiles: Array.isArray(finding.affected_files)
             ? finding.affected_files.map(String)
             : [],
@@ -539,6 +753,16 @@ export class CopilotProvider implements AIProviderClient {
 
       if (Array.isArray(rawFileData.findings)) {
         for (const finding of rawFileData.findings) {
+          const reasoning = finding.reasoning
+            ? String(finding.reasoning)
+            : "Reasoning not provided by the model.";
+
+          // Validate reasoning quality
+          if (finding.reasoning) {
+            const line = typeof finding.line === "number" ? finding.line : "unknown";
+            this.validateReasoning(reasoning, filename, line);
+          }
+
           findings.push({
             line: typeof finding.line === "number" ? finding.line : 0,
             severity: this.validateSeverity(finding.severity),
@@ -546,9 +770,7 @@ export class CopilotProvider implements AIProviderClient {
             category: this.validateCategory(finding.category),
             message: String(finding.message || ""),
             suggestion: String(finding.suggestion || ""),
-            reasoning: finding.reasoning
-              ? String(finding.reasoning)
-              : "Reasoning not provided by the model.",
+            reasoning,
             isPreExisting:
               typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
           });

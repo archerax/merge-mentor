@@ -305,11 +305,17 @@ describe("RepoManager", () => {
       mockFs.readFile.mockImplementation(async (filePath) => {
         const pathStr = String(filePath);
         loadedFiles.push(pathStr);
-        if (pathStr.includes("clean-typescript.instructions.md")) {
+        // Return content for the file when loaded from CONTEXT_FILES path
+        if (
+          pathStr.includes(".github") &&
+          pathStr.includes("instructions") &&
+          pathStr.includes("clean-typescript.instructions.md")
+        ) {
           return "# Clean TypeScript";
         }
         throw new Error("ENOENT");
       });
+      // Mock readdir to also return the same file
       mockFs.readdir.mockResolvedValue([
         { isFile: () => true, name: "clean-typescript.instructions.md" },
       ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);

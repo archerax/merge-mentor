@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Use "node:child_process" to match the import in copilot.ts
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
+  // Mock execSync to return a Windows .exe path so tests expect shell: false
+  execSync: vi.fn(() => "C:\\Program Files\\copilot\\copilot.exe"),
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -96,7 +98,7 @@ describe("CopilotProvider", () => {
 
       expect(result.parsed).toEqual(mockResponse);
       expect(mockSpawn).toHaveBeenCalledWith(
-        "copilot",
+        expect.any(String), // Resolved executable path
         ["-p", shortPrompt],
         expect.objectContaining({ shell: false })
       );
@@ -118,7 +120,7 @@ describe("CopilotProvider", () => {
       const result = await promise;
 
       expect(result.parsed).toEqual(mockResponse);
-      expect(mockFs.mkdir).toHaveBeenCalledWith(expect.stringContaining(".merge-mentor/temp"), {
+      expect(mockFs.mkdir).toHaveBeenCalledWith(expect.stringMatching(/\.merge-mentor[/\\]temp/), {
         recursive: true,
       });
       expect(mockFs.writeFile).toHaveBeenCalledWith(
@@ -127,10 +129,11 @@ describe("CopilotProvider", () => {
         "utf-8"
       );
       expect(mockSpawn).toHaveBeenCalledWith(
-        "copilot",
+        expect.any(String), // Resolved executable path
         expect.arrayContaining([
           "-p",
-          expect.stringMatching(/^Please follow the instructions in @prompt-.*\.md$/),
+          // Now uses absolute path: @C:\\full\\path\\to\\prompt-timestamp-id.md
+          expect.stringMatching(/^Please follow the instructions in @.*prompt-.*\.md$/),
           "--allow-all-tools",
         ]),
         expect.objectContaining({ shell: false })
@@ -175,7 +178,7 @@ describe("CopilotProvider", () => {
       await promise;
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        "copilot",
+        expect.any(String), // Resolved executable path
         expect.arrayContaining(["--model", "gpt-4"]),
         expect.any(Object)
       );

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Use "node:child_process" to match the import in cursor.ts
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
+  execSync: vi.fn(() => "C:\\Program Files\\cursor\\cursor-agent.exe"),
 }));
 
 import { spawn } from "node:child_process";
@@ -312,7 +313,8 @@ describe("CursorProvider", () => {
       const rejection = promise.catch((e) => e);
       await vi.runAllTimersAsync();
       const err = await rejection;
-      expect(err.message).toContain("Cursor CLI is not installed or not in PATH");
+      // Error now comes from process error handler since execSync is mocked to succeed
+      expect(err.message).toContain("CLI execution failed");
     });
 
     it("should throw CursorCliError on process error", async () => {
@@ -391,7 +393,7 @@ describe("CursorProvider", () => {
       await promise;
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        "cursor-agent",
+        expect.any(String), // Resolved executable path
         ["-p", "test prompt", "--model", "gpt-5"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );
@@ -411,7 +413,7 @@ describe("CursorProvider", () => {
       await promise;
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        "cursor-agent",
+        expect.any(String), // Resolved executable path
         ["-p", "test prompt"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );
