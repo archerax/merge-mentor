@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CLI-based providers (Copilot, OpenCode, Cursor) can now read local files directly
   - Simplified codebase by focusing on CLI-based providers only
 
+## [1.12.0] - 2026-01-30
+
+### Added
+- **Streaming Output Display**: Real-time feedback showing the last 5 lines of AI model output during reviews
+  - New `--no-stream` flag to disable streaming output
+  - New `--stream-lines <n>` option to configure number of lines (1-20)
+  - Environment variables `MM_STREAMING_ENABLED` and `MM_STREAMING_LINES` for configuration
+  - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
+
 ## [1.11.0] - 2026-01-14
 
 ### Removed

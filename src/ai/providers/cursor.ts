@@ -250,7 +250,10 @@ export class CursorProvider implements AIProviderClient {
             cwd: options?.workingDirectory,
           });
 
-      proc.stdout?.on("data", (data: Buffer) => chunks.push(data));
+      proc.stdout?.on("data", (data: Buffer) => {
+        chunks.push(data);
+        options?.onStreamData?.(data.toString("utf-8"));
+      });
       proc.stderr?.on("data", (data: Buffer) => errorChunks.push(data));
 
       proc.on("error", (error) => {

@@ -46,6 +46,10 @@ export interface Config {
   readonly reviewRuns: number;
   /** Use specialized review passes (security, logic, performance). */
   readonly specialized: boolean;
+  /** Whether to show streaming output from AI providers. Default: true (if TTY) */
+  readonly streamingEnabled: boolean;
+  /** Number of lines to show in the streaming display. Default: 5 */
+  readonly streamingLines: number;
 }
 
 /**
@@ -116,6 +120,11 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
       (cliOverrides?.skipExistingIssues ?? process.env.MM_SKIP_EXISTING_ISSUES) !== "false",
     reviewRuns,
     specialized,
+    streamingEnabled:
+      cliOverrides?.streamingEnabled ?? process.env.MM_STREAMING_ENABLED !== "false",
+    streamingLines:
+      cliOverrides?.streamingLines ??
+      (process.env.MM_STREAMING_LINES ? Number.parseInt(process.env.MM_STREAMING_LINES, 10) : 5),
   };
 }
 
@@ -141,6 +150,8 @@ export interface CliOverrides {
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
   readonly specialized?: boolean;
+  readonly streamingEnabled?: boolean;
+  readonly streamingLines?: number;
 }
 
 function validateReviewRuns(value: string | undefined): number {

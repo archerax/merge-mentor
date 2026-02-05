@@ -45,6 +45,7 @@ npx merge-mentor review --pr 123
 - **Confidence Filtering** - Only posts high-confidence issues by default
 - **Auto-Resolution** - Detects when issues are fixed and resolves comments
 - **Dry-Run Mode** - Preview changes before posting with detailed markdown reports (default)
+- **Streaming Output** - Real-time feedback showing AI model output during reviews
 
 ## Prerequisites
 
@@ -224,6 +225,10 @@ export LOG_DIR=.merge-mentor/logs  # optional, defaults to .merge-mentor/logs
 
 # Audit logging (enabled by default for security/compliance)
 export AUDIT_LOGGING_ENABLED=true
+
+# Streaming output display
+export MM_STREAMING_ENABLED=true  # Enable/disable streaming output (default: true)
+export MM_STREAMING_LINES=5       # Number of lines in streaming display (default: 5)
 ```
 
 **Or use command-line parameters:**
@@ -370,6 +375,8 @@ merge-mentor review --pr 123 --verbose false
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
+| `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
+| `--stream-lines <n>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES` | `5` |
 
 **GitHub Configuration:**
 | Option | Description | Env Variable |
@@ -448,6 +455,33 @@ merge-mentor review --pr 123 --runs 3 --write
 ```
 
 Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
+
+### Streaming Output Display
+
+During reviews, merge-mentor shows the last N lines of AI model output in real-time:
+
+```bash
+# Default: show 5 lines of streaming output
+merge-mentor review --pr 123
+
+# Disable streaming output
+merge-mentor review --pr 123 --no-stream
+
+# Show more lines (1-20)
+merge-mentor review --pr 123 --stream-lines 10
+```
+
+**Features:**
+- Shows the last N lines of AI model output in real-time
+- Provides visual feedback during long-running reviews
+- Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
+- Can be explicitly disabled with `--no-stream`
+
+**Configuration:**
+```bash
+export MM_STREAMING_ENABLED=true   # Enable/disable (default: true)
+export MM_STREAMING_LINES=5        # Number of lines (default: 5, range: 1-20)
+```
 
 ### Detailed Markdown Reports
 

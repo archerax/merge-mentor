@@ -20,6 +20,8 @@ export interface ReviewOptions {
   verbose: boolean;
   runs?: number;
   specialized?: boolean;
+  stream?: boolean;
+  streamLines?: number;
   // GitHub config
   githubToken?: string;
   githubRepoOwner?: string;
@@ -84,6 +86,8 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     skipExistingIssues: options.skipExistingIssues,
     reviewRuns: options.runs,
     specialized: options.specialized,
+    streamingEnabled: options.stream !== false ? undefined : false,
+    streamingLines: options.streamLines,
   });
   const platform = (options.platform || config.defaultPlatform) as Platform;
 
@@ -140,6 +144,8 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
     specialized: options.specialized ?? config.specialized,
+    streamingEnabled: options.stream !== false && config.streamingEnabled,
+    streamingLines: options.streamLines ?? config.streamingLines,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -404,7 +410,7 @@ program
   .description(
     "Automated code review bot using AI providers (Copilot CLI, OpenCode CLI, Cursor CLI)"
   )
-  .version("1.10.0");
+  .version("1.12.0");
 
 program
   .command("review")
@@ -452,6 +458,19 @@ program
   .option(
     "--skip-existing-issues <bool>",
     "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
+  )
+  // Streaming options
+  .option("--no-stream", "Disable streaming output display")
+  .option(
+    "--stream-lines <number>",
+    "Number of lines in streaming display (1-20). Env: MM_STREAMING_LINES",
+    (value) => {
+      const parsed = parseInt(value, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 20) {
+        throw new Error("--stream-lines must be a number between 1 and 20");
+      }
+      return parsed;
+    }
   )
   .action(async (options: ReviewOptions) => {
     try {

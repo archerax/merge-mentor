@@ -35,6 +35,8 @@ export interface ExecutePromptOptions {
   readonly workingDirectory?: string;
   /** Paths to diff files for @file references. */
   readonly diffFiles?: string[];
+  /** Optional callback invoked with streaming output data chunks. */
+  readonly onStreamData?: (chunk: string) => void;
 }
 
 /**

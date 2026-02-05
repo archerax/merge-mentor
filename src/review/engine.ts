@@ -1,6 +1,7 @@
 import {
   type AIProviderClient,
   type AIProviderType,
+  type AIResponse,
   buildLogicReviewPrompt,
   buildPerformanceReviewPrompt,
   buildSecurityReviewPrompt,
@@ -26,6 +27,7 @@ import type {
   PRFile,
 } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
+import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
@@ -65,6 +67,10 @@ export interface ReviewEngineOptions {
   readonly reviewRuns?: number;
   /** Use specialized review passes (security, logic, performance). */
   readonly specialized?: boolean;
+  /** Enable streaming output display. Default: true (if TTY) */
+  readonly streamingEnabled?: boolean;
+  /** Number of lines in streaming display. Default: 5 */
+  readonly streamingLines?: number;
 }
 
 /**
@@ -81,6 +87,8 @@ export class ReviewEngine {
   private readonly logger = createChildLogger({ component: "ReviewEngine" });
   private readonly auditLogger = getAuditLogger();
   private platformName = "unknown";
+  private readonly streamingEnabled: boolean;
+  private readonly streamingLines: number;
 
   constructor(
     platform: PlatformAdapter,
@@ -121,6 +129,8 @@ export class ReviewEngine {
     this.stateCache = new ReviewStateCache();
     this.repoManager = new RepoManager();
     this.options = resolvedOptions ?? {};
+    this.streamingEnabled = resolvedOptions?.streamingEnabled ?? true;
+    this.streamingLines = resolvedOptions?.streamingLines ?? 5;
     this.platformName = platform.constructor.name.toLowerCase().includes("github")
       ? "github"
       : "azure";
@@ -136,6 +146,30 @@ export class ReviewEngine {
       },
       "ReviewEngine initialized"
     );
+  }
+
+  /**
+   * Creates a streaming display and returns a callback for streaming data.
+   * Returns undefined callback if streaming is disabled.
+   */
+  private createStreamingCallback(context: string): {
+    callback: ((chunk: string) => void) | undefined;
+    finish: () => void;
+  } {
+    if (!this.streamingEnabled) {
+      return { callback: undefined, finish: () => {} };
+    }
+
+    const display = new StreamingDisplay({
+      maxLines: this.streamingLines,
+      title: `🤖 ${context}`,
+      enabled: this.streamingEnabled,
+    });
+
+    return {
+      callback: (chunk: string) => display.push(chunk),
+      finish: () => display.finish(),
+    };
   }
 
   /**
@@ -502,9 +536,13 @@ export class ReviewEngine {
   ): Promise<FileReviewResult[]> {
     this.logger.debug({ type, promptLength: prompt.length }, `Starting ${type} review`);
 
+    const streaming = this.createStreamingCallback(
+      `${type.charAt(0).toUpperCase() + type.slice(1)} review...`
+    );
     try {
       const response = await this.provider.executePrompt(prompt, {
         workingDirectory: repoPath,
+        onStreamData: streaming.callback,
       });
       const results = this.provider.parseBatchedFileReview(response);
 
@@ -524,6 +562,8 @@ export class ReviewEngine {
         `Specialized ${type} review failed`
       );
       return [];
+    } finally {
+      streaming.finish();
     }
   }
 
@@ -723,9 +763,16 @@ export class ReviewEngine {
         "Batched prompt being sent"
       );
 
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: repoPath,
-      });
+      const streaming = this.createStreamingCallback("Reviewing files...");
+      let response: AIResponse;
+      try {
+        response = await this.provider.executePrompt(prompt, {
+          workingDirectory: repoPath,
+          onStreamData: streaming.callback,
+        });
+      } finally {
+        streaming.finish();
+      }
       const results = this.provider.parseBatchedFileReview(response);
 
       // Log individual file results
@@ -932,9 +979,16 @@ export class ReviewEngine {
         repoContext,
         repoPath
       );
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: repoPath,
-      });
+      const streaming = this.createStreamingCallback("Cross-file analysis...");
+      let response: AIResponse;
+      try {
+        response = await this.provider.executePrompt(prompt, {
+          workingDirectory: repoPath,
+          onStreamData: streaming.callback,
+        });
+      } finally {
+        streaming.finish();
+      }
       const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
 

@@ -13,4 +13,5 @@ export { createAIProvider } from "./providerFactory.js";
 export type {
   AIProviderClient,
   AIProviderType,
+  AIResponse,
 } from "./types.js";

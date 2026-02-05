@@ -62,6 +62,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     skipPreExisting: true,
     reviewRuns: 1,
     specialized: false,
+    streamingEnabled: true,
+    streamingLines: 5,
     ...overrides,
   };
 }
