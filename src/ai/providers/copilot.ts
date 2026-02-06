@@ -126,12 +126,6 @@ interface RawBatchedFileReviewResponse {
 }
 
 /**
- * Threshold for prompt length - prompts longer than this will use temp files.
- * CLI arguments have platform-specific limits (typically 8KB-128KB).
- */
-const PROMPT_LENGTH_THRESHOLD = 100;
-
-/**
  * AI provider implementation for GitHub Copilot CLI.
  * Handles retries, JSON parsing, and response validation.
  */
@@ -169,45 +163,41 @@ export class CopilotProvider implements AIProviderClient {
     const promptType = this.inferPromptType(prompt);
     let lastError: Error | null = null;
     let tempFile: string | undefined;
+    let outputFile: string | undefined;
 
     try {
       for (let attempt = 0; attempt < this.maxRetries; attempt++) {
         try {
-          // Use temp file for large prompts to avoid CLI argument length limits
-          if (prompt.length > PROMPT_LENGTH_THRESHOLD) {
-            // Store temp file inside the workspace if provided, so Copilot CLI can access it
-            tempFile = await this.createTempPromptFile(prompt, options?.workingDirectory);
-            // Use relative path if inside workspace, otherwise absolute path
-            const fileRef = options?.workingDirectory
-              ? `.merge-mentor/temp/${path.basename(tempFile)}`
-              : tempFile;
-            const shortPrompt = `Please follow the instructions in @${fileRef}`;
-            const { stdout, stderr } = await this.runCli(shortPrompt, options, tempFile);
-            const parsed = this.parseJsonResponse(stdout);
-            const tokenUsage = this.parseTokenUsage(stderr);
-            this.auditLogger.logAIProviderExecution(
-              "copilot",
-              promptType,
-              this.model,
-              "success",
-              undefined,
-              tokenUsage
-            );
-            return { raw: stdout, parsed, tokenUsage };
-          } else {
-            const { stdout, stderr } = await this.runCli(prompt, options);
-            const parsed = this.parseJsonResponse(stdout);
-            const tokenUsage = this.parseTokenUsage(stderr);
-            this.auditLogger.logAIProviderExecution(
-              "copilot",
-              promptType,
-              this.model,
-              "success",
-              undefined,
-              tokenUsage
-            );
-            return { raw: stdout, parsed, tokenUsage };
-          }
+          // Store prompt in temp file and have agent write JSON to output file
+          // This allows the agent to think, explore, and use tools freely
+          tempFile = await this.createTempPromptFile(prompt, options?.workingDirectory);
+          outputFile = await this.createTempOutputFile(options?.workingDirectory);
+
+          // Use relative path if inside workspace, otherwise absolute path
+          const fileRef = options?.workingDirectory
+            ? `.merge-mentor/temp/${path.basename(tempFile)}`
+            : tempFile;
+          const outputRef = options?.workingDirectory
+            ? `.merge-mentor/temp/${path.basename(outputFile)}`
+            : outputFile;
+
+          const shortPrompt = `Please follow the instructions in @${fileRef} and write your JSON output to ${outputRef}. You may use tools to explore and analyze, but your final JSON response must be written to the output file.`;
+          const { stdout, stderr } = await this.runCli(shortPrompt, options, tempFile);
+
+          // Read JSON from output file instead of parsing stdout
+          const jsonContent = await this.readOutputFile(outputFile);
+          const parsed = this.parseJsonResponse(jsonContent);
+          const tokenUsage = this.parseTokenUsage(stderr);
+
+          this.auditLogger.logAIProviderExecution(
+            "copilot",
+            promptType,
+            this.model,
+            "success",
+            undefined,
+            tokenUsage
+          );
+          return { raw: stdout, parsed, tokenUsage };
         } catch (error) {
           lastError = error as Error;
           this.logger.warn(
@@ -237,9 +227,12 @@ export class CopilotProvider implements AIProviderClient {
         lastError ?? undefined
       );
     } finally {
-      // Clean up temp file
+      // Clean up temp files
       if (tempFile) {
         await this.deleteTempFile(tempFile);
+      }
+      if (outputFile) {
+        await this.deleteTempFile(outputFile);
       }
     }
   }
@@ -266,6 +259,41 @@ export class CopilotProvider implements AIProviderClient {
     const filepath = path.join(tempDir, filename);
     await fs.writeFile(filepath, prompt, "utf-8");
     return filepath;
+  }
+
+  /**
+   * Creates a temporary output file for the agent to write JSON results.
+   * Uses the same directory logic as prompt files.
+   */
+  private async createTempOutputFile(workspaceDir?: string): Promise<string> {
+    const tempDir = workspaceDir
+      ? path.join(workspaceDir, ".merge-mentor", "temp")
+      : this.defaultTempDir;
+
+    await fs.mkdir(tempDir, { recursive: true });
+    const filename = `output-${Date.now()}-${Math.random().toString(36).substring(7)}.json`;
+    const filepath = path.join(tempDir, filename);
+    // Create empty file
+    await fs.writeFile(filepath, "", "utf-8");
+    return filepath;
+  }
+
+  /**
+   * Reads JSON content from the output file written by the agent.
+   */
+  private async readOutputFile(filepath: string): Promise<string> {
+    try {
+      const content = await fs.readFile(filepath, "utf-8");
+      if (!content || content.trim().length === 0) {
+        throw new Error("Output file is empty");
+      }
+      return content;
+    } catch (error) {
+      throw new CopilotCliError(
+        `Failed to read output file: ${(error as Error).message}`,
+        error as Error
+      );
+    }
   }
 
   private async deleteTempFile(filepath: string): Promise<void> {

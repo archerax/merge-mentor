@@ -377,9 +377,7 @@ export function buildBatchedFileReviewPrompt(
     .map((f) => {
       // When repoPath is provided, use @file: syntax with relative path from repo root
       // Otherwise, just use @filename for files in current directory
-      const fileRef = repoPath 
-        ? `@file:.merge-mentor/diffs/${f.diffPath}`
-        : `@${f.diffPath}`;
+      const fileRef = repoPath ? `@file:.merge-mentor/diffs/${f.diffPath}` : `@${f.diffPath}`;
       return `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → ${fileRef}`;
     })
     .join("\n");

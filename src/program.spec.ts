@@ -61,7 +61,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     copilotModel: "gpt-4",
     skipPreExisting: true,
     reviewRuns: 1,
-    specialized: false,
+    reviewType: "general",
     streamingEnabled: true,
     streamingLines: 5,
     ...overrides,
@@ -487,7 +487,7 @@ describe("CLI", () => {
         expect.stringContaining("Detailed markdown report generated:")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Github-test-owner-test-repo-PR42-review-report.md")
+        expect.stringContaining("Github-test-owner-test-repo-PR42-general-review-report.md")
       );
     });
 
@@ -517,7 +517,7 @@ describe("CLI", () => {
         expect.stringContaining("Detailed markdown report generated:")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Github-test-owner-test-repo-PR42-review-report.md")
+        expect.stringContaining("Github-test-owner-test-repo-PR42-general-review-report.md")
       );
     });
 

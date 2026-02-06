@@ -10,6 +10,9 @@ dotenv.config({ path: path.join(process.cwd(), ".env"), quiet: true });
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
 
+/** Supported review types for specialized analysis. */
+export type ReviewType = "general" | "testing" | "security" | "performance";
+
 /** GitHub-specific configuration. */
 export interface GitHubConfig {
   readonly token: string;
@@ -44,8 +47,8 @@ export interface Config {
   readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
-  /** Use specialized review passes (security, logic, performance). */
-  readonly specialized: boolean;
+  /** Type of review to perform (general, testing, security, performance). Default: general */
+  readonly reviewType: ReviewType;
   /** Whether to show streaming output from AI providers. Default: true (if TTY) */
   readonly streamingEnabled: boolean;
   /** Number of lines to show in the streaming display. Default: 5 */
@@ -91,7 +94,7 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     cliOverrides?.reviewRuns?.toString() ?? process.env.MM_REVIEW_RUNS
   );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? process.env.MM_AI_PROVIDER);
-  const specialized = validateSpecialized(cliOverrides?.specialized, process.env.MM_SPECIALIZED);
+  const reviewType = validateReviewType(cliOverrides?.reviewType ?? process.env.MM_REVIEW_TYPE);
 
   return {
     defaultPlatform: ((cliOverrides?.platform ?? process.env.MM_PLATFORM) as Platform) || "github",
@@ -119,12 +122,12 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? process.env.MM_SKIP_EXISTING_ISSUES) !== "false",
     reviewRuns,
-    specialized,
+    reviewType,
     streamingEnabled:
       cliOverrides?.streamingEnabled ?? process.env.MM_STREAMING_ENABLED !== "false",
     streamingLines:
       cliOverrides?.streamingLines ??
-      (process.env.MM_STREAMING_LINES ? Number.parseInt(process.env.MM_STREAMING_LINES, 10) : 5),
+      (process.env.MM_STREAMING_LINES ? Number.parseInt(process.env.MM_STREAMING_LINES, 10) : 9),
   };
 }
 
@@ -149,7 +152,7 @@ export interface CliOverrides {
   readonly cursorTimeout?: number;
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
-  readonly specialized?: boolean;
+  readonly reviewType?: string;
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
 }
@@ -173,14 +176,12 @@ function validateAIProvider(value: string | undefined): AIProviderType {
   return "copilot"; // Default to copilot for backward compatibility
 }
 
-function validateSpecialized(cliValue: boolean | undefined, envValue: string | undefined): boolean {
-  if (cliValue !== undefined) {
-    return cliValue;
+function validateReviewType(value: string | undefined): ReviewType {
+  const validTypes: ReviewType[] = ["general", "testing", "security", "performance"];
+  if (value && validTypes.includes(value as ReviewType)) {
+    return value as ReviewType;
   }
-  if (envValue !== undefined) {
-    return envValue.toLowerCase() === "true";
-  }
-  return false; // Default to false
+  return "general"; // Default to general
 }
 
 /**

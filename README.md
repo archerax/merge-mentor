@@ -38,6 +38,7 @@ npx merge-mentor review --pr 123
 - **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
+- **Specialist Review Types** - Focused reviews for testing, security, or performance concerns
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
@@ -46,6 +47,7 @@ npx merge-mentor review --pr 123
 - **Auto-Resolution** - Detects when issues are fixed and resolves comments
 - **Dry-Run Mode** - Preview changes before posting with detailed markdown reports (default)
 - **Streaming Output** - Real-time feedback showing AI model output during reviews
+- **Extensible Architecture** - Easy to add new specialist review types (see [EXTENDING.md](./EXTENDING.md))
 
 ## Prerequisites
 
@@ -216,6 +218,9 @@ export MM_POST_RESOLUTION_COMMENTS=true
 # Multi-run mode
 export MM_REVIEW_RUNS=1  # 1-5 runs
 
+# Review type (specialist reviews)
+export MM_REVIEW_TYPE=general  # general, testing, security, or performance
+
 # Bot identifier
 export MM_COMMENT_IDENTIFIER="[merge-mentor]"
 
@@ -238,6 +243,7 @@ merge-mentor review --pr 123 \
   --skip-existing-issues true \
   --post-resolution-comments true \
   --runs 3 \
+  --review-type testing \
   --comment-identifier "[custom-bot]"
 ```
 
@@ -360,8 +366,64 @@ merge-mentor review --pr 456 --platform azure --write
 # Multiple review passes for thoroughness
 merge-mentor review --pr 123 --runs 3 --write
 
+# Testing-focused review
+merge-mentor review --pr 123 --review-type testing --write
+
+# Security-focused review
+merge-mentor review --pr 123 --review-type security --write
+
+# Performance-focused review
+merge-mentor review --pr 123 --review-type performance --write
+
 # Quiet mode
 merge-mentor review --pr 123 --verbose false
+```
+
+### Common Use Cases
+
+**1. Standard Development Review:**
+```bash
+# General review for regular PRs
+merge-mentor review --pr 123 --write
+```
+
+**2. Test Coverage Review:**
+```bash
+# Focus on test quality when adding/modifying tests
+merge-mentor review --pr 456 --review-type testing --write
+
+# Thorough testing analysis with 3 passes
+merge-mentor review --pr 456 --review-type testing --runs 3 --write
+```
+
+**3. Security-Sensitive Changes:**
+```bash
+# Security review for authentication or data handling
+merge-mentor review --pr 789 --review-type security --write
+
+# Comprehensive security analysis with 5 passes
+merge-mentor review --pr 789 --review-type security --runs 5 --write
+```
+
+**4. Performance-Critical Code:**
+```bash
+# Performance review for optimization work
+merge-mentor review --pr 321 --review-type performance --write
+
+# Combined with multiple passes for thorough analysis
+merge-mentor review --pr 321 --review-type performance --runs 3 --write
+```
+
+**5. Preview Before Posting:**
+```bash
+# Dry-run generates detailed markdown report without posting
+merge-mentor review --pr 123 --review-type testing
+
+# Review the report in .merge-mentor/reports/
+cat .merge-mentor/reports/Github-myrepo-PR123-testing-review-report.md
+
+# Post if satisfied
+merge-mentor review --pr 123 --review-type testing --write
 ```
 
 ### Command Options
@@ -372,6 +434,7 @@ merge-mentor review --pr 123 --verbose false
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|opencode\|cursor\|openai>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--review-type <type>` | Review type: general, testing, security, performance | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
@@ -455,6 +518,148 @@ merge-mentor review --pr 123 --runs 3 --write
 ```
 
 Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
+
+### Specialist Review Types
+
+Focus reviews on specific concerns with the `--review-type` flag:
+
+```bash
+# General review (default) - comprehensive analysis
+merge-mentor review --pr 123 --write
+
+# Testing-focused review - test coverage and quality
+merge-mentor review --pr 123 --review-type testing --write
+
+# Security-focused review - vulnerabilities and threats
+merge-mentor review --pr 123 --review-type security --write
+
+# Performance-focused review - optimization opportunities
+merge-mentor review --pr 123 --review-type performance --write
+```
+
+**Available Review Types:**
+
+- **`general`** (default): Comprehensive review covering all aspects - bugs, security, performance, quality, and documentation
+- **`testing`**: Testing specialist focused exclusively on test quality and coverage
+- **`security`**: Security specialist focused exclusively on vulnerabilities and threats
+- **`performance`**: Performance specialist focused exclusively on efficiency and optimization
+
+**When to Use Specialist Reviews:**
+
+| Review Type | Use When | What It Checks |
+|-------------|----------|----------------|
+| **testing** | Adding/modifying tests or testable code | Test coverage, test quality, assertion accuracy, naming conventions, mock usage |
+| **security** | Handling sensitive data or auth flows | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
+| **performance** | Performance-critical paths or scaling concerns | Algorithm efficiency, resource usage, caching opportunities, database queries |
+| **general** | Standard development or unsure what to check | All aspects: bugs, security, performance, quality, documentation |
+
+#### Testing Review Deep Dive
+
+The testing specialist analyzes four key areas:
+
+**1. Test Coverage Analysis**
+- Verifies new/modified functions have corresponding tests
+- Checks edge cases (null, empty, invalid input)
+- Ensures error paths are tested
+- Validates all public methods have tests
+- Confirms conditional branches are covered
+- Checks async operations have success and failure tests
+
+**2. Test Naming Convention Validation**
+
+Language-specific naming patterns:
+
+**C# Convention:**
+```csharp
+// Pattern: MethodName_Scenario_ExpectedBehavior
+[Fact]
+public void GetUser_InvalidId_ThrowsException()
+{
+    // Arrange
+    var service = new UserService();
+    
+    // Act & Assert
+    Assert.Throws<NotFoundException>(() => service.GetUser(-1));
+}
+
+// Test class naming: UserService → UserServiceTests
+```
+
+**TypeScript Convention:**
+```typescript
+// Pattern: describe/it blocks with behavior descriptions
+describe('UserService', () => {
+  describe('getUser', () => {
+    it('should throw error when id is invalid', () => {
+      const service = new UserService();
+      
+      expect(() => service.getUser(-1)).toThrow(NotFoundException);
+    });
+  });
+});
+
+// Test file naming: userService.ts → userService.test.ts or userService.spec.ts
+```
+
+**3. Assertion Verification**
+- Assertions match test names and behavior
+- Multiple assertions focus on same logical concept
+- Assertions verify behavior outcomes, not implementation details
+- Sufficient assertions to prove behavior
+- Appropriate matchers used (toBe vs toEqual, specific vs generic)
+
+**4. Mock Framework Usage**
+
+**C# Mocking Best Practices:**
+```csharp
+// Using Moq
+var mockRepository = new Mock<IUserRepository>();
+mockRepository.Setup(r => r.GetUser(It.IsAny<int>()))
+    .Returns(new User { Id = 1, Name = "Alice" });
+
+// Using NSubstitute
+var mockRepository = Substitute.For<IUserRepository>();
+mockRepository.GetUser(Arg.Any<int>())
+    .Returns(new User { Id = 1, Name = "Alice" });
+```
+
+**TypeScript Mocking Best Practices:**
+```typescript
+// Using Vitest
+import { vi } from 'vitest';
+
+const mockRepository = {
+  getUser: vi.fn().mockResolvedValue({ id: 1, name: 'Alice' })
+};
+
+// Verify interactions
+expect(mockRepository.getUser).toHaveBeenCalledWith(1);
+```
+
+**Configuration:**
+```bash
+# Environment variable
+export MM_REVIEW_TYPE=testing
+
+# Or CLI parameter
+merge-mentor review --pr 123 --review-type testing --write
+```
+
+**Example Use Cases:**
+
+```bash
+# Review test changes in a PR
+merge-mentor review --pr 456 --review-type testing --write
+
+# Thorough testing analysis with multiple passes
+merge-mentor review --pr 456 --review-type testing --runs 3 --write
+
+# Combined with confidence filtering for critical test gaps only
+merge-mentor review --pr 456 \
+  --review-type testing \
+  --min-comment-confidence high \
+  --write
+```
 
 ### Streaming Output Display
 
@@ -638,6 +843,17 @@ export OPENAI_TIMEOUT_MS=300000  # 5 minutes (for OpenAI)
 ### Exit Codes
 - `0` - Success or configuration issue
 - `1` - Review failed or critical issues found
+
+## Extending merge-mentor
+
+Want to add a new specialist review type (e.g., accessibility, internationalization, API design)?
+
+See [EXTENDING.md](./EXTENDING.md) for a comprehensive guide including:
+- Architecture patterns
+- Step-by-step implementation guide
+- Complete code examples
+- Testing strategies
+- Best practices and common pitfalls
 
 ## License
 

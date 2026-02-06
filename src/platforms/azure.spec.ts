@@ -56,7 +56,7 @@ function createTestConfig(): Config {
     aiProvider: "copilot",
     skipPreExisting: true,
     reviewRuns: 1,
-    specialized: false,
+    reviewType: "general",
     streamingEnabled: true,
     streamingLines: 5,
   };

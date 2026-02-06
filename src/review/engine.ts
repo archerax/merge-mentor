@@ -2,9 +2,6 @@ import {
   type AIProviderClient,
   type AIProviderType,
   type AIResponse,
-  buildLogicReviewPrompt,
-  buildPerformanceReviewPrompt,
-  buildSecurityReviewPrompt,
   createAIProvider,
 } from "../ai/index.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
@@ -13,6 +10,15 @@ import {
   buildCrossFilePrompt,
   buildFilesSummary,
 } from "../ai/prompts/prompts.js";
+import {
+  buildTestingCrossFilePrompt,
+  buildTestingFileReviewPrompt,
+} from "../ai/prompts/specialists/testing.js";
+import type {
+  SupportedLanguage,
+  TestingCrossFileContext,
+  TestingReviewContext,
+} from "../ai/prompts/specialists/types.js";
 import { getAuditLogger } from "../audit/index.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { ValidationError } from "../errors/index.js";
@@ -27,7 +33,9 @@ import type {
   PRFile,
 } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
+import { detectLanguage } from "../utils/languageDetector.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
+import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
@@ -65,8 +73,8 @@ export interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Number of review runs (1-5). Multiple runs aggregate findings. */
   readonly reviewRuns?: number;
-  /** Use specialized review passes (security, logic, performance). */
-  readonly specialized?: boolean;
+  /** Type of review to perform (general, testing, security, performance). Default: general */
+  readonly reviewType?: string;
   /** Enable streaming output display. Default: true (if TTY) */
   readonly streamingEnabled?: boolean;
   /** Number of lines in streaming display. Default: 5 */
@@ -142,7 +150,7 @@ export class ReviewEngine {
         dryRun: resolvedOptions?.dryRun,
         skipPreExisting: resolvedOptions?.skipPreExisting,
         reviewRuns: resolvedOptions?.reviewRuns ?? 1,
-        specialized: resolvedOptions?.specialized ?? false,
+        reviewType: resolvedOptions?.reviewType ?? "general",
       },
       "ReviewEngine initialized"
     );
@@ -199,10 +207,10 @@ export class ReviewEngine {
     const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
 
     const runs = this.options.reviewRuns ?? 1;
-    const specialized = this.options.specialized ?? false;
-    this.logger.info({ prNumber, prIdentifier, runs, specialized }, "Starting PR review");
+    const reviewType = this.options.reviewType ?? "general";
+    this.logger.info({ prNumber, prIdentifier, runs, reviewType }, "Starting PR review");
     this.log(`Starting review of PR #${prNumber}...`);
-    this.auditLogger.logReviewStart(prNumber, this.platformName, runs);
+    this.auditLogger.logReviewStart(prNumber, this.platformName, runs, reviewType);
 
     const { prDetails, files } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
@@ -215,31 +223,7 @@ export class ReviewEngine {
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
 
-    if (specialized) {
-      // Specialized mode - run parallel security, logic, performance reviews
-      const reviewData = await this.reviewFilesWithSpecialization(
-        prIdentifier,
-        files,
-        existingComments,
-        repoContext?.content,
-        repoContext?.repoPath
-      );
-      fileResults = reviewData.fileResults;
-      filesSkipped = reviewData.filesSkipped;
-
-      // Validate line numbers against actual diff content
-      fileResults = this.validateLineNumbers(fileResults, files);
-
-      // Cross-file analysis
-      crossFileResult = await this.performCrossFileAnalysis(
-        prDetails,
-        files,
-        fileResults,
-        existingComments,
-        repoContext?.content,
-        repoContext?.repoPath
-      );
-    } else if (runs === 1) {
+    if (runs === 1) {
       // Single run - use existing logic
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -439,134 +423,6 @@ export class ReviewEngine {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Reviews files using specialized parallel passes (security, logic, performance).
-   * Each specialized prompt focuses on a single concern for more thorough analysis.
-   */
-  private async reviewFilesWithSpecialization(
-    prIdentifier: string,
-    files: PRFile[],
-    _existingComments: readonly ExistingComment[],
-    repoContext?: string,
-    repoPath?: string
-  ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
-    this.log("Running specialized review passes (security, logic, performance)...");
-    this.logger.info({ prIdentifier }, "Starting specialized review mode");
-
-    // Filter to reviewable files (same as reviewFiles method)
-    const reviewableFiles = files.filter((f) => !this.shouldSkipFile(f));
-
-    if (reviewableFiles.length === 0) {
-      this.log("No reviewable files found");
-      // filesSkipped=0 because no files were cached; files were simply not reviewable
-      return { fileResults: [], filesSkipped: 0 };
-    }
-
-    const filesWithPatches = reviewableFiles.filter((f) => f.patch);
-    if (filesWithPatches.length === 0) {
-      return {
-        fileResults: reviewableFiles.map((f) => ({ filename: f.filename, findings: [] })),
-        // filesSkipped=0 because no files were cached
-        filesSkipped: 0,
-      };
-    }
-
-    // Store diffs for specialized reviews
-    const diffStorage = new DiffStorage();
-    const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
-
-    this.logger.debug(
-      { prIdentifier, fileCount: manifest.files.length, diffDir },
-      "Stored diffs for specialized review"
-    );
-
-    // Copy diffs to repo directory for AI access
-    await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
-
-    // Build specialized prompts
-    const securityPrompt = buildSecurityReviewPrompt(manifest, repoContext, repoPath);
-    const logicPrompt = buildLogicReviewPrompt(manifest, repoContext, repoPath);
-    const performancePrompt = buildPerformanceReviewPrompt(manifest, repoContext, repoPath);
-
-    // Run three parallel reviews
-    this.log("  Running security, logic, and performance reviews in parallel...");
-    const [securityResults, logicResults, performanceResults] = await Promise.all([
-      this.executeSpecializedReview("security", securityPrompt, repoPath),
-      this.executeSpecializedReview("logic", logicPrompt, repoPath),
-      this.executeSpecializedReview("performance", performancePrompt, repoPath),
-    ]);
-
-    // Log results from each pass
-    const securityFindings = securityResults.reduce((sum, r) => sum + r.findings.length, 0);
-    const logicFindings = logicResults.reduce((sum, r) => sum + r.findings.length, 0);
-    const performanceFindings = performanceResults.reduce((sum, r) => sum + r.findings.length, 0);
-
-    this.log(`  Security: ${securityFindings} findings`);
-    this.log(`  Logic: ${logicFindings} findings`);
-    this.log(`  Performance: ${performanceFindings} findings`);
-
-    // Merge and deduplicate results
-    const aggregator = new FindingAggregator();
-    const merged = aggregator.aggregateFileFindings([
-      securityResults,
-      logicResults,
-      performanceResults,
-    ]);
-
-    const totalFindings = merged.reduce((sum, r) => sum + r.findings.length, 0);
-    this.log(`  Total unique findings: ${totalFindings}`);
-
-    // Clean up diffs
-    await diffStorage.cleanup(prIdentifier);
-
-    return {
-      fileResults: merged,
-      // filesSkipped=0 because specialized mode doesn't use caching
-      filesSkipped: 0,
-    };
-  }
-
-  /**
-   * Executes a single specialized review pass.
-   */
-  private async executeSpecializedReview(
-    type: "security" | "logic" | "performance",
-    prompt: string,
-    repoPath?: string
-  ): Promise<FileReviewResult[]> {
-    this.logger.debug({ type, promptLength: prompt.length }, `Starting ${type} review`);
-
-    const streaming = this.createStreamingCallback(
-      `${type.charAt(0).toUpperCase() + type.slice(1)} review...`
-    );
-    try {
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: repoPath,
-        onStreamData: streaming.callback,
-      });
-      const results = this.provider.parseBatchedFileReview(response);
-
-      this.logger.info(
-        {
-          type,
-          filesReviewed: results.length,
-          totalFindings: results.reduce((sum, r) => sum + r.findings.length, 0),
-        },
-        `Specialized ${type} review completed`
-      );
-
-      return results;
-    } catch (error) {
-      this.logger.error(
-        { type, error: (error as Error).message },
-        `Specialized ${type} review failed`
-      );
-      return [];
-    } finally {
-      streaming.finish();
-    }
-  }
-
   private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {
     this.log("Fetching PR details...");
     this.logger.debug({ prNumber }, "Fetching PR data");
@@ -710,6 +566,7 @@ export class ReviewEngine {
   /**
    * Reviews multiple files in a single batched AI call.
    * Stores diffs to disk and asks the AI to review all files at once.
+   * Supports both general and specialist review types.
    */
   private async reviewFilesBatched(
     prIdentifier: string,
@@ -730,26 +587,61 @@ export class ReviewEngine {
     const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
+    const reviewType = this.options.reviewType ?? "general";
+
     try {
       // Store diffs to disk
       const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
       this.logger.info(
-        { prNumber, fileCount: manifest.files.length, diffDir },
+        { prNumber, fileCount: manifest.files.length, diffDir, reviewType },
         "Stored diffs for batched review"
       );
 
-      // Build batched prompt with repo context
-      const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildBatchedFileReviewPrompt(
-        manifest,
-        commentsContext || undefined,
-        repoContext,
-        repoPath
-      );
-
-      this.logger.debug("Copying diffs to repo's .merge-mentor directory for Copilot access");
-      // Copy diff files to repo's .merge-mentor directory so Copilot CLI can access them
+      // Copy diff files to repo's .merge-mentor directory so AI can access them
+      this.logger.debug("Copying diffs to repo's .merge-mentor directory for AI access");
       await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
+
+      // Build prompt based on review type
+      const commentsContext = formatExistingCommentsContext(existingComments);
+      let prompt: string;
+
+      if (reviewType === "testing") {
+        // Get all changed files for context
+        const allChangedFiles = filesWithPatches.map((f) => f.filename);
+
+        // For testing reviews, we need to build context with test file mappings
+        // Detect language from the first non-test file
+        const productionFiles = allChangedFiles.filter((f) => !isTestFile(f));
+        const language: SupportedLanguage =
+          productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
+
+        // Find test files for production files
+        const testFiles = productionFiles
+          .map((f) => findTestFileForProduction(f, allChangedFiles))
+          .filter((f): f is string => f !== undefined);
+
+        const context: TestingReviewContext = {
+          filename: manifest.files.map((f) => f.filename).join(", "),
+          testFiles,
+          language,
+          allChangedFiles,
+        };
+
+        prompt = buildTestingFileReviewPrompt(manifest, context, repoContext, repoPath);
+        this.logger.info(
+          { language, testFilesFound: testFiles.length, productionFiles: productionFiles.length },
+          "Built testing specialist prompt"
+        );
+      } else {
+        // General review
+        prompt = buildBatchedFileReviewPrompt(
+          manifest,
+          commentsContext || undefined,
+          repoContext,
+          repoPath
+        );
+        this.logger.info("Built general review prompt");
+      }
 
       // Single AI call for all files
       this.logger.debug(
@@ -759,6 +651,7 @@ export class ReviewEngine {
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
           hasRepoContext: !!repoContext,
           hasRepoPath: !!repoPath,
+          reviewType,
         },
         "Batched prompt being sent"
       );
@@ -968,17 +861,53 @@ export class ReviewEngine {
     this.log("Performing cross-file analysis...");
     this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
 
+    const reviewType = this.options.reviewType ?? "general";
+
     try {
       const filesSummary = buildFilesSummary(files);
       const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildCrossFilePrompt(
-        prDetails,
-        filesSummary,
-        fileResults,
-        commentsContext,
-        repoContext,
-        repoPath
-      );
+      let prompt: string;
+
+      if (reviewType === "testing") {
+        // Build production-to-test mapping for testing specialist
+        const allChangedFiles = files.map((f) => f.filename);
+        const productionToTestMap = new Map<string, string | undefined>();
+
+        for (const filename of allChangedFiles) {
+          if (!isTestFile(filename)) {
+            const testFile = findTestFileForProduction(filename, allChangedFiles);
+            productionToTestMap.set(filename, testFile);
+          }
+        }
+
+        const context: TestingCrossFileContext = {
+          fileReviewResults: fileResults,
+          productionToTestMap,
+          allChangedFiles,
+          filesSummary,
+        };
+
+        prompt = buildTestingCrossFilePrompt(prDetails, context, repoContext, repoPath);
+        this.logger.info(
+          {
+            productionFiles: productionToTestMap.size,
+            mappedTests: Array.from(productionToTestMap.values()).filter((v) => v).length,
+          },
+          "Built testing specialist cross-file prompt"
+        );
+      } else {
+        // General review
+        prompt = buildCrossFilePrompt(
+          prDetails,
+          filesSummary,
+          fileResults,
+          commentsContext,
+          repoContext,
+          repoPath
+        );
+        this.logger.info("Built general cross-file prompt");
+      }
+
       const streaming = this.createStreamingCallback("Cross-file analysis...");
       let response: AIResponse;
       try {

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Extensibility Documentation** - Comprehensive guide for adding new specialist review types:
+  - Created `EXTENDING.md` with step-by-step instructions for implementing new specialists
+  - Complete code examples for both complex (with custom context) and simple specialists
+  - Architecture patterns and data flow documentation
+  - Testing strategies (unit, integration, and manual testing)
+  - Implementation checklist with 18 verification items
+  - Best practices and common pitfalls
+  - Decision framework for when to add new specialist types
+- **README Enhancement** - Added "Extensible Architecture" feature and "Extending merge-mentor" section linking to EXTENDING.md
+- **Specialist Review Types** - New `--review-type` flag for focused reviews on specific concerns:
+  - `general` (default): Comprehensive review covering all aspects
+  - `testing`: Testing specialist focused on test coverage, quality, and naming conventions
+  - `security`: Security specialist focused on vulnerabilities and threats
+  - `performance`: Performance specialist focused on optimization opportunities
+- **Testing Review Capabilities** - Specialized testing reviews include:
+  - **Test Coverage Analysis**: Verifies functions have tests, edge cases covered, error paths tested
+  - **Naming Convention Validation**: Language-specific patterns (C#: `MethodName_Scenario_ExpectedBehavior`, TypeScript: `describe/it` blocks)
+  - **Assertion Verification**: Ensures assertions match test behavior and use appropriate matchers
+  - **Mock Framework Usage**: Validates proper mocking patterns (C#: Moq/NSubstitute, TypeScript: Vitest/Jest)
+- **Environment Variable Configuration** - New `MM_REVIEW_TYPE` environment variable to set default review type
+
+### Removed
+- **BREAKING**: Removed `--specialized` flag
+  - The `--specialized` flag has been removed in favor of the more explicit `--review-type` flag
+  - Migration: Use `--review-type testing` instead of `--specialized` or `--specialized testing`
+  
+### Migration Guide
+
+**Before (deprecated):**
+```bash
+# Old specialized flag
+merge-mentor review --pr 123 --specialized --write
+merge-mentor review --pr 123 --specialized testing --write
+```
+
+**After (current):**
+```bash
+# New review-type flag
+merge-mentor review --pr 123 --review-type testing --write
+merge-mentor review --pr 123 --review-type security --write
+merge-mentor review --pr 123 --review-type performance --write
+
+# General review (default, same as before with no flag)
+merge-mentor review --pr 123 --write
+```
+
+**Environment Variable Migration:**
+```bash
+# Old (not supported)
+export SPECIALIZED_REVIEW=testing
+
+# New
+export MM_REVIEW_TYPE=testing
+```
+
 ### Removed
 - **BREAKING**: Removed OpenAI API provider support
   - Removed `--provider openai` option and all OpenAI-specific CLI options

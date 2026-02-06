@@ -293,13 +293,13 @@ export class AuditLogger {
   /**
    * Logs review start.
    */
-  logReviewStart(prNumber: number, platform: string, runs: number): void {
+  logReviewStart(prNumber: number, platform: string, runs: number, reviewType?: string): void {
     this.logEvent(
       "review.start",
       { type: "review", id: `pr-${prNumber}`, details: { platform } },
       `Start review of PR #${prNumber}`,
       "success",
-      { prNumber, platform, runs }
+      { prNumber, platform, runs, reviewType: reviewType ?? "general" }
     );
   }
 

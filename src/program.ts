@@ -19,7 +19,7 @@ export interface ReviewOptions {
   write: boolean;
   verbose: boolean;
   runs?: number;
-  specialized?: boolean;
+  reviewType?: string;
   stream?: boolean;
   streamLines?: number;
   // GitHub config
@@ -85,7 +85,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     cursorTimeout: options.cursorTimeout,
     skipExistingIssues: options.skipExistingIssues,
     reviewRuns: options.runs,
-    specialized: options.specialized,
+    reviewType: options.reviewType,
     streamingEnabled: options.stream !== false ? undefined : false,
     streamingLines: options.streamLines,
   });
@@ -143,7 +143,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     copilotToken: config.copilotToken,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
-    specialized: options.specialized ?? config.specialized,
+    reviewType: options.reviewType ?? config.reviewType,
     streamingEnabled: options.stream !== false && config.streamingEnabled,
     streamingLines: options.streamLines ?? config.streamingLines,
   });
@@ -164,7 +164,8 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 export function generateMarkdownReport(
   result: ReviewResult,
   aiProvider: AIProviderType,
-  dryRun: boolean
+  dryRun: boolean,
+  reviewType = "general"
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
@@ -175,6 +176,7 @@ export function generateMarkdownReport(
   // Header with PR details
   report += `**Generated:** ${date}  \n`;
   report += `**AI Provider:** ${aiProvider}  \n`;
+  report += `**Review Type:** ${reviewType}  \n`;
   report += `**PR Title:** ${result.prDetails.title}  \n`;
   report += `**Author:** ${result.prDetails.author}  \n`;
   report += `**Branch:** \`${result.prDetails.headBranch}\` → \`${result.prDetails.baseBranch}\`  \n\n`;
@@ -335,7 +337,8 @@ export function displayResults(
   dryRun: boolean,
   adapter?: PlatformAdapter,
   platform?: Platform,
-  aiProvider?: AIProviderType
+  aiProvider?: AIProviderType,
+  reviewType = "general"
 ): void {
   console.log("=".repeat(60));
   console.log("📊 Review Complete");
@@ -343,6 +346,7 @@ export function displayResults(
   console.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
   console.log(`Author: ${result.prDetails.author}`);
   console.log(`Branch: ${result.prDetails.headBranch} → ${result.prDetails.baseBranch}`);
+  console.log(`Review Type: ${reviewType}`);
   console.log("");
   console.log(`Files Reviewed: ${result.filesReviewed}`);
   console.log(
@@ -370,13 +374,13 @@ export function displayResults(
   // Generate and save markdown report
   if (aiProvider && adapter && platform) {
     try {
-      const markdownReport = generateMarkdownReport(result, aiProvider, dryRun);
+      const markdownReport = generateMarkdownReport(result, aiProvider, dryRun, reviewType);
       const reportDir = join(process.cwd(), ".merge-mentor", "reports");
 
       // Generate unique report filename using platform and project
       const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
       const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
-      const reportFile = join(reportDir, `${prIdentifier}-review-report.md`);
+      const reportFile = join(reportDir, `${prIdentifier}-${reviewType}-review-report.md`);
 
       // Ensure directory exists
       mkdirSync(reportDir, { recursive: true });
@@ -431,9 +435,9 @@ program
     return parsed;
   })
   .option(
-    "--specialized",
-    "Use specialized review passes (security, logic, performance). Env: MM_SPECIALIZED",
-    false
+    "--review-type <type>",
+    "Type of review (general, testing, security, performance). Env: MM_REVIEW_TYPE",
+    "general"
   )
   // GitHub options
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
@@ -494,11 +498,13 @@ program
         cursorTimeout: options.cursorTimeout,
         skipExistingIssues: options.skipExistingIssues,
         reviewRuns: options.runs,
+        reviewType: options.reviewType,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
 
       const { result, adapter, platform } = await executeReview(options);
-      displayResults(result, !options.write, adapter, platform, aiProvider);
+      const reviewType = options.reviewType ?? config.reviewType ?? "general";
+      displayResults(result, !options.write, adapter, platform, aiProvider, reviewType);
 
       logger.info(
         {

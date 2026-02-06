@@ -54,4 +54,8 @@ export const CATEGORY_EMOJI = {
   architecture: "🏗️",
   design: "🎨",
   testing: "🧪",
+  "missing-coverage": "📊",
+  "bad-naming": "🏷️",
+  "incorrect-assertions": "❌",
+  "missing-mocks": "🎭",
 } as const;

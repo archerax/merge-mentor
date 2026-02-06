@@ -15,6 +15,7 @@ vi.mock("node:fs/promises", () => ({
     mkdir: vi.fn(),
     writeFile: vi.fn(),
     unlink: vi.fn(),
+    readFile: vi.fn(),
   },
 }));
 
@@ -82,40 +83,19 @@ describe("CopilotProvider", () => {
   });
 
   describe("executePrompt", () => {
-    it("executes short prompt directly via CLI argument", async () => {
+    it("uses file-based approach for all prompts", async () => {
       const provider = createCopilotProvider();
-      const shortPrompt = "Review this code";
+      const prompt = "Review this code";
       const mockResponse = { findings: [] };
       const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
+        stdout: "Agent thinking process here...",
         exitCode: 0,
       });
       mockSpawn.mockReturnValue(mockProcess);
+      // Mock readFile to return the JSON from output file
+      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
-      const promise = provider.executePrompt(shortPrompt);
-      await vi.runAllTimersAsync();
-      const result = await promise;
-
-      expect(result.parsed).toEqual(mockResponse);
-      expect(mockSpawn).toHaveBeenCalledWith(
-        expect.any(String), // Resolved executable path
-        ["-p", shortPrompt],
-        expect.objectContaining({ shell: false })
-      );
-      expect(mockFs.writeFile).not.toHaveBeenCalled();
-    });
-
-    it("uses temp file for long prompts", async () => {
-      const provider = createCopilotProvider();
-      const longPrompt = "a".repeat(200); // Exceeds PROMPT_LENGTH_THRESHOLD (100)
-      const mockResponse = { findings: [] };
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-
-      const promise = provider.executePrompt(longPrompt);
+      const promise = provider.executePrompt(prompt);
       await vi.runAllTimersAsync();
       const result = await promise;
 
@@ -123,17 +103,30 @@ describe("CopilotProvider", () => {
       expect(mockFs.mkdir).toHaveBeenCalledWith(expect.stringMatching(/\.merge-mentor[/\\]temp/), {
         recursive: true,
       });
+      // Should create both prompt file and output file
       expect(mockFs.writeFile).toHaveBeenCalledWith(
         expect.stringMatching(/prompt-.*\.md$/),
-        longPrompt,
+        prompt,
+        "utf-8"
+      );
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        expect.stringMatching(/output-.*\.json$/),
+        "",
+        "utf-8"
+      );
+      // Should read from output file
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        expect.stringMatching(/output-.*\.json$/),
         "utf-8"
       );
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         expect.arrayContaining([
           "-p",
-          // Now uses absolute path: @C:\\full\\path\\to\\prompt-timestamp-id.md
-          expect.stringMatching(/^Please follow the instructions in @.*prompt-.*\.md$/),
+          // Prompt tells agent to write JSON to output file
+          expect.stringMatching(
+            /^Please follow the instructions in @.*prompt-.*\.md and write your JSON output to/
+          ),
           "--allow-all-tools",
         ]),
         expect.objectContaining({ shell: false })

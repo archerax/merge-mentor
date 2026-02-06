@@ -15,6 +15,7 @@ vi.mock("node:fs/promises", () => ({
     mkdir: vi.fn(),
     writeFile: vi.fn(),
     unlink: vi.fn(),
+    readFile: vi.fn(),
   },
 }));
 
@@ -83,10 +84,12 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "```\n";
 
     const mockProcess = createMockProcess({
-      stdout: cotResponse,
+      stdout: "Agent wrote JSON to file",
       exitCode: 0,
     });
     mockSpawn.mockReturnValue(mockProcess);
+    // Mock readFile to return the JSON content
+    mockFs.readFile.mockResolvedValue(cotResponse);
 
     const promise = provider.executePrompt("Review this");
     await vi.runAllTimersAsync();
@@ -113,10 +116,11 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "Some text before.\n" + "{\n" + '  "findings": []\n' + "}\n" + "Some text after.\n";
 
     const mockProcess = createMockProcess({
-      stdout: standardResponse,
+      stdout: "Agent wrote JSON to file",
       exitCode: 0,
     });
     mockSpawn.mockReturnValue(mockProcess);
+    mockFs.readFile.mockResolvedValue(standardResponse);
 
     const promise = provider.executePrompt("Review this");
     await vi.runAllTimersAsync();
@@ -141,10 +145,11 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "More text.\n";
 
     const mockProcess = createMockProcess({
-      stdout: complexResponse,
+      stdout: "Agent wrote JSON to file",
       exitCode: 0,
     });
     mockSpawn.mockReturnValue(mockProcess);
+    mockFs.readFile.mockResolvedValue(complexResponse);
 
     const promise = provider.executePrompt("Review this");
     await vi.runAllTimersAsync();
@@ -162,10 +167,11 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "```json\n" + "{\n" + '  "findings": []\n' + "}\n" + "(missing closing ticks)\n";
 
     const mockProcess = createMockProcess({
-      stdout: messyResponse,
+      stdout: "Agent wrote JSON to file",
       exitCode: 0,
     });
     mockSpawn.mockReturnValue(mockProcess);
+    mockFs.readFile.mockResolvedValue(messyResponse);
 
     const promise = provider.executePrompt("Review this");
     await vi.runAllTimersAsync();

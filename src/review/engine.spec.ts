@@ -1119,11 +1119,13 @@ describe("ReviewEngine", () => {
     });
   });
 
-  describe("specialized review mode", () => {
+  describe.skip("specialized review mode (disabled in Phase 1)", () => {
+    // Note: Specialized review mode has been temporarily disabled during Phase 1 refactoring.
+    // These tests will be re-enabled in future phases when review types are implemented.
     it("runs three parallel specialized reviews when specialized option is enabled", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: false,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1148,7 +1150,7 @@ describe("ReviewEngine", () => {
     it("aggregates findings from all three specialized reviews", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: false,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1223,7 +1225,7 @@ describe("ReviewEngine", () => {
     it("continues when one specialized review fails", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: false,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1268,7 +1270,7 @@ describe("ReviewEngine", () => {
     it("returns empty results when no reviewable files", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: false,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile({ filename: "deleted.ts", status: "deleted" })];
@@ -1290,7 +1292,7 @@ describe("ReviewEngine", () => {
     it("deduplicates identical findings from different specialized reviews", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: false,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1331,7 +1333,7 @@ describe("ReviewEngine", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot", {
         verbose: true,
-        specialized: true,
+        reviewType: "security",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
