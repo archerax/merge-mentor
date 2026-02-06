@@ -7,7 +7,6 @@ export type AuditEventType =
   | "pr.comments.fetch"
   | "comment.post.inline"
   | "comment.post.general"
-  | "comment.update"
   | "comment.resolve"
   | "copilot.execute"
   | "ai.provider.execute"
@@ -203,26 +202,6 @@ export class AuditLogger {
   }
 
   /**
-   * Logs comment update operation.
-   */
-  logCommentUpdate(
-    commentId: number | string,
-    prNumber: number,
-    platform: string,
-    result: "success" | "failure",
-    error?: string
-  ): void {
-    this.logEvent(
-      "comment.update",
-      { type: "comment", id: commentId.toString(), details: { prNumber, platform } },
-      `Update comment ${commentId} on PR #${prNumber}`,
-      result,
-      { commentId, prNumber, platform },
-      error
-    );
-  }
-
-  /**
    * Logs comment resolve operation.
    */
   logCommentResolve(
@@ -312,7 +291,6 @@ export class AuditLogger {
     filesReviewed: number,
     filesSkipped: number,
     commentsCreated: number,
-    commentsUpdated: number,
     commentsResolved: number,
     commentErrors: number,
     result: "success" | "partial" = "success"
@@ -329,7 +307,6 @@ export class AuditLogger {
         filesReviewed,
         filesSkipped,
         commentsCreated,
-        commentsUpdated,
         commentsResolved,
         commentErrors,
       }

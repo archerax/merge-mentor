@@ -10,7 +10,6 @@ const mockAdapter = {
   getExistingBotComments: vi.fn(),
   postInlineComment: vi.fn(),
   postGeneralComment: vi.fn(),
-  updateComment: vi.fn(),
   resolveComment: vi.fn(),
 };
 
@@ -115,7 +114,6 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
       recommendations: [],
     },
     commentsCreated: 2,
-    commentsUpdated: 1,
     commentsResolved: 0,
     commentErrors: [],
     filesSkipped: 0,
@@ -470,7 +468,6 @@ describe("CLI", () => {
         expect.stringContaining("Dry-run mode - showing what would be posted")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Create: 2"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Update: 1"));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Resolve: 0"));
     });
 
@@ -497,7 +494,6 @@ describe("CLI", () => {
       displayResults(result, false);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments Created: 2"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments Updated: 1"));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments Resolved: 0"));
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("Dry-run mode - showing what would be posted")

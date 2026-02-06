@@ -594,13 +594,6 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
-  async updateComment(commentId: number | string, _body: string): Promise<void> {
-    const threadId = typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
-
-    this.logger.info({ threadId }, "Azure DevOps comment update requested (not implemented)");
-    this.auditLogger.logCommentUpdate(threadId, 0, "azure", "success");
-  }
-
   async resolveComment(commentId: number | string): Promise<void> {
     const threadId = typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
 

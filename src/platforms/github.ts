@@ -244,53 +244,6 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
-  async updateComment(commentId: number | string, body: string): Promise<void> {
-    const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
-    this.logger.debug({ commentId: id }, "Updating comment");
-
-    try {
-      await withRateLimitHandling(() =>
-        this.octokit.pulls.updateReviewComment({
-          owner: this.owner,
-          repo: this.repo,
-          comment_id: id,
-          body,
-        })
-      );
-      this.logger.info({ commentId: id, type: "review" }, "Comment updated successfully");
-      this.auditLogger.logCommentUpdate(id, 0, "github", "success");
-    } catch (error) {
-      this.logger.warn(
-        {
-          commentId: id,
-          error: (error as Error).message,
-        },
-        "Failed to update review comment, trying as issue comment"
-      );
-      try {
-        await withRateLimitHandling(() =>
-          this.octokit.issues.updateComment({
-            owner: this.owner,
-            repo: this.repo,
-            comment_id: id,
-            body,
-          })
-        );
-        this.logger.info({ commentId: id, type: "issue" }, "Comment updated successfully");
-        this.auditLogger.logCommentUpdate(id, 0, "github", "success");
-      } catch (finalError) {
-        this.auditLogger.logCommentUpdate(
-          id,
-          0,
-          "github",
-          "failure",
-          (finalError as Error).message
-        );
-        throw finalError;
-      }
-    }
-  }
-
   async resolveComment(commentId: number | string): Promise<void> {
     const id = typeof commentId === "string" ? parseInt(commentId, 10) : commentId;
     this.logger.debug({ commentId: id }, "Resolving comment");

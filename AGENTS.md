@@ -171,7 +171,6 @@ Comprehensive audit logging is implemented for security and compliance requireme
 **Comment Operations**:
 - `comment.post.inline` - Posting inline code comments
 - `comment.post.general` - Posting general PR comments
-- `comment.update` - Updating existing comments
 - `comment.resolve` - Resolving comment threads
 
 **AI/LLM Operations**:

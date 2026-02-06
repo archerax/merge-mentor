@@ -193,7 +193,6 @@ export function generateMarkdownReport(
   const actionHeader = dryRun ? "### 📝 Planned Actions (Dry-Run)" : "### 📝 Review Actions";
   report += `${actionHeader}\n\n`;
   report += `- Comments to Create: ${result.commentsCreated}\n`;
-  report += `- Comments to Update: ${result.commentsUpdated}\n`;
   report += `- Comments to Resolve: ${result.commentsResolved}\n\n`;
 
   // Issues by severity
@@ -357,11 +356,9 @@ export function displayResults(
   if (dryRun) {
     console.log("📝 Dry-run mode - showing what would be posted:");
     console.log(`  Comments to Create: ${result.commentsCreated}`);
-    console.log(`  Comments to Update: ${result.commentsUpdated}`);
     console.log(`  Comments to Resolve: ${result.commentsResolved}`);
   } else {
     console.log(`Comments Created: ${result.commentsCreated}`);
-    console.log(`Comments Updated: ${result.commentsUpdated}`);
     console.log(`Comments Resolved: ${result.commentsResolved}`);
     if (result.commentErrors.length > 0) {
       console.log(`\n⚠️  Comment Errors: ${result.commentErrors.length}`);

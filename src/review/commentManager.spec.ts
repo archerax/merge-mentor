@@ -336,7 +336,7 @@ describe("CommentManager", () => {
       expect(summaryActions[0].body).toContain("<!-- AI_CODE_REVIEW_SUMMARY -->");
     });
 
-    it("should update existing summary comment when it already exists", () => {
+    it("should skip creating duplicate summary when it already exists", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [
         {
@@ -350,15 +350,11 @@ describe("CommentManager", () => {
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
       const createActions = actions.filter((a) => a.type === "create" && !a.path);
-      const updateActions = actions.filter((a) => a.type === "update");
 
-      expect(createActions).toHaveLength(0); // No new summary created
-      expect(updateActions).toHaveLength(1); // Existing summary updated
-      expect(updateActions[0].existingCommentId).toBe(999);
-      expect(updateActions[0].body).toContain("New assessment");
+      expect(createActions).toHaveLength(0); // No new summary created (avoids duplicate)
     });
 
-    it("should not update summary comment when content is unchanged", () => {
+    it("should skip creating duplicate summary when content is unchanged", () => {
       const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
       const crossFileResult = createCrossFileResult({ overallAssessment: "Test assessment" });
@@ -374,10 +370,8 @@ describe("CommentManager", () => {
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
       const createActions = actions.filter((a) => a.type === "create" && !a.path);
-      const updateActions = actions.filter((a) => a.type === "update");
 
       expect(createActions).toHaveLength(0);
-      expect(updateActions).toHaveLength(0);
     });
 
     it("should not resolve comments without path", () => {
@@ -413,7 +407,7 @@ describe("CommentManager", () => {
       expect(resolveActions[0].existingCommentId).toBe(2);
     });
 
-    it("should not update when existing comment matches new comment", () => {
+    it("should skip creating duplicate when existing comment matches new comment", () => {
       const manager = createCommentManager();
       const finding = createFileFinding({
         line: 10,
@@ -438,8 +432,8 @@ describe("CommentManager", () => {
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
-      const updateActions = actions.filter((a) => a.type === "update");
-      expect(updateActions).toHaveLength(0);
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0); // No duplicate created
     });
   });
 
@@ -551,12 +545,8 @@ describe("CommentManager", () => {
         crossFileResult
       );
       const createActions = secondRunActions.filter((a) => a.type === "create" && a.path);
-      const updateActions = secondRunActions.filter(
-        (a) => a.type === "update" && a.existingCommentId === 1
-      );
 
       expect(createActions).toHaveLength(0); // Should not create duplicate
-      expect(updateActions).toHaveLength(0); // Should not update (content matches)
     });
 
     it("should match comments by finding ID even with modified body", () => {

@@ -8,13 +8,11 @@ const mockOctokitInstance = {
     listFiles: vi.fn(),
     listReviewComments: vi.fn(),
     createReviewComment: vi.fn(),
-    updateReviewComment: vi.fn(),
     getReviewComment: vi.fn(),
   },
   issues: {
     listComments: vi.fn(),
     createComment: vi.fn(),
-    updateComment: vi.fn(),
   },
   graphql: vi.fn(),
 };
@@ -313,54 +311,6 @@ describe("GitHubAdapter", () => {
         repo: "test-repo",
         issue_number: 123,
         body: "Overall feedback",
-      });
-    });
-  });
-
-  describe("updateComment", () => {
-    it("updates review comment successfully", async () => {
-      const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockResolvedValue({});
-
-      await adapter.updateComment(456, "Updated message");
-
-      expect(mockOctokitInstance.pulls.updateReviewComment).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        comment_id: 456,
-        body: "Updated message",
-      });
-    });
-
-    it("falls back to issue comment update when review update fails", async () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockRejectedValue(new Error("Not found"));
-      mockOctokitInstance.issues.updateComment.mockResolvedValue({});
-
-      await adapter.updateComment(456, "Updated message");
-
-      expect(mockOctokitInstance.issues.updateComment).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        comment_id: 456,
-        body: "Updated message",
-      });
-
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("handles string comment ID", async () => {
-      const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.updateReviewComment.mockResolvedValue({});
-
-      await adapter.updateComment("789", "Message");
-
-      expect(mockOctokitInstance.pulls.updateReviewComment).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        comment_id: 789,
-        body: "Message",
       });
     });
   });

@@ -73,17 +73,8 @@ export class CommentManager {
         );
 
         if (existingComment) {
+          // Skip - comment already exists (avoids duplicates)
           matchedExistingIds.add(existingComment.id);
-          const newBody = this.formatInlineComment(finding, fileResult.filename);
-          if (!this.commentsMatch(existingComment.body, newBody)) {
-            actions.push({
-              type: "update",
-              existingCommentId: existingComment.id,
-              path: fileResult.filename,
-              line: finding.line,
-              body: newBody,
-            });
-          }
         } else {
           actions.push({
             type: "create",
@@ -105,19 +96,13 @@ export class CommentManager {
       }
     }
 
-    // Create or update summary comment
+    // Create summary comment (or skip if already exists)
     const existingSummary = this.findExistingSummaryComment(existingComments);
     const newSummaryBody = this.formatSummaryComment(fileResults, crossFileResult);
 
     if (existingSummary) {
+      // Skip - summary already exists
       matchedExistingIds.add(existingSummary.id);
-      if (!this.commentsMatch(existingSummary.body, newSummaryBody)) {
-        actions.push({
-          type: "update",
-          existingCommentId: existingSummary.id,
-          body: newSummaryBody,
-        });
-      }
     } else {
       actions.push({
         type: "create",
@@ -159,11 +144,6 @@ export class CommentManager {
     existingComments: readonly ExistingComment[]
   ): ExistingComment | undefined {
     return existingComments.find((c) => c.body.includes(this.summaryMarker));
-  }
-
-  private commentsMatch(existingBody: string, newBody: string): boolean {
-    const stripIdentifier = (s: string) => s.replace(this.botIdentifier, "").trim();
-    return stripIdentifier(existingBody) === stripIdentifier(newBody);
   }
 
   /**

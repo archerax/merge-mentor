@@ -93,7 +93,7 @@ export interface ExistingComment {
 }
 
 /** Action types for comment management. */
-export type CommentActionType = "create" | "update" | "resolve";
+export type CommentActionType = "create" | "resolve";
 
 /** An action to perform on a comment. */
 export interface CommentAction {
@@ -174,13 +174,6 @@ export interface PlatformAdapter {
    * @param body - Comment body
    */
   postGeneralComment(prNumber: number, body: string): Promise<void>;
-
-  /**
-   * Updates an existing comment.
-   * @param commentId - The comment ID
-   * @param body - New comment body
-   */
-  updateComment(commentId: number | string, body: string): Promise<void>;
 
   /**
    * Marks a comment as resolved.

@@ -716,26 +716,6 @@ describe("AzureDevOpsAdapter", () => {
     });
   });
 
-  describe("updateComment", () => {
-    it("logs update request for numeric id", async () => {
-      const adapter = new AzureDevOpsAdapter(createTestConfig());
-
-      await adapter.updateComment(456, "Updated");
-
-      // Just verify it completes without error - logging is internal
-      expect(true).toBe(true);
-    });
-
-    it("logs update request for string id", async () => {
-      const adapter = new AzureDevOpsAdapter(createTestConfig());
-
-      await adapter.updateComment("789", "Updated");
-
-      // Just verify it completes without error - logging is internal
-      expect(true).toBe(true);
-    });
-  });
-
   describe("resolveComment", () => {
     it("logs resolve request for numeric id", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());

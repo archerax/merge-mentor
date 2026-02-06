@@ -40,7 +40,6 @@ export function createMockPlatformAdapter(options?: {
     getExistingBotComments: number[];
     postInlineComment: Array<{ prNumber: number; path: string; line: number; body: string }>;
     postGeneralComment: Array<{ prNumber: number; body: string }>;
-    updateComment: Array<{ commentId: number | string; body: string }>;
     resolveComment: Array<{ commentId: number | string }>;
   };
 } {
@@ -50,7 +49,6 @@ export function createMockPlatformAdapter(options?: {
     getExistingBotComments: [] as number[],
     postInlineComment: [] as Array<{ prNumber: number; path: string; line: number; body: string }>,
     postGeneralComment: [] as Array<{ prNumber: number; body: string }>,
-    updateComment: [] as Array<{ commentId: number | string; body: string }>,
     resolveComment: [] as Array<{ commentId: number | string }>,
   };
 
@@ -80,9 +78,6 @@ export function createMockPlatformAdapter(options?: {
       if (options?.postGeneralCommentError) {
         throw options.postGeneralCommentError;
       }
-    }),
-    updateComment: vi.fn(async (commentId: number | string, body: string) => {
-      calls.updateComment.push({ commentId, body });
     }),
     resolveComment: vi.fn(async (commentId: number | string) => {
       calls.resolveComment.push({ commentId });

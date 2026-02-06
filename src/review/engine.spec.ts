@@ -52,7 +52,6 @@ function createMockPlatform(): PlatformAdapter {
     getExistingBotComments: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
-    updateComment: vi.fn(),
     resolveComment: vi.fn(),
   };
 }
@@ -222,7 +221,6 @@ describe("ReviewEngine", () => {
 
       expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
       expect(mockPlatform.postGeneralComment).not.toHaveBeenCalled();
-      expect(mockPlatform.updateComment).not.toHaveBeenCalled();
       expect(mockPlatform.resolveComment).not.toHaveBeenCalled();
     });
 
@@ -338,54 +336,6 @@ describe("ReviewEngine", () => {
       consoleSpy.mockRestore();
     });
 
-    it("shows dry run actions for update comment", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        dryRun: true,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-      const existingComments: ExistingComment[] = [
-        {
-          id: 1,
-          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->",
-          path: "test.ts",
-          line: 2,
-        },
-      ];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue(existingComments);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([
-        {
-          filename: "test.ts",
-          findings: [
-            {
-              line: 2,
-              severity: "high",
-              category: "bug",
-              message: "Updated issue",
-              suggestion: "Fix it",
-              isPreExisting: false,
-            },
-          ],
-        },
-      ]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      await engine.reviewPR(123);
-
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("[UPDATE]"));
-      consoleSpy.mockRestore();
-    });
-
     it("shows dry run actions for resolve comment", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
@@ -415,14 +365,14 @@ describe("ReviewEngine", () => {
       consoleSpy.mockRestore();
     });
 
-    it("executes update action", async () => {
+    it("skips creating duplicate comments when matching comment exists", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
       const existingComments: ExistingComment[] = [
         {
           id: 1,
-          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->",
+          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nExisting message\n\n**Suggestion:** Fix\n<!-- finding-id: dGVzdC50czoyOmJ1Zw== -->",
           path: "test.ts",
           line: 2,
         },
@@ -440,8 +390,10 @@ describe("ReviewEngine", () => {
               line: 2,
               severity: "high",
               category: "bug",
-              message: "New message",
+              message: "Same finding",
               suggestion: "Fix",
+              reasoning: "This is bad",
+              confidence: "high" as const,
               isPreExisting: false,
             },
           ],
@@ -455,8 +407,14 @@ describe("ReviewEngine", () => {
 
       const result = await engine.reviewPR(123);
 
-      expect(mockPlatform.updateComment).toHaveBeenCalledWith(1, expect.any(String));
-      expect(result.commentsUpdated).toBe(1);
+      // Should not create a new comment since one already exists
+      expect(mockPlatform.postInlineComment).not.toHaveBeenCalledWith(
+        123,
+        "test.ts",
+        2,
+        expect.any(String)
+      );
+      expect(result.commentsCreated).toBe(1); // Only summary comment
     });
 
     it("executes resolve action", async () => {
@@ -543,62 +501,6 @@ describe("ReviewEngine", () => {
         expect.any(String)
       );
       expect(result.commentsCreated).toBe(2); // 1 inline + 1 summary
-    });
-
-    it("shows dry run update action with file path", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        dryRun: true,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-      const existingComments: ExistingComment[] = [
-        {
-          id: 1,
-          body: "[Bot]\n\n🔴 **HIGH** - bug\n\nOld message\n\n**Suggestion:** Old fix",
-          path: "test.ts",
-          line: 2,
-        },
-      ];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue(existingComments);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([
-        {
-          filename: "test.ts",
-          findings: [
-            {
-              line: 2,
-              severity: "high",
-              category: "bug",
-              message: "New message",
-              suggestion: "Fix",
-
-              isPreExisting: false,
-            },
-          ],
-        },
-      ]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      await engine.reviewPR(123);
-
-      const updateCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] && String(call[0]).includes("[UPDATE]")
-      );
-      expect(updateCalls.length).toBeGreaterThan(0);
-      const pathCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] && String(call[0]).includes("test.ts:2")
-      );
-      expect(pathCalls.length).toBeGreaterThan(0);
-      consoleSpy.mockRestore();
     });
 
     it("warns when all findings filtered out due to invalid line numbers", async () => {
@@ -767,23 +669,6 @@ describe("ReviewEngine", () => {
       expect(mockParseBatchedFileReview).toHaveBeenCalledTimes(1);
     });
 
-    it("handles action with no existingCommentId for update", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
-      const prDetails = createPRDetails();
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-
-      // Manually inject an invalid action (this tests defensive code)
-      const engine_any = engine as any;
-      await expect(engine_any.executeAction(123, { type: "update", body: "test" })).rejects.toThrow(
-        "Update action requires existingCommentId"
-      );
-
-      expect(mockPlatform.updateComment).not.toHaveBeenCalled();
-    });
-
     it("handles action with no body for create", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
@@ -794,17 +679,6 @@ describe("ReviewEngine", () => {
 
       expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
       expect(mockPlatform.postGeneralComment).not.toHaveBeenCalled();
-    });
-
-    it("handles action with no body for update", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
-
-      const engine_any = engine as any;
-      await expect(
-        engine_any.executeAction(123, { type: "update", existingCommentId: 1 })
-      ).rejects.toThrow("Update action requires body");
-
-      expect(mockPlatform.updateComment).not.toHaveBeenCalled();
     });
 
     it("handles action with no existingCommentId for resolve", async () => {
@@ -1094,17 +968,6 @@ describe("ReviewEngine", () => {
       await engine.reviewPR(123);
 
       consoleSpy.mockRestore();
-    });
-
-    it("throws error for update action without existingCommentId", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
-      const prDetails = createPRDetails();
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-
-      await engine.reviewPR(123);
     });
 
     it("throws error for resolve action without existingCommentId", async () => {

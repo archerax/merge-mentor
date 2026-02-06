@@ -408,7 +408,6 @@ describe("Cross-platform behavior", () => {
       "getExistingBotComments",
       "postInlineComment",
       "postGeneralComment",
-      "updateComment",
       "resolveComment",
     ];
 
