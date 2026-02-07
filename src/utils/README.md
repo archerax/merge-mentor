@@ -16,20 +16,20 @@ This module provides automatic rate limit handling with exponential backoff for 
 ### Wrap Individual API Calls
 
 ```typescript
-import { withRateLimitHandling } from './utils/rateLimitHandler';
+import { withRateLimitHandling } from "./utils/rateLimitHandler";
 
-const data = await withRateLimitHandling(
-  () => octokit.pulls.get({ owner, repo, pull_number: 123 })
+const data = await withRateLimitHandling(() =>
+  octokit.pulls.get({ owner, repo, pull_number: 123 }),
 );
 ```
 
 ### Wrap Functions
 
 ```typescript
-import { withRateLimit } from './utils/rateLimitHandler';
+import { withRateLimit } from "./utils/rateLimitHandler";
 
-const getPullRequest = withRateLimit(
-  (prNumber: number) => octokit.pulls.get({ owner, repo, pull_number: prNumber })
+const getPullRequest = withRateLimit((prNumber: number) =>
+  octokit.pulls.get({ owner, repo, pull_number: prNumber }),
 );
 
 // Use it
@@ -39,30 +39,24 @@ const pr = await getPullRequest(123);
 ### Custom Configuration
 
 ```typescript
-const data = await withRateLimitHandling(
-  () => apiCall(),
-  {
-    maxRetries: 5,           // Default: 3
-    baseDelayMs: 2000,       // Default: 1000
-    maxDelayMs: 60000,       // Default: 30000
-  }
-);
+const data = await withRateLimitHandling(() => apiCall(), {
+  maxRetries: 5, // Default: 3
+  baseDelayMs: 2000, // Default: 1000
+  maxDelayMs: 60000, // Default: 30000
+});
 ```
 
 ### Custom Error Detection
 
 ```typescript
-const data = await withRateLimitHandling(
-  () => customApi.call(),
-  {
-    isRateLimitError: (error) => {
-      return error.code === 'RATE_LIMIT_EXCEEDED';
-    },
-    extractRetryAfter: (error) => {
-      return error.retryAfterSeconds * 1000;
-    }
-  }
-);
+const data = await withRateLimitHandling(() => customApi.call(), {
+  isRateLimitError: (error) => {
+    return error.code === "RATE_LIMIT_EXCEEDED";
+  },
+  extractRetryAfter: (error) => {
+    return error.retryAfterSeconds * 1000;
+  },
+});
 ```
 
 ## How It Works
@@ -82,6 +76,7 @@ const data = await withRateLimitHandling(
 ## Test Coverage
 
 The module has 100% test coverage with comprehensive tests for:
+
 - Error detection (GitHub 403, standard 429, Azure DevOps 429)
 - Retry-After header parsing (string, number, timestamps)
 - Exponential backoff calculation

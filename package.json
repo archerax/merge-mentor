@@ -17,8 +17,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:coverage": "vitest run --config vitest.integration.config.ts --coverage",
     "test:all": "vitest run && vitest run --config vitest.integration.config.ts",
-    "lint": "biome check && knip",
-    "lint:fix": "biome check --write && knip --fix"
+    "lint": "npx prettier --write **/*.{md,yml} && biome check && knip",
+    "lint:fix": "npx prettier --write **/*.{md,yml} && biome check --write && knip --fix"
   },
   "keywords": [
     "code-review",
@@ -60,6 +60,7 @@
     "cross-env": "^10.1.0",
     "esbuild": "^0.27.2",
     "knip": "^5.81.0",
+    "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   }

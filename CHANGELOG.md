@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - **Extensibility Documentation** - Comprehensive guide for adding new specialist review types:
   - Created `EXTENDING.md` with step-by-step instructions for implementing new specialists
   - Complete code examples for both complex (with custom context) and simple specialists
@@ -30,13 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment Variable Configuration** - New `MM_REVIEW_TYPE` environment variable to set default review type
 
 ### Removed
+
 - **BREAKING**: Removed `--specialized` flag
   - The `--specialized` flag has been removed in favor of the more explicit `--review-type` flag
   - Migration: Use `--review-type testing` instead of `--specialized` or `--specialized testing`
-  
+
 ### Migration Guide
 
 **Before (deprecated):**
+
 ```bash
 # Old specialized flag
 merge-mentor review --pr 123 --specialized --write
@@ -44,6 +47,7 @@ merge-mentor review --pr 123 --specialized testing --write
 ```
 
 **After (current):**
+
 ```bash
 # New review-type flag
 merge-mentor review --pr 123 --review-type testing --write
@@ -55,6 +59,7 @@ merge-mentor review --pr 123 --write
 ```
 
 **Environment Variable Migration:**
+
 ```bash
 # Old (not supported)
 export SPECIALIZED_REVIEW=testing
@@ -64,6 +69,7 @@ export MM_REVIEW_TYPE=testing
 ```
 
 ### Removed
+
 - **BREAKING**: Removed OpenAI API provider support
   - Removed `--provider openai` option and all OpenAI-specific CLI options
   - Removed `openai` npm dependency and SDK-based provider implementation
@@ -74,6 +80,7 @@ export MM_REVIEW_TYPE=testing
 ## [1.12.0] - 2026-01-30
 
 ### Added
+
 - **Streaming Output Display**: Real-time feedback showing the last 5 lines of AI model output during reviews
   - New `--no-stream` flag to disable streaming output
   - New `--stream-lines <n>` option to configure number of lines (1-20)
@@ -83,6 +90,7 @@ export MM_REVIEW_TYPE=testing
 ## [1.11.0] - 2026-01-14
 
 ### Removed
+
 - **BREAKING**: Removed file-by-file review mode (now uses batched review exclusively)
   - Removed `buildFileReviewPrompt` function from prompts
   - Removed `formatFileCommentsContext` function from comment context
@@ -90,11 +98,12 @@ export MM_REVIEW_TYPE=testing
 - **BREAKING**: Removed backward compatibility for old environment variable names
   - Must now use `MM_` prefix for all environment variables
   - Removed support for unprefixed variables (e.g., `GITHUB_TOKEN`, `DEFAULT_PLATFORM`, `AZURE_DEVOPS_*`)
-  - Updated all documentation to reflect MM_ prefixed variables only
+  - Updated all documentation to reflect MM\_ prefixed variables only
 
 ### Changed
-- Simplified configuration by requiring MM_ prefix for all environment variables
-- Updated tests to use only MM_ prefixed environment variables
+
+- Simplified configuration by requiring MM\_ prefix for all environment variables
+- Updated tests to use only MM\_ prefixed environment variables
 - Cleaned up integration tests by removing deprecated feature tests
 
 ## [1.10.0] - 2026-01-12
@@ -116,8 +125,8 @@ export MM_REVIEW_TYPE=testing
   - Model used for the request
   - API processing time
   - Total wall-clock time
-  This data helps track AI costs, identify optimization opportunities, and monitor performance across review runs.
-- **MM_ environment variable prefix** - All environment variables now use the `MM_` prefix to avoid conflicts with other applications (e.g., `MM_GITHUB_TOKEN` instead of `GITHUB_TOKEN`). Old unprefixed variables are still supported for backward compatibility but are deprecated.
+    This data helps track AI costs, identify optimization opportunities, and monitor performance across review runs.
+- **MM\_ environment variable prefix** - All environment variables now use the `MM_` prefix to avoid conflicts with other applications (e.g., `MM_GITHUB_TOKEN` instead of `GITHUB_TOKEN`). Old unprefixed variables are still supported for backward compatibility but are deprecated.
 - **Comprehensive CLI parameters** - Every environment variable now has a corresponding command-line parameter (e.g., `--github-token`, `--azure-token`, `--copilot-model`). CLI parameters always override environment variables.
 - **CLI parameter documentation** - All CLI help text now shows the corresponding environment variable name for each parameter.
 
@@ -128,7 +137,7 @@ export MM_REVIEW_TYPE=testing
   - `GITHUB_TOKEN` → `MM_GITHUB_TOKEN`
   - `AZURE_DEVOPS_*` → `MM_AZURE_*` (simplified naming)
   - `BOT_COMMENT_IDENTIFIER` → `MM_COMMENT_IDENTIFIER`
-  - `*_TIMEOUT_MS` → `MM_*_TIMEOUT` (removed _MS suffix for consistency)
+  - `*_TIMEOUT_MS` → `MM_*_TIMEOUT` (removed \_MS suffix for consistency)
   - `SKIP_PREEXISTING_ISSUES` → `MM_SKIP_EXISTING_ISSUES` (improved clarity)
   - And more (see README for complete mapping)
 
@@ -301,10 +310,12 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 ### What's Included
 
 **Platform Support**
+
 - GitHub pull requests
 - Azure DevOps pull requests
 
 **Review Features**
+
 - Intelligent code analysis for bugs, security issues, performance problems, code quality, and documentation
 - Inline comments on specific lines of code
 - Summary reports with review statistics
@@ -313,12 +324,14 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 - Dry-run mode for previewing changes before posting
 
 **Smart Optimization**
+
 - Incremental caching: Only reviews changed files on subsequent runs (85% faster)
 - Rate limit handling with automatic retry
 - Configurable AI model selection (GPT-4, Claude, etc.)
 - Timeout controls for large PRs
 
 **Review Categories**
+
 - 🐛 **Bugs**: Logic errors and potential crashes
 - 🔒 **Security**: Vulnerabilities and security risks
 - ⚡ **Performance**: Inefficiencies and optimization opportunities
@@ -326,12 +339,14 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 - 📖 **Documentation**: Missing or unclear documentation
 
 **Severity Levels**
+
 - 🔴 **Critical**: Must be fixed before merge
 - 🟠 **High**: Should be addressed soon
 - 🟡 **Medium**: Worth reviewing
 - 🟢 **Low**: Minor suggestions
 
 **Easy Integration**
+
 - Global CLI tool: `npm install -g merge-mentor`
 - Instant run: `npx merge-mentor review --pr 123`
 - CI/CD ready with GitHub Actions and Azure Pipelines examples

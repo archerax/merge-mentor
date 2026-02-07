@@ -93,6 +93,7 @@ All environment variables use the `MM_` prefix to avoid conflicts with other app
 ### GitHub Configuration
 
 **Linux/macOS:**
+
 ```bash
 export MM_GITHUB_TOKEN=your_personal_access_token
 export MM_GITHUB_REPO_OWNER=username_or_org
@@ -101,6 +102,7 @@ export MM_PLATFORM=github
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:MM_GITHUB_TOKEN="your_personal_access_token"
 $env:MM_GITHUB_REPO_OWNER="username_or_org"
@@ -109,6 +111,7 @@ $env:MM_PLATFORM="github"
 ```
 
 **Windows (Command Prompt):**
+
 ```cmd
 set MM_GITHUB_TOKEN=your_personal_access_token
 set MM_GITHUB_REPO_OWNER=username_or_org
@@ -119,6 +122,7 @@ set MM_PLATFORM=github
 ### Azure DevOps Configuration
 
 **Linux/macOS:**
+
 ```bash
 export MM_AZURE_TOKEN=your_pat
 export MM_AZURE_ORG=organization_name
@@ -128,6 +132,7 @@ export MM_PLATFORM=azure
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:MM_AZURE_TOKEN="your_pat"
 $env:MM_AZURE_ORG="organization_name"
@@ -137,6 +142,7 @@ $env:MM_PLATFORM="azure"
 ```
 
 **Windows (Command Prompt):**
+
 ```cmd
 set MM_AZURE_TOKEN=your_pat
 set MM_AZURE_ORG=organization_name
@@ -150,6 +156,7 @@ set MM_PLATFORM=azure
 **Default Provider**: GitHub Copilot CLI (`copilot`)
 
 **Linux/macOS:**
+
 ```bash
 # Select AI provider (copilot, opencode, cursor, or openai)
 export MM_AI_PROVIDER=copilot
@@ -176,7 +183,8 @@ export MM_OPENAI_MAX_RETRIES=3
 ```
 
 **Windows (PowerShell):**
-```powershell
+
+````powershell
 # Select AI provider
 $env:MM_AI_PROVIDER="copilot"
 
@@ -204,11 +212,12 @@ merge-mentor review --pr 123 \
   --provider openai \
   --openai-api-key sk-your-key \
   --openai-model gpt-4o
-```
+````
 
 ### Optional Settings
 
 **Linux/macOS:**
+
 ```bash
 # Comment filtering
 export MM_MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
@@ -237,6 +246,7 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 ```
 
 **Or use command-line parameters:**
+
 ```bash
 merge-mentor review --pr 123 \
   --min-comment-confidence medium \
@@ -259,6 +269,7 @@ Audit logging is enabled by default for security and compliance tracking. All cr
 Audit logs are written to timestamped log files (`.merge-mentor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log`) with a dedicated `audit` field for easy filtering and analysis. Each review run generates its own log file, preserving historical audit trails.
 
 **Example audit log entry**:
+
 ```json
 {
   "audit": {
@@ -283,6 +294,7 @@ Audit logs are written to timestamped log files (`.merge-mentor/logs/merge-mento
 ```
 
 Audit logs can be filtered and analyzed for:
+
 - Security audits and compliance reporting
 - Tracking bot activity across PRs
 - Debugging failed operations
@@ -292,16 +304,19 @@ Audit logs can be filtered and analyzed for:
 ### Token Permissions
 
 **GitHub Token** (set via `MM_GITHUB_TOKEN` or `--github-token`):
+
 - `repo` scope (full control of private repositories)
 - Or `public_repo` for public repositories only
 
 **Azure DevOps PAT** (set via `MM_AZURE_TOKEN` or `--azure-token`):
+
 - Code: Read & Write
 - Pull Request Threads: Read & Write
 
 ### Available Models
 
 **Copilot CLI**: Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
+
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
 - `claude-opus-4.5`
@@ -317,13 +332,16 @@ Audit logs can be filtered and analyzed for:
 - `gemini-3-pro-preview`
 
 **OpenCode CLI**: Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
+
 - Check OpenCode documentation for supported models
 
 **Cursor CLI**: Configure via `MM_CURSOR_MODEL` environment variable or `--cursor-model` CLI parameter.
+
 - Supports multiple AI models (GPT-5, Claude 4 Sonnet, Claude 4 Opus)
 - Check Cursor CLI documentation for latest supported models
 
 **OpenAI API**: Configure via `MM_OPENAI_MODEL` environment variable or `--openai-model` CLI parameter.
+
 - `gpt-4o` (default)
 - `gpt-4o-mini`
 - `gpt-4-turbo`
@@ -382,12 +400,14 @@ merge-mentor review --pr 123 --verbose false
 ### Common Use Cases
 
 **1. Standard Development Review:**
+
 ```bash
 # General review for regular PRs
 merge-mentor review --pr 123 --write
 ```
 
 **2. Test Coverage Review:**
+
 ```bash
 # Focus on test quality when adding/modifying tests
 merge-mentor review --pr 456 --review-type testing --write
@@ -397,6 +417,7 @@ merge-mentor review --pr 456 --review-type testing --runs 3 --write
 ```
 
 **3. Security-Sensitive Changes:**
+
 ```bash
 # Security review for authentication or data handling
 merge-mentor review --pr 789 --review-type security --write
@@ -406,6 +427,7 @@ merge-mentor review --pr 789 --review-type security --runs 5 --write
 ```
 
 **4. Performance-Critical Code:**
+
 ```bash
 # Performance review for optimization work
 merge-mentor review --pr 321 --review-type performance --write
@@ -415,6 +437,7 @@ merge-mentor review --pr 321 --review-type performance --runs 3 --write
 ```
 
 **5. Preview Before Posting:**
+
 ```bash
 # Dry-run generates detailed markdown report without posting
 merge-mentor review --pr 123 --review-type testing
@@ -546,18 +569,19 @@ merge-mentor review --pr 123 --review-type performance --write
 
 **When to Use Specialist Reviews:**
 
-| Review Type | Use When | What It Checks |
-|-------------|----------|----------------|
-| **testing** | Adding/modifying tests or testable code | Test coverage, test quality, assertion accuracy, naming conventions, mock usage |
-| **security** | Handling sensitive data or auth flows | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
-| **performance** | Performance-critical paths or scaling concerns | Algorithm efficiency, resource usage, caching opportunities, database queries |
-| **general** | Standard development or unsure what to check | All aspects: bugs, security, performance, quality, documentation |
+| Review Type     | Use When                                       | What It Checks                                                                      |
+| --------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **testing**     | Adding/modifying tests or testable code        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
+| **security**    | Handling sensitive data or auth flows          | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
+| **performance** | Performance-critical paths or scaling concerns | Algorithm efficiency, resource usage, caching opportunities, database queries       |
+| **general**     | Standard development or unsure what to check   | All aspects: bugs, security, performance, quality, documentation                    |
 
 #### Testing Review Deep Dive
 
 The testing specialist analyzes four key areas:
 
 **1. Test Coverage Analysis**
+
 - Verifies new/modified functions have corresponding tests
 - Checks edge cases (null, empty, invalid input)
 - Ensures error paths are tested
@@ -570,6 +594,7 @@ The testing specialist analyzes four key areas:
 Language-specific naming patterns:
 
 **C# Convention:**
+
 ```csharp
 // Pattern: MethodName_Scenario_ExpectedBehavior
 [Fact]
@@ -577,7 +602,7 @@ public void GetUser_InvalidId_ThrowsException()
 {
     // Arrange
     var service = new UserService();
-    
+
     // Act & Assert
     Assert.Throws<NotFoundException>(() => service.GetUser(-1));
 }
@@ -586,13 +611,14 @@ public void GetUser_InvalidId_ThrowsException()
 ```
 
 **TypeScript Convention:**
+
 ```typescript
 // Pattern: describe/it blocks with behavior descriptions
-describe('UserService', () => {
-  describe('getUser', () => {
-    it('should throw error when id is invalid', () => {
+describe("UserService", () => {
+  describe("getUser", () => {
+    it("should throw error when id is invalid", () => {
       const service = new UserService();
-      
+
       expect(() => service.getUser(-1)).toThrow(NotFoundException);
     });
   });
@@ -602,6 +628,7 @@ describe('UserService', () => {
 ```
 
 **3. Assertion Verification**
+
 - Assertions match test names and behavior
 - Multiple assertions focus on same logical concept
 - Assertions verify behavior outcomes, not implementation details
@@ -611,6 +638,7 @@ describe('UserService', () => {
 **4. Mock Framework Usage**
 
 **C# Mocking Best Practices:**
+
 ```csharp
 // Using Moq
 var mockRepository = new Mock<IUserRepository>();
@@ -624,12 +652,13 @@ mockRepository.GetUser(Arg.Any<int>())
 ```
 
 **TypeScript Mocking Best Practices:**
+
 ```typescript
 // Using Vitest
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 const mockRepository = {
-  getUser: vi.fn().mockResolvedValue({ id: 1, name: 'Alice' })
+  getUser: vi.fn().mockResolvedValue({ id: 1, name: "Alice" }),
 };
 
 // Verify interactions
@@ -637,6 +666,7 @@ expect(mockRepository.getUser).toHaveBeenCalledWith(1);
 ```
 
 **Configuration:**
+
 ```bash
 # Environment variable
 export MM_REVIEW_TYPE=testing
@@ -677,12 +707,14 @@ merge-mentor review --pr 123 --stream-lines 10
 ```
 
 **Features:**
+
 - Shows the last N lines of AI model output in real-time
 - Provides visual feedback during long-running reviews
 - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
 - Can be explicitly disabled with `--no-stream`
 
 **Configuration:**
+
 ```bash
 export MM_STREAMING_ENABLED=true   # Enable/disable (default: true)
 export MM_STREAMING_LINES=5        # Number of lines (default: 5, range: 1-20)
@@ -700,6 +732,7 @@ merge-mentor review --pr 123
 ```
 
 The markdown report includes:
+
 - **PR summary** with metadata and statistics
 - **Issues by severity and category** with visual indicators
 - **File-specific findings** with line numbers and suggestions
@@ -716,6 +749,7 @@ Only analyzes changed files on re-reviews, saving time and cost. Cache stored in
 ## Review Categories & Severity
 
 **Categories**:
+
 - 🐛 **Bug** - Potential bugs or logical errors
 - 🔒 **Security** - Security vulnerabilities
 - ⚡ **Performance** - Performance issues
@@ -723,6 +757,7 @@ Only analyzes changed files on re-reviews, saving time and cost. Cache stored in
 - 📖 **Documentation** - Missing or inadequate documentation
 
 **Severity Levels**:
+
 - 🔴 **Critical** - Must be fixed
 - 🟠 **High** - Should be addressed
 - 🟡 **Medium** - Worth reviewing
@@ -812,7 +847,7 @@ merge-mentor creates several directories in your project root for different purp
 .merge-mentor/
 ├── cache/                          # Review state caching
 │   └── Github-myrepo-PR123.json     # Platform-aware cache files
-├── diffs/                          # Temporary diff storage for batched reviews  
+├── diffs/                          # Temporary diff storage for batched reviews
 │   └── Azure-MyProject-PR456/       # Platform-aware diff directories
 ├── logs/                           # Timestamped log files
 │   └── merge-mentor_2025-01-06_18-40-30.log
@@ -823,6 +858,7 @@ merge-mentor creates several directories in your project root for different purp
 ```
 
 **Key improvements**:
+
 - **Unique identifiers**: Cache and diff files use `{Platform}-{Project}-PR{Number}` format to prevent conflicts
 - **Historical preservation**: Each run creates new timestamped log files instead of overwriting
 - **Platform isolation**: Multiple platforms and projects can be used without file conflicts
@@ -830,14 +866,18 @@ merge-mentor creates several directories in your project root for different purp
 ## Troubleshooting
 
 ### Timeout errors
+
 Increase timeout for large PRs:
+
 ```bash
 export MM_COPILOT_TIMEOUT=300000  # 5 minutes (for Copilot)
 export MM_OPENCODE_TIMEOUT=300000  # 5 minutes (for OpenCode)
 export MM_CURSOR_TIMEOUT=300000  # 5 minutes (for Cursor)
 export MM_OPENAI_TIMEOUT=300000  # 5 minutes (for OpenAI)
 ```
-export OPENAI_TIMEOUT_MS=300000  # 5 minutes (for OpenAI)
+
+export OPENAI_TIMEOUT_MS=300000 # 5 minutes (for OpenAI)
+
 ```
 
 ### Exit Codes
@@ -861,6 +901,7 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 
 ---
 
-**Version**: 1.9.0  
-**Author**: archerax  
+**Version**: 1.9.0
+**Author**: archerax
 **Documentation**: Included in npm package
+```

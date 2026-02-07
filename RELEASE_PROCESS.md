@@ -34,7 +34,7 @@ Bump the version number in `package.json` according to [Semantic Versioning](htt
 
 1.  Locate the `[Unreleased]` section.
 2.  Rename it to the new version and add the current date (format: `YYYY-MM-DD`).
-    *   Example: `## [1.9.0] - 2026-01-11`
+    - Example: `## [1.9.0] - 2026-01-11`
 3.  Create a new empty `## [Unreleased]` section at the top of the list.
 
 ### 3. Commit Changes
@@ -46,7 +46,7 @@ git add package.json CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
 ```
 
-*Replace `X.Y.Z` with the actual version number.*
+_Replace `X.Y.Z` with the actual version number._
 
 ### 4. Tag the Release
 
@@ -56,7 +56,7 @@ Create a git tag for the new version. **The tag must start with `v`**.
 git tag vX.Y.Z
 ```
 
-*Example: `git tag v1.9.0`*
+_Example: `git tag v1.9.0`_
 
 ### 5. Push Changes
 

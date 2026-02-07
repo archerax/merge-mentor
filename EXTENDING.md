@@ -22,6 +22,7 @@ Specialist reviews are focused AI-powered code reviews that analyze specific asp
 - **`general`** - Comprehensive review (default, not a specialist)
 
 Each specialist has:
+
 1. Custom prompts that define the AI's role and scope
 2. Specialized context gathering (optional)
 3. Category definitions for findings
@@ -40,6 +41,7 @@ Add a specialist review type when:
 ✅ **It benefits from dedicated categories** - Findings need unique categorization (e.g., `wcag-violation`, `translation-missing`)
 
 ❌ **Don't add a specialist for:**
+
 - Concerns already covered by general reviews (e.g., "naming conventions")
 - One-off project-specific checks (use repository context instead)
 - Concerns better handled by static analysis tools (linters, type checkers)
@@ -86,7 +88,12 @@ Add your new type to the `ReviewType` union in `src/config.ts`:
 
 ```typescript
 /** Supported review types for specialized analysis. */
-export type ReviewType = "general" | "testing" | "security" | "performance" | "accessibility";
+export type ReviewType =
+  | "general"
+  | "testing"
+  | "security"
+  | "performance"
+  | "accessibility";
 //                                                                              ^^^^^^^^^^^^^^
 //                                                                              Add your type
 ```
@@ -96,15 +103,21 @@ Update the validation function:
 ```typescript
 function validateReviewType(value: string | undefined): ReviewType {
   if (!value) return "general";
-  
-  const validTypes: ReviewType[] = ["general", "testing", "security", "performance", "accessibility"];
+
+  const validTypes: ReviewType[] = [
+    "general",
+    "testing",
+    "security",
+    "performance",
+    "accessibility",
+  ];
   if (!validTypes.includes(value as ReviewType)) {
     throw new ConfigurationError(
       "reviewType",
-      `Invalid review type: ${value}. Must be one of: ${validTypes.join(", ")}`
+      `Invalid review type: ${value}. Must be one of: ${validTypes.join(", ")}`,
     );
   }
-  
+
   return value as ReviewType;
 }
 ```
@@ -117,7 +130,7 @@ If your specialist introduces new finding categories, add them to `src/constants
 /** Emoji mapping for finding categories. */
 export const CATEGORY_EMOJI = {
   // ... existing categories ...
-  
+
   // Accessibility specialist categories
   "wcag-violation": "♿",
   "aria-issue": "🏷️",
@@ -166,7 +179,10 @@ Create `src/ai/prompts/specialists/<your-specialist>.ts`:
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSeverityContextSection } from "../severityContext.js";
-import type { AccessibilityReviewContext, AccessibilityCrossFileContext } from "./types.js";
+import type {
+  AccessibilityReviewContext,
+  AccessibilityCrossFileContext,
+} from "./types.js";
 
 /**
  * Builds a workspace access section for prompts.
@@ -237,15 +253,15 @@ function getFrameworkGuidance(framework: string): string {
 - Non-semantic click handlers on divs
 `;
   }
-  
+
   // Add other frameworks as needed
-  
+
   return "";
 }
 
 /**
  * Builds a file review prompt for accessibility analysis.
- * 
+ *
  * @param manifest - Manifest describing stored diff files
  * @param context - Accessibility-specific context
  * @param repoContext - Optional repository-specific guidelines
@@ -256,13 +272,13 @@ export function buildAccessibilityFileReviewPrompt(
   manifest: DiffManifest,
   context: AccessibilityReviewContext,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
 ): string {
   const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
-        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`
+        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`,
     )
     .join("\n");
 
@@ -345,7 +361,7 @@ Focus on actionable findings with clear solutions. Skip minor issues.`;
 
 /**
  * Builds a cross-file analysis prompt for accessibility concerns.
- * 
+ *
  * @param prDetails - Pull request metadata
  * @param context - Cross-file accessibility context
  * @param repoContext - Optional repository-specific guidelines
@@ -356,7 +372,7 @@ export function buildAccessibilityCrossFilePrompt(
   prDetails: PRDetails,
   context: AccessibilityCrossFileContext,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
 ): string {
   const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
@@ -364,7 +380,7 @@ export function buildAccessibilityCrossFilePrompt(
 
   // Get unique categories from file reviews
   const categoriesFound = new Set(
-    context.fileReviewResults.flatMap((r) => r.findings.map((f) => f.category))
+    context.fileReviewResults.flatMap((r) => r.findings.map((f) => f.category)),
   );
 
   return `# YOUR ROLE
@@ -435,7 +451,7 @@ if (reviewType === "testing") {
   // Build accessibility context
   const allChangedFiles = filesWithPatches.map((f) => f.filename);
   const uiFiles = allChangedFiles.filter((f) => isUIComponentFile(f));
-  
+
   const context: AccessibilityReviewContext = {
     filename: manifest.files.map((f) => f.filename).join(", "),
     framework: detectFramework(allChangedFiles[0]),
@@ -443,14 +459,24 @@ if (reviewType === "testing") {
     hasInteractiveElements: true, // TODO: detect from diff
   };
 
-  prompt = buildAccessibilityFileReviewPrompt(manifest, context, repoContext, repoPath);
+  prompt = buildAccessibilityFileReviewPrompt(
+    manifest,
+    context,
+    repoContext,
+    repoPath,
+  );
   this.logger.info(
     { framework: context.framework, uiFilesFound: uiFiles.length },
-    "Built accessibility specialist prompt"
+    "Built accessibility specialist prompt",
   );
 } else {
   // General review
-  prompt = buildBatchedFileReviewPrompt(manifest, existingCommentsContext, repoContext, repoPath);
+  prompt = buildBatchedFileReviewPrompt(
+    manifest,
+    existingCommentsContext,
+    repoContext,
+    repoPath,
+  );
 }
 ```
 
@@ -470,10 +496,21 @@ if (reviewType === "testing") {
     filesSummary,
   };
 
-  prompt = buildAccessibilityCrossFilePrompt(prDetails, context, repoContext, repoPath);
+  prompt = buildAccessibilityCrossFilePrompt(
+    prDetails,
+    context,
+    repoContext,
+    repoPath,
+  );
 } else {
   // General cross-file review
-  prompt = buildCrossFilePrompt(prDetails, fileResults, filesSummary, repoContext, repoPath);
+  prompt = buildCrossFilePrompt(
+    prDetails,
+    fileResults,
+    filesSummary,
+    repoContext,
+    repoPath,
+  );
 }
 ```
 
@@ -496,7 +533,7 @@ Add your specialist to the README.md:
 
 **In the "Specialist Review Types" section:**
 
-```markdown
+````markdown
 ### Specialist Review Types
 
 Focus reviews on specific concerns with the `--review-type` flag:
@@ -505,11 +542,13 @@ Focus reviews on specific concerns with the `--review-type` flag:
 # Accessibility-focused review - WCAG compliance
 merge-mentor review --pr 123 --review-type accessibility --write
 ```
+````
 
 **Available Review Types:**
 
 - **`accessibility`**: Web accessibility specialist focused on WCAG 2.1 compliance, ARIA usage, keyboard navigation
-```
+
+````
 
 **In the "When to Use Specialist Reviews" table:**
 
@@ -517,7 +556,7 @@ merge-mentor review --pr 123 --review-type accessibility --write
 | Review Type | Use When | What It Checks |
 |-------------|----------|----------------|
 | **accessibility** | Building user interfaces or forms | WCAG compliance, ARIA attributes, keyboard navigation, focus management, alt text |
-```
+````
 
 ## Examples
 
@@ -531,7 +570,7 @@ For a specialist that doesn't need custom context (like the existing `security` 
 export function buildDocumentationReviewPrompt(
   manifest: DiffManifest,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
 ): string {
   const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
   const filesListing = manifest.files
@@ -559,10 +598,10 @@ Respond with valid JSON with findings array...`;
 **In `engine.ts`:**
 
 ```typescript
-import { 
-  buildSecurityReviewPrompt, 
+import {
+  buildSecurityReviewPrompt,
   buildPerformanceReviewPrompt,
-  buildDocumentationReviewPrompt 
+  buildDocumentationReviewPrompt
 } from "../ai/prompts/specialized.js";
 
 // In reviewFileBatch:
@@ -623,7 +662,13 @@ describe("Accessibility Specialist Prompts", () => {
     it("includes framework-specific guidance", () => {
       const manifest: DiffManifest = {
         files: [
-          { filename: "Button.tsx", diffPath: "Button.diff", status: "modified", additions: 10, deletions: 5 }
+          {
+            filename: "Button.tsx",
+            diffPath: "Button.diff",
+            status: "modified",
+            additions: 10,
+            deletions: 5,
+          },
         ],
       };
 
@@ -670,20 +715,16 @@ import { ReviewEngine } from "../../src/review/engine.js";
 
 describe("Accessibility Specialist Integration", () => {
   it("uses accessibility prompts when reviewType is accessibility", async () => {
-    const engine = new ReviewEngine(
-      mockPlatform,
-      "test-bot",
-      {
-        reviewType: "accessibility",
-        dryRun: true,
-      }
-    );
+    const engine = new ReviewEngine(mockPlatform, "test-bot", {
+      reviewType: "accessibility",
+      dryRun: true,
+    });
 
     await engine.reviewPR(123);
 
     // Verify accessibility-specific prompt was used
     expect(mockAIProvider.executePrompt).toHaveBeenCalledWith(
-      expect.stringContaining("Accessibility Specialist")
+      expect.stringContaining("Accessibility Specialist"),
     );
   });
 });
