@@ -313,10 +313,7 @@ export class RepoManager {
 
     try {
       // Clean any leftover files from previous reviews
-      await this.execWithTimeout(
-        `git -C "${repoPath}" clean -fdx`,
-        this.fetchTimeoutMs
-      );
+      await this.execWithTimeout(`git -C "${repoPath}" clean -fdx`, this.fetchTimeoutMs);
 
       // Update remote URL
       await this.execWithTimeout(

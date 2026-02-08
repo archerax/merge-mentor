@@ -1076,10 +1076,7 @@ export class ReviewEngine {
       const result = this.provider.parseFastReview(response);
 
       // Log results
-      const totalFileFindings = result.fileResults.reduce(
-        (sum, r) => sum + r.findings.length,
-        0
-      );
+      const totalFileFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
       const crossFileFindings = result.crossFileResult.findings.length;
       this.log(
         `  Fast review found ${totalFileFindings} file-level issues and ${crossFileFindings} architectural issues`
