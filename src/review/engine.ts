@@ -5,11 +5,22 @@ import {
   createAIProvider,
 } from "../ai/index.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
+import { buildFilesSummary } from "../ai/prompts/prompts.js";
 import {
-  buildBatchedFileReviewPrompt,
-  buildCrossFilePrompt,
-  buildFilesSummary,
-} from "../ai/prompts/prompts.js";
+  buildGeneralCrossFilePrompt,
+  buildGeneralFileReviewPrompt,
+  type GeneralCrossFileContext,
+} from "../ai/prompts/specialists/general.js";
+import {
+  buildPerformanceCrossFilePrompt,
+  buildPerformanceFileReviewPrompt,
+  type PerformanceCrossFileContext,
+} from "../ai/prompts/specialists/performance.js";
+import {
+  buildSecurityCrossFilePrompt,
+  buildSecurityFileReviewPrompt,
+  type SecurityCrossFileContext,
+} from "../ai/prompts/specialists/security.js";
 import {
   buildTestingCrossFilePrompt,
   buildTestingFileReviewPrompt,
@@ -602,42 +613,59 @@ export class ReviewEngine {
       const commentsContext = formatExistingCommentsContext(existingComments);
       let prompt: string;
 
-      if (reviewType === "testing") {
-        // Get all changed files for context
-        const allChangedFiles = filesWithPatches.map((f) => f.filename);
+      switch (reviewType) {
+        case "testing": {
+          // Get all changed files for context
+          const allChangedFiles = filesWithPatches.map((f) => f.filename);
 
-        // For testing reviews, we need to build context with test file mappings
-        // Detect language from the first non-test file
-        const productionFiles = allChangedFiles.filter((f) => !isTestFile(f));
-        const language: SupportedLanguage =
-          productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
+          // For testing reviews, we need to build context with test file mappings
+          // Detect language from the first non-test file
+          const productionFiles = allChangedFiles.filter((f) => !isTestFile(f));
+          const language: SupportedLanguage =
+            productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
 
-        // Find test files for production files
-        const testFiles = productionFiles
-          .map((f) => findTestFileForProduction(f, allChangedFiles))
-          .filter((f): f is string => f !== undefined);
+          // Find test files for production files
+          const testFiles = productionFiles
+            .map((f) => findTestFileForProduction(f, allChangedFiles))
+            .filter((f): f is string => f !== undefined);
 
-        const context: TestingReviewContext = {
-          filename: manifest.files.map((f) => f.filename).join(", "),
-          testFiles,
-          language,
-          allChangedFiles,
-        };
+          const context: TestingReviewContext = {
+            filename: manifest.files.map((f) => f.filename).join(", "),
+            testFiles,
+            language,
+            allChangedFiles,
+          };
 
-        prompt = buildTestingFileReviewPrompt(manifest, context, repoContext, repoPath);
-        this.logger.info(
-          { language, testFilesFound: testFiles.length, productionFiles: productionFiles.length },
-          "Built testing specialist prompt"
-        );
-      } else {
-        // General review
-        prompt = buildBatchedFileReviewPrompt(
-          manifest,
-          commentsContext || undefined,
-          repoContext,
-          repoPath
-        );
-        this.logger.info("Built general review prompt");
+          prompt = buildTestingFileReviewPrompt(manifest, context, repoContext, repoPath);
+          this.logger.info(
+            {
+              language,
+              testFilesFound: testFiles.length,
+              productionFiles: productionFiles.length,
+            },
+            "Built testing specialist prompt"
+          );
+          break;
+        }
+
+        case "security":
+          prompt = buildSecurityFileReviewPrompt(manifest, repoContext, repoPath);
+          this.logger.info("Built security specialist prompt");
+          break;
+
+        case "performance":
+          prompt = buildPerformanceFileReviewPrompt(manifest, repoContext, repoPath);
+          this.logger.info("Built performance specialist prompt");
+          break;
+        default:
+          prompt = buildGeneralFileReviewPrompt(
+            manifest,
+            commentsContext || undefined,
+            repoContext,
+            repoPath
+          );
+          this.logger.info("Built general review prompt");
+          break;
       }
 
       // Single AI call for all files
@@ -865,44 +893,71 @@ export class ReviewEngine {
       const commentsContext = formatExistingCommentsContext(existingComments);
       let prompt: string;
 
-      if (reviewType === "testing") {
-        // Build production-to-test mapping for testing specialist
-        const allChangedFiles = files.map((f) => f.filename);
-        const productionToTestMap = new Map<string, string | undefined>();
+      switch (reviewType) {
+        case "testing": {
+          // Build production-to-test mapping for testing specialist
+          const allChangedFiles = files.map((f) => f.filename);
+          const productionToTestMap = new Map<string, string | undefined>();
 
-        for (const filename of allChangedFiles) {
-          if (!isTestFile(filename)) {
-            const testFile = findTestFileForProduction(filename, allChangedFiles);
-            productionToTestMap.set(filename, testFile);
+          for (const filename of allChangedFiles) {
+            if (!isTestFile(filename)) {
+              const testFile = findTestFileForProduction(filename, allChangedFiles);
+              productionToTestMap.set(filename, testFile);
+            }
           }
+
+          const context: TestingCrossFileContext = {
+            fileReviewResults: fileResults,
+            productionToTestMap,
+            allChangedFiles,
+            filesSummary,
+          };
+
+          prompt = buildTestingCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          this.logger.info(
+            {
+              productionFiles: productionToTestMap.size,
+              mappedTests: Array.from(productionToTestMap.values()).filter((v) => v).length,
+            },
+            "Built testing specialist cross-file prompt"
+          );
+          break;
         }
 
-        const context: TestingCrossFileContext = {
-          fileReviewResults: fileResults,
-          productionToTestMap,
-          allChangedFiles,
-          filesSummary,
-        };
+        case "security": {
+          const context: SecurityCrossFileContext = {
+            filesSummary,
+            fileReviewResults: fileResults,
+            existingCommentsContext: commentsContext,
+          };
 
-        prompt = buildTestingCrossFilePrompt(prDetails, context, repoContext, repoPath);
-        this.logger.info(
-          {
-            productionFiles: productionToTestMap.size,
-            mappedTests: Array.from(productionToTestMap.values()).filter((v) => v).length,
-          },
-          "Built testing specialist cross-file prompt"
-        );
-      } else {
-        // General review
-        prompt = buildCrossFilePrompt(
-          prDetails,
-          filesSummary,
-          fileResults,
-          commentsContext,
-          repoContext,
-          repoPath
-        );
-        this.logger.info("Built general cross-file prompt");
+          prompt = buildSecurityCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          this.logger.info("Built security specialist cross-file prompt");
+          break;
+        }
+
+        case "performance": {
+          const context: PerformanceCrossFileContext = {
+            filesSummary,
+            fileReviewResults: fileResults,
+            existingCommentsContext: commentsContext,
+          };
+
+          prompt = buildPerformanceCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          this.logger.info("Built performance specialist cross-file prompt");
+          break;
+        }
+        default: {
+          const context: GeneralCrossFileContext = {
+            filesSummary,
+            fileReviewResults: fileResults,
+            existingCommentsContext: commentsContext,
+          };
+
+          prompt = buildGeneralCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          this.logger.info("Built general cross-file prompt");
+          break;
+        }
       }
 
       const streaming = this.createStreamingCallback("Cross-file analysis...");

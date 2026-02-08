@@ -53,11 +53,13 @@ Add a specialist review type when:
 ```
 src/
 ├── ai/prompts/
-│   ├── specialists/
-│   │   ├── types.ts               # Shared types for specialists
-│   │   ├── testing.ts             # Testing specialist prompts
-│   │   └── <new-specialist>.ts    # Your new specialist
-│   └── specialized.ts             # Security/Performance prompts
+│   └── specialists/
+│       ├── types.ts               # Shared types for specialists
+│       ├── general.ts             # General code review prompts
+│       ├── testing.ts             # Testing specialist prompts
+│       ├── security.ts            # Security specialist prompts
+│       ├── performance.ts         # Performance specialist prompts
+│       └── <new-specialist>.ts    # Your new specialist
 ├── config.ts                      # ReviewType union
 ├── constants.ts                   # Category emojis
 └── review/
@@ -564,11 +566,18 @@ merge-mentor review --pr 123 --review-type accessibility --write
 
 For a specialist that doesn't need custom context (like the existing `security` and `performance` specialists), you can keep it simple:
 
-**In `src/ai/prompts/specialized.ts`:**
+**Create `src/ai/prompts/specialists/documentation.ts`:**
 
 ```typescript
-export function buildDocumentationReviewPrompt(
+import type { DiffManifest } from "../../../review/diffStorage.js";
+
+export function buildDocumentationFileReviewPrompt(
   manifest: DiffManifest,
+  context?: {
+    filesSummary?: string;
+    fileReviewResults?: string;
+    existingCommentsContext?: string;
+  },
   repoContext?: string,
   repoPath?: string,
 ): string {
@@ -593,23 +602,52 @@ ${filesListing}
 # OUTPUT
 Respond with valid JSON with findings array...`;
 }
+
+export function buildDocumentationCrossFilePrompt(
+  prDetails: { title: string; description: string },
+  context: {
+    filesSummary?: string;
+    fileReviewResults?: string;
+    existingCommentsContext?: string;
+  },
+  repoContext?: string,
+  repoPath?: string,
+): string {
+  return `# YOUR ROLE
+You are a **Documentation Specialist** performing cross-file documentation review.
+
+# PR DETAILS
+Title: ${prDetails.title}
+Description: ${prDetails.description}
+
+${context.filesSummary || ""}
+
+# OUTPUT
+Respond with valid JSON with findings array...`;
+}
 ```
 
-**In `engine.ts`:**
+**Update `engine.ts`:**
 
 ```typescript
 import {
-  buildSecurityReviewPrompt,
-  buildPerformanceReviewPrompt,
-  buildDocumentationReviewPrompt
-} from "../ai/prompts/specialized.js";
+  buildSecurityFileReviewPrompt,
+  buildSecurityCrossFilePrompt
+} from "../ai/prompts/specialists/security.js";
+import {
+  buildDocumentationFileReviewPrompt,
+  buildDocumentationCrossFilePrompt
+} from "../ai/prompts/specialists/documentation.js";
 
-// In reviewFileBatch:
-} else if (reviewType === "documentation") {
-  prompt = buildDocumentationReviewPrompt(manifest, repoContext, repoPath);
-} else {
-  prompt = buildBatchedFileReviewPrompt(manifest, existingCommentsContext, repoContext, repoPath);
-}
+// In reviewFilesBatched:
+case "documentation":
+  prompt = buildDocumentationFileReviewPrompt(manifest, context, repoContext, repoPath);
+  break;
+
+// In performCrossFileAnalysis:
+case "documentation":
+  prompt = buildDocumentationCrossFilePrompt(prDetails, context, repoContext, repoPath);
+  break;
 ```
 
 ### Example 2: Language-Specific Specialist
@@ -790,8 +828,11 @@ merge-mentor review --pr 123 --review-type accessibility --runs 3 --write
 
 ## Getting Help
 
-- Review existing specialists: `src/ai/prompts/specialists/testing.ts` (most complete example)
-- Check simple specialists: `src/ai/prompts/specialized.ts` (security, performance)
+- Review existing specialists in `src/ai/prompts/specialists/`:
+  - `testing.ts` - Most complete example with custom context and language detection
+  - `security.ts` - Focused specialist with comprehensive security checks
+  - `performance.ts` - Performance-focused with algorithm and resource examples
+  - `general.ts` - General-purpose code review covering all aspects
 - See integration: `src/review/engine.ts` (search for `reviewType`)
 - Ask questions: Open an issue with the `enhancement` label
 

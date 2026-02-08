@@ -17,10 +17,6 @@ vi.mock("../ai/index.js", () => ({
     parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
     parseBatchedFileReview: (...args: unknown[]) => mockParseBatchedFileReview(...args),
   })),
-  // Specialized prompt builders
-  buildSecurityReviewPrompt: vi.fn(() => "mock security prompt"),
-  buildLogicReviewPrompt: vi.fn(() => "mock logic prompt"),
-  buildPerformanceReviewPrompt: vi.fn(() => "mock performance prompt"),
 }));
 
 // Mock the RepoManager to avoid actual git operations
