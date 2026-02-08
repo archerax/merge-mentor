@@ -46,6 +46,7 @@ function cleanEnv(): void {
   delete process.env.MM_OPENCODE_TIMEOUT;
   delete process.env.MM_CURSOR_MODEL;
   delete process.env.MM_CURSOR_TIMEOUT;
+  delete process.env.MM_REVIEW_TYPE;
 }
 
 function setEnv(overrides: Record<string, string>): void {
@@ -395,6 +396,43 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBe(90000);
       expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(5);
+    });
+
+    it("should load MM_REVIEW_TYPE from environment", () => {
+      setEnv({
+        MM_REVIEW_TYPE: "fast",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewType).toBe("fast");
+    });
+
+    it("should default MM_REVIEW_TYPE to general for invalid values", () => {
+      setEnv({
+        MM_REVIEW_TYPE: "invalid",
+      });
+
+      const config = loadConfig();
+
+      expect(config.reviewType).toBe("general");
+    });
+
+    it("should accept all valid MM_REVIEW_TYPE values", () => {
+      setEnv({ MM_REVIEW_TYPE: "general" });
+      expect(loadConfig().reviewType).toBe("general");
+
+      setEnv({ MM_REVIEW_TYPE: "testing" });
+      expect(loadConfig().reviewType).toBe("testing");
+
+      setEnv({ MM_REVIEW_TYPE: "security" });
+      expect(loadConfig().reviewType).toBe("security");
+
+      setEnv({ MM_REVIEW_TYPE: "performance" });
+      expect(loadConfig().reviewType).toBe("performance");
+
+      setEnv({ MM_REVIEW_TYPE: "fast" });
+      expect(loadConfig().reviewType).toBe("fast");
     });
   });
 

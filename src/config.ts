@@ -11,7 +11,7 @@ dotenv.config({ path: path.join(process.cwd(), ".env"), quiet: true });
 export type Platform = "github" | "azure";
 
 /** Supported review types for specialized analysis. */
-export type ReviewType = "general" | "testing" | "security" | "performance";
+export type ReviewType = "general" | "testing" | "security" | "performance" | "fast";
 
 /** GitHub-specific configuration. */
 export interface GitHubConfig {
@@ -177,7 +177,7 @@ function validateAIProvider(value: string | undefined): AIProviderType {
 }
 
 function validateReviewType(value: string | undefined): ReviewType {
-  const validTypes: ReviewType[] = ["general", "testing", "security", "performance"];
+  const validTypes: ReviewType[] = ["general", "testing", "security", "performance", "fast"];
   if (value && validTypes.includes(value as ReviewType)) {
     return value as ReviewType;
   }

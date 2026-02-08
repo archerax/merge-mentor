@@ -233,7 +233,24 @@ export class ReviewEngine {
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
 
-    if (runs === 1) {
+    // Fast review combines file and cross-file analysis in a single pass
+    if (reviewType === "fast") {
+      this.log("Using fast review mode (single-pass file + architectural analysis)...");
+      const fastReviewData = await this.performFastReview(
+        prIdentifier,
+        prDetails,
+        files,
+        existingComments,
+        repoContext?.content,
+        repoContext?.repoPath
+      );
+      fileResults = fastReviewData.fileResults;
+      crossFileResult = fastReviewData.crossFileResult;
+      filesSkipped = 0; // Fast review doesn't use caching yet
+
+      // Validate line numbers against actual diff content
+      fileResults = this.validateLineNumbers(fileResults, files);
+    } else if (runs === 1) {
       // Single run - use existing logic
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -978,6 +995,110 @@ export class ReviewEngine {
     } catch (error) {
       this.auditLogger.logCrossFileReviewComplete(
         prDetails.number,
+        0,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Performs fast review (combined file + cross-file analysis in single pass).
+   * This reduces AI calls by combining both passes into one, saving costs.
+   */
+  private async performFastReview(
+    prIdentifier: string,
+    prDetails: PRDetails,
+    files: PRFile[],
+    existingComments: readonly ExistingComment[],
+    repoContext?: string,
+    repoPath?: string
+  ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
+    this.log("Performing fast review (combined file + architectural analysis)...");
+
+    // Extract PR number for audit logging
+    const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
+    this.auditLogger.logFileReviewStart("fast-review", prNumber);
+
+    // Filter files with patches
+    const filesWithPatches = files.filter((f) => !this.shouldSkipFile(f) && f.patch);
+    if (filesWithPatches.length === 0) {
+      return {
+        fileResults: [],
+        crossFileResult: {
+          overallAssessment: "No files to review",
+          findings: [],
+          recommendations: [],
+        },
+      };
+    }
+
+    const diffStorage = new DiffStorage();
+
+    try {
+      // Store diffs to disk
+      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
+      this.logger.info(
+        { prNumber, fileCount: manifest.files.length, diffDir },
+        "Stored diffs for fast review"
+      );
+
+      // Copy diff files to repo's .merge-mentor directory for AI access
+      await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
+
+      // Build combined prompt for fast review
+      const commentsContext = formatExistingCommentsContext(existingComments);
+      const { buildFastReviewPrompt } = await import("../ai/prompts/specialists/fast.js");
+      const prompt = buildFastReviewPrompt(
+        prDetails,
+        manifest,
+        commentsContext || undefined,
+        repoContext,
+        repoPath
+      );
+
+      this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
+
+      // Single AI call for combined analysis
+      const streaming = this.createStreamingCallback("Fast review (file + architecture)...");
+      let response: AIResponse;
+      try {
+        response = await this.provider.executePrompt(prompt, {
+          workingDirectory: repoPath,
+          onStreamData: streaming.callback,
+        });
+      } finally {
+        streaming.finish();
+      }
+
+      // Parse combined response
+      const result = this.provider.parseFastReview(response);
+
+      // Log results
+      const totalFileFindings = result.fileResults.reduce(
+        (sum, r) => sum + r.findings.length,
+        0
+      );
+      const crossFileFindings = result.crossFileResult.findings.length;
+      this.log(
+        `  Fast review found ${totalFileFindings} file-level issues and ${crossFileFindings} architectural issues`
+      );
+
+      for (const fileResult of result.fileResults) {
+        if (fileResult.findings.length > 0) {
+          this.log(`    ${fileResult.filename}: ${fileResult.findings.length} issues`);
+        }
+      }
+
+      this.auditLogger.logFileReviewComplete("fast-review", prNumber, totalFileFindings);
+      this.auditLogger.logCrossFileReviewComplete(prNumber, crossFileFindings);
+
+      return result;
+    } catch (error) {
+      this.auditLogger.logFileReviewComplete(
+        "fast-review",
+        prNumber,
         0,
         "failure",
         (error as Error).message

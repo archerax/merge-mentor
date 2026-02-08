@@ -228,7 +228,7 @@ export MM_POST_RESOLUTION_COMMENTS=true
 export MM_REVIEW_RUNS=1  # 1-5 runs
 
 # Review type (specialist reviews)
-export MM_REVIEW_TYPE=general  # general, testing, security, or performance
+export MM_REVIEW_TYPE=general  # general, testing, security, performance, or fast
 
 # Bot identifier
 export MM_COMMENT_IDENTIFIER="[merge-mentor]"
@@ -457,7 +457,7 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|opencode\|cursor\|openai>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
-| `--review-type <type>` | Review type: general, testing, security, performance | `MM_REVIEW_TYPE` | `general` |
+| `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
@@ -558,23 +558,28 @@ merge-mentor review --pr 123 --review-type security --write
 
 # Performance-focused review - optimization opportunities
 merge-mentor review --pr 123 --review-type performance --write
+
+# Fast review - single-pass for cost savings (~50% reduction)
+merge-mentor review --pr 123 --review-type fast --write
 ```
 
 **Available Review Types:**
 
-- **`general`** (default): Comprehensive review covering all aspects - bugs, security, performance, quality, and documentation
+- **`general`** (default): Comprehensive review covering all aspects - bugs, security, performance, quality, and documentation (2 AI calls: file-level + cross-file analysis)
 - **`testing`**: Testing specialist focused exclusively on test quality and coverage
 - **`security`**: Security specialist focused exclusively on vulnerabilities and threats
 - **`performance`**: Performance specialist focused exclusively on efficiency and optimization
+- **`fast`**: Combined file and architectural review in a single AI call (~50% cost reduction compared to general)
 
 **When to Use Specialist Reviews:**
 
-| Review Type     | Use When                                       | What It Checks                                                                      |
-| --------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **testing**     | Adding/modifying tests or testable code        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
-| **security**    | Handling sensitive data or auth flows          | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
-| **performance** | Performance-critical paths or scaling concerns | Algorithm efficiency, resource usage, caching opportunities, database queries       |
-| **general**     | Standard development or unsure what to check   | All aspects: bugs, security, performance, quality, documentation                    |
+| Review Type     | Use When                                       | AI Calls | What It Checks                                                                      |
+| --------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| **general**     | Standard development or unsure what to check   | 2        | All aspects: bugs, security, performance, quality, documentation                    |
+| **fast**        | Need cost savings, routine PRs                 | 1        | Same as general but in single pass (file + architectural analysis combined)         |
+| **testing**     | Adding/modifying tests or testable code        | 2        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
+| **security**    | Handling sensitive data or auth flows          | 2        | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
+| **performance** | Performance-critical paths or scaling concerns | 2        | Algorithm efficiency, resource usage, caching opportunities, database queries       |
 
 #### Testing Review Deep Dive
 

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fast Review Type**: New `--review-type fast` option that combines file-level and cross-file analysis in a single AI call
+  - Reduces costs by ~50% compared to the default two-pass `general` review
+  - Single-pass covers both individual code issues and architectural concerns
+  - Flexible comment attribution: line-specific, file-level, or PR-level findings
+  - Same analysis depth as general review with fewer AI calls
+  - Ideal for cost savings on routine PRs while maintaining quality standards
 - **Extensibility Documentation** - Comprehensive guide for adding new specialist review types:
   - Created `EXTENDING.md` with step-by-step instructions for implementing new specialists
   - Complete code examples for both complex (with custom context) and simple specialists

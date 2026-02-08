@@ -16,6 +16,7 @@ import type {
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
+  FastReviewResult,
   TokenUsage,
 } from "../types.js";
 
@@ -123,6 +124,25 @@ interface RawCrossFileReviewResponse {
 /** Raw batched file review response from Copilot. */
 interface RawBatchedFileReviewResponse {
   file_results?: Record<string, RawFileReviewResponse>;
+}
+
+/** Raw fast review finding from Copilot. */
+interface RawFastReviewFinding {
+  file?: unknown;
+  line?: unknown;
+  severity?: unknown;
+  confidence?: unknown;
+  category?: unknown;
+  message?: unknown;
+  suggestion?: unknown;
+  reasoning?: unknown;
+  isPreExisting?: unknown;
+}
+
+/** Raw fast review response from Copilot. */
+interface RawFastReviewResponse {
+  summary?: string;
+  findings?: RawFastReviewFinding[];
 }
 
 /**
@@ -831,6 +851,88 @@ export class CopilotProvider implements AIProviderClient {
     );
 
     return results;
+  }
+
+  /**
+   * Parses a fast review response (combined file + cross-file analysis).
+   * Splits findings by attribution type into file and cross-file results.
+   *
+   * @param response - Raw Copilot response with flat findings list
+   * @returns Combined file and cross-file review results
+   */
+  parseFastReview(response: AIResponse): FastReviewResult {
+    const data = response.parsed as RawFastReviewResponse;
+
+    // Group findings by file, separating general findings
+    const fileFindings = new Map<string, FileFinding[]>();
+    const crossFileFindings: CrossFileFinding[] = [];
+
+    if (Array.isArray(data.findings)) {
+      for (const finding of data.findings) {
+        const file = finding.file ? String(finding.file) : undefined;
+        const line = typeof finding.line === "number" ? finding.line : undefined;
+
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        // Validate reasoning quality
+        if (finding.reasoning) {
+          const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
+          this.validateReasoning(reasoning, context, line || "general");
+        }
+
+        // Determine if this is a file-level or cross-file finding
+        if (file) {
+          // File-level finding (with or without line number)
+          if (!fileFindings.has(file)) {
+            fileFindings.set(file, []);
+          }
+
+          fileFindings.get(file)!.push({
+            line: line || 0,
+            severity: this.validateSeverity(finding.severity),
+            confidence: this.validateConfidence(finding.confidence),
+            category: this.validateCategory(finding.category),
+            message: String(finding.message || ""),
+            suggestion: String(finding.suggestion || ""),
+            reasoning,
+            isPreExisting:
+              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
+          });
+        } else {
+          // Cross-file/general finding
+          crossFileFindings.push({
+            severity: this.validateSeverity(finding.severity),
+            confidence: this.validateConfidence(finding.confidence),
+            category: this.validateCrossFileCategory(finding.category),
+            message: String(finding.message || ""),
+            reasoning,
+            affectedFiles: [], // No specific files attributed
+          });
+        }
+      }
+    }
+
+    // Convert map to file results array
+    const fileResults: FileReviewResult[] = Array.from(fileFindings.entries()).map(
+      ([filename, findings]) => ({
+        filename,
+        findings,
+      })
+    );
+
+    // Build cross-file result
+    const crossFileResult: CrossFileReviewResult = {
+      overallAssessment: String(data.summary || "Review completed"),
+      findings: crossFileFindings,
+      recommendations: [], // Fast review doesn't separate recommendations
+    };
+
+    return {
+      fileResults,
+      crossFileResult,
+    };
   }
 
   private validateSeverity(value: unknown): FileFinding["severity"] {

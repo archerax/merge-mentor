@@ -433,7 +433,7 @@ program
   })
   .option(
     "--review-type <type>",
-    "Type of review (general, testing, security, performance). Env: MM_REVIEW_TYPE",
+    "Type of review (general, testing, security, performance, fast). Env: MM_REVIEW_TYPE",
     "general"
   )
   // GitHub options

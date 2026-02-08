@@ -14,6 +14,7 @@ import type {
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
+  FastReviewResult,
 } from "../types.js";
 
 /**
@@ -127,6 +128,25 @@ interface RawCrossFileReviewResponse {
 /** Raw batched file review response from OpenCode. */
 interface RawBatchedFileReviewResponse {
   file_results?: Record<string, RawFileReviewResponse>;
+}
+
+/** Raw fast review finding from OpenCode. */
+interface RawFastReviewFinding {
+  file?: unknown;
+  line?: unknown;
+  severity?: unknown;
+  confidence?: unknown;
+  category?: unknown;
+  message?: unknown;
+  suggestion?: unknown;
+  reasoning?: unknown;
+  isPreExisting?: unknown;
+}
+
+/** Raw fast review response from OpenCode. */
+interface RawFastReviewResponse {
+  summary?: string;
+  findings?: RawFastReviewFinding[];
 }
 
 /**
@@ -486,6 +506,78 @@ export class OpenCodeProvider implements AIProviderClient {
     }
 
     return results;
+  }
+
+  /**
+   * Parses a fast review response (combined file + cross-file analysis).
+   * Splits findings by attribution type into file and cross-file results.
+   */
+  parseFastReview(response: AIResponse): FastReviewResult {
+    const data = response.parsed as RawFastReviewResponse;
+
+    const fileFindings = new Map<string, FileFinding[]>();
+    const crossFileFindings: CrossFileFinding[] = [];
+
+    if (Array.isArray(data.findings)) {
+      for (const finding of data.findings) {
+        const file = finding.file ? String(finding.file) : undefined;
+        const line = typeof finding.line === "number" ? finding.line : undefined;
+
+        const reasoning = finding.reasoning
+          ? String(finding.reasoning)
+          : "Reasoning not provided by the model.";
+
+        if (finding.reasoning) {
+          const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
+          this.validateReasoning(reasoning, context, line || "general");
+        }
+
+        if (file) {
+          if (!fileFindings.has(file)) {
+            fileFindings.set(file, []);
+          }
+
+          fileFindings.get(file)!.push({
+            line: line || 0,
+            severity: this.validateSeverity(finding.severity),
+            confidence: this.validateConfidence(finding.confidence),
+            category: this.validateCategory(finding.category),
+            message: String(finding.message || ""),
+            suggestion: String(finding.suggestion || ""),
+            reasoning,
+            isPreExisting:
+              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
+          });
+        } else {
+          crossFileFindings.push({
+            severity: this.validateSeverity(finding.severity),
+            confidence: this.validateConfidence(finding.confidence),
+            category: this.validateCrossFileCategory(finding.category),
+            message: String(finding.message || ""),
+            reasoning,
+            affectedFiles: [],
+          });
+        }
+      }
+    }
+
+    const fileResults: FileReviewResult[] = Array.from(fileFindings.entries()).map(
+      ([filename, findings]) => ({
+        filename,
+        findings,
+      })
+    );
+
+    const crossFileResult: CrossFileReviewResult = {
+      overallAssessment: String(data.summary || "Review completed"),
+      findings: crossFileFindings,
+      recommendations: [],
+    };
+
+    return {
+      fileResults,
+      crossFileResult,
+    };
   }
 
   private validateSeverity(value: unknown): FileFinding["severity"] {

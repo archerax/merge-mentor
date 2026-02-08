@@ -1,5 +1,11 @@
 import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types.js";
 
+/** Combined result from fast review (single-pass file + cross-file analysis). */
+export interface FastReviewResult {
+  readonly fileResults: FileReviewResult[];
+  readonly crossFileResult: CrossFileReviewResult;
+}
+
 /** Supported AI provider types. */
 export type AIProviderType = "copilot" | "opencode" | "cursor";
 
@@ -78,4 +84,13 @@ export interface AIProviderClient {
    * @returns Array of structured file review results
    */
   parseBatchedFileReview(response: AIResponse): FileReviewResult[];
+
+  /**
+   * Parses an AI response from fast review (combined file + cross-file analysis).
+   * Splits the flat findings list into file-level and cross-file results.
+   *
+   * @param response - Raw AI response containing combined findings
+   * @returns Combined file and cross-file review results
+   */
+  parseFastReview(response: AIResponse): FastReviewResult;
 }
