@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-02-08
+
 ### Added
 
 - **Fast Review Type**: New `--review-type fast` option that combines file-level and cross-file analysis in a single AI call
