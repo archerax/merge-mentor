@@ -199,8 +199,7 @@ export class CommentManager {
 
     return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
-**Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}  
-**Line**: ${finding.line}
+**Severity**: ${severityEmoji} ${finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1)}
 
 **Issue**: ${finding.message}
 

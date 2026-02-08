@@ -92,15 +92,6 @@ describe("CommentManager", () => {
       expect(result).toContain("⚪");
     });
 
-    it("should include line number in formatted comment", () => {
-      const manager = createCommentManager();
-      const finding = createFileFinding({ line: 42 });
-
-      const result = manager.formatInlineComment(finding);
-
-      expect(result).toContain("**Line**: 42");
-    });
-
     it("should format suggestion text", () => {
       const manager = createCommentManager();
       const finding = createFileFinding({

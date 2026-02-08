@@ -312,6 +312,12 @@ export class RepoManager {
     const remoteUrl = this.buildCloneUrl(repoInfo, token);
 
     try {
+      // Clean any leftover files from previous reviews
+      await this.execWithTimeout(
+        `git -C "${repoPath}" clean -fdx`,
+        this.fetchTimeoutMs
+      );
+
       // Update remote URL
       await this.execWithTimeout(
         `git -C "${repoPath}" remote set-url origin "${remoteUrl}"`,
