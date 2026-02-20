@@ -165,16 +165,16 @@ export MM_REVIEW_TYPE=testing
 - **Per-run log files** - Each review run now generates a unique timestamped log file (e.g., `merge-mentor_2025-01-06_18-40-30.log`) instead of overwriting a single log file. This preserves historical logs and makes debugging easier.
 - **Unique PR identifiers** - Cache files, diff storage, and reports now use platform-aware unique identifiers (e.g., `Github-myrepo-PR123`, `Azure-MyProject-PR456`) instead of just PR numbers. This prevents conflicts when working with multiple platforms or projects.
 - **Enhanced syntax tolerance** - AI prompts now explicitly instruct models not to flag syntax or compilation issues, assuming all code is valid. This reduces false positives for newer language features the model may not recognize.
-- **Detailed markdown reports in dry-run mode** - Dry runs now automatically generate comprehensive markdown reports saved to `.merge-mentor/reports/{platform}-{project}-PR{number}-review-report.md`. Reports include PR metadata, issue summaries by severity/category with visual indicators, detailed file-specific findings, cross-file analysis, overall assessment, and recommendations. Perfect for viewing all issues when console output is too limited.
+- **Detailed markdown reports in dry-run mode** - Dry runs now automatically generate comprehensive markdown reports saved to `.mergementor/reports/{platform}-{project}-PR{number}-review-report.md`. Reports include PR metadata, issue summaries by severity/category with visual indicators, detailed file-specific findings, cross-file analysis, overall assessment, and recommendations. Perfect for viewing all issues when console output is too limited.
 - **Batched file review mode** - Major performance improvement for large PRs. Instead of making one AI call per file (50-300 calls for large PRs), the tool now stores all diffs to disk and makes a single batched AI call to review all files at once. This reduces review time from potentially hours to minutes for large PRs.
 
 ### Changed
 
 - **Debug output moved to logs** - All debug messages (diff processing, JSON parsing, file copying, etc.) are now written to log files instead of cluttering console output. Console output is now clean and focused on user-relevant information.
 - **Stronger focus on changed lines** - AI prompts now emphasize more strongly that only NEW issues introduced in added/modified lines should be flagged, not pre-existing code issues.
-- **File organization** - Cache files now use unique identifiers: `.merge-mentor/cache/Github-myrepo-PR123.json` instead of `pr-123.json`. Diff storage similarly uses unique directory names.
+- **File organization** - Cache files now use unique identifiers: `.mergementor/cache/Github-myrepo-PR123.json` instead of `pr-123.json`. Diff storage similarly uses unique directory names.
 - **Review architecture** - File reviews now use a batched approach:
-  1. Diffs are stored to `.merge-mentor/diffs/{platform}-{project}-PR{number}/` directory
+  1. Diffs are stored to `.mergementor/diffs/{platform}-{project}-PR{number}/` directory
   2. A single AI call reviews all files using `@filename` syntax to read diff files
   3. Cross-file analysis remains a separate call
   4. Total AI calls reduced from N+1 (per file + cross-file) to 2 (batched + cross-file)
@@ -183,7 +183,7 @@ export MM_REVIEW_TYPE=testing
 
 - **Azure DevOps large PR support** - Fixed "Invalid number of file diffs requested" error when reviewing PRs with more than 10 files. The Azure DevOps API limits `getFileDiffs` to 10 files per request, so file diffs are now automatically batched in groups of 10. PRs with any number of files are now supported.
 
-- **Copilot CLI argument length limit** - Large prompts now use temporary files with `@filename` syntax instead of passing the entire prompt as a CLI argument. This prevents failures when reviewing PRs with large diffs or many existing comments. Temp files are automatically created in `.merge-mentor/temp/` and cleaned up after execution. The `--allow-all-tools` flag is used to allow Copilot to read the temp files.
+- **Copilot CLI argument length limit** - Large prompts now use temporary files with `@filename` syntax instead of passing the entire prompt as a CLI argument. This prevents failures when reviewing PRs with large diffs or many existing comments. Temp files are automatically created in `.mergementor/temp/` and cleaned up after execution. The `--allow-all-tools` flag is used to allow Copilot to read the temp files.
 
 ## [1.6.0] - 2025-12-30
 
@@ -212,7 +212,7 @@ merge-mentor review --pr 123 --write
 
 # Use Cursor CLI
 export AI_PROVIDER=cursor
-export CURSOR_MODEL=gpt-5
+export CURSOR_MODEL=claude-haiku-4.5
 merge-mentor review --pr 123 --write
 
 # Or via CLI flag (overrides environment variable)
@@ -225,7 +225,7 @@ merge-mentor review --pr 123 --provider cursor --write
 
 - **Windows and macOS compatibility**: Full cross-platform support for Windows, macOS, and Linux. Build scripts now use `cross-env` for environment variable handling, and command execution explicitly avoids shell-specific syntax. Documentation includes platform-specific configuration examples.
 
-- **Comprehensive audit logging for security and compliance**: All critical bot actions are now logged with structured data, including PR operations, comment actions, AI executions, and review lifecycle events. Audit logs are written to `.merge-mentor/logs/merge-mentor.log` in JSON format for easy parsing and analysis. Enabled by default for enterprise compliance requirements.
+- **Comprehensive audit logging for security and compliance**: All critical bot actions are now logged with structured data, including PR operations, comment actions, AI executions, and review lifecycle events. Audit logs are written to `.mergementor/logs/merge-mentor.log` in JSON format for easy parsing and analysis. Enabled by default for enterprise compliance requirements.
 
 ## [1.4.0] - 2025-12-25
 
@@ -299,7 +299,7 @@ export POST_RESOLUTION_COMMENTS=true
 ### Changed
 
 - **Breaking**: `.env` configuration file must be in your current working directory, not the installation directory
-- **Breaking**: Logs are now written to `.merge-mentor/logs/` in your current directory
+- **Breaking**: Logs are now written to `.mergementor/logs/` in your current directory
 
 ### Migration
 
@@ -335,7 +335,7 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 
 - Incremental caching: Only reviews changed files on subsequent runs (85% faster)
 - Rate limit handling with automatic retry
-- Configurable AI model selection (GPT-4, Claude, etc.)
+- Configurable AI model selection (claude-haiku-4.5, claude-sonnet-4.5, claude-opus-4.5)
 - Timeout controls for large PRs
 
 **Review Categories**

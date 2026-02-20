@@ -31,25 +31,6 @@ Your working directory is set to the repository root.
 }
 
 /**
- * Builds a repository context section for prompts.
- */
-function buildRepoContextSection(repoContext?: string): string {
-  if (!repoContext) return "";
-
-  return `
----
-# REPOSITORY-SPECIFIC GUIDELINES
-
-The following standards are specific to this project.
-**These take precedence over generic best practices.**
-
-${repoContext}
-
----
-`;
-}
-
-/**
  * Context for performance cross-file analysis.
  */
 export interface PerformanceCrossFileContext {
@@ -64,10 +45,9 @@ export interface PerformanceCrossFileContext {
  */
 export function buildPerformanceFileReviewPrompt(
   manifest: DiffManifest,
-  repoContext?: string,
   repoPath?: string
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -75,13 +55,12 @@ export function buildPerformanceFileReviewPrompt(
     )
     .join("\n");
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
 
   return `# YOUR ROLE
 You are a **Performance Engineer** performing a performance-focused code review.
 Your ONLY job is to find performance issues and inefficiencies.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # CRITICAL SCOPE RESTRICTIONS
 
 **ONLY REPORT** performance issues. You MUST IGNORE:
@@ -448,7 +427,6 @@ REMEMBER: Include entry for EVERY file listed, even with empty findings. Only re
 export function buildPerformanceCrossFilePrompt(
   prDetails: PRDetails,
   context: PerformanceCrossFileContext,
-  repoContext?: string,
   repoPath?: string
 ): string {
   const { filesSummary, fileReviewResults, existingCommentsContext } = context;
@@ -462,7 +440,6 @@ export function buildPerformanceCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW performance concerns not already covered.\n`
     : "";
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = repoPath
     ? `
 ---
@@ -504,7 +481,7 @@ Your working directory is set to the repository root.
   return `# YOUR ROLE
 Performance engineer performing system-level performance analysis of a pull request.
 Your focus is on cross-file performance concerns and architectural performance issues.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}

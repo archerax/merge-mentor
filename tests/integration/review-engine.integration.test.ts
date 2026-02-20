@@ -73,7 +73,7 @@ describe("ReviewEngine Integration", () => {
     consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Clean up cache directory before each test
     try {
-      await fs.rm(".merge-mentor", { recursive: true, force: true });
+      await fs.rm(".mergementor", { recursive: true, force: true });
     } catch {
       // Ignore cleanup errors
     }

@@ -32,25 +32,6 @@ Your working directory is set to the repository root.
 }
 
 /**
- * Builds a repository context section for prompts.
- */
-function buildRepoContextSection(repoContext?: string): string {
-  if (!repoContext) return "";
-
-  return `
----
-# REPOSITORY-SPECIFIC GUIDELINES
-
-The following standards are specific to this project.
-**These take precedence over generic best practices.**
-
-${repoContext}
-
----
-`;
-}
-
-/**
  * Gets language-specific testing guidance.
  */
 function getLanguageTestingGuidance(language: "csharp" | "typescript" | "unknown"): string {
@@ -147,10 +128,9 @@ function getLanguageTestingGuidance(language: "csharp" | "typescript" | "unknown
 export function buildTestingFileReviewPrompt(
   manifest: DiffManifest,
   context: TestingReviewContext,
-  repoContext?: string,
   repoPath?: string
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -158,7 +138,6 @@ export function buildTestingFileReviewPrompt(
     )
     .join("\n");
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
   const languageGuidance = getLanguageTestingGuidance(context.language);
 
@@ -187,7 +166,7 @@ Common test patterns to look for:
   return `# YOUR ROLE
 You are a **Test Quality Expert** performing a testing-focused code review.
 Your ONLY job is to evaluate test coverage, test quality, and code testability.
-${repoContextSection}${workspaceSection}${languageGuidance}
+${workspaceSection}${languageGuidance}
 # CRITICAL SCOPE RESTRICTIONS
 
 **ONLY REPORT** testing-related issues. You MUST IGNORE:
@@ -604,7 +583,6 @@ Why skip: Didn't verify - comprehensive integration tests exist in tests/integra
 export function buildTestingCrossFilePrompt(
   prDetails: PRDetails,
   context: TestingCrossFileContext,
-  repoContext?: string,
   repoPath?: string
 ): string {
   const findingsSummary = context.fileReviewResults
@@ -614,13 +592,12 @@ export function buildTestingCrossFilePrompt(
 
   const coverageAnalysis = analyzeCoveragePatterns(context);
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
 
   return `# YOUR ROLE
 Expert test architect performing holistic test coverage analysis across a pull request.
 Your focus is on testing patterns, coverage gaps, and test architecture.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}

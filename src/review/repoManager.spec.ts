@@ -25,11 +25,12 @@ const mockFs = vi.mocked(fs);
 
 describe("RepoManager", () => {
   let repoManager: RepoManager;
-  const testReposDir = "/test/.merge-mentor/repos";
+  const testTempPath = "/test/.mergementor";
+  const testReposDir = "/test/.mergementor/repos";
 
   beforeEach(() => {
     vi.clearAllMocks();
-    repoManager = new RepoManager({ reposDir: testReposDir });
+    repoManager = new RepoManager(testTempPath);
 
     // Default exec mock - succeeds
     mockExec.mockImplementation((_cmd, _opts, callback) => {
@@ -46,15 +47,14 @@ describe("RepoManager", () => {
 
   describe("constructor", () => {
     it("uses default options when none provided", () => {
-      const manager = new RepoManager();
+      const manager = new RepoManager(testTempPath);
       expect(manager).toBeDefined();
     });
 
     it("accepts custom options", () => {
-      const manager = new RepoManager({
+      const manager = new RepoManager(testTempPath, {
         cloneTimeoutMs: 60000,
         fetchTimeoutMs: 15000,
-        reposDir: "/custom/repos",
       });
       expect(manager).toBeDefined();
     });
@@ -200,133 +200,6 @@ describe("RepoManager", () => {
         expect.stringContaining("github-testowner-testrepo"),
         expect.objectContaining({ recursive: true, force: true })
       );
-    });
-  });
-
-  describe("loadRepoContext", () => {
-    const repoPath = "/test/repo";
-
-    it("loads AGENTS.md when present", async () => {
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        if (String(filePath).endsWith("AGENTS.md")) {
-          return "# Agent Instructions\nTest content";
-        }
-        throw new Error("ENOENT");
-      });
-      mockFs.readdir.mockRejectedValue(new Error("ENOENT"));
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      expect(context.filesLoaded).toContain("AGENTS.md");
-      expect(context.content).toContain("# Agent Instructions");
-      expect(context.repoPath).toBe(repoPath);
-    });
-
-    it("loads multiple context files", async () => {
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        const pathStr = String(filePath);
-        if (pathStr.endsWith("AGENTS.md")) {
-          return "# Agent Instructions";
-        }
-        if (pathStr.endsWith("CONTRIBUTING.md")) {
-          return "# Contributing Guide";
-        }
-        throw new Error("ENOENT");
-      });
-      mockFs.readdir.mockRejectedValue(new Error("ENOENT"));
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      expect(context.filesLoaded).toContain("AGENTS.md");
-      expect(context.filesLoaded).toContain("CONTRIBUTING.md");
-      expect(context.content).toContain("# Agent Instructions");
-      expect(context.content).toContain("# Contributing Guide");
-    });
-
-    it("loads .github/instructions files", async () => {
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        const pathStr = String(filePath);
-        if (pathStr.includes("clean-typescript.instructions.md")) {
-          return "# Clean TypeScript";
-        }
-        throw new Error("ENOENT");
-      });
-      mockFs.readdir.mockResolvedValue([
-        { isFile: () => true, name: "extra.instructions.md" },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-
-      // Override for extra file
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        const pathStr = String(filePath);
-        if (pathStr.includes("clean-typescript.instructions.md")) {
-          return "# Clean TypeScript";
-        }
-        if (pathStr.includes("extra.instructions.md")) {
-          return "# Extra Instructions";
-        }
-        throw new Error("ENOENT");
-      });
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      expect(context.content).toContain("# Clean TypeScript");
-    });
-
-    it("returns empty content when no context files found", async () => {
-      mockFs.readFile.mockRejectedValue(new Error("ENOENT"));
-      mockFs.readdir.mockRejectedValue(new Error("ENOENT"));
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      expect(context.filesLoaded).toHaveLength(0);
-      expect(context.content).toBe("");
-    });
-
-    it("skips empty files", async () => {
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        if (String(filePath).endsWith("AGENTS.md")) {
-          return "   \n\t  "; // Whitespace only
-        }
-        if (String(filePath).endsWith("CONTRIBUTING.md")) {
-          return "# Real content";
-        }
-        throw new Error("ENOENT");
-      });
-      mockFs.readdir.mockRejectedValue(new Error("ENOENT"));
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      expect(context.filesLoaded).not.toContain("AGENTS.md");
-      expect(context.filesLoaded).toContain("CONTRIBUTING.md");
-    });
-
-    it("does not load duplicate files from instructions directory", async () => {
-      const loadedFiles: string[] = [];
-      mockFs.readFile.mockImplementation(async (filePath) => {
-        const pathStr = String(filePath);
-        loadedFiles.push(pathStr);
-        // Return content for the file when loaded from CONTEXT_FILES path
-        if (
-          pathStr.includes(".github") &&
-          pathStr.includes("instructions") &&
-          pathStr.includes("clean-typescript.instructions.md")
-        ) {
-          return "# Clean TypeScript";
-        }
-        throw new Error("ENOENT");
-      });
-      // Mock readdir to also return the same file
-      mockFs.readdir.mockResolvedValue([
-        { isFile: () => true, name: "clean-typescript.instructions.md" },
-      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
-
-      const context = await repoManager.loadRepoContext(repoPath);
-
-      // Should only have one entry, not duplicate
-      const cleanTsCount = context.filesLoaded.filter((f) =>
-        f.includes("clean-typescript.instructions.md")
-      ).length;
-      expect(cleanTsCount).toBe(1);
     });
   });
 
@@ -490,9 +363,8 @@ describe("RepoManager", () => {
 
   describe("timeout handling", () => {
     it("handles clone timeout", async () => {
-      const manager = new RepoManager({
+      const manager = new RepoManager(testTempPath, {
         cloneTimeoutMs: 1, // 1ms timeout
-        reposDir: testReposDir,
       });
 
       mockFs.stat.mockRejectedValue(new Error("ENOENT"));

@@ -28,7 +28,15 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"],
-      "args": ["review", "--pr", "${input:prNumber}", "--platform", "${input:platform}"],
+      "args": [
+        "review",
+        "--pr",
+        "${input:prNumber}",
+        "--platform",
+        "${input:platform}",
+        "--review-type",
+        "fast"
+      ],
       "env": {
         "NODE_OPTIONS": "--enable-source-maps"
       }

@@ -252,7 +252,7 @@ describe("CursorProvider", () => {
     });
 
     it("should accept model option", () => {
-      const provider = new CursorProvider({ model: "gpt-5" });
+      const provider = new CursorProvider({ model: "claude-haiku-4.5" });
       expect(provider).toBeDefined();
     });
   });
@@ -380,7 +380,7 @@ describe("CursorProvider", () => {
     });
 
     it("should pass model parameter to cursor-agent CLI when specified", async () => {
-      const provider = new CursorProvider({ model: "gpt-5", maxRetries: 1 });
+      const provider = new CursorProvider({ model: "claude-haiku-4.5", maxRetries: 1 });
       mockSpawn.mockReturnValue(
         createMockProcess({
           stdout: '{"success": true}',
@@ -394,7 +394,7 @@ describe("CursorProvider", () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
-        ["-p", "test prompt", "--model", "gpt-5"],
+        ["-p", "test prompt", "--model", "claude-haiku-4.5"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );
     });

@@ -22,8 +22,8 @@ export class ReviewStateCache {
   private readonly cacheDir: string;
   private readonly logger = createChildLogger({ component: "ReviewStateCache" });
 
-  constructor(cacheDir = ".merge-mentor/cache") {
-    this.cacheDir = cacheDir;
+  constructor(tempPath: string) {
+    this.cacheDir = path.join(tempPath, "cache");
   }
 
   /**

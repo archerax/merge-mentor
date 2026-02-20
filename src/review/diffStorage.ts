@@ -38,14 +38,14 @@ export interface DiffStorageResult {
 
 /**
  * Handles storing PR diffs to the filesystem for batched review.
- * Diffs are stored in `.merge-mentor/diffs/{prIdentifier}/` directory.
+ * Diffs are stored in `{tempPath}/diffs/{prIdentifier}/` directory.
  */
 export class DiffStorage {
   private readonly baseDir: string;
   private readonly logger = createChildLogger({ component: "DiffStorage" });
 
-  constructor(baseDir?: string) {
-    this.baseDir = baseDir ?? path.join(process.cwd(), ".merge-mentor", "diffs");
+  constructor(tempPath: string) {
+    this.baseDir = path.join(tempPath, "diffs");
   }
 
   /**

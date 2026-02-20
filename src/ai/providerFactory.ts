@@ -15,13 +15,13 @@ import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./type
  * @example
  * ```typescript
  * // Create a Copilot provider
- * const copilot = createAIProvider("copilot", { model: "gpt-4o" });
+ * const copilot = createAIProvider("copilot", { model: "claude-sonnet-4.6" });
  *
  * // Create an OpenCode provider
- * const opencode = createAIProvider("opencode", { model: "claude-3.5-sonnet" });
+ * const opencode = createAIProvider("opencode", { model: "claude-sonnet-4.6" });
  *
  * // Create a Cursor provider
- * const cursor = createAIProvider("cursor", { model: "gpt-5" });
+ * const cursor = createAIProvider("cursor", { model: "claude-sonnet-4.6" });
  * ```
  */
 export function createAIProvider(

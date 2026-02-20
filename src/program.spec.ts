@@ -57,12 +57,13 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
     botCommentIdentifier: "[merge-mentor]",
     aiProvider: "copilot",
-    copilotModel: "gpt-4",
+    copilotModel: "claude-sonnet-4.6",
     skipPreExisting: true,
     reviewRuns: 1,
     reviewType: "general",
     streamingEnabled: true,
     streamingLines: 5,
+    tempPath: "./.mergementor",
     ...overrides,
   };
 }
@@ -156,7 +157,7 @@ describe("CLI", () => {
         expect.objectContaining({
           dryRun: true,
           verbose: true,
-          aiModel: "gpt-4",
+          aiModel: "claude-sonnet-4.6",
           reviewRuns: 1,
         })
       );
@@ -199,7 +200,7 @@ describe("CLI", () => {
         expect.objectContaining({
           dryRun: false,
           verbose: false,
-          aiModel: "gpt-4",
+          aiModel: "claude-sonnet-4.6",
           reviewRuns: 1,
         })
       );
@@ -376,7 +377,7 @@ describe("CLI", () => {
     it("uses opencode provider when specified via --provider", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
-          opencodeModel: "claude-3.5-sonnet",
+          opencodeModel: "claude-4.5-sonnet",
           opencodeTimeoutMs: 120000,
         })
       );
@@ -395,7 +396,7 @@ describe("CLI", () => {
         "[merge-mentor]",
         "opencode",
         expect.objectContaining({
-          aiModel: "claude-3.5-sonnet",
+          aiModel: "claude-4.5-sonnet",
           aiTimeoutMs: 120000,
         })
       );
@@ -404,7 +405,7 @@ describe("CLI", () => {
     it("uses cursor provider when specified via --provider", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
-          cursorModel: "gpt-5",
+          cursorModel: "claude-sonnet-4.6",
           cursorTimeoutMs: 180000,
         })
       );
@@ -423,7 +424,7 @@ describe("CLI", () => {
         "[merge-mentor]",
         "cursor",
         expect.objectContaining({
-          aiModel: "gpt-5",
+          aiModel: "claude-sonnet-4.6",
           aiTimeoutMs: 180000,
         })
       );

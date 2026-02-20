@@ -31,25 +31,6 @@ Your working directory is set to the repository root.
 }
 
 /**
- * Builds a repository context section for prompts.
- */
-function buildRepoContextSection(repoContext?: string): string {
-  if (!repoContext) return "";
-
-  return `
----
-# REPOSITORY-SPECIFIC GUIDELINES
-
-The following standards are specific to this project.
-**These take precedence over generic best practices.**
-
-${repoContext}
-
----
-`;
-}
-
-/**
  * Context for general cross-file analysis.
  */
 export interface GeneralCrossFileContext {
@@ -65,10 +46,9 @@ export interface GeneralCrossFileContext {
 export function buildGeneralFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoContext?: string,
   repoPath?: string
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -85,12 +65,11 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 `
     : "";
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
 
   return `# YOUR ROLE
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # TASK
 Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
 
@@ -292,7 +271,6 @@ REMEMBER: Include entry for EVERY file listed, even with empty findings.
 export function buildGeneralCrossFilePrompt(
   prDetails: PRDetails,
   context: GeneralCrossFileContext,
-  repoContext?: string,
   repoPath?: string
 ): string {
   const { filesSummary, fileReviewResults, existingCommentsContext } = context;
@@ -306,7 +284,6 @@ export function buildGeneralCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
     : "";
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = repoPath
     ? `
 ---
@@ -347,7 +324,7 @@ Your working directory is set to the repository root.
 
   return `# YOUR ROLE
 Expert code reviewer performing holistic architectural analysis of a pull request.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}

@@ -209,12 +209,12 @@ describe("Config", () => {
 
     it("should load MM_COPILOT_MODEL from environment", () => {
       setEnv({
-        MM_COPILOT_MODEL: "gpt-4-turbo",
+        MM_COPILOT_MODEL: "claude-haiku-4.5",
       });
 
       const config = loadConfig();
 
-      expect(config.copilotModel).toBe("gpt-4-turbo");
+      expect(config.copilotModel).toBe("claude-haiku-4.5");
     });
 
     it("should load MM_AI_PROVIDER from environment", () => {
@@ -250,12 +250,12 @@ describe("Config", () => {
 
     it("should load MM_OPENCODE_MODEL from environment", () => {
       setEnv({
-        MM_OPENCODE_MODEL: "claude-3.5-sonnet",
+        MM_OPENCODE_MODEL: "claude-4.5-sonnet",
       });
 
       const config = loadConfig();
 
-      expect(config.opencodeModel).toBe("claude-3.5-sonnet");
+      expect(config.opencodeModel).toBe("claude-4.5-sonnet");
     });
 
     it("should load MM_OPENCODE_TIMEOUT from environment", () => {
@@ -280,12 +280,12 @@ describe("Config", () => {
 
     it("should load MM_CURSOR_MODEL from environment", () => {
       setEnv({
-        MM_CURSOR_MODEL: "gpt-5",
+        MM_CURSOR_MODEL: "claude-haiku-4.5",
       });
 
       const config = loadConfig();
 
-      expect(config.cursorModel).toBe("gpt-5");
+      expect(config.cursorModel).toBe("claude-haiku-4.5");
     });
 
     it("should load MM_CURSOR_TIMEOUT from environment", () => {
@@ -320,7 +320,7 @@ describe("Config", () => {
         MM_AZURE_REPO: "az-repo",
         MM_COMMENT_IDENTIFIER: "[MM Bot]",
         MM_AI_PROVIDER: "opencode",
-        MM_COPILOT_MODEL: "gpt-5",
+        MM_COPILOT_MODEL: "claude-haiku-4.5",
         MM_COPILOT_TIMEOUT: "60000",
         MM_MIN_COMMENT_CONFIDENCE: "low",
         MM_SKIP_EXISTING_ISSUES: "false",
@@ -340,7 +340,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[MM Bot]");
       expect(config.aiProvider).toBe("opencode");
-      expect(config.copilotModel).toBe("gpt-5");
+      expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(60000);
       expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(3);
@@ -376,7 +376,7 @@ describe("Config", () => {
         azureRepo: "az-repo",
         commentIdentifier: "[CLI Bot]",
         aiProvider: "cursor",
-        copilotModel: "gpt-5.2",
+        copilotModel: "claude-haiku-4.5",
         copilotTimeout: 90000,
         skipExistingIssues: "false",
         reviewRuns: 5,
@@ -392,7 +392,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[CLI Bot]");
       expect(config.aiProvider).toBe("cursor");
-      expect(config.copilotModel).toBe("gpt-5.2");
+      expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(90000);
       expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(5);

@@ -23,35 +23,11 @@ export interface RepoManagerOptions {
   readonly cloneTimeoutMs?: number;
   /** Fetch timeout in milliseconds (default: 30000 - 30 seconds) */
   readonly fetchTimeoutMs?: number;
-  /** Base directory for storing repos (default: .merge-mentor/repos) */
-  readonly reposDir?: string;
-}
-
-/** Context extracted from repository. */
-export interface RepoContext {
-  /** Combined content of all context files found. */
-  readonly content: string;
-  /** List of files that were loaded. */
-  readonly filesLoaded: readonly string[];
-  /** Path to the repository on disk. */
-  readonly repoPath: string;
 }
 
 /** Default timeouts */
 const DEFAULT_CLONE_TIMEOUT_MS = 120_000; // 2 minutes
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000; // 30 seconds
-
-/** Context files to look for in repositories. */
-const CONTEXT_FILES = [
-  "AGENTS.md",
-  ".github/instructions/clean-typescript.instructions.md",
-  ".github/instructions/pragmatic-typescript.instructions.md",
-  ".github/instructions/testing-typescript.instructions.md",
-  ".github/copilot-instructions.md",
-  "CONTRIBUTING.md",
-  "docs/CODING_STANDARDS.md",
-  "docs/ARCHITECTURE.md",
-];
 
 /**
  * Manages persistent repository clones for context extraction.
@@ -63,10 +39,10 @@ export class RepoManager {
   private readonly fetchTimeoutMs: number;
   private readonly reposDir: string;
 
-  constructor(options?: RepoManagerOptions) {
+  constructor(tempPath: string, options?: RepoManagerOptions) {
     this.cloneTimeoutMs = options?.cloneTimeoutMs ?? DEFAULT_CLONE_TIMEOUT_MS;
     this.fetchTimeoutMs = options?.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
-    this.reposDir = options?.reposDir ?? path.join(process.cwd(), ".merge-mentor", "repos");
+    this.reposDir = path.join(tempPath, "repos");
   }
 
   /**
@@ -100,83 +76,6 @@ export class RepoManager {
       );
       throw error;
     }
-  }
-
-  /**
-   * Loads context files from the repository (AGENTS.md, .github/instructions/, etc.).
-   *
-   * @param repoPath - Path to the cloned repository
-   * @returns Context extracted from the repository
-   */
-  async loadRepoContext(repoPath: string): Promise<RepoContext> {
-    const filesLoaded: string[] = [];
-    const contentParts: string[] = [];
-
-    this.logger.debug({ repoPath }, "Loading repository context files");
-
-    for (const relativePath of CONTEXT_FILES) {
-      const fullPath = path.join(repoPath, relativePath);
-
-      try {
-        const content = await fs.readFile(fullPath, "utf-8");
-
-        if (content.trim().length > 0) {
-          filesLoaded.push(relativePath);
-          contentParts.push(`# Source: ${relativePath}\n\n${content.trim()}`);
-          this.logger.debug({ file: relativePath, size: content.length }, "Loaded context file");
-        }
-      } catch {
-        // File doesn't exist or can't be read - skip silently
-        this.logger.trace({ file: relativePath }, "Context file not found");
-      }
-    }
-
-    // Also check for any additional .instructions.md files in .github/instructions/
-    try {
-      const instructionsDir = path.join(repoPath, ".github", "instructions");
-      const entries = await fs.readdir(instructionsDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith(".instructions.md")) {
-          // Normalize to forward slashes for cross-platform consistency
-          const relativePath = path.join(".github", "instructions", entry.name).replace(/\\/g, "/");
-
-          // Skip if already loaded
-          if (filesLoaded.includes(relativePath)) {
-            continue;
-          }
-
-          const fullPath = path.join(instructionsDir, entry.name);
-          const content = await fs.readFile(fullPath, "utf-8");
-
-          if (content.trim().length > 0) {
-            filesLoaded.push(relativePath);
-            contentParts.push(`# Source: ${relativePath}\n\n${content.trim()}`);
-            this.logger.debug({ file: relativePath, size: content.length }, "Loaded context file");
-          }
-        }
-      }
-    } catch {
-      // .github/instructions directory doesn't exist - skip
-      this.logger.trace("No .github/instructions directory found");
-    }
-
-    const content = contentParts.join("\n\n---\n\n");
-
-    this.logger.info(
-      {
-        repoPath,
-        filesLoaded: filesLoaded.length,
-        totalSize: content.length,
-      },
-      "Repository context loaded"
-    );
-
-    return {
-      content,
-      filesLoaded,
-      repoPath,
-    };
   }
 
   /**

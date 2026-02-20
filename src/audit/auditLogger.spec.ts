@@ -94,18 +94,18 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logCopilotExecution("file-review", "gpt-4", "success");
+      logger.logCopilotExecution("file-review", "claude-haiku-4.5", "success");
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "ai.provider.execute",
         {
           type: "copilot",
           id: "copilot:file-review",
-          details: { provider: "copilot", model: "gpt-4" },
+          details: { provider: "copilot", model: "claude-haiku-4.5" },
         },
         "Execute copilot prompt: file-review",
         "success",
-        { provider: "copilot", promptType: "file-review", model: "gpt-4" },
+        { provider: "copilot", promptType: "file-review", model: "claude-haiku-4.5" },
         undefined
       );
     });
@@ -121,7 +121,7 @@ describe("AuditLogger", () => {
         outputTokens: 773,
         cachedTokens: 22000,
         premiumRequests: 0,
-        model: "gpt-5-mini",
+        model: "claude-haiku-4.5",
         durationApiSeconds: 21,
         durationWallSeconds: 26,
       };
@@ -129,7 +129,7 @@ describe("AuditLogger", () => {
       logger.logAIProviderExecution(
         "copilot",
         "file-review",
-        "gpt-5-mini",
+        "claude-haiku-4.5",
         "success",
         undefined,
         tokenUsage
@@ -140,14 +140,14 @@ describe("AuditLogger", () => {
         {
           type: "copilot",
           id: "copilot:file-review",
-          details: { provider: "copilot", model: "gpt-5-mini" },
+          details: { provider: "copilot", model: "claude-haiku-4.5" },
         },
         "Execute copilot prompt: file-review",
         "success",
         {
           provider: "copilot",
           promptType: "file-review",
-          model: "gpt-5-mini",
+          model: "claude-haiku-4.5",
           tokenUsage,
         },
         undefined

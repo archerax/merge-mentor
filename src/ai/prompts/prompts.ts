@@ -371,13 +371,13 @@ export function buildBatchedFileReviewPrompt(
   repoContext?: string,
   repoPath?: string
 ): string {
-  // When repoPath is provided, diffs are stored in .merge-mentor/diffs/ inside the repo
+  // When repoPath is provided, diffs are stored in .mergementor/diffs/ inside the repo
   // Use @file: prefix for file paths when working in a repository workspace
   const filesListing = manifest.files
     .map((f) => {
       // When repoPath is provided, use @file: syntax with relative path from repo root
       // Otherwise, just use @filename for files in current directory
-      const fileRef = repoPath ? `@file:.merge-mentor/diffs/${f.diffPath}` : `@${f.diffPath}`;
+      const fileRef = repoPath ? `@file:.mergementor/diffs/${f.diffPath}` : `@${f.diffPath}`;
       return `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → ${fileRef}`;
     })
     .join("\n");

@@ -98,7 +98,7 @@ vi.mock("../../src/config.js", () => ({
       project: "test-project",
       repo: "test-repo",
     },
-    copilotModel: "gpt-4",
+    copilotModel: "claude-sonnet-4.6",
     copilotTimeoutMs: 30000,
   }),
   validateConfig: vi.fn(),

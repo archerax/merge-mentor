@@ -53,6 +53,8 @@ export interface Config {
   readonly streamingEnabled: boolean;
   /** Number of lines to show in the streaming display. Default: 5 */
   readonly streamingLines: number;
+  /** Base path for temporary files (cache, diffs, logs, repos, etc.). Default: ./.mergementor */
+  readonly tempPath: string;
 }
 
 /**
@@ -128,6 +130,7 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     streamingLines:
       cliOverrides?.streamingLines ??
       (process.env.MM_STREAMING_LINES ? Number.parseInt(process.env.MM_STREAMING_LINES, 10) : 9),
+    tempPath: path.resolve(cliOverrides?.tempPath ?? process.env.MM_TEMP_PATH ?? "./.mergementor"),
   };
 }
 
@@ -155,6 +158,7 @@ export interface CliOverrides {
   readonly reviewType?: string;
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
+  readonly tempPath?: string;
 }
 
 function validateReviewRuns(value: string | undefined): number {

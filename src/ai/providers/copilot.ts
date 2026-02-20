@@ -157,13 +157,16 @@ export class CopilotProvider implements AIProviderClient {
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotProvider" });
   private readonly defaultTempDir: string;
+  private readonly transcriptDir: string;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
     this.token = options?.token;
-    this.defaultTempDir = path.join(process.cwd(), ".merge-mentor", "temp");
+    const tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
+    this.defaultTempDir = path.join(tempPath, "temp");
+    this.transcriptDir = path.join(tempPath, "transcripts");
   }
 
   /**
@@ -195,19 +198,30 @@ export class CopilotProvider implements AIProviderClient {
 
           // Use relative path if inside workspace, otherwise absolute path
           const fileRef = options?.workingDirectory
-            ? `.merge-mentor/temp/${path.basename(tempFile)}`
+            ? `.mergementor/temp/${path.basename(tempFile)}`
             : tempFile;
           const outputRef = options?.workingDirectory
-            ? `.merge-mentor/temp/${path.basename(outputFile)}`
+            ? `.mergementor/temp/${path.basename(outputFile)}`
             : outputFile;
 
           const shortPrompt = `Please follow the instructions in @${fileRef} and write your JSON output to ${outputRef}. You may use tools to explore and analyze, but your final JSON response must be written to the output file.`;
-          const { stdout, stderr } = await this.runCli(shortPrompt, options, tempFile);
+          const { stdout, stderr, command } = await this.runCli(shortPrompt, options, tempFile);
 
           // Read JSON from output file instead of parsing stdout
           const jsonContent = await this.readOutputFile(outputFile);
           const parsed = this.parseJsonResponse(jsonContent);
           const tokenUsage = this.parseTokenUsage(stderr);
+
+          // Save full transcript for debugging
+          await this.saveTranscript({
+            prompt,
+            stdout,
+            stderr,
+            jsonOutput: jsonContent,
+            tokenUsage,
+            success: true,
+            command,
+          });
 
           this.auditLogger.logAIProviderExecution(
             "copilot",
@@ -234,6 +248,16 @@ export class CopilotProvider implements AIProviderClient {
           }
         }
       }
+
+      // Save transcript even on failure for debugging
+      await this.saveTranscript({
+        prompt,
+        stdout: "",
+        stderr: lastError?.message || "",
+        jsonOutput: "",
+        success: false,
+        error: lastError?.message,
+      });
 
       this.auditLogger.logAIProviderExecution(
         "copilot",
@@ -265,13 +289,13 @@ export class CopilotProvider implements AIProviderClient {
 
   /**
    * Creates a temporary file for the prompt.
-   * When workspaceDir is provided, creates the file inside the workspace's .merge-mentor directory
+   * When workspaceDir is provided, creates the file inside the workspace's .mergementor directory
    * so that Copilot CLI can access it via @file reference.
    */
   private async createTempPromptFile(prompt: string, workspaceDir?: string): Promise<string> {
     // If workspaceDir is provided, store temp files inside the repo so Copilot can access them
     const tempDir = workspaceDir
-      ? path.join(workspaceDir, ".merge-mentor", "temp")
+      ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
     await fs.mkdir(tempDir, { recursive: true });
@@ -287,7 +311,7 @@ export class CopilotProvider implements AIProviderClient {
    */
   private async createTempOutputFile(workspaceDir?: string): Promise<string> {
     const tempDir = workspaceDir
-      ? path.join(workspaceDir, ".merge-mentor", "temp")
+      ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
     await fs.mkdir(tempDir, { recursive: true });
@@ -324,24 +348,98 @@ export class CopilotProvider implements AIProviderClient {
     }
   }
 
+  /**
+   * Saves a full transcript of the AI agent session to disk for debugging.
+   * Includes input prompt, stdout, stderr, JSON output, and metadata.
+   */
+  private async saveTranscript(data: {
+    prompt: string;
+    stdout: string;
+    stderr: string;
+    jsonOutput: string;
+    tokenUsage?: TokenUsage;
+    success: boolean;
+    error?: string;
+    command?: string;
+  }): Promise<void> {
+    try {
+      await fs.mkdir(this.transcriptDir, { recursive: true });
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const status = data.success ? "success" : "failure";
+      const filename = `transcript-${timestamp}-${status}.txt`;
+      const filepath = path.join(this.transcriptDir, filename);
+
+      const transcript = [
+        "=".repeat(80),
+        "COPILOT AI AGENT TRANSCRIPT",
+        "=".repeat(80),
+        `Timestamp: ${new Date().toISOString()}`,
+        `Status: ${status}`,
+        `Model: ${this.model || "default"}`,
+        data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
+        data.command ? `CLI Command: ${data.command}` : "",
+        "",
+        "=".repeat(80),
+        "INPUT PROMPT",
+        "=".repeat(80),
+        data.prompt,
+        "",
+        "=".repeat(80),
+        "STDOUT OUTPUT",
+        "=".repeat(80),
+        data.stdout || "(empty)",
+        "",
+        "=".repeat(80),
+        "STDERR OUTPUT",
+        "=".repeat(80),
+        data.stderr || "(empty)",
+        "",
+        "=".repeat(80),
+        "JSON OUTPUT",
+        "=".repeat(80),
+        data.jsonOutput || "(empty)",
+      ];
+
+      if (data.error) {
+        transcript.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
+      }
+
+      transcript.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
+
+      await fs.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
+
+      this.logger.debug(
+        { filepath, success: data.success },
+        "Saved agent transcript for debugging"
+      );
+    } catch (error) {
+      // Log but don't throw - transcript saving is non-critical
+      this.logger.warn({ error: (error as Error).message }, "Failed to save agent transcript");
+    }
+  }
+
   private runCli(
     prompt: string,
     options?: ExecutePromptOptions,
     tempFilePath?: string
-  ): Promise<{ stdout: string; stderr: string }> {
+  ): Promise<{ stdout: string; stderr: string; command: string }> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const errorChunks: Buffer[] = [];
 
-      const args = ["-p", prompt];
-      if (this.model) {
-        args.push("--model", this.model);
-      }
+      const args: string[] = [];
 
       // Add --allow-all-tools when using temp files so Copilot can read them
       if (tempFilePath) {
         args.push("--allow-all-tools");
       }
+
+      if (this.model) {
+        args.push("--model", this.model);
+      }
+
+      args.push("-p", prompt);
 
       // Using array-based args with spawn handles escaping correctly on all platforms (Windows, macOS, Linux)
       const env = this.token ? { ...process.env, GITHUB_TOKEN: this.token } : process.env;
@@ -362,6 +460,9 @@ export class CopilotProvider implements AIProviderClient {
         return;
       }
 
+      // Build the full CLI command string for logging and transcript
+      const fullCommand = `${executablePath} ${args.join(" ")}`;
+
       this.logger.debug(
         {
           command: executablePath,
@@ -370,6 +471,7 @@ export class CopilotProvider implements AIProviderClient {
           hasToken: !!this.token,
           model: this.model,
           tempFilePath,
+          fullCommand,
         },
         "Spawning Copilot CLI process"
       );
@@ -381,30 +483,26 @@ export class CopilotProvider implements AIProviderClient {
         process.platform === "win32" &&
         (executablePath === "copilot" || !executablePath.toLowerCase().endsWith(".exe"));
 
+      const joinedArgs = args
+        .map((arg) => {
+          // Quote arguments that contain spaces or special characters
+          if (arg.includes(" ") || arg.includes("&") || arg.includes("|") || arg.includes(".")) {
+            return `"${arg.replace(/"/g, '\\"')}"`;
+          }
+          return arg;
+        })
+        .join(" ");
+
       // When using shell: true, pass command and args as a single string to avoid
       // DEP0190 warning and ensure proper escaping
       const proc = needsShell
-        ? spawn(
-            executablePath,
-            [
-              args
-                .map((arg) => {
-                  // Quote arguments that contain spaces or special characters
-                  if (arg.includes(" ") || arg.includes("&") || arg.includes("|")) {
-                    return `"${arg.replace(/"/g, '\\"')}"`;
-                  }
-                  return arg;
-                })
-                .join(" "),
-            ],
-            {
-              stdio: ["inherit", "pipe", "pipe"],
-              timeout: this.timeoutMs,
-              shell: true,
-              cwd,
-              env,
-            }
-          )
+        ? spawn(executablePath, [joinedArgs], {
+            stdio: ["inherit", "pipe", "pipe"],
+            timeout: this.timeoutMs,
+            shell: true,
+            cwd,
+            env,
+          })
         : spawn(executablePath, args, {
             stdio: ["inherit", "pipe", "pipe"],
             timeout: this.timeoutMs,
@@ -442,7 +540,7 @@ export class CopilotProvider implements AIProviderClient {
         const stderr = Buffer.concat(errorChunks).toString("utf-8");
 
         if (code === 0) {
-          resolve({ stdout, stderr });
+          resolve({ stdout, stderr, command: fullCommand });
         } else if (code === null) {
           reject(
             new CopilotCliError(
@@ -528,7 +626,7 @@ export class CopilotProvider implements AIProviderClient {
    * Total duration (API):  21s
    * Total duration (wall): 26s
    * Usage by model:
-   *     gpt-5-mini           33.0k input, 773 output, 22.0k cache read (Est. 0 Premium requests)
+   *     claude-haiku-4.5     33.0k input, 773 output, 22.0k cache read (Est. 0 Premium requests)
    * ```
    *
    * @param stderr - Stderr output from Copilot CLI
@@ -566,9 +664,9 @@ export class CopilotProvider implements AIProviderClient {
         durationWallSeconds = Number.parseInt(wallDurationMatch[1], 10);
       }
 
-      // Parse usage by model: "gpt-5-mini           33.0k input, 773 output, 22.0k cache read"
+      // Parse usage by model: "claude-haiku-4.5     33.0k input, 773 output, 22.0k cache read"
       const usageMatch = stderr.match(
-        /^\s+([a-z0-9-]+)\s+([\d.]+[kKmM]?)\s+input,\s+(\d+)\s+output(?:,\s+([\d.]+[kKmM]?)\s+cache read)?/m
+        /^\s+([a-z0-9-.]+)\s+([\d.]+[kKmM]?)\s+input,\s+(\d+)\s+output(?:,\s+([\d.]+[kKmM]?)\s+cache read)?/m
       );
       if (usageMatch) {
         model = usageMatch[1];

@@ -31,25 +31,6 @@ Your working directory is set to the repository root.
 }
 
 /**
- * Builds a repository context section for prompts.
- */
-function buildRepoContextSection(repoContext?: string): string {
-  if (!repoContext) return "";
-
-  return `
----
-# REPOSITORY-SPECIFIC GUIDELINES
-
-The following standards are specific to this project.
-**These take precedence over generic best practices.**
-
-${repoContext}
-
----
-`;
-}
-
-/**
  * Context for security cross-file analysis.
  */
 export interface SecurityCrossFileContext {
@@ -62,12 +43,8 @@ export interface SecurityCrossFileContext {
  * Builds a prompt for security-focused file review.
  * Instructs the AI to act as a security researcher and ONLY report security vulnerabilities.
  */
-export function buildSecurityFileReviewPrompt(
-  manifest: DiffManifest,
-  repoContext?: string,
-  repoPath?: string
-): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+export function buildSecurityFileReviewPrompt(manifest: DiffManifest, repoPath?: string): string {
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -75,13 +52,12 @@ export function buildSecurityFileReviewPrompt(
     )
     .join("\n");
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
 
   return `# YOUR ROLE
 You are a **Security Researcher** performing a security-focused code review.
 Your ONLY job is to find security vulnerabilities.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # CRITICAL SCOPE RESTRICTIONS
 
 **ONLY REPORT** security vulnerabilities. You MUST IGNORE:
@@ -430,7 +406,6 @@ REMEMBER: Include entry for EVERY file listed, even with empty findings. Only re
 export function buildSecurityCrossFilePrompt(
   prDetails: PRDetails,
   context: SecurityCrossFileContext,
-  repoContext?: string,
   repoPath?: string
 ): string {
   const { filesSummary, fileReviewResults, existingCommentsContext } = context;
@@ -444,7 +419,6 @@ export function buildSecurityCrossFilePrompt(
     ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW security concerns not already covered.\n`
     : "";
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = repoPath
     ? `
 ---
@@ -486,7 +460,7 @@ Your working directory is set to the repository root.
   return `# YOUR ROLE
 Security researcher performing system-level security analysis of a pull request.
 Your focus is on cross-file security concerns and architectural security issues.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}

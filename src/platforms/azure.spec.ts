@@ -59,6 +59,7 @@ function createTestConfig(): Config {
     reviewType: "general",
     streamingEnabled: true,
     streamingLines: 5,
+    tempPath: "./.mergementor",
   };
 }
 

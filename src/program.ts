@@ -5,7 +5,7 @@ import { Command } from "commander";
 import type { AIProviderType } from "./ai/types.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "./constants.js";
-import { logger } from "./logger.js";
+import { initLogger, logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
 import type { PlatformAdapter } from "./platforms/types.js";
@@ -22,6 +22,7 @@ export interface ReviewOptions {
   reviewType?: string;
   stream?: boolean;
   streamLines?: number;
+  tempPath?: string;
   // GitHub config
   githubToken?: string;
   githubRepoOwner?: string;
@@ -76,6 +77,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     azureProject: options.azureProject,
     azureRepo: options.azureRepo,
     commentIdentifier: options.commentIdentifier,
+    tempPath: options.tempPath,
     aiProvider: options.provider,
     copilotModel: options.copilotModel,
     copilotTimeout: options.copilotTimeout,
@@ -89,6 +91,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     streamingEnabled: options.stream !== false ? undefined : false,
     streamingLines: options.streamLines,
   });
+
+  // Initialize logger with configured temp path
+  initLogger(config.tempPath);
+
   const platform = (options.platform || config.defaultPlatform) as Platform;
 
   if (!["github", "azure"].includes(platform)) {
@@ -146,6 +152,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     reviewType: options.reviewType ?? config.reviewType,
     streamingEnabled: options.stream !== false && config.streamingEnabled,
     streamingLines: options.streamLines ?? config.streamingLines,
+    tempPath: config.tempPath,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -202,7 +209,9 @@ export function generateMarkdownReport(
     Object.entries(severityCounts).forEach(([severity, count]) => {
       if (count > 0) {
         const emoji = SEVERITY_EMOJI[severity as keyof typeof SEVERITY_EMOJI];
-        report += `- ${emoji} **${severity.charAt(0).toUpperCase() + severity.slice(1)}:** ${count}\n`;
+        report += `- ${emoji} **${
+          severity.charAt(0).toUpperCase() + severity.slice(1)
+        }:** ${count}\n`;
       }
     });
     report += `\n`;
@@ -215,7 +224,9 @@ export function generateMarkdownReport(
     Object.entries(categoryCounts).forEach(([category, count]) => {
       if (count > 0) {
         const emoji = CATEGORY_EMOJI[category as keyof typeof CATEGORY_EMOJI];
-        report += `- ${emoji} **${category.charAt(0).toUpperCase() + category.slice(1)}:** ${count}\n`;
+        report += `- ${emoji} **${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }:** ${count}\n`;
       }
     });
     report += `\n`;
@@ -255,9 +266,13 @@ export function generateMarkdownReport(
       const severityEmoji = SEVERITY_EMOJI[finding.severity];
       const categoryEmoji = CATEGORY_EMOJI[finding.category];
 
-      report += `### ${index + 1}. ${severityEmoji} ${categoryEmoji} ${finding.category.toUpperCase()}\n\n`;
+      report += `### ${
+        index + 1
+      }. ${severityEmoji} ${categoryEmoji} ${finding.category.toUpperCase()}\n\n`;
       report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
-      report += `**Affected Files:** ${finding.affectedFiles.map((f) => `\`${f}\``).join(", ")}  \n\n`;
+      report += `**Affected Files:** ${finding.affectedFiles
+        .map((f) => `\`${f}\``)
+        .join(", ")}  \n\n`;
       report += `**Issue:** ${finding.message}\n\n`;
       report += `---\n\n`;
     });
@@ -337,7 +352,8 @@ export function displayResults(
   adapter?: PlatformAdapter,
   platform?: Platform,
   aiProvider?: AIProviderType,
-  reviewType = "general"
+  reviewType = "general",
+  tempPath?: string
 ): void {
   console.log("=".repeat(60));
   console.log("📊 Review Complete");
@@ -372,7 +388,7 @@ export function displayResults(
   if (aiProvider && adapter && platform) {
     try {
       const markdownReport = generateMarkdownReport(result, aiProvider, dryRun, reviewType);
-      const reportDir = join(process.cwd(), ".merge-mentor", "reports");
+      const reportDir = join(tempPath ?? "./.mergementor", "reports");
 
       // Generate unique report filename using platform and project
       const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
@@ -447,6 +463,10 @@ program
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
   // Bot config
   .option("--comment-identifier <id>", "Bot comment identifier. Env: MM_COMMENT_IDENTIFIER")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
   // AI provider config
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
@@ -501,7 +521,15 @@ program
 
       const { result, adapter, platform } = await executeReview(options);
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
-      displayResults(result, !options.write, adapter, platform, aiProvider, reviewType);
+      displayResults(
+        result,
+        !options.write,
+        adapter,
+        platform,
+        aiProvider,
+        reviewType,
+        config.tempPath
+      );
 
       logger.info(
         {
@@ -536,8 +564,10 @@ program
   .option("--list", "List all cloned repositories", false)
   .option("--clean", "Remove all cloned repositories", false)
   .option("--clean-repo <name>", "Remove a specific cloned repository")
-  .action((options: { list?: boolean; clean?: boolean; cleanRepo?: string }) => {
-    const reposDir = join(process.cwd(), ".merge-mentor", "repos");
+  .option("--temp-path <path>", "Base path for temporary files. Env: MM_TEMP_PATH")
+  .action((options: { list?: boolean; clean?: boolean; cleanRepo?: string; tempPath?: string }) => {
+    const config = loadConfig({ tempPath: options.tempPath });
+    const reposDir = join(config.tempPath, "repos");
 
     try {
       // Ensure repos directory exists

@@ -152,7 +152,7 @@ export function createTestConfig(overrides?: Partial<Config>): Config {
       project: "test-project",
       repo: "test-repo",
     },
-    copilotModel: "gpt-4",
+    copilotModel: "claude-sonnet-4.6",
     copilotTimeoutMs: 30000,
     commentFilter: {
       minConfidence: "high",

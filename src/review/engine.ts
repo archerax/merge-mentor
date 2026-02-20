@@ -1,3 +1,4 @@
+import path from "node:path";
 import {
   type AIProviderClient,
   type AIProviderType,
@@ -50,7 +51,7 @@ import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.j
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
-import { type RepoContext, RepoManager } from "./repoManager.js";
+import { RepoManager } from "./repoManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 /** Result of a complete PR review. */
@@ -89,6 +90,8 @@ export interface ReviewEngineOptions {
   readonly streamingEnabled?: boolean;
   /** Number of lines in streaming display. Default: 5 */
   readonly streamingLines?: number;
+  /** Base path for temporary files (cache, diffs, logs, repos, etc.). */
+  readonly tempPath?: string;
 }
 
 /**
@@ -132,20 +135,22 @@ export class ReviewEngine {
     // Resolve model and timeout (support both legacy and new options)
     const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
     const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
+    const tempPath = resolvedOptions?.tempPath ?? path.join(process.cwd(), ".mergementor");
 
     // Build provider options
     const providerOptions = {
       model,
       timeoutMs,
       token: resolvedProviderType === "copilot" ? resolvedOptions?.copilotToken : undefined,
+      tempPath,
     };
 
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
     });
-    this.stateCache = new ReviewStateCache();
-    this.repoManager = new RepoManager();
+    this.stateCache = new ReviewStateCache(tempPath);
+    this.repoManager = new RepoManager(tempPath);
     this.options = resolvedOptions ?? {};
     this.streamingEnabled = resolvedOptions?.streamingEnabled ?? true;
     this.streamingLines = resolvedOptions?.streamingLines ?? 5;
@@ -226,8 +231,8 @@ export class ReviewEngine {
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prIdentifier);
 
-    // Load repository context (coding standards, guidelines)
-    const repoContext = await this.loadRepoContext(prDetails.baseBranch);
+    // Ensure repo is cloned for CLI agent workspace access (required for review)
+    const repoPath = await this.ensureRepoCloned(prDetails.baseBranch);
 
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
@@ -241,8 +246,7 @@ export class ReviewEngine {
         prDetails,
         files,
         existingComments,
-        repoContext?.content,
-        repoContext?.repoPath
+        repoPath
       );
       fileResults = fastReviewData.fileResults;
       crossFileResult = fastReviewData.crossFileResult;
@@ -257,8 +261,7 @@ export class ReviewEngine {
         files,
         existingComments,
         cachedState,
-        repoContext?.content,
-        repoContext?.repoPath
+        repoPath
       );
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
@@ -277,8 +280,7 @@ export class ReviewEngine {
           files,
           fileResults,
           existingComments,
-          repoContext?.content,
-          repoContext?.repoPath
+          repoPath
         );
       }
     } else {
@@ -290,8 +292,7 @@ export class ReviewEngine {
         files,
         runs,
         existingComments,
-        repoContext?.content,
-        repoContext?.repoPath
+        repoPath
       );
       fileResults = aggregated.fileResults;
       crossFileResult = aggregated.crossFileResult;
@@ -364,7 +365,6 @@ export class ReviewEngine {
     files: PRFile[],
     runs: number,
     existingComments: readonly ExistingComment[],
-    repoContext?: string,
     repoPath?: string
   ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
     const allFileResults: FileReviewResult[][] = [];
@@ -392,7 +392,6 @@ export class ReviewEngine {
           files,
           runComments,
           undefined,
-          repoContext,
           repoPath
         );
         const validatedResults = this.validateLineNumbers(fileResults, files);
@@ -407,7 +406,6 @@ export class ReviewEngine {
           files,
           validatedResults,
           runComments,
-          repoContext,
           repoPath
         );
         allCrossFileResults.push(crossFileResult);
@@ -482,44 +480,31 @@ export class ReviewEngine {
   }
 
   /**
-   * Loads repository context (coding standards, guidelines) for review.
-   * Gracefully degrades if context cannot be loaded.
+   * Ensures repository is cloned for CLI agent workspace access.
+   * Returns the path to the cloned repository.
+   * @throws {Error} If repository cloning fails
    */
-  private async loadRepoContext(branch: string): Promise<RepoContext | undefined> {
+  private async ensureRepoCloned(branch: string): Promise<string> {
+    this.log("📦 Cloning repository for workspace access...");
+    this.logger.debug({ branch }, "Ensuring repository is cloned");
+
+    const repoInfo = this.platform.getRepoInfo();
+    const token = this.platform.getToken();
+
     try {
-      this.log("📦 Loading repository context...");
-      this.logger.debug({ branch }, "Loading repository context");
-
-      const repoInfo = this.platform.getRepoInfo();
-      const token = this.platform.getToken();
-
       const repoPath = await this.repoManager.ensureRepo(repoInfo, branch, token);
-      const context = await this.repoManager.loadRepoContext(repoPath);
 
-      if (context.filesLoaded.length > 0) {
-        this.log(
-          `  ✓ Loaded ${context.filesLoaded.length} context document(s): ${context.filesLoaded.join(", ")}`
-        );
-        this.logger.info(
-          {
-            filesLoaded: context.filesLoaded,
-            contentLength: context.content.length,
-          },
-          "Repository context loaded successfully"
-        );
-        return context;
-      }
-
-      this.log("  → No context documents found in repository");
-      this.logger.info({ repoPath }, "No repository context files found");
-      return undefined;
+      this.log(`  ✓ Repository ready at: ${repoPath}`);
+      this.logger.info({ repoPath }, "Repository cloned successfully");
+      return repoPath;
     } catch (error) {
-      this.log(`  ⚠️ Could not load repository context: ${(error as Error).message}`);
-      this.logger.warn(
-        { error: (error as Error).message },
-        "Failed to load repository context, continuing without it"
+      const errorMsg = `Failed to clone repository: ${(error as Error).message}`;
+      this.log(`  ❌ ${errorMsg}`);
+      this.logger.error(
+        { error: (error as Error).message, branch },
+        "Repository cloning failed, aborting review"
       );
-      return undefined;
+      throw new Error(errorMsg);
     }
   }
 
@@ -528,7 +513,6 @@ export class ReviewEngine {
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
-    repoContext?: string,
     repoPath?: string
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     // Filter out files that should be skipped
@@ -574,7 +558,6 @@ export class ReviewEngine {
       prIdentifier,
       filesToReview,
       existingComments,
-      repoContext,
       repoPath
     );
 
@@ -597,10 +580,10 @@ export class ReviewEngine {
     prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    repoContext?: string,
     repoPath?: string
   ): Promise<FileReviewResult[]> {
-    const diffStorage = new DiffStorage();
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath);
 
     // Filter files with patches
     const filesWithPatches = files.filter((f) => f.patch);
@@ -622,8 +605,8 @@ export class ReviewEngine {
         "Stored diffs for batched review"
       );
 
-      // Copy diff files to repo's .merge-mentor directory so AI can access them
-      this.logger.debug("Copying diffs to repo's .merge-mentor directory for AI access");
+      // Copy diff files to repo's .mergementor directory so AI can access them
+      this.logger.debug("Copying diffs to repo's .mergementor directory for AI access");
       await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
 
       // Build prompt based on review type
@@ -653,7 +636,7 @@ export class ReviewEngine {
             allChangedFiles,
           };
 
-          prompt = buildTestingFileReviewPrompt(manifest, context, repoContext, repoPath);
+          prompt = buildTestingFileReviewPrompt(manifest, context, repoPath);
           this.logger.info(
             {
               language,
@@ -666,21 +649,16 @@ export class ReviewEngine {
         }
 
         case "security":
-          prompt = buildSecurityFileReviewPrompt(manifest, repoContext, repoPath);
+          prompt = buildSecurityFileReviewPrompt(manifest, repoPath);
           this.logger.info("Built security specialist prompt");
           break;
 
         case "performance":
-          prompt = buildPerformanceFileReviewPrompt(manifest, repoContext, repoPath);
+          prompt = buildPerformanceFileReviewPrompt(manifest, repoPath);
           this.logger.info("Built performance specialist prompt");
           break;
         default:
-          prompt = buildGeneralFileReviewPrompt(
-            manifest,
-            commentsContext || undefined,
-            repoContext,
-            repoPath
-          );
+          prompt = buildGeneralFileReviewPrompt(manifest, commentsContext || undefined, repoPath);
           this.logger.info("Built general review prompt");
           break;
       }
@@ -691,7 +669,6 @@ export class ReviewEngine {
           promptLength: prompt.length,
           promptPreview: prompt.substring(0, 2000),
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
-          hasRepoContext: !!repoContext,
           hasRepoPath: !!repoPath,
           reviewType,
         },
@@ -751,7 +728,7 @@ export class ReviewEngine {
   }
 
   /**
-   * Copies diff files to the repo's .merge-mentor directory so Copilot CLI can access them.
+   * Copies diff files to the repo's .mergementor directory so Copilot CLI can access them.
    * If repoPath is not provided, falls back to the global temp directory.
    */
   private async copyDiffsToRepoDir(
@@ -762,10 +739,10 @@ export class ReviewEngine {
     const fs = await import("node:fs/promises");
     const nodePath = await import("node:path");
 
-    // Use repo's .merge-mentor/diffs directory if repoPath provided, otherwise global temp
+    // Use repo's .mergementor/diffs directory if repoPath provided, otherwise global temp
     const targetDir = repoPath
-      ? nodePath.join(repoPath, ".merge-mentor", "diffs")
-      : nodePath.join(process.cwd(), ".merge-mentor", "temp");
+      ? nodePath.join(repoPath, ".mergementor", "diffs")
+      : nodePath.join(process.cwd(), ".mergementor", "temp");
 
     // Ensure target directory exists
     await fs.mkdir(targetDir, { recursive: true });
@@ -897,7 +874,6 @@ export class ReviewEngine {
     files: PRFile[],
     fileResults: readonly FileReviewResult[],
     existingComments: readonly ExistingComment[],
-    repoContext?: string,
     repoPath?: string
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
@@ -930,7 +906,7 @@ export class ReviewEngine {
             filesSummary,
           };
 
-          prompt = buildTestingCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          prompt = buildTestingCrossFilePrompt(prDetails, context, repoPath);
           this.logger.info(
             {
               productionFiles: productionToTestMap.size,
@@ -948,7 +924,7 @@ export class ReviewEngine {
             existingCommentsContext: commentsContext,
           };
 
-          prompt = buildSecurityCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          prompt = buildSecurityCrossFilePrompt(prDetails, context, repoPath);
           this.logger.info("Built security specialist cross-file prompt");
           break;
         }
@@ -960,7 +936,7 @@ export class ReviewEngine {
             existingCommentsContext: commentsContext,
           };
 
-          prompt = buildPerformanceCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          prompt = buildPerformanceCrossFilePrompt(prDetails, context, repoPath);
           this.logger.info("Built performance specialist cross-file prompt");
           break;
         }
@@ -971,7 +947,7 @@ export class ReviewEngine {
             existingCommentsContext: commentsContext,
           };
 
-          prompt = buildGeneralCrossFilePrompt(prDetails, context, repoContext, repoPath);
+          prompt = buildGeneralCrossFilePrompt(prDetails, context, repoPath);
           this.logger.info("Built general cross-file prompt");
           break;
         }
@@ -1012,7 +988,6 @@ export class ReviewEngine {
     prDetails: PRDetails,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    repoContext?: string,
     repoPath?: string
   ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
@@ -1034,7 +1009,8 @@ export class ReviewEngine {
       };
     }
 
-    const diffStorage = new DiffStorage();
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath);
 
     try {
       // Store diffs to disk
@@ -1044,7 +1020,7 @@ export class ReviewEngine {
         "Stored diffs for fast review"
       );
 
-      // Copy diff files to repo's .merge-mentor directory for AI access
+      // Copy diff files to repo's .mergementor directory for AI access
       await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
 
       // Build combined prompt for fast review
@@ -1054,7 +1030,6 @@ export class ReviewEngine {
         prDetails,
         manifest,
         commentsContext || undefined,
-        repoContext,
         repoPath
       );
 

@@ -23,7 +23,7 @@ describe("createAIProvider", () => {
 
   it("should pass options to CopilotProvider", () => {
     const provider = createAIProvider("copilot", {
-      model: "gpt-4o",
+      model: "claude-haiku-4.5",
       timeoutMs: 60000,
       maxRetries: 5,
     });
@@ -32,7 +32,7 @@ describe("createAIProvider", () => {
 
   it("should pass options to OpenCodeProvider", () => {
     const provider = createAIProvider("opencode", {
-      model: "claude-3.5-sonnet",
+      model: "claude-haiku-4.5",
       timeoutMs: 120000,
       maxRetries: 3,
     });
@@ -41,7 +41,7 @@ describe("createAIProvider", () => {
 
   it("should pass options to CursorProvider", () => {
     const provider = createAIProvider("cursor", {
-      model: "gpt-5",
+      model: "claude-haiku-4.5",
       timeoutMs: 180000,
       maxRetries: 4,
     });

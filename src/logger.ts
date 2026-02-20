@@ -3,6 +3,18 @@ import type { Logger } from "pino";
 import pino from "pino";
 
 let _logger: Logger | undefined;
+let _tempPath: string | undefined;
+
+/**
+ * Initialize the logger with a specific temp path.
+ * Must be called before using the logger.
+ *
+ * @param tempPath - Base path for temporary files
+ */
+export function initLogger(tempPath: string): void {
+  _tempPath = tempPath;
+  _logger = undefined; // Reset logger to force recreation with new path
+}
 
 /**
  * Get or create the logger instance.
@@ -10,8 +22,9 @@ let _logger: Logger | undefined;
  */
 export function getLogger(): Logger {
   if (!_logger) {
-    // Determine log file path with timestamp for per-run logging
-    const logDir = process.env.LOG_DIR || path.join(process.cwd(), ".merge-mentor", "logs");
+    // Use configured temp path or fallback to default
+    const basePath = _tempPath || path.join(process.cwd(), ".mergementor");
+    const logDir = path.join(basePath, "logs");
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, -5);
     const logFile = path.join(logDir, `merge-mentor_${timestamp}.log`);
 

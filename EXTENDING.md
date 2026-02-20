@@ -276,7 +276,7 @@ export function buildAccessibilityFileReviewPrompt(
   repoContext?: string,
   repoPath?: string,
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -581,7 +581,7 @@ export function buildDocumentationFileReviewPrompt(
   repoContext?: string,
   repoPath?: string,
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map((f) => `- ${f.filename} (${f.status}) → @${diffPrefix}${f.diffPath}`)
     .join("\n");

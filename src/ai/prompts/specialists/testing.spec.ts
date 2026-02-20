@@ -92,21 +92,6 @@ describe("testing specialist prompts", () => {
       expect(prompt).toContain("xUnit, NUnit, or MSTest");
     });
 
-    test("includes repository context when provided", () => {
-      const context: TestingReviewContext = {
-        filename: "UserService.ts",
-        testFiles: ["UserService.test.ts"],
-        language: "typescript",
-        allChangedFiles: ["UserService.ts", "UserService.test.ts"],
-      };
-
-      const repoContext = "Use Vitest for all tests. Minimum 80% coverage required.";
-      const prompt = buildTestingFileReviewPrompt(mockManifest, context, repoContext);
-
-      expect(prompt).toContain("REPOSITORY-SPECIFIC GUIDELINES");
-      expect(prompt).toContain("Use Vitest for all tests");
-    });
-
     test("includes workspace section when repoPath provided", () => {
       const context: TestingReviewContext = {
         filename: "UserService.ts",
@@ -115,12 +100,7 @@ describe("testing specialist prompts", () => {
         allChangedFiles: ["UserService.ts", "UserService.test.ts"],
       };
 
-      const prompt = buildTestingFileReviewPrompt(
-        mockManifest,
-        context,
-        undefined,
-        "/path/to/repo"
-      );
+      const prompt = buildTestingFileReviewPrompt(mockManifest, context, "/path/to/repo");
 
       expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
       expect(prompt).toContain("@workspace /search");
@@ -206,21 +186,6 @@ describe("testing specialist prompts", () => {
       expect(prompt).toContain("Files Without Test Coverage");
       expect(prompt).toContain("UserService.ts");
       expect(prompt).toContain("OrderService.ts");
-    });
-
-    test("includes repository context when provided", () => {
-      const context: TestingCrossFileContext = {
-        fileReviewResults: [],
-        productionToTestMap: new Map(),
-        allChangedFiles: [],
-        filesSummary: "0 files changed",
-      };
-
-      const repoContext = "Integration tests required for all service files.";
-      const prompt = buildTestingCrossFilePrompt(mockPRDetails, context, repoContext);
-
-      expect(prompt).toContain("REPOSITORY-SPECIFIC GUIDELINES");
-      expect(prompt).toContain("Integration tests required");
     });
   });
 });

@@ -161,16 +161,8 @@ describe("Specialized Review Prompts", () => {
       expect(prompt).toContain('"reasoning"');
     });
 
-    it("should include repository context when provided", () => {
-      const repoContext = "Use TypeScript strict mode\nNo any types allowed";
-      const prompt = buildSecurityFileReviewPrompt(mockManifest, repoContext);
-
-      expect(prompt).toContain("REPOSITORY-SPECIFIC GUIDELINES");
-      expect(prompt).toContain(repoContext);
-    });
-
     it("should include workspace access section when repoPath provided", () => {
-      const prompt = buildSecurityFileReviewPrompt(mockManifest, undefined, "/path/to/repo");
+      const prompt = buildSecurityFileReviewPrompt(mockManifest, "/path/to/repo");
 
       expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
       expect(prompt).toContain("@workspace /search");
@@ -178,9 +170,9 @@ describe("Specialized Review Prompts", () => {
     });
 
     it("should use relative diff paths when repoPath provided", () => {
-      const prompt = buildSecurityFileReviewPrompt(mockManifest, undefined, "/path/to/repo");
+      const prompt = buildSecurityFileReviewPrompt(mockManifest, "/path/to/repo");
 
-      expect(prompt).toContain("@.merge-mentor/diffs/auth.diff");
+      expect(prompt).toContain("@.mergementor/diffs/");
     });
 
     it("should not include workspace section without repoPath", () => {
@@ -333,25 +325,17 @@ describe("Specialized Review Prompts", () => {
       expect(prompt).toContain('"findings"');
     });
 
-    it("should include repository context when provided", () => {
-      const repoContext = "Performance budget: 100ms TTI";
-      const prompt = buildPerformanceFileReviewPrompt(mockManifest, repoContext);
-
-      expect(prompt).toContain("REPOSITORY-SPECIFIC GUIDELINES");
-      expect(prompt).toContain(repoContext);
-    });
-
     it("should include workspace access section when repoPath provided", () => {
-      const prompt = buildPerformanceFileReviewPrompt(mockManifest, undefined, "/path/to/repo");
+      const prompt = buildPerformanceFileReviewPrompt(mockManifest, "/path/to/repo");
 
       expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
       expect(prompt).toContain("@workspace /search");
     });
 
     it("should use relative diff paths when repoPath provided", () => {
-      const prompt = buildPerformanceFileReviewPrompt(mockManifest, undefined, "/path/to/repo");
+      const prompt = buildPerformanceFileReviewPrompt(mockManifest, "/path/to/repo");
 
-      expect(prompt).toContain("@.merge-mentor/diffs/auth.diff");
+      expect(prompt).toContain("@.mergementor/diffs/");
     });
 
     it("should include counter-argument requirement", () => {

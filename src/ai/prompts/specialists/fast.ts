@@ -27,22 +27,6 @@ Your working directory is set to the repository root.
 `;
 }
 
-function buildRepoContextSection(repoContext?: string): string {
-  if (!repoContext) return "";
-
-  return `
----
-# REPOSITORY-SPECIFIC GUIDELINES
-
-The following standards are specific to this project.
-**These take precedence over generic best practices.**
-
-${repoContext}
-
----
-`;
-}
-
 /**
  * Builds a prompt for fast review (combined file + cross-file analysis).
  * This combines both file-level and architectural analysis in a single pass for cost savings.
@@ -51,10 +35,9 @@ export function buildFastReviewPrompt(
   prDetails: PRDetails,
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoContext?: string,
   repoPath?: string
 ): string {
-  const diffPrefix = repoPath ? ".merge-mentor/diffs/" : "";
+  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
     .map(
       (f) =>
@@ -71,7 +54,6 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 `
     : "";
 
-  const repoContextSection = buildRepoContextSection(repoContext);
   const workspaceSection = buildWorkspaceSection(repoPath);
 
   return `# YOUR ROLE
@@ -80,7 +62,7 @@ Expert code reviewer performing comprehensive analysis in a single pass. You wil
 2. **Architectural concerns**: Cross-file integration issues, system-level design problems
 
 Be thorough and strict in catching issues at both levels.
-${repoContextSection}${workspaceSection}
+${workspaceSection}
 # PR CONTEXT
 Title: ${prDetails.title}
 Description: ${prDetails.description || "No description provided"}

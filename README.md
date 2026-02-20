@@ -158,28 +158,21 @@ set MM_PLATFORM=azure
 **Linux/macOS:**
 
 ```bash
-# Select AI provider (copilot, opencode, cursor, or openai)
+# Select AI provider (copilot, opencode, or cursor)
 export MM_AI_PROVIDER=copilot
 
 # Copilot-specific settings
-export MM_COPILOT_MODEL=gpt-5.2
+export MM_COPILOT_MODEL=claude-sonnet-4.6
 export MM_COPILOT_TIMEOUT=180000
 
 # OpenCode-specific settings (when using --provider opencode)
-export MM_OPENCODE_MODEL=claude-sonnet-4.5
+export MM_OPENCODE_MODEL=claude-sonnet-4.6
 export MM_OPENCODE_TIMEOUT=180000
 
 # Cursor-specific settings (when using --provider cursor)
-export MM_CURSOR_MODEL=gpt-5
+export MM_CURSOR_MODEL=claude-sonnet-4.6
 export MM_CURSOR_TIMEOUT=180000
 
-# OpenAI-specific settings (when using --provider openai)
-export MM_OPENAI_API_KEY=sk-your-api-key
-export MM_OPENAI_MODEL=gpt-4o
-export MM_OPENAI_TIMEOUT=180000
-# Optional: Custom base URL for Azure Foundry
-export MM_OPENAI_BASE_URL=https://your-foundry.azure.com/v1
-export MM_OPENAI_MAX_RETRIES=3
 ```
 
 **Windows (PowerShell):**
@@ -189,29 +182,23 @@ export MM_OPENAI_MAX_RETRIES=3
 $env:MM_AI_PROVIDER="copilot"
 
 # Copilot settings
-$env:MM_COPILOT_MODEL="gpt-5.2"
+$env:MM_COPILOT_MODEL="claude-sonnet-4.6"
 $env:MM_COPILOT_TIMEOUT="180000"
 
 # OpenCode settings
-$env:MM_OPENCODE_MODEL="claude-sonnet-4.5"
+$env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 $env:MM_OPENCODE_TIMEOUT="180000"
 
 # Cursor settings
-$env:MM_CURSOR_MODEL="gpt-5"
+$env:MM_CURSOR_MODEL="claude-sonnet-4.6"
 $env:MM_CURSOR_TIMEOUT="180000"
 
 **Or use command-line parameters:**
 ```bash
 merge-mentor review --pr 123 \
   --provider opencode \
-  --opencode-model claude-sonnet-4.5 \
+  --opencode-model claude-sonnet-4.6 \
   --opencode-timeout 180000
-
-# OpenAI example
-merge-mentor review --pr 123 \
-  --provider openai \
-  --openai-api-key sk-your-key \
-  --openai-model gpt-4o
 ````
 
 ### Optional Settings
@@ -233,9 +220,11 @@ export MM_REVIEW_TYPE=general  # general, testing, security, performance, or fas
 # Bot identifier
 export MM_COMMENT_IDENTIFIER="[merge-mentor]"
 
+# Temporary directory configuration
+export MM_TEMP_PATH=./.mergementor  # Base path for temporary files (cache, diffs, logs, repos, reports, transcripts)
+
 # Logging
 export LOG_LEVEL=info  # debug, info, warn, or error
-export LOG_DIR=.merge-mentor/logs  # optional, defaults to .merge-mentor/logs
 
 # Audit logging (enabled by default for security/compliance)
 export AUDIT_LOGGING_ENABLED=true
@@ -266,7 +255,7 @@ Audit logging is enabled by default for security and compliance tracking. All cr
 - **Copilot Execution**: All LLM prompt executions
 - **Review Lifecycle**: Start/completion of reviews and individual file analysis
 
-Audit logs are written to timestamped log files (`.merge-mentor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log`) with a dedicated `audit` field for easy filtering and analysis. Each review run generates its own log file, preserving historical audit trails.
+Audit logs are written to timestamped log files (`.mergementor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log`) with a dedicated `audit` field for easy filtering and analysis. Each review run generates its own log file, preserving historical audit trails.
 
 **Example audit log entry**:
 
@@ -299,6 +288,43 @@ Audit logs can be filtered and analyzed for:
 - Tracking bot activity across PRs
 - Debugging failed operations
 - Usage analytics and cost tracking
+
+### Temporary Directory Structure
+
+By default, merge-mentor stores temporary files in `./.mergementor` relative to the current working directory. You can customize this location using the `MM_TEMP_PATH` environment variable or `--temp-path` CLI flag.
+
+**Directory Structure:**
+
+```
+.mergementor/                    # Default base directory (configurable)
+├── cache/                       # Review state cache (for incremental reviews)
+├── diffs/                       # PR diff files for AI analysis
+├── logs/                        # Timestamped log files with audit trails
+├── repos/                       # Cloned repositories (for context loading)
+├── reports/                     # Markdown review reports (dry-run mode)
+├── temp/                        # Temporary files (prompts, outputs)
+└── transcripts/                 # AI session transcripts (for debugging)
+```
+
+**Configuration Examples:**
+
+```bash
+# Use absolute path
+export MM_TEMP_PATH=/var/tmp/merge-mentor
+
+# Use relative path (relative to current directory)
+export MM_TEMP_PATH=./temp/mm
+
+# CLI parameter
+merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
+```
+
+**Note:** The entire directory structure is recreated under the configured path. This is useful for:
+
+- Using a faster disk for temporary storage
+- Isolating data in containerized environments
+- Controlling disk usage by location
+- Centralized temporary storage in CI/CD pipelines
 - Identifying patterns in review failures
 
 ### Token Permissions
@@ -317,19 +343,10 @@ Audit logs can be filtered and analyzed for:
 
 **Copilot CLI**: Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
 
+- `claude-sonnet-4.6` (default)
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
 - `claude-opus-4.5`
-- `claude-sonnet-4`
-- `gpt-5.1-codex-max`
-- `gpt-5.1-codex`
-- `gpt-5.2`
-- `gpt-5.1`
-- `gpt-5`
-- `gpt-5.1-codex-mini`
-- `gpt-5-mini`
-- `gpt-4.1`
-- `gemini-3-pro-preview`
 
 **OpenCode CLI**: Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
 
@@ -337,31 +354,8 @@ Audit logs can be filtered and analyzed for:
 
 **Cursor CLI**: Configure via `MM_CURSOR_MODEL` environment variable or `--cursor-model` CLI parameter.
 
-- Supports multiple AI models (GPT-5, Claude 4 Sonnet, Claude 4 Opus)
+- Supports multiple AI models (claude-sonnet-4.6, claude-haiku-4.5, claude-sonnet-4.5, claude-opus-4.5)
 - Check Cursor CLI documentation for latest supported models
-
-**OpenAI API**: Configure via `MM_OPENAI_MODEL` environment variable or `--openai-model` CLI parameter.
-
-- `gpt-4o` (default)
-- `gpt-4o-mini`
-- `gpt-4-turbo`
-- `gpt-4`
-- `gpt-3.5-turbo`
-- Any model available on your OpenAI account or Azure Foundry deployment
-
-### Azure Foundry Compatibility
-
-OpenAI provider supports Azure Foundry (OpenAI-compatible endpoints):
-
-```bash
-# Azure Foundry configuration
-export MM_OPENAI_API_KEY="your-azure-api-key"
-export MM_OPENAI_BASE_URL="https://your-foundry.azure.com/v1"
-export MM_OPENAI_MODEL="gpt-4"
-
-# Run review
-merge-mentor review --pr 123 --provider openai --write
-```
 
 ## Usage
 
@@ -442,8 +436,8 @@ merge-mentor review --pr 321 --review-type performance --runs 3 --write
 # Dry-run generates detailed markdown report without posting
 merge-mentor review --pr 123 --review-type testing
 
-# Review the report in .merge-mentor/reports/
-cat .merge-mentor/reports/Github-myrepo-PR123-testing-review-report.md
+# Review the report in .mergementor/reports/
+cat .mergementor/reports/Github-myrepo-PR123-testing-review-report.md
 
 # Post if satisfied
 merge-mentor review --pr 123 --review-type testing --write
@@ -456,7 +450,7 @@ merge-mentor review --pr 123 --review-type testing --write
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|opencode\|cursor\|openai>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
 | `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
@@ -733,7 +727,7 @@ In dry-run mode, merge-mentor automatically generates comprehensive markdown rep
 # Generate detailed report without posting comments
 merge-mentor review --pr 123
 
-# Report saved to: .merge-mentor/reports/pr-123-review-report.md
+# Report saved to: .mergementor/reports/pr-123-review-report.md
 ```
 
 The markdown report includes:
@@ -749,7 +743,7 @@ Reports use emojis for visual clarity (🔴 Critical, 🟠 High, 🟡 Medium, �
 
 ### Incremental Reviews
 
-Only analyzes changed files on re-reviews, saving time and cost. Cache stored in `.merge-mentor/cache/`.
+Only analyzes changed files on re-reviews, saving time and cost. Cache stored in `.mergementor/cache/`.
 
 ## Review Categories & Severity
 
@@ -830,15 +824,15 @@ steps:
 
 ## Logging
 
-Logs are written to timestamped files in `.merge-mentor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log` in your current directory. Each review run generates its own log file, preserving historical logs for debugging and audit purposes.
+Logs are written to timestamped files in `.mergementor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log` in your current directory. Each review run generates its own log file, preserving historical logs for debugging and audit purposes.
 
 ```bash
 # View latest logs
-ls -la .merge-mentor/logs/
-tail -f .merge-mentor/logs/merge-mentor_*.log
+ls -la .mergementor/logs/
+tail -f .mergementor/logs/merge-mentor_*.log
 
 # View specific run
-tail -f .merge-mentor/logs/merge-mentor_2025-01-06_18-40-30.log
+tail -f .mergementor/logs/merge-mentor_2025-01-06_18-40-30.log
 
 # Set log level
 export LOG_LEVEL=debug  # debug, info, warn, error
@@ -849,7 +843,7 @@ export LOG_LEVEL=debug  # debug, info, warn, error
 merge-mentor creates several directories in your project root for different purposes:
 
 ```
-.merge-mentor/
+.mergementor/
 ├── cache/                          # Review state caching
 │   └── Github-myrepo-PR123.json     # Platform-aware cache files
 ├── diffs/                          # Temporary diff storage for batched reviews
@@ -878,14 +872,10 @@ Increase timeout for large PRs:
 export MM_COPILOT_TIMEOUT=300000  # 5 minutes (for Copilot)
 export MM_OPENCODE_TIMEOUT=300000  # 5 minutes (for OpenCode)
 export MM_CURSOR_TIMEOUT=300000  # 5 minutes (for Cursor)
-export MM_OPENAI_TIMEOUT=300000  # 5 minutes (for OpenAI)
-```
-
-export OPENAI_TIMEOUT_MS=300000 # 5 minutes (for OpenAI)
-
 ```
 
 ### Exit Codes
+
 - `0` - Success or configuration issue
 - `1` - Review failed or critical issues found
 
@@ -894,6 +884,7 @@ export OPENAI_TIMEOUT_MS=300000 # 5 minutes (for OpenAI)
 Want to add a new specialist review type (e.g., accessibility, internationalization, API design)?
 
 See [EXTENDING.md](./EXTENDING.md) for a comprehensive guide including:
+
 - Architecture patterns
 - Step-by-step implementation guide
 - Complete code examples
@@ -909,4 +900,7 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 **Version**: 1.9.0
 **Author**: archerax
 **Documentation**: Included in npm package
+
+```
+
 ```

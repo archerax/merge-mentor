@@ -33,6 +33,8 @@ export interface AIProviderOptions {
   readonly timeoutMs?: number;
   readonly model?: string;
   readonly token?: string;
+  /** Base path for temporary files (temp, transcripts). */
+  readonly tempPath?: string;
 }
 
 /** Options for executing a prompt with additional context. */

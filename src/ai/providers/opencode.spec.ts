@@ -344,7 +344,7 @@ describe("OpenCodeProvider", () => {
     });
 
     it("should pass model parameter to opencode CLI when specified", async () => {
-      const provider = new OpenCodeProvider({ model: "claude-3.5-sonnet", maxRetries: 1 });
+      const provider = new OpenCodeProvider({ model: "claude-4.5-sonnet", maxRetries: 1 });
       mockSpawn.mockReturnValue(
         createMockProcess({
           stdout: '{"success": true}',
@@ -358,7 +358,7 @@ describe("OpenCodeProvider", () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
-        ["-p", "test prompt", "--model", "claude-3.5-sonnet"],
+        ["-p", "test prompt", "--model", "claude-4.5-sonnet"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
       );
     });

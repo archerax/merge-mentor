@@ -21,16 +21,10 @@ vi.mock("../ai/index.js", () => ({
 
 // Mock the RepoManager to avoid actual git operations
 const mockEnsureRepo = vi.fn().mockResolvedValue("/mock/repo/path");
-const mockLoadRepoContext = vi.fn().mockResolvedValue({
-  content: "",
-  filesLoaded: [],
-  repoPath: "/mock/repo/path",
-});
 
 vi.mock("./repoManager.js", () => ({
   RepoManager: class MockRepoManager {
     ensureRepo = mockEnsureRepo;
-    loadRepoContext = mockLoadRepoContext;
   },
 }));
 
@@ -98,7 +92,7 @@ describe("ReviewEngine", () => {
   afterEach(async () => {
     // Clean up cache directory between tests
     try {
-      await fs.rm(".merge-mentor", { recursive: true, force: true });
+      await fs.rm(".mergementor", { recursive: true, force: true });
     } catch {
       // Ignore cleanup errors
     }
