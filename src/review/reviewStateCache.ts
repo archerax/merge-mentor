@@ -1,7 +1,7 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { createChildLogger } from "../logger.js";
 import type { FileReviewResult } from "../platforms/types.js";
+import { type Clock, type FileSystem, nodeFs, systemClock } from "../ports/index.js";
 
 /** Cached state for a single file review. */
 interface CachedFileReview {
@@ -22,7 +22,11 @@ export class ReviewStateCache {
   private readonly cacheDir: string;
   private readonly logger = createChildLogger({ component: "ReviewStateCache" });
 
-  constructor(tempPath: string) {
+  constructor(
+    tempPath: string,
+    private readonly fileSystem: FileSystem = nodeFs,
+    private readonly clock: Clock = systemClock
+  ) {
     this.cacheDir = path.join(tempPath, "cache");
   }
 
@@ -35,7 +39,7 @@ export class ReviewStateCache {
   async getState(prIdentifier: string): Promise<ReviewState | undefined> {
     try {
       const filePath = this.getCachePath(prIdentifier);
-      const data = await fs.readFile(filePath, "utf-8");
+      const data = await this.fileSystem.readFile(filePath, "utf-8");
       const state = JSON.parse(data) as ReviewState;
       this.logger.debug(
         { prIdentifier, filesCount: Object.keys(state.files).length },
@@ -70,7 +74,7 @@ export class ReviewStateCache {
     crossFileResult?: import("../platforms/types.js").CrossFileReviewResult
   ): Promise<void> {
     try {
-      await fs.mkdir(this.cacheDir, { recursive: true });
+      await this.fileSystem.mkdir(this.cacheDir, { recursive: true });
 
       const files: Record<string, CachedFileReview> = {};
       for (const result of fileResults) {
@@ -82,13 +86,13 @@ export class ReviewStateCache {
 
       const state: ReviewState = {
         prIdentifier,
-        lastReviewedAt: new Date().toISOString(),
+        lastReviewedAt: this.clock.timestamp(),
         files,
         crossFileResult,
       };
 
       const filePath = this.getCachePath(prIdentifier);
-      await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
+      await this.fileSystem.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
       this.logger.info(
         { prIdentifier, filesCount: Object.keys(files).length },
         "Saved review state to cache"
@@ -130,7 +134,7 @@ export class ReviewStateCache {
   async clearState(prIdentifier: string): Promise<void> {
     try {
       const filePath = this.getCachePath(prIdentifier);
-      await fs.unlink(filePath);
+      await this.fileSystem.unlink(filePath);
       this.logger.info({ prIdentifier }, "Cleared cached review state");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

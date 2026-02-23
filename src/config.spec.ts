@@ -1,49 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
 import { ConfigurationError } from "./errors/index.js";
-
-function setEnv(overrides: Record<string, string>): void {
-  Object.entries(overrides).forEach(([key, value]) => {
-    vi.stubEnv(key, value);
-  });
-}
+import { createStubEnvironment } from "./ports/environment.test-helper.js";
 
 describe("Config", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
-    // Delete all config env vars to ensure test isolation from the process environment.
-    // vi.unstubAllEnvs() only restores stubbed vars; delete handles pre-existing values.
-    for (const key of [
-      "MM_PLATFORM",
-      "MM_GITHUB_TOKEN",
-      "MM_GITHUB_REPO_OWNER",
-      "MM_GITHUB_REPO_NAME",
-      "MM_AZURE_TOKEN",
-      "MM_AZURE_ORG",
-      "MM_AZURE_PROJECT",
-      "MM_AZURE_REPO",
-      "MM_COMMENT_IDENTIFIER",
-      "MM_MIN_COMMENT_CONFIDENCE",
-      "MM_SKIP_EXISTING_ISSUES",
-      "MM_POST_RESOLUTION_COMMENTS",
-      "MM_REVIEW_RUNS",
-      "MM_AI_PROVIDER",
-      "MM_COPILOT_MODEL",
-      "MM_COPILOT_TIMEOUT",
-      "MM_OPENCODE_MODEL",
-      "MM_OPENCODE_TIMEOUT",
-      "MM_CURSOR_MODEL",
-      "MM_CURSOR_TIMEOUT",
-      "MM_REVIEW_TYPE",
-    ]) {
-      delete process.env[key];
-    }
-  });
-
   describe("loadConfig", () => {
     it("should load default values when env vars are not set", () => {
-      const config = loadConfig();
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
 
       expect(config.defaultPlatform).toBe("github");
       expect(config.github.token).toBe("");
@@ -60,7 +24,7 @@ describe("Config", () => {
     });
 
     it("should load values from environment variables", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_PLATFORM: "azure",
         MM_GITHUB_TOKEN: "gh-token",
         MM_GITHUB_REPO_OWNER: "owner",
@@ -72,7 +36,7 @@ describe("Config", () => {
         MM_COMMENT_IDENTIFIER: "[Custom Bot]",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.defaultPlatform).toBe("azure");
       expect(config.github.token).toBe("gh-token");
@@ -86,210 +50,216 @@ describe("Config", () => {
     });
 
     it("should load skipPreExisting setting from environment variable", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_SKIP_EXISTING_ISSUES: "false",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.skipPreExisting).toBe(false);
     });
 
     it("should default skipPreExisting to true when not set", () => {
-      setEnv({});
+      const env = createStubEnvironment();
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.skipPreExisting).toBe(true);
     });
 
     it("should load MM_REVIEW_RUNS from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_RUNS: "3",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewRuns).toBe(3);
     });
 
     it("should default MM_REVIEW_RUNS to 1 for invalid values", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_RUNS: "invalid",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewRuns).toBe(1);
     });
 
     it("should default MM_REVIEW_RUNS to 1 for values below range", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_RUNS: "0",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewRuns).toBe(1);
     });
 
     it("should default MM_REVIEW_RUNS to 1 for values above range", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_RUNS: "10",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewRuns).toBe(1);
     });
 
     it("should accept MM_REVIEW_RUNS at boundary values", () => {
-      setEnv({ MM_REVIEW_RUNS: "1" });
-      expect(loadConfig().reviewRuns).toBe(1);
+      expect(loadConfig(undefined, createStubEnvironment({ MM_REVIEW_RUNS: "1" })).reviewRuns).toBe(
+        1
+      );
 
-      setEnv({ MM_REVIEW_RUNS: "5" });
-      expect(loadConfig().reviewRuns).toBe(5);
+      expect(loadConfig(undefined, createStubEnvironment({ MM_REVIEW_RUNS: "5" })).reviewRuns).toBe(
+        5
+      );
     });
 
     it("should load MM_COPILOT_TIMEOUT from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_COPILOT_TIMEOUT: "60000",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.copilotTimeoutMs).toBe(60000);
     });
 
     it("should ignore MM_COPILOT_TIMEOUT when zero or negative", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_COPILOT_TIMEOUT: "0",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
     it("should ignore MM_COPILOT_TIMEOUT when negative", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_COPILOT_TIMEOUT: "-1000",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
     it("should default MM_COPILOT_TIMEOUT to undefined when not set", () => {
-      const config = loadConfig();
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
 
       expect(config.copilotTimeoutMs).toBeUndefined();
     });
 
     it("should load MM_COPILOT_MODEL from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_COPILOT_MODEL: "claude-haiku-4.5",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.copilotModel).toBe("claude-haiku-4.5");
     });
 
     it("should load MM_AI_PROVIDER from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_AI_PROVIDER: "opencode",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.aiProvider).toBe("opencode");
     });
 
     it("should default MM_AI_PROVIDER to copilot for invalid values", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_AI_PROVIDER: "invalid",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.aiProvider).toBe("copilot");
     });
 
     it("should accept all valid MM_AI_PROVIDER values", () => {
-      setEnv({ MM_AI_PROVIDER: "copilot" });
-      expect(loadConfig().aiProvider).toBe("copilot");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "copilot" })).aiProvider
+      ).toBe("copilot");
 
-      setEnv({ MM_AI_PROVIDER: "opencode" });
-      expect(loadConfig().aiProvider).toBe("opencode");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode" })).aiProvider
+      ).toBe("opencode");
 
-      setEnv({ MM_AI_PROVIDER: "cursor" });
-      expect(loadConfig().aiProvider).toBe("cursor");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "cursor" })).aiProvider
+      ).toBe("cursor");
     });
 
     it("should load MM_OPENCODE_MODEL from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_OPENCODE_MODEL: "claude-4.5-sonnet",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.opencodeModel).toBe("claude-4.5-sonnet");
     });
 
     it("should load MM_OPENCODE_TIMEOUT from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_OPENCODE_TIMEOUT: "120000",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.opencodeTimeoutMs).toBe(120000);
     });
 
     it("should ignore MM_OPENCODE_TIMEOUT when zero or negative", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_OPENCODE_TIMEOUT: "0",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.opencodeTimeoutMs).toBeUndefined();
     });
 
     it("should load MM_CURSOR_MODEL from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_CURSOR_MODEL: "claude-haiku-4.5",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.cursorModel).toBe("claude-haiku-4.5");
     });
 
     it("should load MM_CURSOR_TIMEOUT from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_CURSOR_TIMEOUT: "180000",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.cursorTimeoutMs).toBe(180000);
     });
 
     it("should ignore MM_CURSOR_TIMEOUT when zero or negative", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_CURSOR_TIMEOUT: "0",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.cursorTimeoutMs).toBeUndefined();
     });
 
     it("should support all MM_ prefixed environment variables", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_PLATFORM: "azure",
         MM_GITHUB_TOKEN: "gh-token",
         MM_GITHUB_REPO_OWNER: "owner",
@@ -308,7 +278,7 @@ describe("Config", () => {
         MM_REVIEW_RUNS: "3",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.defaultPlatform).toBe("azure");
       expect(config.github.token).toBe("gh-token");
@@ -327,17 +297,20 @@ describe("Config", () => {
     });
 
     it("should accept CLI overrides that take precedence over environment variables", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_GITHUB_TOKEN: "env-token",
         MM_PLATFORM: "github",
         MM_REVIEW_RUNS: "1",
       });
 
-      const config = loadConfig({
-        githubToken: "cli-token",
-        platform: "azure",
-        reviewRuns: 3,
-      });
+      const config = loadConfig(
+        {
+          githubToken: "cli-token",
+          platform: "azure",
+          reviewRuns: 3,
+        },
+        env
+      );
 
       expect(config.github.token).toBe("cli-token");
       expect(config.defaultPlatform).toBe("azure");
@@ -345,22 +318,26 @@ describe("Config", () => {
     });
 
     it("should accept all CLI overrides", () => {
-      const config = loadConfig({
-        platform: "azure",
-        githubToken: "gh-token",
-        githubRepoOwner: "owner",
-        githubRepoName: "repo",
-        azureToken: "az-token",
-        azureOrg: "org",
-        azureProject: "project",
-        azureRepo: "az-repo",
-        commentIdentifier: "[CLI Bot]",
-        aiProvider: "cursor",
-        copilotModel: "claude-haiku-4.5",
-        copilotTimeout: 90000,
-        skipExistingIssues: "false",
-        reviewRuns: 5,
-      });
+      const env = createStubEnvironment();
+      const config = loadConfig(
+        {
+          platform: "azure",
+          githubToken: "gh-token",
+          githubRepoOwner: "owner",
+          githubRepoName: "repo",
+          azureToken: "az-token",
+          azureOrg: "org",
+          azureProject: "project",
+          azureRepo: "az-repo",
+          commentIdentifier: "[CLI Bot]",
+          aiProvider: "cursor",
+          copilotModel: "claude-haiku-4.5",
+          copilotTimeout: 90000,
+          skipExistingIssues: "false",
+          reviewRuns: 5,
+        },
+        env
+      );
 
       expect(config.defaultPlatform).toBe("azure");
       expect(config.github.token).toBe("gh-token");
@@ -379,123 +356,141 @@ describe("Config", () => {
     });
 
     it("should load MM_REVIEW_TYPE from environment", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_TYPE: "fast",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewType).toBe("fast");
     });
 
     it("should default MM_REVIEW_TYPE to general for invalid values", () => {
-      setEnv({
+      const env = createStubEnvironment({
         MM_REVIEW_TYPE: "invalid",
       });
 
-      const config = loadConfig();
+      const config = loadConfig(undefined, env);
 
       expect(config.reviewType).toBe("general");
     });
 
     it("should accept all valid MM_REVIEW_TYPE values", () => {
-      setEnv({ MM_REVIEW_TYPE: "general" });
-      expect(loadConfig().reviewType).toBe("general");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "general" })).reviewType
+      ).toBe("general");
 
-      setEnv({ MM_REVIEW_TYPE: "testing" });
-      expect(loadConfig().reviewType).toBe("testing");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "testing" })).reviewType
+      ).toBe("testing");
 
-      setEnv({ MM_REVIEW_TYPE: "security" });
-      expect(loadConfig().reviewType).toBe("security");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "security" })).reviewType
+      ).toBe("security");
 
-      setEnv({ MM_REVIEW_TYPE: "performance" });
-      expect(loadConfig().reviewType).toBe("performance");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "performance" })).reviewType
+      ).toBe("performance");
 
-      setEnv({ MM_REVIEW_TYPE: "fast" });
-      expect(loadConfig().reviewType).toBe("fast");
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "fast" })).reviewType
+      ).toBe("fast");
     });
   });
 
   describe("validateConfig", () => {
     it("should throw ConfigurationError when GitHub token is missing", () => {
-      const config = loadConfig();
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "github" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "github" as Platform)).toThrow("MM_GITHUB_TOKEN");
     });
 
     it("should throw ConfigurationError when GitHub owner is missing", () => {
-      vi.stubEnv("MM_GITHUB_TOKEN", "token");
-      const config = loadConfig();
+      const env = createStubEnvironment({ MM_GITHUB_TOKEN: "token" });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "github" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "github" as Platform)).toThrow("MM_GITHUB_REPO_OWNER");
     });
 
     it("should throw ConfigurationError when GitHub repo is missing", () => {
-      vi.stubEnv("MM_GITHUB_TOKEN", "token");
-      vi.stubEnv("MM_GITHUB_REPO_OWNER", "owner");
-      const config = loadConfig();
+      const env = createStubEnvironment({
+        MM_GITHUB_TOKEN: "token",
+        MM_GITHUB_REPO_OWNER: "owner",
+      });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "github" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "github" as Platform)).toThrow("MM_GITHUB_REPO_NAME");
     });
 
     it("should not throw when all GitHub config is provided", () => {
-      vi.stubEnv("MM_GITHUB_TOKEN", "token");
-      vi.stubEnv("MM_GITHUB_REPO_OWNER", "owner");
-      vi.stubEnv("MM_GITHUB_REPO_NAME", "repo");
-      const config = loadConfig();
+      const env = createStubEnvironment({
+        MM_GITHUB_TOKEN: "token",
+        MM_GITHUB_REPO_OWNER: "owner",
+        MM_GITHUB_REPO_NAME: "repo",
+      });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "github" as Platform)).not.toThrow();
     });
 
     it("should throw ConfigurationError when Azure DevOps token is missing", () => {
-      const config = loadConfig();
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "azure" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "azure" as Platform)).toThrow("MM_AZURE_TOKEN");
     });
 
     it("should throw ConfigurationError when Azure DevOps org is missing", () => {
-      vi.stubEnv("MM_AZURE_TOKEN", "token");
-      const config = loadConfig();
+      const env = createStubEnvironment({ MM_AZURE_TOKEN: "token" });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "azure" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "azure" as Platform)).toThrow("MM_AZURE_ORG");
     });
 
     it("should throw ConfigurationError when Azure DevOps project is missing", () => {
-      vi.stubEnv("MM_AZURE_TOKEN", "token");
-      vi.stubEnv("MM_AZURE_ORG", "org");
-      const config = loadConfig();
+      const env = createStubEnvironment({
+        MM_AZURE_TOKEN: "token",
+        MM_AZURE_ORG: "org",
+      });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "azure" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "azure" as Platform)).toThrow("MM_AZURE_PROJECT");
     });
 
     it("should throw ConfigurationError when Azure DevOps repo is missing", () => {
-      vi.stubEnv("MM_AZURE_TOKEN", "token");
-      vi.stubEnv("MM_AZURE_ORG", "org");
-      vi.stubEnv("MM_AZURE_PROJECT", "project");
-      const config = loadConfig();
+      const env = createStubEnvironment({
+        MM_AZURE_TOKEN: "token",
+        MM_AZURE_ORG: "org",
+        MM_AZURE_PROJECT: "project",
+      });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "azure" as Platform)).toThrow(ConfigurationError);
       expect(() => validateConfig(config, "azure" as Platform)).toThrow("MM_AZURE_REPO");
     });
 
     it("should not throw when all Azure DevOps config is provided", () => {
-      vi.stubEnv("MM_AZURE_TOKEN", "token");
-      vi.stubEnv("MM_AZURE_ORG", "org");
-      vi.stubEnv("MM_AZURE_PROJECT", "project");
-      vi.stubEnv("MM_AZURE_REPO", "repo");
-      const config = loadConfig();
+      const env = createStubEnvironment({
+        MM_AZURE_TOKEN: "token",
+        MM_AZURE_ORG: "org",
+        MM_AZURE_PROJECT: "project",
+        MM_AZURE_REPO: "repo",
+      });
+      const config = loadConfig(undefined, env);
 
       expect(() => validateConfig(config, "azure" as Platform)).not.toThrow();
     });
 
     it("should not throw for unknown platform (no validation)", () => {
-      const config = loadConfig();
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
       const unknownPlatform = "unknown" as unknown as Platform;
 
       expect(() => validateConfig(config, unknownPlatform)).not.toThrow();

@@ -5,7 +5,6 @@
 ```bash
 pnpm build            # Compile TypeScript
 pnpm test             # Run unit tests
-pnpm test:integration # Run integration tests
 pnpm lint             # Lint with Biome
 pnpm check            # Build + test + lint
 ```
@@ -17,7 +16,6 @@ pnpm check            # Build + test + lint
 - `src/review/` – Review engine, comment management, deduplication
 - `src/audit/` – Audit logging for security/compliance
 - `src/` – CLI, config, logger, error handling, utilities
-- `tests/integration/` – End-to-end tests with mocked dependencies
 
 ## Tech Stack
 

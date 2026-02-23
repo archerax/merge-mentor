@@ -1,10 +1,13 @@
-import { exec as execCallback } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { createChildLogger } from "../logger.js";
-
-const exec = promisify(execCallback);
+import {
+  type Clock,
+  type FileSystem,
+  nodeFs,
+  nodeProcessRunner,
+  type ProcessRunner,
+  systemClock,
+} from "../ports/index.js";
 
 /** Repository information for cloning. */
 export interface RepoInfo {
@@ -39,7 +42,13 @@ export class RepoManager {
   private readonly fetchTimeoutMs: number;
   private readonly reposDir: string;
 
-  constructor(tempPath: string, options?: RepoManagerOptions) {
+  constructor(
+    tempPath: string,
+    options?: RepoManagerOptions,
+    private readonly fileSystem: FileSystem = nodeFs,
+    private readonly runner: ProcessRunner = nodeProcessRunner,
+    private readonly clock: Clock = systemClock
+  ) {
     this.cloneTimeoutMs = options?.cloneTimeoutMs ?? DEFAULT_CLONE_TIMEOUT_MS;
     this.fetchTimeoutMs = options?.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
     this.reposDir = path.join(tempPath, "repos");
@@ -85,8 +94,8 @@ export class RepoManager {
    */
   async listClonedRepos(): Promise<string[]> {
     try {
-      await fs.mkdir(this.reposDir, { recursive: true });
-      const entries = await fs.readdir(this.reposDir, { withFileTypes: true });
+      await this.fileSystem.mkdir(this.reposDir, { recursive: true });
+      const entries = await this.fileSystem.readdir(this.reposDir, { withFileTypes: true });
       return entries.filter((e) => e.isDirectory()).map((e) => e.name);
     } catch {
       return [];
@@ -103,7 +112,7 @@ export class RepoManager {
     const repoPath = path.join(this.reposDir, repoName);
 
     try {
-      const stats = await fs.stat(repoPath);
+      const stats = await this.fileSystem.stat(repoPath);
 
       if (!stats.isDirectory()) {
         return undefined;
@@ -111,7 +120,7 @@ export class RepoManager {
 
       // Get directory size (approximate - just the .git directory)
       const gitPath = path.join(repoPath, ".git");
-      const gitStats = await fs.stat(gitPath);
+      const gitStats = await this.fileSystem.stat(gitPath);
 
       return {
         size: gitStats.size,
@@ -130,7 +139,7 @@ export class RepoManager {
    */
   async cleanOldRepos(olderThanDays: number): Promise<number> {
     const repos = await this.listClonedRepos();
-    const cutoffDate = new Date();
+    const cutoffDate = this.clock.now();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     let removed = 0;
@@ -140,7 +149,7 @@ export class RepoManager {
 
       if (stats && stats.lastUsed < cutoffDate) {
         const repoPath = path.join(this.reposDir, repoName);
-        await fs.rm(repoPath, { recursive: true, force: true });
+        await this.fileSystem.rm(repoPath, { recursive: true, force: true });
         this.logger.info({ repoName, lastUsed: stats.lastUsed }, "Removed old repository");
         removed++;
       }
@@ -165,7 +174,7 @@ export class RepoManager {
   private async repoExists(repoPath: string): Promise<boolean> {
     try {
       const gitPath = path.join(repoPath, ".git");
-      const stats = await fs.stat(gitPath);
+      const stats = await this.fileSystem.stat(gitPath);
       return stats.isDirectory();
     } catch {
       return false;
@@ -184,7 +193,7 @@ export class RepoManager {
     const cloneUrl = this.buildCloneUrl(repoInfo, token);
 
     // Ensure parent directory exists
-    await fs.mkdir(path.dirname(repoPath), { recursive: true });
+    await this.fileSystem.mkdir(path.dirname(repoPath), { recursive: true });
 
     const cloneCmd = `git clone --depth 1 --single-branch --branch ${branch} "${cloneUrl}" "${repoPath}"`;
 
@@ -193,7 +202,7 @@ export class RepoManager {
       this.logger.info({ repoPath, branch }, "Repository cloned successfully");
     } catch (error) {
       // Clean up partial clone on failure
-      await fs.rm(repoPath, { recursive: true, force: true }).catch(() => {});
+      await this.fileSystem.rm(repoPath, { recursive: true, force: true }).catch(() => {});
       throw new Error(`Failed to clone repository: ${(error as Error).message}`);
     }
   }
@@ -259,11 +268,11 @@ export class RepoManager {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const { stdout } = await exec(command, {
+      const result = await this.runner.exec(command, {
         signal: controller.signal,
         maxBuffer: 50 * 1024 * 1024, // 50MB buffer
       });
-      return stdout;
+      return result.stdout;
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         throw new Error(`Command timed out after ${timeoutMs}ms`);

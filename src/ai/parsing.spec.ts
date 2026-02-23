@@ -1,68 +1,36 @@
-import { spawn } from "node:child_process";
-import fs from "node:fs/promises";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mocked } from "vitest";
+import { createFixedClock } from "../ports/clock.test-helper.js";
+import { createStubExecutableFinder } from "../ports/executableFinder.test-helper.js";
+import type { FileSystem } from "../ports/fileSystem.js";
+import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
+import type { ProcessRunner } from "../ports/processRunner.js";
+import {
+  createStubChildProcess,
+  createStubProcessRunner,
+} from "../ports/processRunner.test-helper.js";
 import { CopilotProvider } from "./providers/copilot.js";
 
-// Mock dependencies - use "node:child_process" to match the import in copilot.ts
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-  // Mock execSync to return a Windows .exe path so tests expect shell: false
-  execSync: vi.fn(() => "C:\\Program Files\\copilot\\copilot.exe"),
-}));
-
-vi.mock("node:fs/promises", () => ({
-  default: {
-    mkdir: vi.fn(),
-    writeFile: vi.fn(),
-    unlink: vi.fn(),
-    readFile: vi.fn(),
-  },
-}));
-
-const mockSpawn = vi.mocked(spawn);
-const mockFs = vi.mocked(fs);
-
-function createMockProcess(options: { stdout?: string; stderr?: string; exitCode?: number }): any {
-  return {
-    stdin: null,
-    stdout: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stdout) {
-          setTimeout(() => handler(Buffer.from(options.stdout!)), 10);
-        }
-      }),
-    },
-    stderr: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stderr) {
-          setTimeout(() => handler(Buffer.from(options.stderr!)), 10);
-        }
-      }),
-    },
-    on: vi.fn((event: string, handler: (arg: any) => void) => {
-      if (event === "close" && options.exitCode !== undefined) {
-        setTimeout(() => handler(options.exitCode), 10);
-      }
-    }),
-  };
-}
-
 describe("Chain of Thought Parsing (CopilotProvider)", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    mockFs.mkdir.mockResolvedValue(undefined);
-    mockFs.writeFile.mockResolvedValue(undefined);
-    mockFs.unlink.mockResolvedValue(undefined);
-  });
+  function createProvider() {
+    const processRunner = createStubProcessRunner() as Mocked<ProcessRunner>;
+    const executableFinder = createStubExecutableFinder({
+      copilot: "C:\\Program Files\\copilot\\copilot.exe",
+    });
+    const fileSystem = createStubFileSystem() as Mocked<FileSystem>;
+    const clock = createFixedClock("2025-01-15T10:00:00.000Z");
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.useRealTimers();
-    vi.clearAllMocks();
-  });
+    const provider = new CopilotProvider({
+      processRunner,
+      executableFinder,
+      fileSystem,
+      clock,
+    });
+
+    return { provider, processRunner, fileSystem };
+  }
 
   it("parses JSON correctly when embedded in markdown code blocks", async () => {
-    const provider = new CopilotProvider();
+    const { provider, processRunner, fileSystem } = createProvider();
     const cotResponse =
       "Here is my analysis:\n" +
       "1. The code looks okay but has a bug in line 10.\n" +
@@ -83,17 +51,12 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "}\n" +
       "```\n";
 
-    const mockProcess = createMockProcess({
-      stdout: "Agent wrote JSON to file",
-      exitCode: 0,
-    });
-    mockSpawn.mockReturnValue(mockProcess);
-    // Mock readFile to return the JSON content
-    mockFs.readFile.mockResolvedValue(cotResponse);
+    processRunner.spawn.mockReturnValue(
+      createStubChildProcess({ stdout: "Agent wrote JSON to file", exitCode: 0 })
+    );
+    fileSystem.readFile.mockResolvedValue(cotResponse);
 
-    const promise = provider.executePrompt("Review this");
-    await vi.runAllTimersAsync();
-    const result = await promise;
+    const result = await provider.executePrompt("Review this");
 
     expect(result.parsed).toEqual({
       findings: [
@@ -111,26 +74,22 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
   });
 
   it("falls back to standard JSON parsing if no markdown block is found", async () => {
-    const provider = new CopilotProvider();
+    const { provider, processRunner, fileSystem } = createProvider();
     const standardResponse =
       "Some text before.\n" + "{\n" + '  "findings": []\n' + "}\n" + "Some text after.\n";
 
-    const mockProcess = createMockProcess({
-      stdout: "Agent wrote JSON to file",
-      exitCode: 0,
-    });
-    mockSpawn.mockReturnValue(mockProcess);
-    mockFs.readFile.mockResolvedValue(standardResponse);
+    processRunner.spawn.mockReturnValue(
+      createStubChildProcess({ stdout: "Agent wrote JSON to file", exitCode: 0 })
+    );
+    fileSystem.readFile.mockResolvedValue(standardResponse);
 
-    const promise = provider.executePrompt("Review this");
-    await vi.runAllTimersAsync();
-    const result = await promise;
+    const result = await provider.executePrompt("Review this");
 
     expect(result.parsed).toEqual({ findings: [] });
   });
 
   it("handles mixed content with multiple code blocks (takes the first json block)", async () => {
-    const provider = new CopilotProvider();
+    const { provider, processRunner, fileSystem } = createProvider();
     const complexResponse =
       "Analysis:\n" +
       "```\n" +
@@ -144,16 +103,12 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
       "```\n\n" +
       "More text.\n";
 
-    const mockProcess = createMockProcess({
-      stdout: "Agent wrote JSON to file",
-      exitCode: 0,
-    });
-    mockSpawn.mockReturnValue(mockProcess);
-    mockFs.readFile.mockResolvedValue(complexResponse);
+    processRunner.spawn.mockReturnValue(
+      createStubChildProcess({ stdout: "Agent wrote JSON to file", exitCode: 0 })
+    );
+    fileSystem.readFile.mockResolvedValue(complexResponse);
 
-    const promise = provider.executePrompt("Review this");
-    await vi.runAllTimersAsync();
-    const result = await promise;
+    const result = await provider.executePrompt("Review this");
 
     expect(result.parsed).toEqual({
       findings: [{ message: "First finding" }],
@@ -161,21 +116,16 @@ describe("Chain of Thought Parsing (CopilotProvider)", () => {
   });
 
   it("handles malformed markdown but valid JSON by falling back", async () => {
-    const provider = new CopilotProvider();
-    // Markdown block is not closed properly or has wrong tag, but JSON is valid
+    const { provider, processRunner, fileSystem } = createProvider();
     const messyResponse =
       "```json\n" + "{\n" + '  "findings": []\n' + "}\n" + "(missing closing ticks)\n";
 
-    const mockProcess = createMockProcess({
-      stdout: "Agent wrote JSON to file",
-      exitCode: 0,
-    });
-    mockSpawn.mockReturnValue(mockProcess);
-    mockFs.readFile.mockResolvedValue(messyResponse);
+    processRunner.spawn.mockReturnValue(
+      createStubChildProcess({ stdout: "Agent wrote JSON to file", exitCode: 0 })
+    );
+    fileSystem.readFile.mockResolvedValue(messyResponse);
 
-    const promise = provider.executePrompt("Review this");
-    await vi.runAllTimersAsync();
-    const result = await promise;
+    const result = await provider.executePrompt("Review this");
 
     expect(result.parsed).toEqual({ findings: [] });
   });

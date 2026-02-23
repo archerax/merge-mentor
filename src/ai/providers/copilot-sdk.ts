@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
@@ -11,6 +10,7 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import { type Clock, type FileSystem, nodeFs, systemClock } from "../../ports/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -97,6 +97,8 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
   private readonly defaultTempDir: string;
   private readonly transcriptDir: string;
+  private readonly fileSystem: FileSystem;
+  private readonly clock: Clock;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -105,6 +107,8 @@ export class CopilotSdkProvider implements AIProviderClient {
     const tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.defaultTempDir = path.join(tempPath, "temp");
     this.transcriptDir = path.join(tempPath, "transcripts");
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+    this.clock = options?.clock ?? systemClock;
   }
 
   /**
@@ -269,10 +273,10 @@ export class CopilotSdkProvider implements AIProviderClient {
       ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
-    await fs.mkdir(tempDir, { recursive: true });
-    const filename = `prompt-${Date.now()}-${Math.random().toString(36).substring(7)}.md`;
+    await this.fileSystem.mkdir(tempDir, { recursive: true });
+    const filename = `prompt-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.md`;
     const filepath = path.join(tempDir, filename);
-    await fs.writeFile(filepath, prompt, "utf-8");
+    await this.fileSystem.writeFile(filepath, prompt, "utf-8");
     return filepath;
   }
 
@@ -281,16 +285,16 @@ export class CopilotSdkProvider implements AIProviderClient {
       ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
-    await fs.mkdir(tempDir, { recursive: true });
-    const filename = `output-${Date.now()}-${Math.random().toString(36).substring(7)}.json`;
+    await this.fileSystem.mkdir(tempDir, { recursive: true });
+    const filename = `output-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.json`;
     const filepath = path.join(tempDir, filename);
-    await fs.writeFile(filepath, "", "utf-8");
+    await this.fileSystem.writeFile(filepath, "", "utf-8");
     return filepath;
   }
 
   private async readOutputFile(filepath: string): Promise<string> {
     try {
-      const content = await fs.readFile(filepath, "utf-8");
+      const content = await this.fileSystem.readFile(filepath, "utf-8");
       if (!content || content.trim().length === 0) {
         throw new Error("Output file is empty");
       }
@@ -305,7 +309,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
   private async deleteTempFile(filepath: string): Promise<void> {
     try {
-      await fs.unlink(filepath);
+      await this.fileSystem.unlink(filepath);
     } catch {
       // Ignore deletion errors - temp files will be cleaned up eventually
     }
@@ -320,9 +324,9 @@ export class CopilotSdkProvider implements AIProviderClient {
     error?: string;
   }): Promise<void> {
     try {
-      await fs.mkdir(this.transcriptDir, { recursive: true });
+      await this.fileSystem.mkdir(this.transcriptDir, { recursive: true });
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
       const status = data.success ? "success" : "failure";
       const filename = `transcript-sdk-${timestamp}-${status}.txt`;
       const filepath = path.join(this.transcriptDir, filename);
@@ -331,7 +335,7 @@ export class CopilotSdkProvider implements AIProviderClient {
         "=".repeat(80),
         "COPILOT SDK PROVIDER TRANSCRIPT",
         "=".repeat(80),
-        `Timestamp: ${new Date().toISOString()}`,
+        `Timestamp: ${this.clock.timestamp()}`,
         `Status: ${status}`,
         `Model: ${this.model || "default"}`,
         data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
@@ -358,7 +362,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
       transcript.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
 
-      await fs.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
+      await this.fileSystem.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
     } catch (error) {
       this.logger.warn({ error: (error as Error).message }, "Failed to save SDK transcript");
     }

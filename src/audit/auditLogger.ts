@@ -1,4 +1,5 @@
 import { createChildLogger } from "../logger.js";
+import { type Clock, systemClock } from "../ports/index.js";
 
 /** Audit event types for security and compliance tracking. */
 export type AuditEventType =
@@ -43,6 +44,7 @@ export interface AuditResource {
 export interface AuditLoggerOptions {
   readonly enabled?: boolean;
   readonly actor?: string;
+  readonly clock?: Clock;
 }
 
 /**
@@ -53,10 +55,12 @@ export class AuditLogger {
   private readonly logger = createChildLogger({ component: "AuditLogger" });
   private readonly enabled: boolean;
   private readonly actor: string;
+  private readonly clock: Clock;
 
   constructor(options?: AuditLoggerOptions) {
     this.enabled = options?.enabled ?? true;
     this.actor = options?.actor ?? "merge-mentor-bot";
+    this.clock = options?.clock ?? systemClock;
   }
 
   /**
@@ -84,7 +88,7 @@ export class AuditLogger {
 
     const event: AuditEvent = {
       eventType,
-      timestamp: new Date().toISOString(),
+      timestamp: this.clock.timestamp(),
       severity,
       actor: this.actor,
       resource,

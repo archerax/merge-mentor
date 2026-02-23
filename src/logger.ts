@@ -1,9 +1,12 @@
 import path from "node:path";
 import type { Logger } from "pino";
 import pino from "pino";
+import { type Clock, type Environment, processEnvironment, systemClock } from "./ports/index.js";
 
 let _logger: Logger | undefined;
 let _tempPath: string | undefined;
+let _clock: Clock = systemClock;
+let _env: Environment = processEnvironment;
 
 /**
  * Initialize the logger with a specific temp path.
@@ -11,8 +14,10 @@ let _tempPath: string | undefined;
  *
  * @param tempPath - Base path for temporary files
  */
-export function initLogger(tempPath: string): void {
+export function initLogger(tempPath: string, clock?: Clock, env?: Environment): void {
   _tempPath = tempPath;
+  if (clock) _clock = clock;
+  if (env) _env = env;
   _logger = undefined; // Reset logger to force recreation with new path
 }
 
@@ -25,11 +30,16 @@ export function getLogger(): Logger {
     // Use configured temp path or fallback to default
     const basePath = _tempPath || path.join(process.cwd(), ".mergementor");
     const logDir = path.join(basePath, "logs");
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, -5);
+    const timestamp = _clock
+      .now()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .replace("T", "_")
+      .slice(0, -5);
     const logFile = path.join(logDir, `merge-mentor_${timestamp}.log`);
 
     _logger = pino({
-      level: process.env.LOG_LEVEL || "info",
+      level: _env.get("LOG_LEVEL") || "info",
       transport: {
         target: "pino/file",
         options: {

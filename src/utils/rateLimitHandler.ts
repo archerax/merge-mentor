@@ -1,4 +1,5 @@
 import { createChildLogger } from "../logger.js";
+import { type Clock, systemClock } from "../ports/index.js";
 
 /**
  * Rate limit handling utilities for API requests.
@@ -21,6 +22,8 @@ export interface RateLimitOptions {
   readonly isRateLimitError?: (error: unknown) => boolean;
   /** Custom function to extract retry-after value from error. */
   readonly extractRetryAfter?: (error: unknown) => number | undefined;
+  /** Clock for time-based calculations. Default: systemClock */
+  readonly clock?: Clock;
 }
 
 interface RateLimitInfo {
@@ -57,7 +60,7 @@ export function isRateLimitError(error: unknown): boolean {
  * Extracts Retry-After value from error response.
  * Returns milliseconds to wait, or undefined if not available.
  */
-export function extractRetryAfter(error: unknown): number | undefined {
+export function extractRetryAfter(error: unknown, clock: Clock = systemClock): number | undefined {
   if (!error || typeof error !== "object") return undefined;
 
   // Check response headers for Retry-After
@@ -84,7 +87,7 @@ export function extractRetryAfter(error: unknown): number | undefined {
       if (typeof rateLimitReset === "string" || typeof rateLimitReset === "number") {
         const resetTime = parseInt(rateLimitReset.toString(), 10);
         if (!Number.isNaN(resetTime)) {
-          const now = Math.floor(Date.now() / 1000);
+          const now = Math.floor(clock.epochMs() / 1000);
           const delaySeconds = Math.max(0, resetTime - now);
           return delaySeconds * 1000;
         }
@@ -100,7 +103,8 @@ export function extractRetryAfter(error: unknown): number | undefined {
  */
 function getRateLimitInfo(error: unknown, options: RateLimitOptions): RateLimitInfo {
   const checkRateLimit = options.isRateLimitError || isRateLimitError;
-  const extractRetry = options.extractRetryAfter || extractRetryAfter;
+  const clock = options.clock ?? systemClock;
+  const extractRetry = options.extractRetryAfter || ((e: unknown) => extractRetryAfter(e, clock));
 
   const isRateLimit = checkRateLimit(error);
   if (!isRateLimit) {

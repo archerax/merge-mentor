@@ -3,6 +3,8 @@
  * Provides real-time feedback during long-running AI CLI operations.
  */
 
+import { type Clock, consoleOutputWriter, type OutputWriter, systemClock } from "../ports/index.js";
+
 /** Configuration options for StreamingDisplay. */
 export interface StreamingDisplayOptions {
   /** Maximum number of lines to display in the rolling window. Default: 5 */
@@ -13,6 +15,14 @@ export interface StreamingDisplayOptions {
   readonly title?: string;
   /** Enable/disable display. Default: auto-detect TTY via process.stdout.isTTY */
   readonly enabled?: boolean;
+  /** Output writer for terminal output. Default: consoleOutputWriter */
+  readonly output?: OutputWriter;
+  /** Clock for timestamps. Default: systemClock */
+  readonly clock?: Clock;
+  /** Terminal width override. Default: process.stdout.columns || 80 */
+  readonly columns?: number;
+  /** Whether the terminal is a TTY. Default: process.stdout.isTTY */
+  readonly isTTY?: boolean;
 }
 
 /**
@@ -32,6 +42,9 @@ export class StreamingDisplay {
   private readonly prefix: string;
   private readonly title: string;
   private readonly enabled: boolean;
+  private readonly output: OutputWriter;
+  private readonly clock: Clock;
+  private readonly terminalColumns: number;
 
   /** Circular buffer storing the last N complete lines */
   private readonly lineBuffer: string[];
@@ -56,7 +69,10 @@ export class StreamingDisplay {
     this.maxLines = options.maxLines ?? 5;
     this.prefix = options.prefix ?? "  │ ";
     this.title = options.title ?? "🤖 AI Processing...";
-    this.enabled = options.enabled ?? process.stdout.isTTY === true;
+    this.enabled = options.enabled ?? options.isTTY ?? process.stdout.isTTY === true;
+    this.output = options.output ?? consoleOutputWriter;
+    this.clock = options.clock ?? systemClock;
+    this.terminalColumns = options.columns ?? (process.stdout.columns || 80);
     this.lineBuffer = new Array<string>(this.maxLines).fill("");
   }
 
@@ -143,7 +159,7 @@ export class StreamingDisplay {
       // Render final state and move cursor below
       this.render();
       if (this.hasRendered) {
-        process.stdout.write("\n");
+        this.output.write("\n");
       }
     } else {
       this.clear();
@@ -171,7 +187,7 @@ export class StreamingDisplay {
    * Schedule a render with debouncing to avoid excessive updates.
    */
   private scheduleRender(): void {
-    const now = Date.now();
+    const now = this.clock.epochMs();
     const timeSinceLastRender = now - this.lastRenderTime;
 
     if (timeSinceLastRender >= this.renderDebounceMs) {
@@ -196,8 +212,8 @@ export class StreamingDisplay {
       return;
     }
 
-    this.lastRenderTime = Date.now();
-    const terminalWidth = process.stdout.columns || 80;
+    this.lastRenderTime = this.clock.epochMs();
+    const terminalWidth = this.terminalColumns;
 
     // Clear previous output if we've rendered before
     if (this.hasRendered) {
@@ -225,7 +241,7 @@ export class StreamingDisplay {
     }
 
     // Write all at once
-    process.stdout.write(`${output.join("\n")}\n`);
+    this.output.write(`${output.join("\n")}\n`);
 
     this.hasRendered = true;
     this.displayedLineCount = lines.length + (this.partialLine.length > 0 ? 1 : 0);
@@ -259,7 +275,7 @@ export class StreamingDisplay {
   private clearLines(count: number): void {
     for (let i = 0; i < count; i++) {
       // Move up one line, clear it, return to start
-      process.stdout.write("\x1B[1A\x1B[2K\r");
+      this.output.write("\x1B[1A\x1B[2K\r");
     }
   }
 

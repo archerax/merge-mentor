@@ -1,7 +1,7 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { createChildLogger } from "../logger.js";
 import type { PRFile } from "../platforms/types.js";
+import { type Clock, type FileSystem, nodeFs, systemClock } from "../ports/index.js";
 import { convertToNumberedDiff } from "../utils/diffFormatter.js";
 
 /** Entry for a single file in the diff manifest. */
@@ -44,7 +44,11 @@ export class DiffStorage {
   private readonly baseDir: string;
   private readonly logger = createChildLogger({ component: "DiffStorage" });
 
-  constructor(tempPath: string) {
+  constructor(
+    tempPath: string,
+    private readonly fileSystem: FileSystem = nodeFs,
+    private readonly clock: Clock = systemClock
+  ) {
     this.baseDir = path.join(tempPath, "diffs");
   }
 
@@ -62,7 +66,7 @@ export class DiffStorage {
     await this.cleanup(prIdentifier);
 
     // Create the diffs directory
-    await fs.mkdir(diffDir, { recursive: true });
+    await this.fileSystem.mkdir(diffDir, { recursive: true });
 
     const entries: DiffFileEntry[] = [];
 
@@ -116,11 +120,11 @@ export class DiffStorage {
 
       // Ensure parent directory exists for nested paths
       const parentDir = path.dirname(fullPath);
-      await fs.mkdir(parentDir, { recursive: true });
+      await this.fileSystem.mkdir(parentDir, { recursive: true });
 
       // Write the diff content with pre-calculated line numbers
       const numberedDiff = convertToNumberedDiff(file.patch);
-      await fs.writeFile(fullPath, numberedDiff, "utf-8");
+      await this.fileSystem.writeFile(fullPath, numberedDiff, "utf-8");
 
       entries.push({
         filename: file.filename,
@@ -134,11 +138,11 @@ export class DiffStorage {
     const manifest: DiffManifest = {
       prIdentifier,
       files: entries,
-      createdAt: new Date().toISOString(),
+      createdAt: this.clock.timestamp(),
     };
 
     // Write manifest
-    await fs.writeFile(
+    await this.fileSystem.writeFile(
       path.join(diffDir, "manifest.json"),
       JSON.stringify(manifest, null, 2),
       "utf-8"
@@ -165,7 +169,7 @@ export class DiffStorage {
     const diffDir = path.join(this.baseDir, prIdentifier);
 
     try {
-      await fs.rm(diffDir, { recursive: true, force: true });
+      await this.fileSystem.rm(diffDir, { recursive: true, force: true });
       this.logger.debug({ prIdentifier, diffDir }, "Cleaned up diff directory");
     } catch (error) {
       // Ignore errors if directory doesn't exist
@@ -183,7 +187,7 @@ export class DiffStorage {
    */
   async cleanupAll(): Promise<void> {
     try {
-      await fs.rm(this.baseDir, { recursive: true, force: true });
+      await this.fileSystem.rm(this.baseDir, { recursive: true, force: true });
       this.logger.debug({ baseDir: this.baseDir }, "Cleaned up all diff directories");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

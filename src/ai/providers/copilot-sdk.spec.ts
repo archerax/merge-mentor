@@ -1,5 +1,8 @@
-import fs from "node:fs/promises";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import type { Clock } from "../../ports/clock.js";
+import { createFixedClock } from "../../ports/clock.test-helper.js";
+import type { FileSystem } from "../../ports/fileSystem.js";
+import { createStubFileSystem } from "../../ports/fileSystem.test-helper.js";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
 const { mockSession, mockClient } = vi.hoisted(() => {
@@ -22,36 +25,27 @@ vi.mock("@github/copilot-sdk", () => ({
   }),
 }));
 
-vi.mock("node:fs/promises", () => ({
-  default: {
-    mkdir: vi.fn(),
-    writeFile: vi.fn(),
-    readFile: vi.fn(),
-    unlink: vi.fn(),
-  },
-}));
-
 import { CopilotSdkError, ValidationError } from "../../errors/index.js";
 import type { AIResponse } from "../types.js";
 import { CopilotSdkProvider } from "./copilot-sdk.js";
-
-const mockFs = vi.mocked(fs);
-
-function createProvider(maxRetries = 1, timeoutMs = 5000, model?: string): CopilotSdkProvider {
-  return new CopilotSdkProvider({ maxRetries, timeoutMs, model });
-}
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
 }
 
 describe("CopilotSdkProvider", () => {
+  let fileSystem: Mocked<FileSystem>;
+  let clock: Clock;
+
+  function createProvider(maxRetries = 1, timeoutMs = 5000, model?: string): CopilotSdkProvider {
+    return new CopilotSdkProvider({ maxRetries, timeoutMs, model, fileSystem, clock });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    mockFs.mkdir.mockResolvedValue(undefined);
-    mockFs.writeFile.mockResolvedValue(undefined);
-    mockFs.unlink.mockResolvedValue(undefined);
+    fileSystem = createStubFileSystem() as Mocked<FileSystem>;
+    clock = createFixedClock();
     mockSession.on.mockReturnValue(() => {});
     mockSession.destroy.mockResolvedValue(undefined);
     mockClient.createSession.mockResolvedValue(mockSession);
@@ -85,7 +79,7 @@ describe("CopilotSdkProvider", () => {
         type: "assistant.message",
         data: { content: "Done" },
       });
-      mockFs.readFile.mockResolvedValue(jsonContent as any);
+      fileSystem.readFile.mockResolvedValue(jsonContent);
 
       const result = await provider.executePrompt("Review the following file: test.ts");
 
@@ -99,7 +93,7 @@ describe("CopilotSdkProvider", () => {
         type: "assistant.message",
         data: { content: "Done" },
       });
-      mockFs.readFile.mockResolvedValue("" as any);
+      fileSystem.readFile.mockResolvedValue("");
 
       await expect(provider.executePrompt("Review the following file: test.ts")).rejects.toThrow(
         CopilotSdkError
@@ -126,7 +120,7 @@ describe("CopilotSdkProvider", () => {
         type: "assistant.message",
         data: { content: "Done" },
       });
-      mockFs.readFile.mockResolvedValue(jsonContent as any);
+      fileSystem.readFile.mockResolvedValue(jsonContent);
 
       await provider.executePrompt("Review the following file: test.ts");
 
@@ -150,7 +144,7 @@ describe("CopilotSdkProvider", () => {
         type: "assistant.message",
         data: { content: "Done" },
       });
-      mockFs.readFile.mockResolvedValue(jsonContent as any);
+      fileSystem.readFile.mockResolvedValue(jsonContent);
 
       await provider.executePrompt("Review the following file: test.ts", { onStreamData });
 
@@ -165,11 +159,11 @@ describe("CopilotSdkProvider", () => {
         type: "assistant.message",
         data: { content: "Done" },
       });
-      mockFs.readFile.mockResolvedValue(jsonContent as any);
+      fileSystem.readFile.mockResolvedValue(jsonContent);
 
       await provider.executePrompt("Review the following file: test.ts");
 
-      expect(mockFs.unlink).toHaveBeenCalledTimes(2); // prompt + output files
+      expect(fileSystem.unlink).toHaveBeenCalledTimes(2); // prompt + output files
     });
   });
 

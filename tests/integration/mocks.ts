@@ -53,6 +53,12 @@ export function createMockPlatformAdapter(options?: {
   return {
     calls,
     getProjectIdentifier: vi.fn(() => "test-project"),
+    getRepoInfo: vi.fn(() => ({
+      owner: "test-owner",
+      repo: "test-repo",
+      platform: "github" as const,
+    })),
+    getToken: vi.fn(() => "test-github-token"),
     getPRDetails: vi.fn(async (prNumber: number) => {
       calls.getPRDetails.push(prNumber);
       return options?.prDetails ?? samplePRDetails;

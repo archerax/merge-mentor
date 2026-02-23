@@ -1,4 +1,8 @@
 import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types.js";
+import type { Clock } from "../ports/clock.js";
+import type { ExecutableFinder } from "../ports/executableFinder.js";
+import type { FileSystem } from "../ports/fileSystem.js";
+import type { ProcessRunner } from "../ports/processRunner.js";
 
 /** Combined result from fast review (single-pass file + cross-file analysis). */
 export interface FastReviewResult {
@@ -35,6 +39,14 @@ export interface AIProviderOptions {
   readonly token?: string;
   /** Base path for temporary files (temp, transcripts). */
   readonly tempPath?: string;
+  /** Finds executables on PATH (defaults to system finder). */
+  readonly executableFinder?: ExecutableFinder;
+  /** Runs child processes (defaults to node child_process). */
+  readonly processRunner?: ProcessRunner;
+  /** Filesystem operations (defaults to node fs/promises). */
+  readonly fileSystem?: FileSystem;
+  /** System clock (defaults to real clock). */
+  readonly clock?: Clock;
 }
 
 /** Options for executing a prompt with additional context. */

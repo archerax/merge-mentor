@@ -1,62 +1,31 @@
-import type { ChildProcess } from "node:child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Mock must be at top level before any imports that use it
-// Use "node:child_process" to match the import in cursor.ts
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-  execSync: vi.fn(() => "C:\\Program Files\\cursor\\cursor-agent.exe"),
-}));
-
-import { spawn } from "node:child_process";
+import { afterEach, beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import type { ExecutableFinder } from "../../ports/executableFinder.js";
+import { createStubExecutableFinder } from "../../ports/executableFinder.test-helper.js";
+import type { ProcessRunner } from "../../ports/processRunner.js";
+import {
+  createStubChildProcess,
+  createStubProcessRunner,
+} from "../../ports/processRunner.test-helper.js";
 import type { AIResponse } from "../types.js";
 import { CursorCliError, CursorProvider } from "./cursor.js";
-
-const mockSpawn = vi.mocked(spawn);
-
-function createCursorProvider(maxRetries = 1, timeoutMs = 5000): CursorProvider {
-  return new CursorProvider({ maxRetries, timeoutMs });
-}
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
 }
 
-function createMockProcess(options: {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-  error?: Error;
-}): ChildProcess {
-  const mockProcess: any = {
-    stdin: null,
-    stdout: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stdout) {
-          setTimeout(() => handler(Buffer.from(options.stdout!)), 10);
-        }
-      }),
-    },
-    stderr: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stderr) {
-          setTimeout(() => handler(Buffer.from(options.stderr!)), 10);
-        }
-      }),
-    },
-    on: vi.fn((event: string, handler: (arg: any) => void) => {
-      if (event === "close" && options.exitCode !== undefined) {
-        setTimeout(() => handler(options.exitCode), 10);
-      } else if (event === "error" && options.error) {
-        setTimeout(() => handler(options.error), 10);
-      }
-    }),
-  };
-  return mockProcess as ChildProcess;
-}
-
 describe("CursorProvider", () => {
+  let processRunner: Mocked<ProcessRunner>;
+  let executableFinder: ExecutableFinder;
+
+  function createCursorProvider(maxRetries = 1, timeoutMs = 5000): CursorProvider {
+    return new CursorProvider({ maxRetries, timeoutMs, processRunner, executableFinder });
+  }
+
   beforeEach(() => {
+    processRunner = createStubProcessRunner() as Mocked<ProcessRunner>;
+    executableFinder = createStubExecutableFinder({
+      "cursor-agent": "C:\\Program Files\\cursor\\cursor-agent.exe",
+    });
     vi.useFakeTimers();
   });
 
@@ -272,8 +241,8 @@ describe("CursorProvider", () => {
 
     it("should return parsed JSON response on success", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"findings": []}',
           exitCode: 0,
         })
@@ -289,8 +258,8 @@ describe("CursorProvider", () => {
 
     it("should throw error when no JSON found", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: "plain text without json",
           exitCode: 0,
         })
@@ -307,7 +276,7 @@ describe("CursorProvider", () => {
       const provider = createCursorProvider(1, 5000);
       const error: any = new Error("spawn cursor-agent ENOENT");
       error.code = "ENOENT";
-      mockSpawn.mockReturnValue(createMockProcess({ error }));
+      processRunner.spawn.mockReturnValue(createStubChildProcess({ error }));
 
       const promise = provider.executePrompt("test");
       const rejection = promise.catch((e) => e);
@@ -319,8 +288,8 @@ describe("CursorProvider", () => {
 
     it("should throw CursorCliError on process error", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           error: new Error("Unknown error"),
         })
       );
@@ -334,8 +303,8 @@ describe("CursorProvider", () => {
 
     it("should throw CursorCliError on non-zero exit code", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stderr: "Error occurred",
           exitCode: 1,
         })
@@ -349,15 +318,20 @@ describe("CursorProvider", () => {
     });
 
     it("should retry on failure", async () => {
-      const provider = new CursorProvider({ maxRetries: 3, timeoutMs: 5000 });
+      const provider = new CursorProvider({
+        maxRetries: 3,
+        timeoutMs: 5000,
+        processRunner,
+        executableFinder,
+      });
       let attempt = 0;
 
-      mockSpawn.mockImplementation(() => {
+      processRunner.spawn.mockImplementation(() => {
         attempt++;
         if (attempt === 3) {
-          return createMockProcess({ stdout: '{"success": true}', exitCode: 0 });
+          return createStubChildProcess({ stdout: '{"success": true}', exitCode: 0 });
         }
-        return createMockProcess({ exitCode: 1 });
+        return createStubChildProcess({ exitCode: 1 });
       });
 
       const resultPromise = provider.executePrompt("test");
@@ -369,8 +343,13 @@ describe("CursorProvider", () => {
     });
 
     it("should throw after max retries exceeded", async () => {
-      const provider = new CursorProvider({ maxRetries: 2, timeoutMs: 5000 });
-      mockSpawn.mockReturnValue(createMockProcess({ exitCode: 1 }));
+      const provider = new CursorProvider({
+        maxRetries: 2,
+        timeoutMs: 5000,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockImplementation(() => createStubChildProcess({ exitCode: 1 }));
 
       const promise = provider.executePrompt("test");
       const rejection = promise.catch((e) => e);
@@ -380,9 +359,14 @@ describe("CursorProvider", () => {
     });
 
     it("should pass model parameter to cursor-agent CLI when specified", async () => {
-      const provider = new CursorProvider({ model: "claude-haiku-4.5", maxRetries: 1 });
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      const provider = new CursorProvider({
+        model: "claude-haiku-4.5",
+        maxRetries: 1,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"success": true}',
           exitCode: 0,
         })
@@ -392,7 +376,7 @@ describe("CursorProvider", () => {
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         ["-p", "test prompt", "--model", "claude-haiku-4.5"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
@@ -400,9 +384,13 @@ describe("CursorProvider", () => {
     });
 
     it("should not pass model parameter when not specified", async () => {
-      const provider = new CursorProvider({ maxRetries: 1 });
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      const provider = new CursorProvider({
+        maxRetries: 1,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"success": true}',
           exitCode: 0,
         })
@@ -412,7 +400,7 @@ describe("CursorProvider", () => {
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         ["-p", "test prompt"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
@@ -421,8 +409,8 @@ describe("CursorProvider", () => {
 
     it("should infer file-review prompt type", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"findings": []}',
           exitCode: 0,
         })
@@ -433,13 +421,13 @@ describe("CursorProvider", () => {
       await promise;
 
       // Verify prompt was processed (inferPromptType is internal, tested via successful execution)
-      expect(mockSpawn).toHaveBeenCalled();
+      expect(processRunner.spawn).toHaveBeenCalled();
     });
 
     it("should infer cross-file-review prompt type", async () => {
       const provider = createCursorProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"overall_assessment": "ok"}',
           exitCode: 0,
         })
@@ -449,7 +437,7 @@ describe("CursorProvider", () => {
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalled();
+      expect(processRunner.spawn).toHaveBeenCalled();
     });
   });
 

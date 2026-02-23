@@ -1,62 +1,31 @@
-import type { ChildProcess } from "node:child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Mock must be at top level before any imports that use it
-// Use "node:child_process" to match the import in opencode.ts
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-  execSync: vi.fn(() => "C:\\Program Files\\opencode\\opencode.exe"),
-}));
-
-import { spawn } from "node:child_process";
+import { afterEach, beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import type { ExecutableFinder } from "../../ports/executableFinder.js";
+import { createStubExecutableFinder } from "../../ports/executableFinder.test-helper.js";
+import type { ProcessRunner } from "../../ports/processRunner.js";
+import {
+  createStubChildProcess,
+  createStubProcessRunner,
+} from "../../ports/processRunner.test-helper.js";
 import type { AIResponse } from "../types.js";
 import { OpenCodeCliError, OpenCodeProvider } from "./opencode.js";
-
-const mockSpawn = vi.mocked(spawn);
-
-function createOpenCodeProvider(maxRetries = 1, timeoutMs = 5000): OpenCodeProvider {
-  return new OpenCodeProvider({ maxRetries, timeoutMs });
-}
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
 }
 
-function createMockProcess(options: {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-  error?: Error;
-}): ChildProcess {
-  const mockProcess: any = {
-    stdin: null,
-    stdout: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stdout) {
-          setTimeout(() => handler(Buffer.from(options.stdout!)), 10);
-        }
-      }),
-    },
-    stderr: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stderr) {
-          setTimeout(() => handler(Buffer.from(options.stderr!)), 10);
-        }
-      }),
-    },
-    on: vi.fn((event: string, handler: (arg: any) => void) => {
-      if (event === "close" && options.exitCode !== undefined) {
-        setTimeout(() => handler(options.exitCode), 10);
-      } else if (event === "error" && options.error) {
-        setTimeout(() => handler(options.error), 10);
-      }
-    }),
-  };
-  return mockProcess as ChildProcess;
-}
-
 describe("OpenCodeProvider", () => {
+  let processRunner: Mocked<ProcessRunner>;
+  let executableFinder: ExecutableFinder;
+
+  function createOpenCodeProvider(maxRetries = 1, timeoutMs = 5000): OpenCodeProvider {
+    return new OpenCodeProvider({ maxRetries, timeoutMs, processRunner, executableFinder });
+  }
+
   beforeEach(() => {
+    processRunner = createStubProcessRunner() as Mocked<ProcessRunner>;
+    executableFinder = createStubExecutableFinder({
+      opencode: "C:\\Program Files\\opencode\\opencode.exe",
+    });
     vi.useFakeTimers();
   });
 
@@ -236,8 +205,8 @@ describe("OpenCodeProvider", () => {
 
     it("should return parsed JSON response on success", async () => {
       const provider = createOpenCodeProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"findings": []}',
           exitCode: 0,
         })
@@ -253,8 +222,8 @@ describe("OpenCodeProvider", () => {
 
     it("should throw error when no JSON found", async () => {
       const provider = createOpenCodeProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: "plain text without json",
           exitCode: 0,
         })
@@ -271,7 +240,7 @@ describe("OpenCodeProvider", () => {
       const provider = createOpenCodeProvider(1, 5000);
       const error: any = new Error("spawn opencode ENOENT");
       error.code = "ENOENT";
-      mockSpawn.mockReturnValue(createMockProcess({ error }));
+      processRunner.spawn.mockReturnValue(createStubChildProcess({ error }));
 
       const promise = provider.executePrompt("test");
       const rejection = promise.catch((e) => e);
@@ -283,8 +252,8 @@ describe("OpenCodeProvider", () => {
 
     it("should throw OpenCodeCliError on process error", async () => {
       const provider = createOpenCodeProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           error: new Error("Unknown error"),
         })
       );
@@ -298,8 +267,8 @@ describe("OpenCodeProvider", () => {
 
     it("should throw OpenCodeCliError on non-zero exit code", async () => {
       const provider = createOpenCodeProvider(1, 5000);
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stderr: "Error occurred",
           exitCode: 1,
         })
@@ -313,15 +282,20 @@ describe("OpenCodeProvider", () => {
     });
 
     it("should retry on failure", async () => {
-      const provider = new OpenCodeProvider({ maxRetries: 3, timeoutMs: 5000 });
+      const provider = new OpenCodeProvider({
+        maxRetries: 3,
+        timeoutMs: 5000,
+        processRunner,
+        executableFinder,
+      });
       let attempt = 0;
 
-      mockSpawn.mockImplementation(() => {
+      processRunner.spawn.mockImplementation(() => {
         attempt++;
         if (attempt === 3) {
-          return createMockProcess({ stdout: '{"success": true}', exitCode: 0 });
+          return createStubChildProcess({ stdout: '{"success": true}', exitCode: 0 });
         }
-        return createMockProcess({ exitCode: 1 });
+        return createStubChildProcess({ exitCode: 1 });
       });
 
       const resultPromise = provider.executePrompt("test");
@@ -333,8 +307,13 @@ describe("OpenCodeProvider", () => {
     });
 
     it("should throw after max retries exceeded", async () => {
-      const provider = new OpenCodeProvider({ maxRetries: 2, timeoutMs: 5000 });
-      mockSpawn.mockReturnValue(createMockProcess({ exitCode: 1 }));
+      const provider = new OpenCodeProvider({
+        maxRetries: 2,
+        timeoutMs: 5000,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockImplementation(() => createStubChildProcess({ exitCode: 1 }));
 
       const promise = provider.executePrompt("test");
       const rejection = promise.catch((e) => e);
@@ -344,9 +323,14 @@ describe("OpenCodeProvider", () => {
     });
 
     it("should pass model parameter to opencode CLI when specified", async () => {
-      const provider = new OpenCodeProvider({ model: "claude-4.5-sonnet", maxRetries: 1 });
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      const provider = new OpenCodeProvider({
+        model: "claude-4.5-sonnet",
+        maxRetries: 1,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"success": true}',
           exitCode: 0,
         })
@@ -356,7 +340,7 @@ describe("OpenCodeProvider", () => {
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         ["-p", "test prompt", "--model", "claude-4.5-sonnet"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })
@@ -364,9 +348,13 @@ describe("OpenCodeProvider", () => {
     });
 
     it("should not pass model parameter when not specified", async () => {
-      const provider = new OpenCodeProvider({ maxRetries: 1 });
-      mockSpawn.mockReturnValue(
-        createMockProcess({
+      const provider = new OpenCodeProvider({
+        maxRetries: 1,
+        processRunner,
+        executableFinder,
+      });
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
           stdout: '{"success": true}',
           exitCode: 0,
         })
@@ -376,7 +364,7 @@ describe("OpenCodeProvider", () => {
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         ["-p", "test prompt"],
         expect.objectContaining({ stdio: ["inherit", "pipe", "pipe"] })

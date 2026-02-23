@@ -1,4 +1,3 @@
-import { execSync, spawn } from "node:child_process";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { JsonParseError, ValidationError } from "../../errors/index.js";
@@ -9,6 +8,12 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import {
+  createSystemExecutableFinder,
+  type ExecutableFinder,
+  nodeProcessRunner,
+  type ProcessRunner,
+} from "../../ports/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -16,67 +21,6 @@ import type {
   ExecutePromptOptions,
   FastReviewResult,
 } from "../types.js";
-
-/**
- * Cache for resolved executable paths.
- */
-const executablePathCache = new Map<string, string>();
-
-/**
- * Resolves the full path to an executable by searching PATH.
- * On Windows, returns command name for batch files (requires shell: true).
- */
-function resolveExecutablePath(command: string): string {
-  const cached = executablePathCache.get(command);
-  if (cached) {
-    return cached;
-  }
-
-  // On Windows, batch files (.bat, .cmd) cannot be executed with shell: false
-  // In this case, just return the command name and we'll use shell: true
-  if (process.platform === "win32") {
-    try {
-      const result = execSync(`where ${command}`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-        timeout: 5000,
-      }).trim();
-
-      const executablePath = result.split(/\r?\n/)[0].trim();
-
-      // If it's a batch file, return the command name (will use shell: true)
-      if (
-        executablePath.toLowerCase().endsWith(".bat") ||
-        executablePath.toLowerCase().endsWith(".cmd")
-      ) {
-        executablePathCache.set(command, command);
-        return command;
-      }
-
-      executablePathCache.set(command, executablePath);
-      return executablePath;
-    } catch {
-      // If where fails, still try the command name with shell
-      executablePathCache.set(command, command);
-      return command;
-    }
-  }
-
-  // Unix-like systems: resolve the full path
-  try {
-    const result = execSync(`which ${command}`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 5000,
-    }).trim();
-
-    const executablePath = result.split(/\r?\n/)[0].trim();
-    executablePathCache.set(command, executablePath);
-    return executablePath;
-  } catch {
-    throw new Error(`Command "${command}" not found in PATH`);
-  }
-}
 
 /**
  * Error thrown when the Cursor CLI fails or is unavailable.
@@ -161,11 +105,15 @@ export class CursorProvider implements AIProviderClient {
   private readonly model?: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CursorProvider" });
+  private readonly executableFinder: ExecutableFinder;
+  private readonly processRunner: ProcessRunner;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.executableFinder = options?.executableFinder ?? createSystemExecutableFinder();
+    this.processRunner = options?.processRunner ?? nodeProcessRunner;
   }
 
   /**
@@ -229,10 +177,8 @@ export class CursorProvider implements AIProviderClient {
       }
 
       // Resolve the full path to the cursor-agent executable before spawning.
-      let executablePath: string;
-      try {
-        executablePath = resolveExecutablePath("cursor-agent");
-      } catch {
+      const executablePath = this.executableFinder.find("cursor-agent");
+      if (!executablePath) {
         reject(new CursorCliError("Cursor CLI is not installed or not in PATH"));
         return;
       }
@@ -244,7 +190,7 @@ export class CursorProvider implements AIProviderClient {
 
       // When using shell: true, pass command and args as a single string
       const proc = needsShell
-        ? spawn(
+        ? this.processRunner.spawn(
             executablePath,
             [
               args
@@ -263,7 +209,7 @@ export class CursorProvider implements AIProviderClient {
               cwd: options?.workingDirectory,
             }
           )
-        : spawn(executablePath, args, {
+        : this.processRunner.spawn(executablePath, args, {
             stdio: ["inherit", "pipe", "pipe"],
             timeout: this.timeoutMs,
             shell: false,

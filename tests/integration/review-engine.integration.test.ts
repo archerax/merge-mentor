@@ -24,6 +24,7 @@ vi.mock("../../src/ai/index.js", () => ({
 
 // Mock the logger to suppress output during tests
 vi.mock("../../src/logger.js", () => ({
+  initLogger: vi.fn(),
   logger: {
     info: vi.fn(),
     debug: vi.fn(),

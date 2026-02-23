@@ -1,79 +1,53 @@
-import type { ChildProcess } from "node:child_process";
-import fs from "node:fs/promises";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Mock must be at top level before any imports that use it
-// Use "node:child_process" to match the import in copilot.ts
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-  // Mock execSync to return a Windows .exe path so tests expect shell: false
-  execSync: vi.fn(() => "C:\\Program Files\\copilot\\copilot.exe"),
-}));
-
-vi.mock("node:fs/promises", () => ({
-  default: {
-    mkdir: vi.fn(),
-    writeFile: vi.fn(),
-    unlink: vi.fn(),
-    readFile: vi.fn(),
-  },
-}));
-
-import { spawn } from "node:child_process";
+import { afterEach, beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { CopilotCliError } from "../../errors/index.js";
+import type { Clock } from "../../ports/clock.js";
+import { createFixedClock } from "../../ports/clock.test-helper.js";
+import type { ExecutableFinder } from "../../ports/executableFinder.js";
+import { createStubExecutableFinder } from "../../ports/executableFinder.test-helper.js";
+import type { FileSystem } from "../../ports/fileSystem.js";
+import { createStubFileSystem } from "../../ports/fileSystem.test-helper.js";
+import type { ProcessRunner } from "../../ports/processRunner.js";
+import {
+  createStubChildProcess,
+  createStubProcessRunner,
+} from "../../ports/processRunner.test-helper.js";
 import type { AIResponse } from "../types.js";
 import { CopilotProvider } from "./copilot.js";
-
-const mockSpawn = vi.mocked(spawn);
-const mockFs = vi.mocked(fs);
-
-function createCopilotProvider(maxRetries = 1, timeoutMs = 5000, model?: string): CopilotProvider {
-  return new CopilotProvider({ maxRetries, timeoutMs, model });
-}
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
 }
 
-function createMockProcess(options: {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-  error?: Error;
-}): ChildProcess {
-  const mockProcess: any = {
-    stdin: null,
-    stdout: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stdout) {
-          setTimeout(() => handler(Buffer.from(options.stdout!)), 10);
-        }
-      }),
-    },
-    stderr: {
-      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
-        if (event === "data" && options.stderr) {
-          setTimeout(() => handler(Buffer.from(options.stderr!)), 10);
-        }
-      }),
-    },
-    on: vi.fn((event: string, handler: (arg: any) => void) => {
-      if (event === "close" && options.exitCode !== undefined) {
-        setTimeout(() => handler(options.exitCode), 10);
-      } else if (event === "error" && options.error) {
-        setTimeout(() => handler(options.error), 10);
-      }
-    }),
-  };
-  return mockProcess as ChildProcess;
-}
-
 describe("CopilotProvider", () => {
+  let processRunner: Mocked<ProcessRunner>;
+  let executableFinder: ExecutableFinder;
+  let fileSystem: Mocked<FileSystem>;
+  let clock: Clock;
+
+  function createCopilotProvider(
+    maxRetries = 1,
+    timeoutMs = 5000,
+    model?: string
+  ): CopilotProvider {
+    return new CopilotProvider({
+      maxRetries,
+      timeoutMs,
+      model,
+      processRunner,
+      executableFinder,
+      fileSystem,
+      clock,
+    });
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
-    mockFs.mkdir.mockResolvedValue(undefined);
-    mockFs.writeFile.mockResolvedValue(undefined);
-    mockFs.unlink.mockResolvedValue(undefined);
+    processRunner = createStubProcessRunner() as Mocked<ProcessRunner>;
+    executableFinder = createStubExecutableFinder({
+      copilot: "C:\\Program Files\\copilot\\copilot.exe",
+    });
+    fileSystem = createStubFileSystem() as Mocked<FileSystem>;
+    clock = createFixedClock();
   });
 
   afterEach(() => {
@@ -87,40 +61,43 @@ describe("CopilotProvider", () => {
       const provider = createCopilotProvider();
       const prompt = "Review this code";
       const mockResponse = { findings: [] };
-      const mockProcess = createMockProcess({
-        stdout: "Agent thinking process here...",
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      // Mock readFile to return the JSON from output file
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: "Agent thinking process here...",
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt(prompt);
       await vi.runAllTimersAsync();
       const result = await promise;
 
       expect(result.parsed).toEqual(mockResponse);
-      expect(mockFs.mkdir).toHaveBeenCalledWith(expect.stringMatching(/\.mergementor[/\\]temp/), {
-        recursive: true,
-      });
+      expect(fileSystem.mkdir).toHaveBeenCalledWith(
+        expect.stringMatching(/\.mergementor[/\\]temp/),
+        {
+          recursive: true,
+        }
+      );
       // Should create prompt file
-      expect(mockFs.writeFile).toHaveBeenCalledWith(
+      expect(fileSystem.writeFile).toHaveBeenCalledWith(
         expect.stringMatching(/prompt-.*\.md$/),
         prompt,
         "utf-8"
       );
       // Should create transcript file
-      expect(mockFs.writeFile).toHaveBeenCalledWith(
+      expect(fileSystem.writeFile).toHaveBeenCalledWith(
         expect.stringMatching(/transcript-.*\.txt$/),
         expect.stringContaining("COPILOT AI AGENT TRANSCRIPT"),
         "utf-8"
       );
       // Should read from output file
-      expect(mockFs.readFile).toHaveBeenCalledWith(
+      expect(fileSystem.readFile).toHaveBeenCalledWith(
         expect.stringMatching(/output-.*\.json$/),
         "utf-8"
       );
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         expect.arrayContaining([
           "-p",
@@ -132,17 +109,18 @@ describe("CopilotProvider", () => {
         ]),
         expect.objectContaining({ shell: false })
       );
-      expect(mockFs.unlink).toHaveBeenCalled();
+      expect(fileSystem.unlink).toHaveBeenCalled();
     });
 
     it("cleans up temp file even on failure", async () => {
       const provider = createCopilotProvider();
       const longPrompt = "a".repeat(200);
-      const mockProcess = createMockProcess({
-        stderr: "CLI error",
-        exitCode: 1,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stderr: "CLI error",
+          exitCode: 1,
+        })
+      );
 
       const promise = provider.executePrompt(longPrompt);
 
@@ -155,24 +133,25 @@ describe("CopilotProvider", () => {
       // Now verify the error was thrown
       await expect(promise).rejects.toThrow(CopilotCliError);
 
-      expect(mockFs.unlink).toHaveBeenCalled();
+      expect(fileSystem.unlink).toHaveBeenCalled();
     });
 
     it("passes model parameter when configured", async () => {
       const provider = createCopilotProvider(1, 5000, "claude-haiku-4.5");
       const mockResponse = { findings: [] };
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: JSON.stringify(mockResponse),
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test prompt");
       await vi.runAllTimersAsync();
       await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(processRunner.spawn).toHaveBeenCalledWith(
         expect.any(String), // Resolved executable path
         expect.arrayContaining(["--model", "claude-haiku-4.5"]),
         expect.any(Object)
@@ -189,19 +168,18 @@ describe("CopilotProvider", () => {
       const mockResponse = { findings: [] };
       let attemptCount = 0;
 
-      // Reset mock to clear previous test calls
-      mockSpawn.mockReset();
-
-      mockSpawn.mockImplementation(() => {
+      processRunner.spawn.mockImplementation(() => {
         attemptCount++;
         if (attemptCount === 1) {
-          return createMockProcess({ stderr: "error", exitCode: 1 });
+          return createStubChildProcess({ stderr: "error", exitCode: 1 });
         }
-        return createMockProcess({
+        return createStubChildProcess({
           stdout: JSON.stringify(mockResponse),
           exitCode: 0,
         });
       });
+
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test");
       await vi.runAllTimersAsync();
@@ -321,14 +299,14 @@ Total code changes:    0 lines added, 0 lines removed
 Usage by model:
     claude-haiku-4.5     33.0k input, 773 output, 22.0k cache read (Est. 0 Premium requests)`;
 
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        stderr,
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      // Mock readFile to return the JSON from output file
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: JSON.stringify(mockResponse),
+          stderr,
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test prompt");
       await vi.runAllTimersAsync();
@@ -354,14 +332,14 @@ Total duration (wall): 18s
 Usage by model:
     claude-haiku-4.5     120.5k input, 1500 output (Est. 5 Premium requests)`;
 
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        stderr,
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      // Mock readFile to return the JSON from output file
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: JSON.stringify(mockResponse),
+          stderr,
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test prompt");
       await vi.runAllTimersAsync();
@@ -382,14 +360,13 @@ Usage by model:
       const provider = createCopilotProvider();
       const mockResponse = { findings: [] };
 
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        stderr: "",
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      // Mock readFile to return the JSON from output file
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: JSON.stringify(mockResponse),
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test prompt");
       await vi.runAllTimersAsync();
@@ -404,14 +381,14 @@ Usage by model:
       const stderr = `Usage by model:
     claude-opus          50k input, 200 output`;
 
-      const mockProcess = createMockProcess({
-        stdout: JSON.stringify(mockResponse),
-        stderr,
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      // Mock readFile to return the JSON from output file
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: JSON.stringify(mockResponse),
+          stderr,
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt("test prompt");
       await vi.runAllTimersAsync();
@@ -434,32 +411,33 @@ Usage by model:
       const mockResponse = { findings: [] };
       const mockStdout = "Agent thinking process here...";
       const mockStderr = "Total usage est:       0 Premium requests";
-      const mockProcess = createMockProcess({
-        stdout: mockStdout,
-        stderr: mockStderr,
-        exitCode: 0,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
-      mockFs.readFile.mockResolvedValue(JSON.stringify(mockResponse));
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stdout: mockStdout,
+          stderr: mockStderr,
+          exitCode: 0,
+        })
+      );
+      fileSystem.readFile.mockResolvedValue(JSON.stringify(mockResponse));
 
       const promise = provider.executePrompt(prompt);
       await vi.runAllTimersAsync();
       await promise;
 
       // Verify transcript directory was created
-      expect(mockFs.mkdir).toHaveBeenCalledWith(
+      expect(fileSystem.mkdir).toHaveBeenCalledWith(
         expect.stringMatching(/\.mergementor[/\\]transcripts/),
         { recursive: true }
       );
 
       // Verify transcript file was written
-      const transcriptCalls = (mockFs.writeFile as any).mock.calls.filter((call: any[]) =>
-        call[0].includes("transcript-")
+      const transcriptCalls = fileSystem.writeFile.mock.calls.filter((call) =>
+        String(call[0]).includes("transcript-")
       );
       expect(transcriptCalls.length).toBeGreaterThan(0);
 
       const transcriptCall = transcriptCalls[0];
-      const transcriptContent = transcriptCall[1];
+      const transcriptContent = transcriptCall[1] as string;
 
       // Verify transcript contains all required sections
       expect(transcriptContent).toContain("COPILOT AI AGENT TRANSCRIPT");
@@ -478,11 +456,12 @@ Usage by model:
     it("saves transcript on failure", async () => {
       const provider = createCopilotProvider();
       const prompt = "Review this code";
-      const mockProcess = createMockProcess({
-        stderr: "CLI error occurred",
-        exitCode: 1,
-      });
-      mockSpawn.mockReturnValue(mockProcess);
+      processRunner.spawn.mockReturnValue(
+        createStubChildProcess({
+          stderr: "CLI error occurred",
+          exitCode: 1,
+        })
+      );
 
       const promise = provider.executePrompt(prompt);
       await Promise.all([
@@ -493,13 +472,13 @@ Usage by model:
       await expect(promise).rejects.toThrow(CopilotCliError);
 
       // Verify transcript file was written even on failure
-      const transcriptCalls = (mockFs.writeFile as any).mock.calls.filter((call: any[]) =>
-        call[0].includes("transcript-")
+      const transcriptCalls = fileSystem.writeFile.mock.calls.filter((call) =>
+        String(call[0]).includes("transcript-")
       );
       expect(transcriptCalls.length).toBeGreaterThan(0);
 
       const transcriptCall = transcriptCalls[0];
-      const transcriptContent = transcriptCall[1];
+      const transcriptContent = transcriptCall[1] as string;
 
       // Verify transcript contains error information
       expect(transcriptContent).toContain("COPILOT AI AGENT TRANSCRIPT");

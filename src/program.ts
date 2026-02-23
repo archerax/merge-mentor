@@ -9,6 +9,12 @@ import { initLogger, logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
 import type { PlatformAdapter } from "./platforms/types.js";
+import {
+  consoleOutputWriter,
+  type Environment,
+  type OutputWriter,
+  processEnvironment,
+} from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
 
@@ -54,11 +60,20 @@ export interface ReviewExecutionResult {
   platform: Platform;
 }
 
+export interface ProgramDeps {
+  output?: OutputWriter;
+  env?: Environment;
+}
+
 /**
  * Execute the review command logic.
  * Extracted for testability.
  */
-export async function executeReview(options: ReviewOptions): Promise<ReviewExecutionResult> {
+export async function executeReview(
+  options: ReviewOptions,
+  deps: ProgramDeps = {}
+): Promise<ReviewExecutionResult> {
+  const output = deps.output ?? consoleOutputWriter;
   logger.info(
     {
       pr: options.pr,
@@ -165,7 +180,7 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 
   const modeLabel = dryRun ? "(dry-run)" : "";
   const providerLabel = `[${aiProvider}]`;
-  console.log(
+  output.log(
     `\n🔍 Starting code review for PR #${options.pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
   );
 
@@ -360,31 +375,33 @@ export function displayResults(
   platform?: Platform,
   aiProvider?: AIProviderType,
   reviewType = "general",
-  tempPath?: string
+  tempPath?: string,
+  deps: ProgramDeps = {}
 ): void {
-  console.log("=".repeat(60));
-  console.log("📊 Review Complete");
-  console.log("=".repeat(60));
-  console.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
-  console.log(`Author: ${result.prDetails.author}`);
-  console.log(`Branch: ${result.prDetails.headBranch} → ${result.prDetails.baseBranch}`);
-  console.log(`Review Type: ${reviewType}`);
-  console.log("");
-  console.log(`Files Reviewed: ${result.filesReviewed}`);
-  console.log(
+  const output = deps.output ?? consoleOutputWriter;
+  output.log("=".repeat(60));
+  output.log("📊 Review Complete");
+  output.log("=".repeat(60));
+  output.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
+  output.log(`Author: ${result.prDetails.author}`);
+  output.log(`Branch: ${result.prDetails.headBranch} → ${result.prDetails.baseBranch}`);
+  output.log(`Review Type: ${reviewType}`);
+  output.log("");
+  output.log(`Files Reviewed: ${result.filesReviewed}`);
+  output.log(
     `Total Issues Found: ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)}`
   );
-  console.log("");
+  output.log("");
 
   if (dryRun) {
-    console.log("📝 Dry-run mode - showing what would be posted:");
-    console.log(`  Comments to Create: ${result.commentsCreated}`);
+    output.log("📝 Dry-run mode - showing what would be posted:");
+    output.log(`  Comments to Create: ${result.commentsCreated}`);
   } else {
-    console.log(`Comments Created: ${result.commentsCreated}`);
+    output.log(`Comments Created: ${result.commentsCreated}`);
     if (result.commentErrors.length > 0) {
-      console.log(`\n⚠️  Comment Errors: ${result.commentErrors.length}`);
+      output.log(`\n⚠️  Comment Errors: ${result.commentErrors.length}`);
       result.commentErrors.forEach((err, i) => {
-        console.log(`  ${i + 1}. ${err}`);
+        output.log(`  ${i + 1}. ${err}`);
       });
     }
   }
@@ -406,16 +423,16 @@ export function displayResults(
       // Write the report
       writeFileSync(reportFile, markdownReport, "utf-8");
 
-      console.log("");
-      console.log("📄 Detailed markdown report generated:");
-      console.log(`  ${reportFile}`);
+      output.log("");
+      output.log("📄 Detailed markdown report generated:");
+      output.log(`  ${reportFile}`);
     } catch (error) {
       logger.warn({ error: (error as Error).message }, "Failed to generate markdown report");
-      console.log("");
-      console.log("⚠️  Failed to generate markdown report - see logs for details");
+      output.log("");
+      output.log("⚠️  Failed to generate markdown report - see logs for details");
     }
   }
-  console.log(`${"=".repeat(60)}\n`);
+  output.log(`${"=".repeat(60)}\n`);
 }
 
 /**
@@ -565,7 +582,7 @@ program
         },
         "Review failed"
       );
-      console.error(`\n❌ Error: ${err.message}\n`);
+      consoleOutputWriter.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }
   });
@@ -581,6 +598,7 @@ program
   .action((options: { list?: boolean; clean?: boolean; cleanRepo?: string; tempPath?: string }) => {
     const config = loadConfig({ tempPath: options.tempPath });
     const reposDir = join(config.tempPath, "repos");
+    const output = consoleOutputWriter;
 
     try {
       // Ensure repos directory exists
@@ -594,16 +612,16 @@ program
         });
 
         if (repos.length === 0) {
-          console.log("No cloned repositories found.");
+          output.log("No cloned repositories found.");
         } else {
-          console.log(`\n📁 Cloned repositories (${repos.length}):\n`);
+          output.log(`\n📁 Cloned repositories (${repos.length}):\n`);
           for (const repo of repos) {
             const repoPath = join(reposDir, repo);
             const stats = statSync(repoPath);
-            console.log(`  • ${repo}`);
-            console.log(`    Path: ${repoPath}`);
-            console.log(`    Last modified: ${stats.mtime.toISOString()}`);
-            console.log("");
+            output.log(`  • ${repo}`);
+            output.log(`    Path: ${repoPath}`);
+            output.log(`    Last modified: ${stats.mtime.toISOString()}`);
+            output.log("");
           }
         }
       } else if (options.clean) {
@@ -614,15 +632,15 @@ program
         });
 
         if (repos.length === 0) {
-          console.log("No cloned repositories to clean.");
+          output.log("No cloned repositories to clean.");
         } else {
-          console.log(`\n🧹 Cleaning ${repos.length} repositories...\n`);
+          output.log(`\n🧹 Cleaning ${repos.length} repositories...\n`);
           for (const repo of repos) {
             const repoPath = join(reposDir, repo);
             rmSync(repoPath, { recursive: true, force: true });
-            console.log(`  ✓ Removed: ${repo}`);
+            output.log(`  ✓ Removed: ${repo}`);
           }
-          console.log(`\n✅ Cleaned ${repos.length} repositories.`);
+          output.log(`\n✅ Cleaned ${repos.length} repositories.`);
         }
       } else if (options.cleanRepo) {
         // Clean specific repo
@@ -631,30 +649,30 @@ program
           const stats = statSync(repoPath);
           if (stats.isDirectory()) {
             rmSync(repoPath, { recursive: true, force: true });
-            console.log(`✅ Removed repository: ${options.cleanRepo}`);
+            output.log(`✅ Removed repository: ${options.cleanRepo}`);
           } else {
-            console.error(`❌ Error: "${options.cleanRepo}" is not a directory.`);
+            output.error(`❌ Error: "${options.cleanRepo}" is not a directory.`);
             process.exit(1);
           }
         } catch {
-          console.error(`❌ Error: Repository "${options.cleanRepo}" not found.`);
+          output.error(`❌ Error: Repository "${options.cleanRepo}" not found.`);
           process.exit(1);
         }
       } else {
         // No option specified, show help
-        console.log("\nUsage: merge-mentor repos [options]\n");
-        console.log("Options:");
-        console.log("  --list           List all cloned repositories");
-        console.log("  --clean          Remove all cloned repositories");
-        console.log("  --clean-repo <n> Remove a specific cloned repository");
-        console.log("");
+        output.log("\nUsage: merge-mentor repos [options]\n");
+        output.log("Options:");
+        output.log("  --list           List all cloned repositories");
+        output.log("  --clean          Remove all cloned repositories");
+        output.log("  --clean-repo <n> Remove a specific cloned repository");
+        output.log("");
       }
 
       process.exit(0);
     } catch (error) {
       const err = error as Error;
       logger.error({ error: err.message }, "Repository management failed");
-      console.error(`\n❌ Error: ${err.message}\n`);
+      output.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }
   });
@@ -665,18 +683,20 @@ program
   .description("Check AI provider CLI installations and configuration")
   .option("--provider <provider>", "Check specific provider (copilot, opencode, cursor)")
   .action((options: { provider?: string }) => {
-    console.log("\n🔍 merge-mentor diagnostics\n");
-    console.log(`Platform: ${process.platform}`);
-    console.log(`Node.js: ${process.version}`);
-    console.log(`CWD: ${process.cwd()}`);
-    console.log(`PATH length: ${(process.env.PATH || process.env.Path || "").length} chars\n`);
+    const output = consoleOutputWriter;
+    const env = processEnvironment;
+    output.log("\n🔍 merge-mentor diagnostics\n");
+    output.log(`Platform: ${process.platform}`);
+    output.log(`Node.js: ${process.version}`);
+    output.log(`CWD: ${process.cwd()}`);
+    output.log(`PATH length: ${(env.get("PATH") || env.get("Path") || "").length} chars\n`);
 
     const providersToCheck = options.provider
       ? [options.provider]
       : ["copilot", "opencode", "cursor"];
 
     for (const provider of providersToCheck) {
-      console.log(`\n📦 Checking ${provider} CLI:`);
+      output.log(`\n📦 Checking ${provider} CLI:`);
 
       try {
         // Try to get version
@@ -685,7 +705,7 @@ program
           stdio: ["pipe", "pipe", "pipe"],
           timeout: 5000,
         }).trim();
-        console.log(`  ✅ Installed: ${versionOutput}`);
+        output.log(`  ✅ Installed: ${versionOutput}`);
 
         // Try to get path
         const whichCommand = process.platform === "win32" ? "where" : "which";
@@ -695,33 +715,33 @@ program
             stdio: ["pipe", "pipe", "pipe"],
             timeout: 5000,
           }).trim();
-          console.log(`  📍 Location: ${pathOutput}`);
+          output.log(`  📍 Location: ${pathOutput}`);
         } catch {
-          console.log(`  ⚠️  Could not determine installation location`);
+          output.log(`  ⚠️  Could not determine installation location`);
         }
       } catch (error) {
         const err = error as Error & { status?: number };
-        console.log(`  ❌ Not found or not working`);
+        output.log(`  ❌ Not found or not working`);
         if (err.message) {
-          console.log(`     Error: ${err.message.split("\n")[0]}`);
+          output.log(`     Error: ${err.message.split("\n")[0]}`);
         }
       }
     }
 
-    console.log("\n");
+    output.log("\n");
 
     // Check configuration
     try {
       const config = loadConfig({});
-      console.log("⚙️  Configuration:");
-      console.log(`  Default platform: ${config.defaultPlatform}`);
-      console.log(`  AI provider: ${config.aiProvider}`);
-      console.log(`  GitHub token: ${config.github.token ? "✅ Set" : "❌ Not set"}`);
-      console.log(`  Azure token: ${config.azure.token ? "✅ Set" : "❌ Not set"}`);
-      console.log("");
+      output.log("⚙️  Configuration:");
+      output.log(`  Default platform: ${config.defaultPlatform}`);
+      output.log(`  AI provider: ${config.aiProvider}`);
+      output.log(`  GitHub token: ${config.github.token ? "✅ Set" : "❌ Not set"}`);
+      output.log(`  Azure token: ${config.azure.token ? "✅ Set" : "❌ Not set"}`);
+      output.log("");
     } catch (error) {
-      console.log("⚙️  Configuration: ⚠️  Could not load configuration");
-      console.log(`   ${(error as Error).message}\n`);
+      output.log("⚙️  Configuration: ⚠️  Could not load configuration");
+      output.log(`   ${(error as Error).message}\n`);
     }
 
     process.exit(0);

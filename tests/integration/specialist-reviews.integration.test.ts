@@ -9,6 +9,12 @@ import type { PRFile } from "../../src/platforms/types.js";
 // Create mock instances
 const mockGitHubAdapter = {
   getProjectIdentifier: vi.fn().mockReturnValue("test-project"),
+  getRepoInfo: vi.fn().mockReturnValue({
+    owner: "test",
+    repo: "repo",
+    platform: "github" as const,
+  }),
+  getToken: vi.fn().mockReturnValue("test-token"),
   getPRDetails: vi.fn().mockResolvedValue({
     number: 42,
     title: "Add test coverage",
@@ -68,6 +74,29 @@ vi.mock("../../src/platforms/github.js", () => ({
 
 vi.mock("../../src/ai/providerFactory.js", () => ({
   createAIProvider: vi.fn().mockReturnValue(mockAIProvider),
+}));
+
+// Mock the logger to suppress output and provide initLogger
+vi.mock("../../src/logger.js", () => ({
+  initLogger: vi.fn(),
+  logger: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    child: vi.fn().mockReturnValue({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    }),
+  },
+  createChildLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 
 // Mock config with all required fields

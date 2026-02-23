@@ -1,40 +1,34 @@
-import fs from "node:fs/promises";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 import type { FileReviewResult } from "../platforms/types.js";
+import { createFixedClock } from "../ports/clock.test-helper.js";
+import type { FileSystem } from "../ports/fileSystem.js";
+import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
-
-vi.mock("node:fs/promises", () => ({
-  default: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    readFile: vi.fn(),
-    unlink: vi.fn().mockResolvedValue(undefined),
-    rm: vi.fn().mockResolvedValue(undefined),
-    access: vi.fn().mockResolvedValue(undefined),
-  },
-}));
 
 describe("ReviewStateCache", () => {
   const testCacheDir = ".test-cache";
   let cache: ReviewStateCache;
   let fileStore: Map<string, string>;
+  let fileSystem: Mocked<FileSystem>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     fileStore = new Map();
+    fileSystem = createStubFileSystem() as Mocked<FileSystem>;
 
-    vi.mocked(fs.writeFile).mockImplementation(async (filePath, data) => {
+    fileSystem.writeFile.mockImplementation(async (filePath, data) => {
       fileStore.set(filePath as string, data as string);
     });
 
-    vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
+    fileSystem.readFile.mockImplementation(async (filePath) => {
       const data = fileStore.get(filePath as string);
-      if (data !== undefined) return data as unknown as ReturnType<typeof fs.readFile>;
-      const err = Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" });
+      if (data !== undefined) return data;
+      const err = Object.assign(new Error("ENOENT: no such file or directory"), {
+        code: "ENOENT",
+      });
       throw err;
     });
 
-    vi.mocked(fs.unlink).mockImplementation(async (filePath) => {
+    fileSystem.unlink.mockImplementation(async (filePath) => {
       if (!fileStore.has(filePath as string)) {
         const err = Object.assign(new Error("ENOENT: no such file or directory"), {
           code: "ENOENT",
@@ -44,7 +38,7 @@ describe("ReviewStateCache", () => {
       fileStore.delete(filePath as string);
     });
 
-    cache = new ReviewStateCache(testCacheDir);
+    cache = new ReviewStateCache(testCacheDir, fileSystem, createFixedClock());
   });
 
   describe("getState", () => {
@@ -84,9 +78,7 @@ describe("ReviewStateCache", () => {
     });
 
     it("returns undefined for corrupted cache file", async () => {
-      vi.mocked(fs.readFile).mockResolvedValueOnce(
-        "invalid json" as unknown as Buffer<ArrayBuffer>
-      );
+      fileSystem.readFile.mockResolvedValueOnce("invalid json");
 
       const state = await cache.getState("Github-testrepo-PR123");
 
@@ -101,7 +93,7 @@ describe("ReviewStateCache", () => {
 
       await cache.saveState("Github-testrepo-PR456", fileResults, fileShaMap);
 
-      expect(vi.mocked(fs.mkdir)).toHaveBeenCalledWith(expect.stringContaining("cache"), {
+      expect(fileSystem.mkdir).toHaveBeenCalledWith(expect.stringContaining("cache"), {
         recursive: true,
       });
     });

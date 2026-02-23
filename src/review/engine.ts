@@ -44,6 +44,7 @@ import type {
   PRDetails,
   PRFile,
 } from "../platforms/types.js";
+import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from "../ports/index.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { detectLanguage } from "../utils/languageDetector.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
@@ -91,6 +92,10 @@ export interface ReviewEngineOptions {
   readonly streamingLines?: number;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). */
   readonly tempPath?: string;
+  /** Output writer for console output. Default: consoleOutputWriter */
+  readonly output?: OutputWriter;
+  /** File system abstraction for I/O operations. Default: nodeFs */
+  readonly fileSystem?: FileSystem;
 }
 
 /**
@@ -103,6 +108,8 @@ export class ReviewEngine {
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
   private readonly repoManager: RepoManager;
+  private readonly output: OutputWriter;
+  private readonly fileSystem: FileSystem;
   private readonly options: ReviewEngineOptions;
   private readonly logger = createChildLogger({ component: "ReviewEngine" });
   private readonly auditLogger = getAuditLogger();
@@ -144,6 +151,8 @@ export class ReviewEngine {
       tempPath,
     };
 
+    this.output = resolvedOptions?.output ?? consoleOutputWriter;
+    this.fileSystem = resolvedOptions?.fileSystem ?? nodeFs;
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
@@ -733,16 +742,13 @@ export class ReviewEngine {
     manifest: DiffManifest,
     repoPath?: string
   ): Promise<void> {
-    const fs = await import("node:fs/promises");
-    const nodePath = await import("node:path");
-
     // Use repo's .mergementor/diffs directory if repoPath provided, otherwise global temp
     const targetDir = repoPath
-      ? nodePath.join(repoPath, ".mergementor", "diffs")
-      : nodePath.join(process.cwd(), ".mergementor", "temp");
+      ? path.join(repoPath, ".mergementor", "diffs")
+      : path.join(this.options.tempPath ?? ".mergementor", "temp");
 
     // Ensure target directory exists
-    await fs.mkdir(targetDir, { recursive: true });
+    await this.fileSystem.mkdir(targetDir, { recursive: true });
 
     this.logger.debug(
       { fileCount: manifest.files.length, targetDir },
@@ -750,8 +756,8 @@ export class ReviewEngine {
     );
 
     for (const fileEntry of manifest.files) {
-      const sourcePath = nodePath.join(diffDir, fileEntry.diffPath);
-      const destPath = nodePath.join(targetDir, fileEntry.diffPath);
+      const sourcePath = path.join(diffDir, fileEntry.diffPath);
+      const destPath = path.join(targetDir, fileEntry.diffPath);
 
       this.logger.debug(
         { diffPath: fileEntry.diffPath, sourcePath, destPath },
@@ -759,8 +765,8 @@ export class ReviewEngine {
       );
 
       try {
-        const content = await fs.readFile(sourcePath, "utf-8");
-        await fs.writeFile(destPath, content, "utf-8");
+        const content = await this.fileSystem.readFile(sourcePath, "utf-8");
+        await this.fileSystem.writeFile(destPath, content, "utf-8");
         this.logger.debug(
           { diffPath: fileEntry.diffPath, contentLength: content.length },
           "Successfully copied diff file"
@@ -1196,7 +1202,7 @@ export class ReviewEngine {
 
   private log(message: string): void {
     if (this.options.verbose !== false) {
-      console.log(message);
+      this.output.log(message);
       this.logger.debug(message);
     }
   }

@@ -1,5 +1,3 @@
-import { execSync, spawn } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -11,6 +9,16 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import {
+  type Clock,
+  createSystemExecutableFinder,
+  type ExecutableFinder,
+  type FileSystem,
+  nodeFs,
+  nodeProcessRunner,
+  type ProcessRunner,
+  systemClock,
+} from "../../ports/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -19,73 +27,6 @@ import type {
   FastReviewResult,
   TokenUsage,
 } from "../types.js";
-
-/**
- * Cache for resolved executable paths.
- * Avoids repeated `where`/`which` lookups during a session.
- */
-const executablePathCache = new Map<string, string>();
-
-/**
- * Resolves the full path to an executable by searching PATH.
- * Uses `where` on Windows, `which` on Unix-like systems.
- * Caches results to avoid repeated lookups.
- *
- * @param command - The command name to resolve (e.g., "copilot")
- * @returns The full path to the executable (or original command if not found/Windows batch file)
- */
-function resolveExecutablePath(command: string): string {
-  const cached = executablePathCache.get(command);
-  if (cached) {
-    return cached;
-  }
-
-  // On Windows, batch files (.bat, .cmd) cannot be executed with shell: false
-  // In this case, just return the command name and we'll use shell: true
-  if (process.platform === "win32") {
-    try {
-      const result = execSync(`where ${command}`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-        timeout: 5000,
-      }).trim();
-
-      // `where` on Windows may return multiple lines; use the first one
-      const executablePath = result.split(/\r?\n/)[0].trim();
-
-      // If it's a batch file, return the command name (will use shell: true)
-      if (
-        executablePath.toLowerCase().endsWith(".bat") ||
-        executablePath.toLowerCase().endsWith(".cmd")
-      ) {
-        executablePathCache.set(command, command);
-        return command;
-      }
-
-      executablePathCache.set(command, executablePath);
-      return executablePath;
-    } catch {
-      // If where fails, still try the command name with shell
-      executablePathCache.set(command, command);
-      return command;
-    }
-  }
-
-  // Unix-like systems: resolve the full path
-  try {
-    const result = execSync(`which ${command}`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 5000,
-    }).trim();
-
-    const executablePath = result.split(/\r?\n/)[0].trim();
-    executablePathCache.set(command, executablePath);
-    return executablePath;
-  } catch {
-    throw new Error(`Command "${command}" not found in PATH`);
-  }
-}
 
 /** Raw finding structure from Copilot JSON response. */
 interface RawFileFinding {
@@ -158,6 +99,10 @@ export class CopilotProvider implements AIProviderClient {
   private readonly logger = createChildLogger({ component: "CopilotProvider" });
   private readonly defaultTempDir: string;
   private readonly transcriptDir: string;
+  private readonly executableFinder: ExecutableFinder;
+  private readonly processRunner: ProcessRunner;
+  private readonly fileSystem: FileSystem;
+  private readonly clock: Clock;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -167,6 +112,10 @@ export class CopilotProvider implements AIProviderClient {
     const tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.defaultTempDir = path.join(tempPath, "temp");
     this.transcriptDir = path.join(tempPath, "transcripts");
+    this.executableFinder = options?.executableFinder ?? createSystemExecutableFinder();
+    this.processRunner = options?.processRunner ?? nodeProcessRunner;
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+    this.clock = options?.clock ?? systemClock;
   }
 
   /**
@@ -298,10 +247,10 @@ export class CopilotProvider implements AIProviderClient {
       ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
-    await fs.mkdir(tempDir, { recursive: true });
-    const filename = `prompt-${Date.now()}-${Math.random().toString(36).substring(7)}.md`;
+    await this.fileSystem.mkdir(tempDir, { recursive: true });
+    const filename = `prompt-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.md`;
     const filepath = path.join(tempDir, filename);
-    await fs.writeFile(filepath, prompt, "utf-8");
+    await this.fileSystem.writeFile(filepath, prompt, "utf-8");
     return filepath;
   }
 
@@ -314,11 +263,11 @@ export class CopilotProvider implements AIProviderClient {
       ? path.join(workspaceDir, ".mergementor", "temp")
       : this.defaultTempDir;
 
-    await fs.mkdir(tempDir, { recursive: true });
-    const filename = `output-${Date.now()}-${Math.random().toString(36).substring(7)}.json`;
+    await this.fileSystem.mkdir(tempDir, { recursive: true });
+    const filename = `output-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.json`;
     const filepath = path.join(tempDir, filename);
     // Create empty file
-    await fs.writeFile(filepath, "", "utf-8");
+    await this.fileSystem.writeFile(filepath, "", "utf-8");
     return filepath;
   }
 
@@ -327,7 +276,7 @@ export class CopilotProvider implements AIProviderClient {
    */
   private async readOutputFile(filepath: string): Promise<string> {
     try {
-      const content = await fs.readFile(filepath, "utf-8");
+      const content = await this.fileSystem.readFile(filepath, "utf-8");
       if (!content || content.trim().length === 0) {
         throw new Error("Output file is empty");
       }
@@ -342,7 +291,7 @@ export class CopilotProvider implements AIProviderClient {
 
   private async deleteTempFile(filepath: string): Promise<void> {
     try {
-      await fs.unlink(filepath);
+      await this.fileSystem.unlink(filepath);
     } catch (_error) {
       // Ignore deletion errors - temp files will be cleaned up eventually
     }
@@ -363,9 +312,9 @@ export class CopilotProvider implements AIProviderClient {
     command?: string;
   }): Promise<void> {
     try {
-      await fs.mkdir(this.transcriptDir, { recursive: true });
+      await this.fileSystem.mkdir(this.transcriptDir, { recursive: true });
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
       const status = data.success ? "success" : "failure";
       const filename = `transcript-${timestamp}-${status}.txt`;
       const filepath = path.join(this.transcriptDir, filename);
@@ -374,7 +323,7 @@ export class CopilotProvider implements AIProviderClient {
         "=".repeat(80),
         "COPILOT AI AGENT TRANSCRIPT",
         "=".repeat(80),
-        `Timestamp: ${new Date().toISOString()}`,
+        `Timestamp: ${this.clock.timestamp()}`,
         `Status: ${status}`,
         `Model: ${this.model || "default"}`,
         data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
@@ -407,7 +356,7 @@ export class CopilotProvider implements AIProviderClient {
 
       transcript.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
 
-      await fs.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
+      await this.fileSystem.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
 
       this.logger.debug(
         { filepath, success: data.success },
@@ -452,10 +401,8 @@ export class CopilotProvider implements AIProviderClient {
 
       // Resolve the full path to the copilot executable before spawning.
       // This ensures the command is found even when cwd is different from the current process.
-      let executablePath: string;
-      try {
-        executablePath = resolveExecutablePath("copilot");
-      } catch {
+      const executablePath = this.executableFinder.find("copilot");
+      if (!executablePath) {
         reject(new CopilotCliError("Copilot CLI is not installed or not in PATH."));
         return;
       }
@@ -496,14 +443,14 @@ export class CopilotProvider implements AIProviderClient {
       // When using shell: true, pass command and args as a single string to avoid
       // DEP0190 warning and ensure proper escaping
       const proc = needsShell
-        ? spawn(executablePath, [joinedArgs], {
+        ? this.processRunner.spawn(executablePath, [joinedArgs], {
             stdio: ["inherit", "pipe", "pipe"],
             timeout: this.timeoutMs,
             shell: true,
             cwd,
             env,
           })
-        : spawn(executablePath, args, {
+        : this.processRunner.spawn(executablePath, args, {
             stdio: ["inherit", "pipe", "pipe"],
             timeout: this.timeoutMs,
             shell: false,

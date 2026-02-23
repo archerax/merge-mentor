@@ -8,6 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Create mock instances that can be shared
 const mockGitHubAdapter = {
   getProjectIdentifier: vi.fn().mockReturnValue("test-project"),
+  getRepoInfo: vi.fn().mockReturnValue({
+    owner: "test-owner",
+    repo: "test-repo",
+    platform: "github" as const,
+  }),
+  getToken: vi.fn().mockReturnValue("test-token"),
   getPRDetails: vi.fn().mockResolvedValue({
     number: 42,
     title: "Test PR",
@@ -34,6 +40,14 @@ const mockGitHubAdapter = {
 
 const mockAzureAdapter = {
   getProjectIdentifier: vi.fn().mockReturnValue("azure-project"),
+  getRepoInfo: vi.fn().mockReturnValue({
+    owner: "test-org",
+    repo: "test-repo",
+    platform: "azure" as const,
+    org: "test-org",
+    project: "test-project",
+  }),
+  getToken: vi.fn().mockReturnValue("test-token"),
   getPRDetails: vi.fn().mockResolvedValue({
     number: 42,
     title: "Test PR",
@@ -103,6 +117,7 @@ vi.mock("../../src/config.js", () => ({
 }));
 
 vi.mock("../../src/logger.js", () => ({
+  initLogger: vi.fn(),
   logger: {
     info: vi.fn(),
     debug: vi.fn(),
