@@ -39,6 +39,8 @@ export interface Config {
   readonly copilotToken?: string;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
+  readonly copilotSdkModel?: string;
+  readonly copilotSdkTimeoutMs?: number;
   readonly opencodeModel?: string;
   readonly opencodeTimeoutMs?: number;
   readonly cursorModel?: string;
@@ -74,6 +76,13 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     (cliOverrides?.copilotTimeout ?? process.env.MM_COPILOT_TIMEOUT)
       ? Number.parseInt(
           cliOverrides?.copilotTimeout?.toString() ?? process.env.MM_COPILOT_TIMEOUT!,
+          10
+        )
+      : undefined;
+  const copilotSdkTimeoutMs =
+    (cliOverrides?.copilotSdkTimeout ?? process.env.MM_COPILOT_SDK_TIMEOUT)
+      ? Number.parseInt(
+          cliOverrides?.copilotSdkTimeout?.toString() ?? process.env.MM_COPILOT_SDK_TIMEOUT!,
           10
         )
       : undefined;
@@ -117,6 +126,9 @@ export function loadConfig(cliOverrides?: Partial<CliOverrides>): Config {
     copilotToken: cliOverrides?.copilotToken ?? process.env.MM_COPILOT_TOKEN,
     copilotModel: cliOverrides?.copilotModel ?? process.env.MM_COPILOT_MODEL,
     copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
+    copilotSdkModel: cliOverrides?.copilotSdkModel ?? process.env.MM_COPILOT_SDK_MODEL,
+    copilotSdkTimeoutMs:
+      copilotSdkTimeoutMs && copilotSdkTimeoutMs > 0 ? copilotSdkTimeoutMs : undefined,
     opencodeModel: cliOverrides?.opencodeModel ?? process.env.MM_OPENCODE_MODEL,
     opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
     cursorModel: cliOverrides?.cursorModel ?? process.env.MM_CURSOR_MODEL,
@@ -149,6 +161,8 @@ export interface CliOverrides {
   readonly copilotToken?: string;
   readonly copilotModel?: string;
   readonly copilotTimeout?: number;
+  readonly copilotSdkModel?: string;
+  readonly copilotSdkTimeout?: number;
   readonly opencodeModel?: string;
   readonly opencodeTimeout?: number;
   readonly cursorModel?: string;
@@ -173,7 +187,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "opencode", "cursor"];
+  const validProviders: AIProviderType[] = ["copilot", "copilot-sdk", "opencode", "cursor"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

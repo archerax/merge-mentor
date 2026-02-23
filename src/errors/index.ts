@@ -23,6 +23,19 @@ export class CopilotCliError extends MergeMentorError {
 }
 
 /**
+ * Error thrown when the Copilot SDK fails or is unavailable.
+ */
+export class CopilotSdkError extends MergeMentorError {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = "CopilotSdkError";
+  }
+}
+
+/**
  * Error thrown when configuration is missing or invalid.
  */
 export class ConfigurationError extends MergeMentorError {

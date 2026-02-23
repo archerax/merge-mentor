@@ -282,41 +282,6 @@ describe("CommentManager", () => {
       expect(createActions[0].line).toBe(10);
     });
 
-    it("should resolve comments that are no longer relevant", () => {
-      const manager = createCommentManager();
-      const existingComments: ExistingComment[] = [
-        { id: 1, body: "bug issue", path: "test.ts", line: 10 },
-      ];
-      const fileResults: FileReviewResult[] = [];
-      const crossFileResult = createCrossFileResult({ overallAssessment: "All good" });
-
-      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
-
-      const resolveActions = actions.filter((a) => a.type === "resolve");
-      expect(resolveActions).toHaveLength(1);
-      expect(resolveActions[0].existingCommentId).toBe(1);
-    });
-
-    it("should not resolve already resolved comments", () => {
-      const manager = createCommentManager();
-      const existingComments: ExistingComment[] = [
-        {
-          id: 1,
-          body: "bug issue",
-          path: "test.ts",
-          line: 10,
-          isResolved: true,
-        },
-      ];
-      const fileResults: FileReviewResult[] = [];
-      const crossFileResult = createCrossFileResult();
-
-      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
-
-      const resolveActions = actions.filter((a) => a.type === "resolve");
-      expect(resolveActions).toHaveLength(0);
-    });
-
     it("should create a summary comment when none exists", () => {
       const manager = createCommentManager();
       const actions = manager.determineActions([], [], createCrossFileResult());
@@ -363,39 +328,6 @@ describe("CommentManager", () => {
       const createActions = actions.filter((a) => a.type === "create" && !a.path);
 
       expect(createActions).toHaveLength(0);
-    });
-
-    it("should not resolve comments without path", () => {
-      const manager = createCommentManager();
-      const existingComments: ExistingComment[] = [{ id: 1, body: "General comment" }];
-      const fileResults: FileReviewResult[] = [];
-      const crossFileResult = createCrossFileResult();
-
-      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
-
-      const resolveActions = actions.filter((a) => a.type === "resolve");
-      expect(resolveActions).toHaveLength(0);
-    });
-
-    it("should match comments correctly by category and line", () => {
-      const manager = createCommentManager();
-      const existingComments: ExistingComment[] = [
-        { id: 1, body: "bug at line 10", path: "test.ts", line: 10 },
-        { id: 2, body: "security at line 20", path: "test.ts", line: 20 },
-      ];
-      const fileResults: FileReviewResult[] = [
-        {
-          filename: "test.ts",
-          findings: [createFileFinding({ line: 10, category: "bug", message: "Bug issue" })],
-        },
-      ];
-      const crossFileResult = createCrossFileResult();
-
-      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
-
-      const resolveActions = actions.filter((a) => a.type === "resolve");
-      expect(resolveActions).toHaveLength(1);
-      expect(resolveActions[0].existingCommentId).toBe(2);
     });
 
     it("should skip creating duplicate when existing comment matches new comment", () => {

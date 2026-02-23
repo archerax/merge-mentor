@@ -22,7 +22,6 @@ const mockGitHubAdapter = {
   postInlineComment: vi.fn().mockResolvedValue(undefined),
   postGeneralComment: vi.fn().mockResolvedValue(undefined),
   updateComment: vi.fn().mockResolvedValue(undefined),
-  resolveComment: vi.fn().mockResolvedValue(undefined),
 };
 
 // Mock AI provider

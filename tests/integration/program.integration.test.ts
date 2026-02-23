@@ -30,7 +30,6 @@ const mockGitHubAdapter = {
   postInlineComment: vi.fn().mockResolvedValue(undefined),
   postGeneralComment: vi.fn().mockResolvedValue(undefined),
   updateComment: vi.fn().mockResolvedValue(undefined),
-  resolveComment: vi.fn().mockResolvedValue(undefined),
 };
 
 const mockAzureAdapter = {
@@ -48,7 +47,6 @@ const mockAzureAdapter = {
   postInlineComment: vi.fn().mockResolvedValue(undefined),
   postGeneralComment: vi.fn().mockResolvedValue(undefined),
   updateComment: vi.fn().mockResolvedValue(undefined),
-  resolveComment: vi.fn().mockResolvedValue(undefined),
 };
 
 const mockCopilotInstance = {
@@ -233,7 +231,6 @@ describe("CLI Integration", () => {
         },
         commentsCreated: 2,
         commentsUpdated: 1,
-        commentsResolved: 0,
         commentErrors: [],
       };
 
@@ -267,7 +264,6 @@ describe("CLI Integration", () => {
         },
         commentsCreated: 2,
         commentsUpdated: 1,
-        commentsResolved: 0,
         commentErrors: [],
       };
 
@@ -300,7 +296,6 @@ describe("CLI Integration", () => {
         },
         commentsCreated: 0,
         commentsUpdated: 0,
-        commentsResolved: 0,
         commentErrors: ["Error 1", "Error 2"],
       };
 
@@ -347,7 +342,6 @@ describe("CLI Integration", () => {
         },
         commentsCreated: 0,
         commentsUpdated: 0,
-        commentsResolved: 0,
         commentErrors: [],
       };
 
@@ -389,7 +383,6 @@ describe("CLI Integration", () => {
         },
         commentsCreated: 0,
         commentsUpdated: 0,
-        commentsResolved: 0,
         commentErrors: [],
       };
 

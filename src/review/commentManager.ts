@@ -16,7 +16,7 @@ export interface CommentManagerOptions {
 }
 
 /**
- * Manages PR comment lifecycle (create, update, resolve).
+ * Manages PR comment lifecycle (create).
  * Tracks bot comments and determines required actions.
  */
 export class CommentManager {
@@ -36,7 +36,7 @@ export class CommentManager {
    * @param existingComments - Bot comments already on the PR
    * @param fileResults - Results from file-by-file review
    * @param crossFileResult - Results from cross-file analysis
-   * @returns Array of actions to perform (create, update, resolve)
+   * @returns Array of actions to perform (create)
    *
    * @example
    * ```typescript
@@ -83,16 +83,6 @@ export class CommentManager {
             body: this.formatInlineComment(finding, fileResult.filename),
           });
         }
-      }
-    }
-
-    // Resolve comments that are no longer relevant
-    for (const comment of existingComments) {
-      if (!matchedExistingIds.has(comment.id) && !comment.isResolved && comment.path) {
-        actions.push({
-          type: "resolve",
-          existingCommentId: comment.id,
-        });
       }
     }
 

@@ -184,7 +184,7 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logReviewComplete(123, "github", 10, 2, 5, 1, 0);
+      logger.logReviewComplete(123, "github", 10, 2, 5, 0);
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "review.complete",
@@ -197,7 +197,6 @@ describe("AuditLogger", () => {
           filesReviewed: 10,
           filesSkipped: 2,
           commentsCreated: 5,
-          commentsResolved: 1,
           commentErrors: 0,
         }
       );
@@ -207,7 +206,7 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logReviewComplete(123, "github", 10, 2, 5, 1, 2);
+      logger.logReviewComplete(123, "github", 10, 2, 5, 2);
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "review.complete",

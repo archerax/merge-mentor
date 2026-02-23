@@ -38,6 +38,8 @@ export interface ReviewOptions {
   copilotToken?: string;
   copilotModel?: string;
   copilotTimeout?: number;
+  copilotSdkModel?: string;
+  copilotSdkTimeout?: number;
   opencodeModel?: string;
   opencodeTimeout?: number;
   cursorModel?: string;
@@ -81,6 +83,8 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
     aiProvider: options.provider,
     copilotModel: options.copilotModel,
     copilotTimeout: options.copilotTimeout,
+    copilotSdkModel: options.copilotSdkModel,
+    copilotSdkTimeout: options.copilotSdkTimeout,
     opencodeModel: options.opencodeModel,
     opencodeTimeout: options.opencodeTimeout,
     cursorModel: options.cursorModel,
@@ -104,10 +108,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "opencode", "cursor"].includes(aiProvider)) {
+  if (!["copilot", "copilot-sdk", "opencode", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "opencode", or "cursor".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", or "cursor".`
     );
   }
 
@@ -128,6 +132,10 @@ export async function executeReview(options: ReviewOptions): Promise<ReviewExecu
   let aiTimeoutMs: number | undefined;
 
   switch (aiProvider) {
+    case "copilot-sdk":
+      aiModel = config.copilotSdkModel;
+      aiTimeoutMs = config.copilotSdkTimeoutMs;
+      break;
     case "opencode":
       aiModel = config.opencodeModel;
       aiTimeoutMs = config.opencodeTimeoutMs;
@@ -199,8 +207,7 @@ export function generateMarkdownReport(
   // Review actions summary
   const actionHeader = dryRun ? "### 📝 Planned Actions (Dry-Run)" : "### 📝 Review Actions";
   report += `${actionHeader}\n\n`;
-  report += `- Comments to Create: ${result.commentsCreated}\n`;
-  report += `- Comments to Resolve: ${result.commentsResolved}\n\n`;
+  report += `- Comments to Create: ${result.commentsCreated}\n\n`;
 
   // Issues by severity
   const severityCounts = countIssuesBySeverity(result);
@@ -372,10 +379,8 @@ export function displayResults(
   if (dryRun) {
     console.log("📝 Dry-run mode - showing what would be posted:");
     console.log(`  Comments to Create: ${result.commentsCreated}`);
-    console.log(`  Comments to Resolve: ${result.commentsResolved}`);
   } else {
     console.log(`Comments Created: ${result.commentsCreated}`);
-    console.log(`Comments Resolved: ${result.commentsResolved}`);
     if (result.commentErrors.length > 0) {
       console.log(`\n⚠️  Comment Errors: ${result.commentErrors.length}`);
       result.commentErrors.forEach((err, i) => {
@@ -471,6 +476,12 @@ program
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
   .option("--copilot-timeout <ms>", "Copilot timeout in ms. Env: MM_COPILOT_TIMEOUT", parseInt)
+  .option("--copilot-sdk-model <model>", "Copilot SDK model name. Env: MM_COPILOT_SDK_MODEL")
+  .option(
+    "--copilot-sdk-timeout <ms>",
+    "Copilot SDK timeout in ms. Env: MM_COPILOT_SDK_TIMEOUT",
+    parseInt
+  )
   .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
   .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
   .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
@@ -509,6 +520,8 @@ program
         copilotToken: options.copilotToken,
         copilotModel: options.copilotModel,
         copilotTimeout: options.copilotTimeout,
+        copilotSdkModel: options.copilotSdkModel,
+        copilotSdkTimeout: options.copilotSdkTimeout,
         opencodeModel: options.opencodeModel,
         opencodeTimeout: options.opencodeTimeout,
         cursorModel: options.cursorModel,

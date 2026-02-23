@@ -717,26 +717,6 @@ describe("AzureDevOpsAdapter", () => {
     });
   });
 
-  describe("resolveComment", () => {
-    it("logs resolve request for numeric id", async () => {
-      const adapter = new AzureDevOpsAdapter(createTestConfig());
-
-      await adapter.resolveComment(456);
-
-      // Just verify it completes without error - logging is internal
-      expect(true).toBe(true);
-    });
-
-    it("logs resolve request for string id", async () => {
-      const adapter = new AzureDevOpsAdapter(createTestConfig());
-
-      await adapter.resolveComment("789");
-
-      // Just verify it completes without error - logging is internal
-      expect(true).toBe(true);
-    });
-  });
-
   describe("getPRFiles edge cases", () => {
     it("returns empty array when PR has no commits", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());

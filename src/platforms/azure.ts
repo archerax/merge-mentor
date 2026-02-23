@@ -593,11 +593,4 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       throw error;
     }
   }
-
-  async resolveComment(commentId: number | string): Promise<void> {
-    const threadId = typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
-
-    this.logger.info({ threadId }, "Azure DevOps comment resolve requested (not implemented)");
-    this.auditLogger.logCommentResolve(threadId, 0, "azure", "success");
-  }
 }

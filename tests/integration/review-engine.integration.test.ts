@@ -3,7 +3,6 @@
  * Tests the complete review flow from PR fetch to comment posting.
  */
 
-import fs from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIResponse } from "../../src/ai/types.js";
 import { ReviewEngine } from "../../src/review/engine.js";
@@ -65,18 +64,63 @@ vi.mock("../../src/review/diffStorage.js", () => {
   };
 });
 
+// Mock ReviewStateCache with an in-memory store so caching tests work without disk I/O
+vi.mock("../../src/review/reviewStateCache.js", () => ({
+  ReviewStateCache: class MockReviewStateCache {
+    private stateMap = new Map<
+      string,
+      {
+        prIdentifier: string;
+        lastReviewedAt: string;
+        files: Record<string, { sha: string; result: unknown }>;
+        crossFileResult?: unknown;
+      }
+    >();
+
+    async getState(prIdentifier: string) {
+      return this.stateMap.get(prIdentifier);
+    }
+
+    async saveState(
+      prIdentifier: string,
+      fileResults: Array<{ filename: string }>,
+      fileShaMap: Map<string, string>,
+      crossFileResult?: unknown
+    ) {
+      const files: Record<string, { sha: string; result: unknown }> = {};
+      for (const result of fileResults) {
+        const sha = fileShaMap.get(result.filename);
+        if (sha) files[result.filename] = { sha, result };
+      }
+      this.stateMap.set(prIdentifier, {
+        prIdentifier,
+        lastReviewedAt: new Date().toISOString(),
+        files,
+        crossFileResult,
+      });
+    }
+
+    getCachedFileReview(
+      filename: string,
+      sha: string,
+      cachedState: { files: Record<string, { sha: string; result: unknown }> }
+    ) {
+      const cached = cachedState.files[filename];
+      return cached?.sha === sha ? cached.result : undefined;
+    }
+
+    async clearState(prIdentifier: string) {
+      this.stateMap.delete(prIdentifier);
+    }
+  },
+}));
+
 describe("ReviewEngine Integration", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    // Clean up cache directory before each test
-    try {
-      await fs.rm(".mergementor", { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup errors
-    }
   });
 
   afterEach(() => {

@@ -408,7 +408,6 @@ describe("Cross-platform behavior", () => {
       "getExistingBotComments",
       "postInlineComment",
       "postGeneralComment",
-      "resolveComment",
     ];
 
     for (const method of methods) {

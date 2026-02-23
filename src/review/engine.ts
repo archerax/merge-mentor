@@ -62,7 +62,6 @@ export interface ReviewResult {
   readonly fileResults: readonly FileReviewResult[];
   readonly crossFileResult: CrossFileReviewResult;
   readonly commentsCreated: number;
-  readonly commentsResolved: number;
   readonly commentErrors: readonly string[];
 }
 
@@ -329,7 +328,6 @@ export class ReviewEngine {
         filesSkipped,
         totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
         commentsCreated: commentStats.commentsCreated,
-        commentsResolved: commentStats.commentsResolved,
         commentErrors: commentStats.commentErrors.length,
       },
       "PR review completed"
@@ -341,7 +339,6 @@ export class ReviewEngine {
       fileResults.length - filesSkipped,
       filesSkipped,
       commentStats.commentsCreated,
-      commentStats.commentsResolved,
       commentStats.commentErrors.length
     );
 
@@ -1084,11 +1081,9 @@ export class ReviewEngine {
     actions: CommentAction[]
   ): Promise<{
     commentsCreated: number;
-    commentsResolved: number;
     commentErrors: string[];
   }> {
     let commentsCreated = 0;
-    let commentsResolved = 0;
     const commentErrors: string[] = [];
 
     if (!this.options.dryRun) {
@@ -1096,7 +1091,6 @@ export class ReviewEngine {
         try {
           await this.executeAction(prNumber, action);
           if (action.type === "create") commentsCreated++;
-          else if (action.type === "resolve") commentsResolved++;
         } catch (error) {
           const err = error as Error;
           const errorMsg = `Failed to ${action.type} comment: ${err.message}`;
@@ -1119,10 +1113,9 @@ export class ReviewEngine {
     } else {
       this.logDryRunActions(actions);
       commentsCreated = actions.filter((a) => a.type === "create").length;
-      commentsResolved = actions.filter((a) => a.type === "resolve").length;
     }
 
-    return { commentsCreated, commentsResolved, commentErrors };
+    return { commentsCreated, commentErrors };
   }
 
   private async executeAction(prNumber: number, action: CommentAction): Promise<void> {
@@ -1152,14 +1145,6 @@ export class ReviewEngine {
           await this.platform.postGeneralComment(prNumber, action.body);
           this.logger.info({ prNumber }, "General comment created");
         }
-        break;
-
-      case "resolve":
-        if (!action.existingCommentId) {
-          throw new Error("Resolve action requires existingCommentId");
-        }
-        await this.platform.resolveComment(action.existingCommentId);
-        this.logger.info({ prNumber, commentId: action.existingCommentId }, "Comment resolved");
         break;
     }
   }
@@ -1236,11 +1221,6 @@ export class ReviewEngine {
         this.log(separator);
         this.log(action.body || "");
         this.log(`${separator}\n`);
-        break;
-
-      case "resolve":
-        this.log(`[RESOLVE] Comment ID: ${action.existingCommentId}`);
-        this.log("");
         break;
     }
   }

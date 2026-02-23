@@ -7,7 +7,7 @@ export interface FastReviewResult {
 }
 
 /** Supported AI provider types. */
-export type AIProviderType = "copilot" | "opencode" | "cursor";
+export type AIProviderType = "copilot" | "copilot-sdk" | "opencode" | "cursor";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {

@@ -10,7 +10,6 @@ const mockAdapter = {
   getExistingBotComments: vi.fn(),
   postInlineComment: vi.fn(),
   postGeneralComment: vi.fn(),
-  resolveComment: vi.fn(),
 };
 
 // Mock dependencies with factory functions
@@ -115,7 +114,6 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
       recommendations: [],
     },
     commentsCreated: 2,
-    commentsResolved: 0,
     commentErrors: [],
     filesSkipped: 0,
     ...overrides,
@@ -439,7 +437,7 @@ describe("CLI", () => {
       };
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot", "opencode", or "cursor".'
+        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", or "cursor".'
       );
     });
   });
@@ -469,7 +467,6 @@ describe("CLI", () => {
         expect.stringContaining("Dry-run mode - showing what would be posted")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Create: 2"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments to Resolve: 0"));
     });
 
     it("generates markdown report in dry-run mode with AI provider", () => {
@@ -495,7 +492,6 @@ describe("CLI", () => {
       displayResults(result, false);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments Created: 2"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Comments Resolved: 0"));
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("Dry-run mode - showing what would be posted")
       );

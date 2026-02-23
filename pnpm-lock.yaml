@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@github/copilot-sdk':
+        specifier: ^0.1.25
+        version: 0.1.25
       '@octokit/rest':
         specifier: ^22.0.1
         version: 22.0.1
@@ -298,6 +301,50 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@github/copilot-darwin-arm64@0.0.411':
+    resolution: {integrity: sha512-dtr+iHxTS4f8HlV2JT9Fp0FFoxuiPWCnU3XGmrHK+rY6bX5okPC2daU5idvs77WKUGcH8yHTZtfbKYUiMxKosw==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@github/copilot-darwin-x64@0.0.411':
+    resolution: {integrity: sha512-zhdbQCbPi1L4iHClackSLx8POfklA+NX9RQLuS48HlKi/0KI/JlaDA/bdbIeMR79wjif5t9gnc/m+RTVmHlRtA==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@github/copilot-linux-arm64@0.0.411':
+    resolution: {integrity: sha512-oZYZ7oX/7O+jzdTUcHkfD1A8YnNRW6mlUgdPjUg+5rXC43bwIdyatAnc0ObY21m9h8ghxGqholoLhm5WnGv1LQ==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  '@github/copilot-linux-x64@0.0.411':
+    resolution: {integrity: sha512-nnXrKANmmGnkwa3ROlKdAhVNOx8daeMSE8Xh0o3ybKckFv4s38blhKdcxs0RJQRxgAk4p7XXGlDDKNRhurqF1g==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@github/copilot-sdk@0.1.25':
+    resolution: {integrity: sha512-hIgYLPXzWw9bNgrsD5BLKmgVH20ow5Or5UyVXfVe3YgeiaTgFxC4jWSAVHLGB6ufHZUrvbjppcq2dWK63FmDRA==}
+    engines: {node: '>=20.0.0'}
+
+  '@github/copilot-win32-arm64@0.0.411':
+    resolution: {integrity: sha512-h+Bovb2YVCQSeELZOO7zxv8uht45XHcvAkFbRsc1gf9dl109sSUJIcB4KAhs8Aznk28qksxz7kvdSgUWyQBlIA==}
+    cpu: [arm64]
+    os: [win32]
+    hasBin: true
+
+  '@github/copilot-win32-x64@0.0.411':
+    resolution: {integrity: sha512-xmOgi1lGvUBHQJWmq5AK1EP95+Y8xR4TFoK9OCSOaGbQ+LFcX2jF7iavnMolfWwddabew/AMQjsEHlXvbgMG8Q==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
+
+  '@github/copilot@0.0.411':
+    resolution: {integrity: sha512-I3/7gw40Iu1O+kTyNPKJHNqDRyOebjsUW6wJsvSVrOpT0TNa3/lfm8xdS2XUuJWkp+PgEG/PRwF7u3DVNdP7bQ==}
+    hasBin: true
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -1174,6 +1221,10 @@ packages:
       jsdom:
         optional: true
 
+  vscode-jsonrpc@8.2.1:
+    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
+    engines: {node: '>=14.0.0'}
+
   walk-up-path@4.0.0:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
@@ -1190,6 +1241,9 @@ packages:
 
   zod@4.3.5:
     resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
+
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
 snapshots:
 
@@ -1338,6 +1392,39 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.2':
     optional: true
+
+  '@github/copilot-darwin-arm64@0.0.411':
+    optional: true
+
+  '@github/copilot-darwin-x64@0.0.411':
+    optional: true
+
+  '@github/copilot-linux-arm64@0.0.411':
+    optional: true
+
+  '@github/copilot-linux-x64@0.0.411':
+    optional: true
+
+  '@github/copilot-sdk@0.1.25':
+    dependencies:
+      '@github/copilot': 0.0.411
+      vscode-jsonrpc: 8.2.1
+      zod: 4.3.6
+
+  '@github/copilot-win32-arm64@0.0.411':
+    optional: true
+
+  '@github/copilot-win32-x64@0.0.411':
+    optional: true
+
+  '@github/copilot@0.0.411':
+    optionalDependencies:
+      '@github/copilot-darwin-arm64': 0.0.411
+      '@github/copilot-darwin-x64': 0.0.411
+      '@github/copilot-linux-arm64': 0.0.411
+      '@github/copilot-linux-x64': 0.0.411
+      '@github/copilot-win32-arm64': 0.0.411
+      '@github/copilot-win32-x64': 0.0.411
 
   '@jridgewell/resolve-uri@3.1.2': {}
 
@@ -2165,6 +2252,8 @@ snapshots:
       - tsx
       - yaml
 
+  vscode-jsonrpc@8.2.1: {}
+
   walk-up-path@4.0.0: {}
 
   which@2.0.2:
@@ -2177,3 +2266,5 @@ snapshots:
       stackback: 0.0.2
 
   zod@4.3.5: {}
+
+  zod@4.3.6: {}
