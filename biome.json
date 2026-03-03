@@ -20,10 +20,10 @@
       },
       "suspicious": {
         "noConsole": "off",
-        "noExplicitAny": "off"
+        "noExplicitAny": "error"
       },
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "error"
       }
     }
   },

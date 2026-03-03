@@ -4,6 +4,7 @@ import type {
   ExistingComment,
   FileFinding,
   FileReviewResult,
+  FindingSeverity,
 } from "../platforms/types.js";
 import { CommentManager } from "./commentManager.js";
 
@@ -85,7 +86,7 @@ describe("CommentManager", () => {
 
     it("should use default emoji for unknown severity", () => {
       const manager = createCommentManager();
-      const finding = createFileFinding({ severity: "unknown" as any });
+      const finding = createFileFinding({ severity: "unknown" as unknown as FindingSeverity });
 
       const result = manager.formatInlineComment(finding);
 

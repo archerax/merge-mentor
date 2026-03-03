@@ -31,13 +31,14 @@ export function createStubChildProcess(
       : (optionsOrExitCode ?? {});
   const exitCode = opts.exitCode ?? 0;
 
-  const proc = new EventEmitter() as unknown as ChildProcess;
   const stdout = new EventEmitter();
   const stderr = new EventEmitter();
-  (proc as any).stdout = stdout;
-  (proc as any).stderr = stderr;
-  (proc as any).stdin = null;
-  (proc as any).pid = 12345;
+  const proc = Object.assign(new EventEmitter(), {
+    stdout,
+    stderr,
+    stdin: null,
+    pid: 12345,
+  }) as unknown as ChildProcess;
 
   // Auto-emit events on next tick (after listeners are attached)
   process.nextTick(() => {

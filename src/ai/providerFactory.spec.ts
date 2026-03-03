@@ -5,6 +5,7 @@ import { CopilotProvider } from "./providers/copilot.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { CursorProvider } from "./providers/cursor.js";
 import { OpenCodeProvider } from "./providers/opencode.js";
+import type { AIProviderType } from "./types.js";
 
 describe("createAIProvider", () => {
   it("should create CopilotProvider for 'copilot' type", () => {
@@ -64,8 +65,10 @@ describe("createAIProvider", () => {
   });
 
   it("should throw ConfigurationError for unsupported provider type", () => {
-    expect(() => createAIProvider("invalid" as any)).toThrow(ConfigurationError);
-    expect(() => createAIProvider("invalid" as any)).toThrow(
+    expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
+      ConfigurationError
+    );
+    expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
       "Unsupported AI provider: invalid. Valid options are: copilot, copilot-sdk, opencode, cursor"
     );
   });

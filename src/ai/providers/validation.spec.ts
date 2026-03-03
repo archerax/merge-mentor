@@ -15,7 +15,7 @@ describe("AI Provider Reasoning Validation", () => {
       info: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof logger.createChildLogger>);
   });
 
   afterEach(() => {
@@ -68,7 +68,7 @@ describe("AI Provider Reasoning Validation", () => {
       expect(warnMock).toHaveBeenCalled();
       const warnCalls = warnMock.mock.calls;
       const hasShortWarning = warnCalls.some((call) =>
-        call.some((arg: any) =>
+        call.some((arg: unknown) =>
           typeof arg === "string" ? arg.includes("too short") || arg.includes("50+") : false
         )
       );
@@ -116,8 +116,8 @@ describe("AI Provider Reasoning Validation", () => {
       const warnMock = getWarnMock();
       expect(warnMock).toHaveBeenCalled();
       const warnCalls = warnMock.mock.calls;
-      const hasKeywordWarning = warnCalls.some((call: any[]) =>
-        call.some((arg: any) =>
+      const hasKeywordWarning = warnCalls.some((call: unknown[]) =>
+        call.some((arg: unknown) =>
           typeof arg === "string"
             ? arg.includes("verification keywords") || arg.includes("verified/checked")
             : false

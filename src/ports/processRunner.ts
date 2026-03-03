@@ -28,7 +28,11 @@ export interface ProcessRunner {
   ): Promise<ExecResult>;
   execSync(
     command: string,
-    options?: { encoding: BufferEncoding; stdio?: any; timeout?: number }
+    options?: {
+      encoding: BufferEncoding;
+      stdio?: import("node:child_process").StdioOptions;
+      timeout?: number;
+    }
   ): string;
   spawn(command: string, args: string[], options?: SpawnOptions): ChildProcess;
 }

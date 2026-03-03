@@ -38,7 +38,10 @@ export function formatExistingCommentsContext(
     if (!byFile.has(comment.path)) {
       byFile.set(comment.path, []);
     }
-    byFile.get(comment.path)!.push(comment);
+    const comments = byFile.get(comment.path);
+    if (comments) {
+      comments.push(comment);
+    }
   }
 
   // Format as structured list

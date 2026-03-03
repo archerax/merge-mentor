@@ -74,28 +74,28 @@ export function loadConfig(
   const copilotTimeoutMs =
     (cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT"))
       ? Number.parseInt(
-          cliOverrides?.copilotTimeout?.toString() ?? env.get("MM_COPILOT_TIMEOUT")!,
+          cliOverrides?.copilotTimeout?.toString() ?? env.get("MM_COPILOT_TIMEOUT") ?? "",
           10
         )
       : undefined;
   const copilotSdkTimeoutMs =
     (cliOverrides?.copilotSdkTimeout ?? env.get("MM_COPILOT_SDK_TIMEOUT"))
       ? Number.parseInt(
-          cliOverrides?.copilotSdkTimeout?.toString() ?? env.get("MM_COPILOT_SDK_TIMEOUT")!,
+          cliOverrides?.copilotSdkTimeout?.toString() ?? env.get("MM_COPILOT_SDK_TIMEOUT") ?? "",
           10
         )
       : undefined;
   const opencodeTimeoutMs =
     (cliOverrides?.opencodeTimeout ?? env.get("MM_OPENCODE_TIMEOUT"))
       ? Number.parseInt(
-          cliOverrides?.opencodeTimeout?.toString() ?? env.get("MM_OPENCODE_TIMEOUT")!,
+          cliOverrides?.opencodeTimeout?.toString() ?? env.get("MM_OPENCODE_TIMEOUT") ?? "",
           10
         )
       : undefined;
   const cursorTimeoutMs =
     (cliOverrides?.cursorTimeout ?? env.get("MM_CURSOR_TIMEOUT"))
       ? Number.parseInt(
-          cliOverrides?.cursorTimeout?.toString() ?? env.get("MM_CURSOR_TIMEOUT")!,
+          cliOverrides?.cursorTimeout?.toString() ?? env.get("MM_CURSOR_TIMEOUT") ?? "",
           10
         )
       : undefined;
@@ -139,7 +139,9 @@ export function loadConfig(
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED") !== "false",
     streamingLines:
       cliOverrides?.streamingLines ??
-      (env.get("MM_STREAMING_LINES") ? Number.parseInt(env.get("MM_STREAMING_LINES")!, 10) : 9),
+      (env.get("MM_STREAMING_LINES")
+        ? Number.parseInt(env.get("MM_STREAMING_LINES") ?? "", 10)
+        : 9),
     tempPath: path.resolve(cliOverrides?.tempPath ?? env.get("MM_TEMP_PATH") ?? "./.mergementor"),
   };
 }

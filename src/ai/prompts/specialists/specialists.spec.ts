@@ -128,7 +128,7 @@ describe("Specialized Review Prompts", () => {
       // Count good examples
       const goodExampleMatches = prompt.match(/✅ EXAMPLE \d+:/g);
       expect(goodExampleMatches).not.toBeNull();
-      expect(goodExampleMatches!.length).toBeGreaterThanOrEqual(15);
+      expect(goodExampleMatches?.length).toBeGreaterThanOrEqual(15);
     });
 
     it("should include bad examples showing what NOT to report", () => {
@@ -298,7 +298,7 @@ describe("Specialized Review Prompts", () => {
       // Count good examples
       const goodExampleMatches = prompt.match(/✅ EXAMPLE \d+:/g);
       expect(goodExampleMatches).not.toBeNull();
-      expect(goodExampleMatches!.length).toBeGreaterThanOrEqual(15);
+      expect(goodExampleMatches?.length).toBeGreaterThanOrEqual(15);
     });
 
     it("should include bad examples showing what NOT to report", () => {

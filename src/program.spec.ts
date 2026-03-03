@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "./config.js";
+import type { PlatformAdapter } from "./platforms/types.js";
 import { generateMarkdownReport } from "./program.js";
 import type { ReviewResult } from "./review/engine.js";
 
@@ -301,7 +302,7 @@ describe("CLI", () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Starting code review for PR #42")
       );
-      const dryRunCalls = consoleLogSpy.mock.calls.filter((call: any[]) =>
+      const dryRunCalls = consoleLogSpy.mock.calls.filter((call: unknown[]) =>
         call[0]?.toString().includes("(dry-run)")
       );
       expect(dryRunCalls.length).toBe(0);
@@ -476,7 +477,13 @@ describe("CLI", () => {
         getProjectIdentifier: () => "test-owner-test-repo",
       };
 
-      displayResults(result, true, mockAdapterWithId as any, "github", "copilot");
+      displayResults(
+        result,
+        true,
+        mockAdapterWithId as unknown as PlatformAdapter,
+        "github",
+        "copilot"
+      );
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Detailed markdown report generated:")
@@ -504,7 +511,13 @@ describe("CLI", () => {
         getProjectIdentifier: () => "test-owner-test-repo",
       };
 
-      displayResults(result, false, mockAdapterWithId as any, "github", "copilot");
+      displayResults(
+        result,
+        false,
+        mockAdapterWithId as unknown as PlatformAdapter,
+        "github",
+        "copilot"
+      );
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Detailed markdown report generated:")

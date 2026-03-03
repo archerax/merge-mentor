@@ -238,8 +238,7 @@ describe("OpenCodeProvider", () => {
 
     it("should throw OpenCodeCliError when opencode not found", async () => {
       const provider = createOpenCodeProvider(1, 5000);
-      const error: any = new Error("spawn opencode ENOENT");
-      error.code = "ENOENT";
+      const error = Object.assign(new Error("spawn opencode ENOENT"), { code: "ENOENT" });
       processRunner.spawn.mockReturnValue(createStubChildProcess({ error }));
 
       const promise = provider.executePrompt("test");

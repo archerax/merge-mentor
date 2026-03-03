@@ -25,10 +25,10 @@ vi.mock("azure-devops-node-api", () => ({
 
 // Mock fetch for REST API calls
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Helper to create mock Response
-function createMockResponse(ok: boolean, status: number, data: any) {
+function createMockResponse(ok: boolean, status: number, data: unknown) {
   return Promise.resolve({
     ok,
     status,

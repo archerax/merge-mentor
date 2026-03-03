@@ -197,8 +197,8 @@ describe("RepoManager", () => {
       const stats = await repoManager.getRepoStats("github-owner-repo");
 
       expect(stats).toBeDefined();
-      expect(stats!.size).toBe(5000000);
-      expect(stats!.lastUsed).toEqual(mtime);
+      expect(stats?.size).toBe(5000000);
+      expect(stats?.lastUsed).toEqual(mtime);
     });
 
     it("returns undefined for non-existent repository", async () => {

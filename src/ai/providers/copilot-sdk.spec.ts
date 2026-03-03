@@ -134,7 +134,7 @@ describe("CopilotSdkProvider", () => {
       const onStreamData = vi.fn();
       const jsonContent = JSON.stringify({ findings: [] });
 
-      mockSession.on.mockImplementation((eventType: string, handler: (e: any) => void) => {
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
         if (eventType === "assistant.message_delta") {
           handler({ type: "assistant.message_delta", data: { deltaContent: "hello " } });
         }

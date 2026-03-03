@@ -20,7 +20,8 @@ export const nodeFs: FileSystem = {
   mkdir: (path, options) => fs.mkdir(path, options),
   rm: (path, options) => fs.rm(path, options),
   access: (path) => fs.access(path),
-  readdir: (path, options) => fs.readdir(path, options as any) as any,
+  readdir: (path, options) =>
+    fs.readdir(path, options as { withFileTypes: true }) as Promise<import("node:fs").Dirent[]>,
   stat: (path) => fs.stat(path),
   unlink: (path) => fs.unlink(path),
 };

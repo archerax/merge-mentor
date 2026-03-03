@@ -274,8 +274,7 @@ describe("CursorProvider", () => {
 
     it("should throw CursorCliError when cursor-agent not found", async () => {
       const provider = createCursorProvider(1, 5000);
-      const error: any = new Error("spawn cursor-agent ENOENT");
-      error.code = "ENOENT";
+      const error = Object.assign(new Error("spawn cursor-agent ENOENT"), { code: "ENOENT" });
       processRunner.spawn.mockReturnValue(createStubChildProcess({ error }));
 
       const promise = provider.executePrompt("test");

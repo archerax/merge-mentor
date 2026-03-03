@@ -343,7 +343,7 @@ describe("severityContext", () => {
       // Count example headers (### Example N:)
       const exampleMatches = section.match(/### Example \d+:/g);
       expect(exampleMatches).not.toBeNull();
-      expect(exampleMatches!.length).toBeGreaterThanOrEqual(20);
+      expect(exampleMatches?.length).toBeGreaterThanOrEqual(20);
     });
 
     it("includes examples showing same bug in different contexts", () => {

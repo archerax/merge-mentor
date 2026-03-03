@@ -483,17 +483,20 @@ export class CursorProvider implements AIProviderClient {
             fileFindings.set(file, []);
           }
 
-          fileFindings.get(file)!.push({
-            line: line || 0,
-            severity: this.validateSeverity(finding.severity),
-            confidence: this.validateConfidence(finding.confidence),
-            category: this.validateCategory(finding.category),
-            message: String(finding.message || ""),
-            suggestion: String(finding.suggestion || ""),
-            reasoning,
-            isPreExisting:
-              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
-          });
+          const findings = fileFindings.get(file);
+          if (findings) {
+            findings.push({
+              line: line || 0,
+              severity: this.validateSeverity(finding.severity),
+              confidence: this.validateConfidence(finding.confidence),
+              category: this.validateCategory(finding.category),
+              message: String(finding.message || ""),
+              suggestion: String(finding.suggestion || ""),
+              reasoning,
+              isPreExisting:
+                typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
+            });
+          }
         } else {
           crossFileFindings.push({
             severity: this.validateSeverity(finding.severity),

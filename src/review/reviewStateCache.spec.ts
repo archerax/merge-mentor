@@ -122,7 +122,7 @@ describe("ReviewStateCache", () => {
 
       expect(state?.prIdentifier).toBe("Github-testrepo-PR789");
       expect(state?.lastReviewedAt).toBeDefined();
-      expect(new Date(state!.lastReviewedAt)).toBeInstanceOf(Date);
+      expect(new Date(state?.lastReviewedAt ?? "")).toBeInstanceOf(Date);
     });
 
     it("saves cross-file analysis result when provided", async () => {
@@ -172,9 +172,9 @@ describe("ReviewStateCache", () => {
       await cache.saveState("Github-testrepo-PR100", fileResults, fileShaMap);
       const state = await cache.getState("Github-testrepo-PR100");
 
-      expect(Object.keys(state!.files)).toHaveLength(1);
-      expect(state!.files["with-sha.ts"]).toBeDefined();
-      expect(state!.files["without-sha.ts"]).toBeUndefined();
+      expect(Object.keys(state?.files ?? {})).toHaveLength(1);
+      expect(state?.files["with-sha.ts"]).toBeDefined();
+      expect(state?.files["without-sha.ts"]).toBeUndefined();
     });
 
     it("overwrites existing state", async () => {
@@ -230,9 +230,14 @@ describe("ReviewStateCache", () => {
       const fileShaMap = new Map([["match.ts", "matching-sha"]]);
 
       await cache.saveState("Github-testrepo-PR300", fileResults, fileShaMap);
-      const state = (await cache.getState("Github-testrepo-PR300"))!;
+      const state = await cache.getState("Github-testrepo-PR300");
+      expect(state).toBeDefined();
 
-      const result = cache.getCachedFileReview("match.ts", "matching-sha", state);
+      const result = cache.getCachedFileReview(
+        "match.ts",
+        "matching-sha",
+        state ?? { prIdentifier: "", lastReviewedAt: "", files: {} }
+      );
 
       expect(result).toBeDefined();
       expect(result?.filename).toBe("match.ts");
@@ -244,9 +249,14 @@ describe("ReviewStateCache", () => {
       const fileShaMap = new Map([["changed.ts", "old-sha"]]);
 
       await cache.saveState("Github-testrepo-PR400", fileResults, fileShaMap);
-      const state = (await cache.getState("Github-testrepo-PR400"))!;
+      const state = await cache.getState("Github-testrepo-PR400");
+      expect(state).toBeDefined();
 
-      const result = cache.getCachedFileReview("changed.ts", "new-sha", state);
+      const result = cache.getCachedFileReview(
+        "changed.ts",
+        "new-sha",
+        state ?? { prIdentifier: "", lastReviewedAt: "", files: {} }
+      );
 
       expect(result).toBeUndefined();
     });
@@ -256,9 +266,14 @@ describe("ReviewStateCache", () => {
       const fileShaMap = new Map([["cached.ts", "sha123"]]);
 
       await cache.saveState("Github-testrepo-PR500", fileResults, fileShaMap);
-      const state = (await cache.getState("Github-testrepo-PR500"))!;
+      const state = await cache.getState("Github-testrepo-PR500");
+      expect(state).toBeDefined();
 
-      const result = cache.getCachedFileReview("not-cached.ts", "any-sha", state);
+      const result = cache.getCachedFileReview(
+        "not-cached.ts",
+        "any-sha",
+        state ?? { prIdentifier: "", lastReviewedAt: "", files: {} }
+      );
 
       expect(result).toBeUndefined();
     });

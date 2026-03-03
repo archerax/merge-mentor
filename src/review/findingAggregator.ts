@@ -48,7 +48,8 @@ export class FindingAggregator {
         if (!fileFindings.has(fileResult.filename)) {
           fileFindings.set(fileResult.filename, new Map());
         }
-        const findingsMap = fileFindings.get(fileResult.filename)!;
+        const findingsMap = fileFindings.get(fileResult.filename);
+        if (!findingsMap) continue;
 
         for (const finding of fileResult.findings) {
           const fingerprint = generateFindingFingerprint(fileResult.filename, finding);

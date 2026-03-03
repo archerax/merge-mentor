@@ -647,8 +647,9 @@ describe("ReviewEngine", () => {
     it("handles action with no body for create", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
-      const engine_any = engine as any;
-      await expect(engine_any.executeAction(123, { type: "create" })).rejects.toThrow(
+      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
+      const executeAction = engine["executeAction"].bind(engine);
+      await expect(executeAction(123, { type: "create" })).rejects.toThrow(
         "Create action requires body"
       );
 
@@ -659,8 +660,9 @@ describe("ReviewEngine", () => {
     it("creates general comment when path or line is missing", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
-      const engine_any = engine as any;
-      await engine_any.executeAction(123, {
+      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
+      const executeAction = engine["executeAction"].bind(engine);
+      await executeAction(123, {
         type: "create",
         body: "General comment body",
         // No path or line
@@ -673,8 +675,9 @@ describe("ReviewEngine", () => {
     it("creates general comment when only path is provided", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
-      const engine_any = engine as any;
-      await engine_any.executeAction(123, {
+      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
+      const executeAction = engine["executeAction"].bind(engine);
+      await executeAction(123, {
         type: "create",
         body: "Comment body",
         path: "file.ts",
@@ -688,8 +691,9 @@ describe("ReviewEngine", () => {
     it("creates general comment when only line is provided", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
 
-      const engine_any = engine as any;
-      await engine_any.executeAction(123, {
+      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
+      const executeAction = engine["executeAction"].bind(engine);
+      await executeAction(123, {
         type: "create",
         body: "Comment body",
         line: 10,
