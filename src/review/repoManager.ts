@@ -21,7 +21,7 @@ export interface RepoInfo {
 }
 
 /** Options for repository operations. */
-export interface RepoManagerOptions {
+interface RepoManagerOptions {
   /** Clone timeout in milliseconds (default: 120000 - 2 minutes) */
   readonly cloneTimeoutMs?: number;
   /** Fetch timeout in milliseconds (default: 30000 - 30 seconds) */

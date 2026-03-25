@@ -14,7 +14,7 @@ export function createStubProcessRunner(overrides?: Partial<ProcessRunner>): Pro
 }
 
 /** Options for configuring a stub ChildProcess. */
-export interface StubChildProcessOptions {
+interface StubChildProcessOptions {
   readonly stdout?: string;
   readonly stderr?: string;
   readonly exitCode?: number;

@@ -1,7 +1,7 @@
 import type { OutputWriter } from "./outputWriter.js";
 
 /** Captured output entry. */
-export interface CapturedOutput {
+interface CapturedOutput {
   readonly type: "log" | "error" | "write";
   readonly data: string;
 }

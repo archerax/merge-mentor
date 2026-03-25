@@ -29,7 +29,7 @@ export interface DiffManifest {
 }
 
 /** Result of storing diffs to disk. */
-export interface DiffStorageResult {
+interface DiffStorageResult {
   /** Absolute path to the diffs directory */
   readonly diffDir: string;
   /** Manifest describing stored diffs */

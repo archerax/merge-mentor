@@ -12,14 +12,14 @@ interface NumberedLine {
   content: string;
 }
 
-export interface NumberedHunk {
+interface NumberedHunk {
   /** Header showing line range info */
   header: string;
   /** Lines with calculated line numbers */
   lines: NumberedLine[];
 }
 
-export interface NumberedDiff {
+interface NumberedDiff {
   /** All hunks in the diff */
   hunks: NumberedHunk[];
 }

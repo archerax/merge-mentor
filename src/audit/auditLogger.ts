@@ -2,7 +2,7 @@ import { createChildLogger } from "../logger.js";
 import { type Clock, systemClock } from "../ports/index.js";
 
 /** Audit event types for security and compliance tracking. */
-export type AuditEventType =
+type AuditEventType =
   | "pr.details.fetch"
   | "pr.files.fetch"
   | "pr.comments.fetch"
@@ -18,10 +18,10 @@ export type AuditEventType =
   | "crossfile.review.complete";
 
 /** Audit event severity levels. */
-export type AuditSeverity = "info" | "warn" | "error";
+type AuditSeverity = "info" | "warn" | "error";
 
 /** Base audit event structure. */
-export interface AuditEvent {
+interface AuditEvent {
   readonly eventType: AuditEventType;
   readonly timestamp: string;
   readonly severity: AuditSeverity;
@@ -34,14 +34,14 @@ export interface AuditEvent {
 }
 
 /** Resource being acted upon. */
-export interface AuditResource {
+interface AuditResource {
   readonly type: "pr" | "file" | "comment" | "copilot" | "review";
   readonly id: string;
   readonly details?: Record<string, unknown>;
 }
 
 /** Options for audit logger configuration. */
-export interface AuditLoggerOptions {
+interface AuditLoggerOptions {
   readonly enabled?: boolean;
   readonly actor?: string;
   readonly clock?: Clock;

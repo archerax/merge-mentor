@@ -67,7 +67,7 @@ export interface ReviewResult {
 }
 
 /** Options for configuring the review engine. */
-export interface ReviewEngineOptions {
+interface ReviewEngineOptions {
   readonly verbose?: boolean;
   readonly dryRun?: boolean;
   /** @deprecated Use aiModel instead */

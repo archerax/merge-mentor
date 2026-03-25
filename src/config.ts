@@ -147,7 +147,7 @@ export function loadConfig(
 }
 
 /** CLI parameter overrides for configuration. */
-export interface CliOverrides {
+interface CliOverrides {
   readonly platform?: string;
   readonly githubToken?: string;
   readonly githubRepoOwner?: string;

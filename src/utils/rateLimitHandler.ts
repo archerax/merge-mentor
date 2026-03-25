@@ -11,7 +11,7 @@ const DEFAULT_MAX_DELAY_MS = 30000;
 
 const logger = createChildLogger({ component: "RateLimitHandler" });
 
-export interface RateLimitOptions {
+interface RateLimitOptions {
   /** Maximum number of retry attempts. Default: 3 */
   readonly maxRetries?: number;
   /** Base delay in milliseconds for exponential backoff. Default: 1000 */

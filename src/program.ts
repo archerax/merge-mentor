@@ -54,13 +54,13 @@ export interface ReviewOptions {
   skipExistingIssues?: string;
 }
 
-export interface ReviewExecutionResult {
+interface ReviewExecutionResult {
   result: ReviewResult;
   adapter: PlatformAdapter;
   platform: Platform;
 }
 
-export interface ProgramDeps {
+interface ProgramDeps {
   output?: OutputWriter;
   env?: Environment;
 }

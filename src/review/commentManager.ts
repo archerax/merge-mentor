@@ -10,7 +10,7 @@ import type {
 } from "../platforms/types.js";
 
 /** Options for configuring comment filtering behavior. */
-export interface CommentManagerOptions {
+interface CommentManagerOptions {
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting?: boolean;
 }

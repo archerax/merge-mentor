@@ -1,7 +1,7 @@
 /**
  * Supported programming languages for specialized reviews.
  */
-export type DetectedLanguage = "csharp" | "typescript" | "unknown";
+type DetectedLanguage = "csharp" | "typescript" | "unknown";
 
 /**
  * Detects the programming language based on file extension.
