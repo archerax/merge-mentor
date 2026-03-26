@@ -3,6 +3,29 @@ import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { ReviewEngine } from "./engine.js";
 
+// Stub nodeFs so engine and DiffStorage never touch the real filesystem during tests
+vi.mock("../ports/index.js", async () => {
+  const actual = await vi.importActual<typeof import("../ports/index.js")>("../ports/index.js");
+  return {
+    ...actual,
+    nodeFs: {
+      readFile: vi.fn().mockResolvedValue(""),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      mkdir: vi.fn().mockResolvedValue(undefined),
+      rm: vi.fn().mockResolvedValue(undefined),
+      access: vi.fn().mockResolvedValue(undefined),
+      readdir: vi.fn().mockResolvedValue([]),
+      stat: vi.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => true,
+        size: 0,
+        mtime: new Date("2025-01-01T00:00:00.000Z"),
+      }),
+      unlink: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+});
+
 // Mock the createAIProvider function with a factory that returns a mock provider
 const mockExecutePrompt = vi.fn();
 const mockParseFileReview = vi.fn();

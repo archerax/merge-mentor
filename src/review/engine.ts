@@ -589,7 +589,7 @@ export class ReviewEngine {
     repoPath?: string
   ): Promise<FileReviewResult[]> {
     const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
-    const diffStorage = new DiffStorage(tempPath);
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
 
     // Filter files with patches
     const filesWithPatches = files.filter((f) => f.patch);
@@ -1013,7 +1013,7 @@ export class ReviewEngine {
     }
 
     const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
-    const diffStorage = new DiffStorage(tempPath);
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
 
     try {
       // Store diffs to disk
