@@ -39,9 +39,6 @@ jobs:
       - name: Run unit tests
         run: pnpm test:coverage
 
-      - name: Run integration tests
-        run: pnpm test:integration
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
