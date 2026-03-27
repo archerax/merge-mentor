@@ -1,5 +1,5 @@
 import path from "node:path";
-import { CopilotClient } from "@github/copilot-sdk";
+import { approveAll, CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { CopilotSdkError, JsonParseError, ValidationError } from "../../errors/index.js";
@@ -230,6 +230,7 @@ export class CopilotSdkProvider implements AIProviderClient {
         model: this.model,
         workingDirectory: options?.workingDirectory,
         streaming: true,
+        onPermissionRequest: approveAll,
       };
 
       const session = await client.createSession(sessionConfig);

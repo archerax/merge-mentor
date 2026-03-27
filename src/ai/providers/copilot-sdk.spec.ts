@@ -23,6 +23,7 @@ vi.mock("@github/copilot-sdk", () => ({
   CopilotClient: vi.fn().mockImplementation(function () {
     return mockClient;
   }),
+  approveAll: vi.fn(),
 }));
 
 import { CopilotSdkError, ValidationError } from "../../errors/index.js";
