@@ -1,6 +1,6 @@
 {
   "name": "merge-mentor",
-  "version": "1.13.0",
+  "version": "1.15.0",
   "description": "Automated code review bot powered by AI CLI tools (Copilot, OpenCode, Cursor)",
   "main": "dist/cli.js",
   "bin": {
@@ -43,7 +43,7 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.25",
+    "@github/copilot-sdk": "^0.2.0",
     "@octokit/rest": "^22.0.1",
     "azure-devops-node-api": "^15.1.2",
     "commander": "^14.0.3",
