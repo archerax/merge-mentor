@@ -8,6 +8,7 @@ import {
   type ProcessRunner,
   systemClock,
 } from "../ports/index.js";
+import { redactToken } from "../utils/redact.js";
 
 /** Repository information for cloning. */
 export interface RepoInfo {
@@ -205,7 +206,9 @@ export class RepoManager {
     } catch (error) {
       // Clean up partial clone on failure
       await this.fileSystem.rm(repoPath, { recursive: true, force: true }).catch(() => {});
-      throw new Error(`Failed to clone repository: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to clone repository: ${redactToken((error as Error).message, token)}`
+      );
     }
   }
 
@@ -248,7 +251,9 @@ export class RepoManager {
 
       this.logger.info({ repoPath, branch }, "Repository updated successfully");
     } catch (error) {
-      throw new Error(`Failed to update repository: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to update repository: ${redactToken((error as Error).message, token)}`
+      );
     }
   }
 

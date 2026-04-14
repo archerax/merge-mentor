@@ -121,9 +121,7 @@ describe("RepoManager", () => {
 
       expect(processRunner.execFile).toHaveBeenCalledWith(
         "git",
-        expect.arrayContaining([
-          "https://test-token@dev.azure.com/myorg/myproject/_git/azurerepo",
-        ]),
+        expect.arrayContaining(["https://test-token@dev.azure.com/myorg/myproject/_git/azurerepo"]),
         expect.any(Object)
       );
     });
@@ -152,6 +150,19 @@ describe("RepoManager", () => {
       );
     });
 
+    it("redacts token from clone error messages", async () => {
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+      processRunner.execFile.mockRejectedValue(
+        new Error(
+          `fatal: repository 'https://${token}@github.com/testowner/testrepo.git' not found`
+        )
+      );
+
+      await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toSatisfy(
+        (err: Error) => !err.message.includes(token)
+      );
+    });
+
     it("throws error when update fails", async () => {
       fileSystem.stat.mockResolvedValue({
         isDirectory: () => true,
@@ -160,6 +171,21 @@ describe("RepoManager", () => {
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to update repository"
+      );
+    });
+
+    it("redacts token from update error messages", async () => {
+      fileSystem.stat.mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+      processRunner.execFile.mockRejectedValue(
+        new Error(
+          `error: could not read Username for 'https://${token}@github.com': No such device or address`
+        )
+      );
+
+      await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toSatisfy(
+        (err: Error) => !err.message.includes(token)
       );
     });
 
