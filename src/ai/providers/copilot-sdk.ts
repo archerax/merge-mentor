@@ -1,4 +1,3 @@
-import path from "node:path";
 import { approveAll, CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -10,14 +9,12 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
-import { type Clock, type FileSystem, nodeFs, systemClock } from "../../ports/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
   FastReviewResult,
-  TokenUsage,
 } from "../types.js";
 
 /** Raw finding structure from Copilot SDK JSON response. */
@@ -78,37 +75,53 @@ interface RawFastReviewResponse {
   findings?: RawFastReviewFinding[];
 }
 
+/** Detected prompt type used for audit logging. */
+type PromptType =
+  | "file-review"
+  | "cross-file-review"
+  | "batched-file-review"
+  | "fast-review"
+  | "unknown";
+
 /**
  * AI provider implementation using the @github/copilot-sdk package.
  *
- * Uses the same file-on-disk pattern as the CopilotProvider:
- * 1. Writes the full prompt to a temp `.md` file
- * 2. Creates an empty output `.json` file
- * 3. Creates a CopilotClient session and sends a short prompt referencing those files
- * 4. Reads the JSON result from the output file
- *
- * This avoids subprocess spawning while keeping the same review logic.
+ * Unlike the CLI-based CopilotProvider, this SDK provider:
+ * - Sends prompts directly via the SDK (no subprocess spawning or temp files)
+ * - Parses JSON from the assistant response content
+ * - Reuses the CopilotClient across multiple executePrompt calls for efficiency
+ * - Supports streaming via assistant.message_delta events
  */
 export class CopilotSdkProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly token?: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
-  private readonly defaultTempDir: string;
-  private readonly transcriptDir: string;
-  private readonly fileSystem: FileSystem;
-  private readonly clock: Clock;
+
+  private client?: CopilotClient;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
-    const tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
-    this.defaultTempDir = path.join(tempPath, "temp");
-    this.transcriptDir = path.join(tempPath, "transcripts");
-    this.fileSystem = options?.fileSystem ?? nodeFs;
-    this.clock = options?.clock ?? systemClock;
+    this.token = options?.token;
+  }
+
+  /**
+   * Shuts down the cached Copilot CLI process. Safe to call multiple times.
+   * Call when the provider instance is no longer needed (e.g. after a review completes).
+   */
+  destroy(): void {
+    if (this.client) {
+      try {
+        void this.client.stop();
+      } catch {
+        // Ignore server shutdown errors
+      }
+      this.client = undefined;
+    }
   }
 
   /**
@@ -125,116 +138,85 @@ export class CopilotSdkProvider implements AIProviderClient {
       throw new ValidationError("prompt", "Prompt cannot be empty.");
     }
 
-    const promptType = this.inferPromptType(prompt);
+    const promptType: PromptType = options?.promptType ?? this.inferPromptType(prompt);
     let lastError: Error | null = null;
-    let tempFile: string | undefined;
-    let outputFile: string | undefined;
 
-    try {
-      for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-        try {
-          tempFile = await this.createTempPromptFile(prompt, options?.workingDirectory);
-          outputFile = await this.createTempOutputFile(options?.workingDirectory);
-
-          const fileRef = options?.workingDirectory
-            ? `.mergementor/temp/${path.basename(tempFile)}`
-            : tempFile;
-          const outputRef = options?.workingDirectory
-            ? `.mergementor/temp/${path.basename(outputFile)}`
-            : outputFile;
-
-          const shortPrompt = `Please follow the instructions in @${fileRef} and write your JSON output to ${outputRef}. You may use tools to explore and analyze, but your final JSON response must be written to the output file.`;
-
-          const { content, tokenUsage } = await this.runSdk(shortPrompt, options, tempFile);
-
-          const jsonContent = await this.readOutputFile(outputFile);
-          const parsed = this.parseJsonResponse(jsonContent);
-
-          await this.saveTranscript({
-            prompt,
-            content,
-            jsonOutput: jsonContent,
-            tokenUsage,
-            success: true,
-          });
-
-          this.auditLogger.logAIProviderExecution(
-            "copilot-sdk",
-            promptType,
-            this.model,
-            "success",
-            undefined,
-            tokenUsage
-          );
-          return { raw: content, parsed, tokenUsage };
-        } catch (error) {
-          lastError = error as Error;
-          this.logger.warn(
-            {
-              attempt: attempt + 1,
-              maxRetries: this.maxRetries,
-              error: lastError.message,
-              willRetry: attempt < this.maxRetries - 1,
-            },
-            "Copilot SDK execution attempt failed"
-          );
-          if (attempt < this.maxRetries - 1) {
-            await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
-          }
+    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+      try {
+        const { raw, parsed } = await this.runSdk(prompt, options);
+        this.auditLogger.logAIProviderExecution("copilot-sdk", promptType, this.model, "success");
+        return { raw, parsed };
+      } catch (error) {
+        lastError = error as Error;
+        this.logger.warn(
+          {
+            attempt: attempt + 1,
+            maxRetries: this.maxRetries,
+            error: lastError.message,
+            willRetry: attempt < this.maxRetries - 1,
+          },
+          "Copilot SDK execution attempt failed"
+        );
+        if (attempt < this.maxRetries - 1) {
+          await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
         }
       }
-
-      await this.saveTranscript({
-        prompt,
-        content: "",
-        jsonOutput: "",
-        success: false,
-        error: lastError?.message,
-      });
-
-      this.auditLogger.logAIProviderExecution(
-        "copilot-sdk",
-        promptType,
-        this.model,
-        "failure",
-        lastError?.message
-      );
-      throw new CopilotSdkError(
-        `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
-        lastError ?? undefined
-      );
-    } finally {
-      if (tempFile) {
-        await this.deleteTempFile(tempFile);
-      }
-      if (outputFile) {
-        await this.deleteTempFile(outputFile);
-      }
     }
+
+    this.auditLogger.logAIProviderExecution(
+      "copilot-sdk",
+      promptType,
+      this.model,
+      "failure",
+      lastError?.message
+    );
+    throw new CopilotSdkError(
+      `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
+      lastError ?? undefined
+    );
   }
 
-  private inferPromptType(prompt: string): string {
+  private inferPromptType(prompt: string): PromptType {
+    if (prompt.includes("file_results")) return "batched-file-review";
     if (prompt.includes("cross-file")) return "cross-file-review";
     if (prompt.includes("Review the following file")) return "file-review";
+    if (prompt.includes("fast") && prompt.includes("review")) return "fast-review";
     return "unknown";
+  }
+
+  private getClient(): CopilotClient {
+    if (this.client) return this.client;
+
+    const config: Record<string, unknown> = {};
+    if (this.token) {
+      config.githubToken = this.token;
+    }
+
+    this.client = new CopilotClient(Object.keys(config).length > 0 ? config : undefined);
+    return this.client;
   }
 
   private async runSdk(
     prompt: string,
-    options?: ExecutePromptOptions,
-    tempFilePath?: string
-  ): Promise<{ content: string; tokenUsage?: TokenUsage }> {
-    const client = new CopilotClient();
+    options?: ExecutePromptOptions
+  ): Promise<{ raw: string; parsed: unknown }> {
+    let client: CopilotClient;
     try {
-      const sessionConfig: Parameters<CopilotClient["createSession"]>[0] = {
-        model: this.model,
-        workingDirectory: options?.workingDirectory,
-        streaming: true,
-        onPermissionRequest: approveAll,
-      };
+      client = this.getClient();
+    } catch (error) {
+      // Client creation failed; reset cache and let the retry loop handle it
+      this.destroy();
+      throw error;
+    }
 
-      const session = await client.createSession(sessionConfig);
+    const session = await client.createSession({
+      model: this.model,
+      workingDirectory: options?.workingDirectory,
+      streaming: true,
+      onPermissionRequest: approveAll,
+    });
 
+    try {
       const chunks: string[] = [];
       const unsubscribe = session.on("assistant.message_delta", (event) => {
         const delta = event.data.deltaContent;
@@ -245,9 +227,6 @@ export class CopilotSdkProvider implements AIProviderClient {
       });
 
       const attachments: Array<{ type: "file"; path: string }> = [];
-      if (tempFilePath) {
-        attachments.push({ type: "file", path: tempFilePath });
-      }
       if (options?.diffFiles) {
         for (const diffFile of options.diffFiles) {
           attachments.push({ type: "file", path: diffFile });
@@ -260,112 +239,20 @@ export class CopilotSdkProvider implements AIProviderClient {
       );
 
       unsubscribe();
-      await session.destroy();
 
       const content = response?.data.content ?? chunks.join("");
-      return { content };
+      if (!content) {
+        throw new CopilotSdkError("No content in response from Copilot SDK");
+      }
+
+      const parsed = this.parseJsonResponse(content);
+      return { raw: content, parsed };
     } finally {
-      await client.stop();
-    }
-  }
-
-  private async createTempPromptFile(prompt: string, workspaceDir?: string): Promise<string> {
-    const tempDir = workspaceDir
-      ? path.join(workspaceDir, ".mergementor", "temp")
-      : this.defaultTempDir;
-
-    await this.fileSystem.mkdir(tempDir, { recursive: true });
-    const filename = `prompt-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.md`;
-    const filepath = path.join(tempDir, filename);
-    await this.fileSystem.writeFile(filepath, prompt, "utf-8");
-    return filepath;
-  }
-
-  private async createTempOutputFile(workspaceDir?: string): Promise<string> {
-    const tempDir = workspaceDir
-      ? path.join(workspaceDir, ".mergementor", "temp")
-      : this.defaultTempDir;
-
-    await this.fileSystem.mkdir(tempDir, { recursive: true });
-    const filename = `output-${this.clock.epochMs()}-${Math.random().toString(36).substring(7)}.json`;
-    const filepath = path.join(tempDir, filename);
-    await this.fileSystem.writeFile(filepath, "", "utf-8");
-    return filepath;
-  }
-
-  private async readOutputFile(filepath: string): Promise<string> {
-    try {
-      const content = await this.fileSystem.readFile(filepath, "utf-8");
-      if (!content || content.trim().length === 0) {
-        throw new Error("Output file is empty");
+      try {
+        await session.disconnect();
+      } catch {
+        // Best-effort session cleanup
       }
-      return content;
-    } catch (error) {
-      throw new CopilotSdkError(
-        `Failed to read output file: ${(error as Error).message}`,
-        error as Error
-      );
-    }
-  }
-
-  private async deleteTempFile(filepath: string): Promise<void> {
-    try {
-      await this.fileSystem.unlink(filepath);
-    } catch {
-      // Ignore deletion errors - temp files will be cleaned up eventually
-    }
-  }
-
-  private async saveTranscript(data: {
-    prompt: string;
-    content: string;
-    jsonOutput: string;
-    tokenUsage?: TokenUsage;
-    success: boolean;
-    error?: string;
-  }): Promise<void> {
-    try {
-      await this.fileSystem.mkdir(this.transcriptDir, { recursive: true });
-
-      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
-      const status = data.success ? "success" : "failure";
-      const filename = `transcript-sdk-${timestamp}-${status}.txt`;
-      const filepath = path.join(this.transcriptDir, filename);
-
-      const transcript = [
-        "=".repeat(80),
-        "COPILOT SDK PROVIDER TRANSCRIPT",
-        "=".repeat(80),
-        `Timestamp: ${this.clock.timestamp()}`,
-        `Status: ${status}`,
-        `Model: ${this.model || "default"}`,
-        data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
-        "",
-        "=".repeat(80),
-        "INPUT PROMPT",
-        "=".repeat(80),
-        data.prompt,
-        "",
-        "=".repeat(80),
-        "SDK RESPONSE",
-        "=".repeat(80),
-        data.content || "(empty)",
-        "",
-        "=".repeat(80),
-        "JSON OUTPUT",
-        "=".repeat(80),
-        data.jsonOutput || "(empty)",
-      ];
-
-      if (data.error) {
-        transcript.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
-      }
-
-      transcript.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
-
-      await this.fileSystem.writeFile(filepath, transcript.filter(Boolean).join("\n"), "utf-8");
-    } catch (error) {
-      this.logger.warn({ error: (error as Error).message }, "Failed to save SDK transcript");
     }
   }
 
