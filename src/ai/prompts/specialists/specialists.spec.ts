@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
-import { buildPerformanceFileReviewPrompt } from "./performance.js";
-import { buildSecurityFileReviewPrompt } from "./security.js";
+import type { PerformanceCrossFileContext } from "./performance.js";
+import {
+  buildPerformanceCrossFilePrompt,
+  buildPerformanceFileReviewPrompt,
+} from "./performance.js";
+import type { SecurityCrossFileContext } from "./security.js";
+import { buildSecurityCrossFilePrompt, buildSecurityFileReviewPrompt } from "./security.js";
 
 describe("Specialized Review Prompts", () => {
   const mockManifest: DiffManifest = {
@@ -354,6 +360,337 @@ describe("Specialized Review Prompts", () => {
       expect(prompt).toContain("Decision:");
       expect(prompt).toContain("✅ **Report**");
       expect(prompt).toContain("❌ **Don't report**");
+    });
+  });
+
+  const mockPRDetails: PRDetails = {
+    number: 42,
+    title: "Add authentication middleware",
+    description: "Implements JWT-based auth for API routes",
+    author: "testuser",
+    baseBranch: "main",
+    headBranch: "feature/auth",
+  };
+
+  describe("buildSecurityCrossFilePrompt", () => {
+    function createSecurityContext(
+      overrides?: Partial<SecurityCrossFileContext>
+    ): SecurityCrossFileContext {
+      return {
+        filesSummary: "src/auth.ts (modified, +25/-10)\nsrc/utils.ts (added, +50/-0)",
+        fileReviewResults: [
+          {
+            filename: "src/auth.ts",
+            findings: [
+              {
+                line: 10,
+                severity: "high",
+                confidence: "high",
+                category: "security",
+                message: "Hardcoded secret",
+                suggestion: "Use env variable",
+                reasoning: "Secret exposed in source",
+              },
+            ],
+          },
+          {
+            filename: "src/utils.ts",
+            findings: [],
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    it("should return string containing PR context", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("Add authentication middleware");
+      expect(prompt).toContain("Implements JWT-based auth for API routes");
+    });
+
+    it("should include file review results summary", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("src/auth.ts: 1 finding(s)");
+      expect(prompt).not.toContain("src/utils.ts: 0 finding(s)");
+    });
+
+    it("should show files summary from context", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("src/auth.ts (modified, +25/-10)");
+      expect(prompt).toContain("src/utils.ts (added, +50/-0)");
+    });
+
+    it("should include existing comments section when provided", () => {
+      const prompt = buildSecurityCrossFilePrompt(
+        mockPRDetails,
+        createSecurityContext({
+          existingCommentsContext: "reviewer1: Check CSRF tokens",
+        })
+      );
+
+      expect(prompt).toContain("EXISTING PR COMMENTS");
+      expect(prompt).toContain("Check CSRF tokens");
+      expect(prompt).toContain("Focus on NEW security concerns");
+    });
+
+    it("should omit comments section when not provided", () => {
+      const prompt = buildSecurityCrossFilePrompt(
+        mockPRDetails,
+        createSecurityContext({ existingCommentsContext: undefined })
+      );
+
+      expect(prompt).not.toContain("EXISTING PR COMMENTS");
+    });
+
+    it("should include workspace section when repoPath is provided", () => {
+      const prompt = buildSecurityCrossFilePrompt(
+        mockPRDetails,
+        createSecurityContext(),
+        "/path/to/repo"
+      );
+
+      expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
+      expect(prompt).toContain("@workspace /search");
+      expect(prompt).toContain("Critical for Security Analysis");
+    });
+
+    it("should omit workspace section when repoPath is undefined", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).not.toContain("WORKSPACE ACCESS ENABLED");
+    });
+
+    it("should contain security-focused analysis instructions", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("Security researcher");
+      expect(prompt).toContain("cross-file security concerns");
+      expect(prompt).toContain("Authentication/Authorization Architecture");
+      expect(prompt).toContain("Trust Boundaries");
+      expect(prompt).toContain("Security Control Consistency");
+    });
+
+    it("should contain critical scope restrictions", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("CRITICAL SCOPE RESTRICTIONS");
+      expect(prompt).toContain("ONLY REPORT");
+      expect(prompt).toContain("system-level security issues");
+    });
+
+    it("should contain JSON output format", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("OUTPUT FORMAT");
+      expect(prompt).toContain("```json");
+      expect(prompt).toContain('"findings"');
+      expect(prompt).toContain('"overallAssessment"');
+      expect(prompt).toContain('"recommendations"');
+    });
+
+    it("should include self-challenge requirement", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("SELF-CHALLENGE REQUIREMENT");
+      expect(prompt).toContain("truly a cross-file security issue");
+    });
+
+    it("should show fallback when no individual findings exist", () => {
+      const prompt = buildSecurityCrossFilePrompt(
+        mockPRDetails,
+        createSecurityContext({
+          fileReviewResults: [{ filename: "src/auth.ts", findings: [] }],
+        })
+      );
+
+      expect(prompt).toContain("No individual security issues found");
+    });
+
+    it("should show fallback when description is empty", () => {
+      const prWithoutDesc: PRDetails = { ...mockPRDetails, description: "" };
+      const prompt = buildSecurityCrossFilePrompt(prWithoutDesc, createSecurityContext());
+
+      expect(prompt).toContain("No description provided");
+    });
+
+    it("should include counter-argument documentation", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("Counter-Argument Documentation");
+      expect(prompt).toContain("Counter-Argument Considered:");
+      expect(prompt).toContain("Rebuttal:");
+    });
+
+    it("should include verification checklist", () => {
+      const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
+
+      expect(prompt).toContain("VERIFICATION CHECKLIST");
+      expect(prompt).toContain("Issue spans multiple files");
+      expect(prompt).toContain("realistic attack scenario");
+    });
+  });
+
+  describe("buildPerformanceCrossFilePrompt", () => {
+    function createPerformanceContext(
+      overrides?: Partial<PerformanceCrossFileContext>
+    ): PerformanceCrossFileContext {
+      return {
+        filesSummary: "src/fetcher.ts (modified, +30/-5)\nsrc/aggregator.ts (added, +60/-0)",
+        fileReviewResults: [
+          {
+            filename: "src/fetcher.ts",
+            findings: [
+              {
+                line: 22,
+                severity: "medium",
+                confidence: "high",
+                category: "performance",
+                message: "N+1 query pattern",
+                suggestion: "Use batch loading",
+                reasoning: "Queries inside loop",
+              },
+            ],
+          },
+          {
+            filename: "src/aggregator.ts",
+            findings: [],
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    it("should return string containing PR context", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("Add authentication middleware");
+      expect(prompt).toContain("Implements JWT-based auth for API routes");
+    });
+
+    it("should include file review results summary", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("src/fetcher.ts: 1 finding(s)");
+      expect(prompt).not.toContain("src/aggregator.ts: 0 finding(s)");
+    });
+
+    it("should show files summary from context", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("src/fetcher.ts (modified, +30/-5)");
+      expect(prompt).toContain("src/aggregator.ts (added, +60/-0)");
+    });
+
+    it("should include existing comments section when provided", () => {
+      const prompt = buildPerformanceCrossFilePrompt(
+        mockPRDetails,
+        createPerformanceContext({
+          existingCommentsContext: "reviewer1: Consider caching this query",
+        })
+      );
+
+      expect(prompt).toContain("EXISTING PR COMMENTS");
+      expect(prompt).toContain("Consider caching this query");
+      expect(prompt).toContain("Focus on NEW performance concerns");
+    });
+
+    it("should omit comments section when not provided", () => {
+      const prompt = buildPerformanceCrossFilePrompt(
+        mockPRDetails,
+        createPerformanceContext({ existingCommentsContext: undefined })
+      );
+
+      expect(prompt).not.toContain("EXISTING PR COMMENTS");
+    });
+
+    it("should include workspace section when repoPath is provided", () => {
+      const prompt = buildPerformanceCrossFilePrompt(
+        mockPRDetails,
+        createPerformanceContext(),
+        "/path/to/repo"
+      );
+
+      expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
+      expect(prompt).toContain("@workspace /search");
+      expect(prompt).toContain("Critical for Performance Analysis");
+    });
+
+    it("should omit workspace section when repoPath is undefined", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).not.toContain("WORKSPACE ACCESS ENABLED");
+    });
+
+    it("should contain performance-focused analysis instructions", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("Performance engineer");
+      expect(prompt).toContain("cross-file performance concerns");
+      expect(prompt).toContain("Distributed Performance Patterns");
+      expect(prompt).toContain("Resource Management Architecture");
+      expect(prompt).toContain("Caching Architecture");
+    });
+
+    it("should contain critical scope restrictions", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("CRITICAL SCOPE RESTRICTIONS");
+      expect(prompt).toContain("ONLY REPORT");
+      expect(prompt).toContain("system-level performance issues");
+    });
+
+    it("should contain JSON output format", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("OUTPUT FORMAT");
+      expect(prompt).toContain("```json");
+      expect(prompt).toContain('"findings"');
+      expect(prompt).toContain('"overallAssessment"');
+      expect(prompt).toContain('"recommendations"');
+    });
+
+    it("should include self-challenge requirement", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("SELF-CHALLENGE REQUIREMENT");
+      expect(prompt).toContain("truly a cross-file performance issue");
+    });
+
+    it("should show fallback when no individual findings exist", () => {
+      const prompt = buildPerformanceCrossFilePrompt(
+        mockPRDetails,
+        createPerformanceContext({
+          fileReviewResults: [{ filename: "src/fetcher.ts", findings: [] }],
+        })
+      );
+
+      expect(prompt).toContain("No individual performance issues found");
+    });
+
+    it("should show fallback when description is empty", () => {
+      const prWithoutDesc: PRDetails = { ...mockPRDetails, description: "" };
+      const prompt = buildPerformanceCrossFilePrompt(prWithoutDesc, createPerformanceContext());
+
+      expect(prompt).toContain("No description provided");
+    });
+
+    it("should include counter-argument documentation", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("Counter-Argument Documentation");
+      expect(prompt).toContain("Counter-Argument Considered:");
+      expect(prompt).toContain("Rebuttal:");
+    });
+
+    it("should include verification checklist", () => {
+      const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
+
+      expect(prompt).toContain("VERIFICATION CHECKLIST");
+      expect(prompt).toContain("Issue spans multiple files");
+      expect(prompt).toContain("Performance impact is measurable");
     });
   });
 

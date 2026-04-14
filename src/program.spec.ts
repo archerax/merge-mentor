@@ -43,11 +43,39 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    mkdirSync: vi.fn(),
+    readdirSync: vi.fn(() => []),
+    statSync: vi.fn(),
+    rmSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  };
+});
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
+
+import { execSync } from "node:child_process";
+import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 // Import after mocks are set up
 import { loadConfig, validateConfig } from "./config.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
-import { displayResults, executeReview, hasCriticalIssues, type ReviewOptions } from "./program.js";
+import {
+  displayResults,
+  executeReview,
+  hasCriticalIssues,
+  program,
+  type ReviewOptions,
+} from "./program.js";
 import { ReviewEngine } from "./review/engine.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
@@ -854,6 +882,339 @@ describe("CLI", () => {
 
       expect(report).toContain("### 📝 Review Actions");
       expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");
+    });
+  });
+
+  describe("repos command", () => {
+    let exitSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      vi.mocked(mkdirSync).mockReturnValue(undefined);
+      vi.mocked(readdirSync).mockReturnValue([]);
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig());
+    });
+
+    it("shows usage help when no options are specified", async () => {
+      await program.parseAsync(["node", "test", "repos"]);
+
+      expect(mkdirSync).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Usage: merge-mentor repos [options]")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("lists empty repos when no repositories exist", async () => {
+      vi.mocked(readdirSync).mockReturnValue([]);
+
+      await program.parseAsync(["node", "test", "repos", "--list"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith("No cloned repositories found.");
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("lists existing repositories with details", async () => {
+      const mockDate = new Date("2024-01-15T10:30:00Z");
+      vi.mocked(readdirSync).mockReturnValue(["repo-a", "repo-b"] as unknown as ReturnType<
+        typeof readdirSync
+      >);
+      vi.mocked(statSync).mockReturnValue({
+        isDirectory: () => true,
+        mtime: mockDate,
+      } as unknown as ReturnType<typeof statSync>);
+
+      await program.parseAsync(["node", "test", "repos", "--list"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Cloned repositories (2)")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("repo-a"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("repo-b"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(mockDate.toISOString()));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("reports no repos to clean when directory is empty", async () => {
+      vi.mocked(readdirSync).mockReturnValue([]);
+
+      await program.parseAsync(["node", "test", "repos", "--clean"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith("No cloned repositories to clean.");
+      expect(rmSync).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("cleans all repositories", async () => {
+      vi.mocked(readdirSync).mockReturnValue(["repo-x", "repo-y"] as unknown as ReturnType<
+        typeof readdirSync
+      >);
+      vi.mocked(statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as unknown as ReturnType<typeof statSync>);
+
+      await program.parseAsync(["node", "test", "repos", "--clean"]);
+
+      expect(rmSync).toHaveBeenCalledTimes(2);
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Removed: repo-x"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Removed: repo-y"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Cleaned 2 repositories"));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("removes a specific repository with --clean-repo", async () => {
+      vi.mocked(statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as unknown as ReturnType<typeof statSync>);
+
+      await program.parseAsync(["node", "test", "repos", "--clean-repo", "my-repo"]);
+
+      expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("my-repo"), {
+        recursive: true,
+        force: true,
+      });
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Removed repository: my-repo")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("errors when --clean-repo target is not a directory", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(statSync).mockReturnValue({
+        isDirectory: () => false,
+      } as unknown as ReturnType<typeof statSync>);
+
+      await program.parseAsync(["node", "test", "repos", "--clean-repo", "not-a-dir"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("is not a directory"));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --clean-repo target is not found", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(statSync).mockImplementation(() => {
+        throw new Error("ENOENT");
+      });
+
+      await program.parseAsync(["node", "test", "repos", "--clean-repo", "missing"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Repository "missing" not found')
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("handles unexpected errors during repos management", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(mkdirSync).mockImplementation(() => {
+        throw new Error("Permission denied");
+      });
+
+      await program.parseAsync(["node", "test", "repos", "--list"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("Permission denied"));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("passes --temp-path option to loadConfig", async () => {
+      await program.parseAsync(["node", "test", "repos", "--temp-path", "/custom/path", "--list"]);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ tempPath: "/custom/path" })
+      );
+    });
+
+    it("filters non-directory entries when listing repos", async () => {
+      vi.mocked(readdirSync).mockReturnValue(["real-repo", "some-file"] as unknown as ReturnType<
+        typeof readdirSync
+      >);
+      let callCount = 0;
+      vi.mocked(statSync).mockImplementation(() => {
+        callCount++;
+        if (callCount <= 1) {
+          return { isDirectory: () => true, mtime: new Date() } as unknown as ReturnType<
+            typeof statSync
+          >;
+        }
+        return { isDirectory: () => false } as unknown as ReturnType<typeof statSync>;
+      });
+
+      await program.parseAsync(["node", "test", "repos", "--list"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Cloned repositories (1)")
+      );
+    });
+  });
+
+  describe("doctor command", () => {
+    let exitSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig());
+    });
+
+    it("displays system diagnostics header", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("merge-mentor diagnostics")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Platform:"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Node.js:"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("CWD:"));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("checks all three providers by default", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking opencode CLI"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking cursor CLI"));
+    });
+
+    it("checks only specified provider with --provider", async () => {
+      vi.mocked(execSync).mockReturnValue("copilot 1.0.0");
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Checking opencode CLI")
+      );
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Checking cursor CLI")
+      );
+    });
+
+    it("shows installed version when provider is found", async () => {
+      vi.mocked(execSync).mockReturnValue("copilot 2.5.0");
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Installed: copilot 2.5.0")
+      );
+    });
+
+    it("shows location when which/where succeeds", async () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("copilot 2.5.0")
+        .mockReturnValueOnce("/usr/local/bin/copilot");
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Location: /usr/local/bin/copilot")
+      );
+    });
+
+    it("shows warning when which/where fails", async () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("copilot 2.5.0")
+        .mockImplementationOnce(() => {
+          throw new Error("which failed");
+        });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Could not determine installation location")
+      );
+    });
+
+    it("shows not found when provider version check fails", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("command not found: opencode");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "opencode"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Not found or not working")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("command not found: opencode")
+      );
+    });
+
+    it("displays configuration details", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          defaultPlatform: "github",
+          aiProvider: "copilot",
+        })
+      );
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Configuration:"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Default platform: github")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("AI provider: copilot"));
+    });
+
+    it("shows token status for GitHub and Azure", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("GitHub token: ✅ Set"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Azure token: ✅ Set"));
+    });
+
+    it("shows token not set when tokens are empty", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          github: { token: "", owner: "o", repo: "r" },
+          azure: { token: "", org: "o", project: "p", repo: "r" },
+        })
+      );
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("GitHub token: ❌ Not set")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Azure token: ❌ Not set")
+      );
+    });
+
+    it("handles config loading failure gracefully", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+      vi.mocked(loadConfig).mockImplementation(() => {
+        throw new Error("Config file not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Could not load configuration")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Config file not found"));
     });
   });
 });
