@@ -79,8 +79,8 @@ export class GitHubAdapter implements PlatformAdapter {
 
   async getPRFiles(prNumber: number): Promise<PRFile[]> {
     try {
-      const { data } = await withRateLimitHandling(() =>
-        this.octokit.pulls.listFiles({
+      const data = await withRateLimitHandling(() =>
+        this.octokit.paginate(this.octokit.pulls.listFiles, {
           owner: this.owner,
           repo: this.repo,
           pull_number: prNumber,
@@ -116,8 +116,8 @@ export class GitHubAdapter implements PlatformAdapter {
       const comments: ExistingComment[] = [];
 
       // Get PR review comments (inline comments)
-      const { data: reviewComments } = await withRateLimitHandling(() =>
-        this.octokit.pulls.listReviewComments({
+      const reviewComments = await withRateLimitHandling(() =>
+        this.octokit.paginate(this.octokit.pulls.listReviewComments, {
           owner: this.owner,
           repo: this.repo,
           pull_number: prNumber,
@@ -137,8 +137,8 @@ export class GitHubAdapter implements PlatformAdapter {
       }
 
       // Get issue comments (general comments)
-      const { data: issueComments } = await withRateLimitHandling(() =>
-        this.octokit.issues.listComments({
+      const issueComments = await withRateLimitHandling(() =>
+        this.octokit.paginate(this.octokit.issues.listComments, {
           owner: this.owner,
           repo: this.repo,
           issue_number: prNumber,

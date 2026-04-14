@@ -14,6 +14,7 @@ const mockOctokitInstance = {
     listComments: vi.fn(),
     createComment: vi.fn(),
   },
+  paginate: vi.fn(),
   graphql: vi.fn(),
 };
 
@@ -21,6 +22,7 @@ vi.mock("@octokit/rest", () => ({
   Octokit: class {
     pulls = mockOctokitInstance.pulls;
     issues = mockOctokitInstance.issues;
+    paginate = mockOctokitInstance.paginate;
     graphql = mockOctokitInstance.graphql;
   },
 }));
@@ -126,26 +128,24 @@ describe("GitHubAdapter", () => {
   describe("getPRFiles", () => {
     it("retrieves PR files successfully", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listFiles.mockResolvedValue({
-        data: [
-          {
-            filename: "src/test.ts",
-            status: "modified",
-            additions: 10,
-            deletions: 5,
-            patch: "@@ -1,3 +1,4 @@",
-            sha: "abc123",
-          },
-          {
-            filename: "README.md",
-            status: "added",
-            additions: 20,
-            deletions: 0,
-            patch: "@@ -0,0 +1,20 @@",
-            sha: "def456",
-          },
-        ],
-      });
+      mockOctokitInstance.paginate.mockResolvedValue([
+        {
+          filename: "src/test.ts",
+          status: "modified",
+          additions: 10,
+          deletions: 5,
+          patch: "@@ -1,3 +1,4 @@",
+          sha: "abc123",
+        },
+        {
+          filename: "README.md",
+          status: "added",
+          additions: 20,
+          deletions: 0,
+          patch: "@@ -0,0 +1,20 @@",
+          sha: "def456",
+        },
+      ]);
 
       const result = await adapter.getPRFiles(123);
 
@@ -166,11 +166,20 @@ describe("GitHubAdapter", () => {
         patch: "@@ -0,0 +1,20 @@",
         sha: "def456",
       });
+      expect(mockOctokitInstance.paginate).toHaveBeenCalledWith(
+        mockOctokitInstance.pulls.listFiles,
+        {
+          owner: "test-owner",
+          repo: "test-repo",
+          pull_number: 123,
+          per_page: 100,
+        }
+      );
     });
 
     it("handles empty file list", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listFiles.mockResolvedValue({ data: [] });
+      mockOctokitInstance.paginate.mockResolvedValue([]);
 
       const result = await adapter.getPRFiles(123);
 
@@ -179,31 +188,46 @@ describe("GitHubAdapter", () => {
 
     it("handles files with null sha", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listFiles.mockResolvedValue({
-        data: [
-          {
-            filename: "src/test.ts",
-            status: "modified",
-            additions: 10,
-            deletions: 5,
-            patch: "@@ -1,3 +1,4 @@",
-            sha: null, // This tests the ?? undefined branch
-          },
-        ],
-      });
+      mockOctokitInstance.paginate.mockResolvedValue([
+        {
+          filename: "src/test.ts",
+          status: "modified",
+          additions: 10,
+          deletions: 5,
+          patch: "@@ -1,3 +1,4 @@",
+          sha: null,
+        },
+      ]);
 
       const result = await adapter.getPRFiles(123);
 
       expect(result).toHaveLength(1);
       expect(result[0].sha).toBeUndefined();
     });
+
+    it("retrieves all files across multiple pages", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      const manyFiles = Array.from({ length: 150 }, (_, i) => ({
+        filename: `src/file${i}.ts`,
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@",
+        sha: `sha${i}`,
+      }));
+      mockOctokitInstance.paginate.mockResolvedValue(manyFiles);
+
+      const result = await adapter.getPRFiles(123);
+
+      expect(result).toHaveLength(150);
+    });
   });
 
   describe("getExistingBotComments", () => {
     it("retrieves bot comments from reviews and issues", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listReviewComments.mockResolvedValue({
-        data: [
+      mockOctokitInstance.paginate
+        .mockResolvedValueOnce([
           {
             id: 1,
             body: "<!-- merge-mentor -->\nReview comment",
@@ -216,10 +240,8 @@ describe("GitHubAdapter", () => {
             path: "src/other.ts",
             line: 5,
           },
-        ],
-      });
-      mockOctokitInstance.issues.listComments.mockResolvedValue({
-        data: [
+        ])
+        .mockResolvedValueOnce([
           {
             id: 3,
             body: "<!-- merge-mentor -->\nGeneral comment",
@@ -228,8 +250,7 @@ describe("GitHubAdapter", () => {
             id: 4,
             body: "User comment",
           },
-        ],
-      });
+        ]);
 
       const result = await adapter.getExistingBotComments(123);
 
@@ -248,17 +269,16 @@ describe("GitHubAdapter", () => {
 
     it("handles missing line in review comment", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listReviewComments.mockResolvedValue({
-        data: [
+      mockOctokitInstance.paginate
+        .mockResolvedValueOnce([
           {
             id: 1,
             body: "<!-- merge-mentor -->\nComment",
             path: "test.ts",
             line: null,
           },
-        ],
-      });
-      mockOctokitInstance.issues.listComments.mockResolvedValue({ data: [] });
+        ])
+        .mockResolvedValueOnce([]);
 
       const result = await adapter.getExistingBotComments(123);
 
@@ -267,14 +287,45 @@ describe("GitHubAdapter", () => {
 
     it("handles null body in issue comment", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
-      mockOctokitInstance.pulls.listReviewComments.mockResolvedValue({ data: [] });
-      mockOctokitInstance.issues.listComments.mockResolvedValue({
-        data: [{ id: 1, body: null }],
-      });
+      mockOctokitInstance.paginate
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 1, body: null }]);
 
       const result = await adapter.getExistingBotComments(123);
 
       expect(result).toHaveLength(0);
+    });
+
+    it("paginates through all review and issue comments", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      const manyReviewComments = Array.from({ length: 120 }, (_, i) => ({
+        id: i + 1,
+        body: `<!-- merge-mentor -->\nComment ${i}`,
+        path: `src/file${i}.ts`,
+        line: i + 1,
+      }));
+      const manyIssueComments = Array.from({ length: 30 }, (_, i) => ({
+        id: i + 200,
+        body: `<!-- merge-mentor -->\nIssue comment ${i}`,
+      }));
+      mockOctokitInstance.paginate
+        .mockResolvedValueOnce(manyReviewComments)
+        .mockResolvedValueOnce(manyIssueComments);
+
+      const result = await adapter.getExistingBotComments(123);
+
+      expect(result).toHaveLength(150);
+      expect(mockOctokitInstance.paginate).toHaveBeenCalledTimes(2);
+      expect(mockOctokitInstance.paginate).toHaveBeenNthCalledWith(
+        1,
+        mockOctokitInstance.pulls.listReviewComments,
+        { owner: "test-owner", repo: "test-repo", pull_number: 123, per_page: 100 }
+      );
+      expect(mockOctokitInstance.paginate).toHaveBeenNthCalledWith(
+        2,
+        mockOctokitInstance.issues.listComments,
+        { owner: "test-owner", repo: "test-repo", issue_number: 123, per_page: 100 }
+      );
     });
   });
 
