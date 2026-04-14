@@ -195,10 +195,12 @@ export class RepoManager {
     // Ensure parent directory exists
     await this.fileSystem.mkdir(path.dirname(repoPath), { recursive: true });
 
-    const cloneCmd = `git clone --depth 1 --single-branch --branch ${branch} "${cloneUrl}" "${repoPath}"`;
-
     try {
-      await this.execWithTimeout(cloneCmd, this.cloneTimeoutMs);
+      await this.execFileWithTimeout(
+        "git",
+        ["clone", "--depth", "1", "--single-branch", "--branch", branch, cloneUrl, repoPath],
+        this.cloneTimeoutMs
+      );
       this.logger.info({ repoPath, branch }, "Repository cloned successfully");
     } catch (error) {
       // Clean up partial clone on failure
@@ -221,23 +223,26 @@ export class RepoManager {
 
     try {
       // Clean any leftover files from previous reviews
-      await this.execWithTimeout(`git -C "${repoPath}" clean -fdx`, this.fetchTimeoutMs);
+      await this.execFileWithTimeout("git", ["-C", repoPath, "clean", "-fdx"], this.fetchTimeoutMs);
 
       // Update remote URL
-      await this.execWithTimeout(
-        `git -C "${repoPath}" remote set-url origin "${remoteUrl}"`,
+      await this.execFileWithTimeout(
+        "git",
+        ["-C", repoPath, "remote", "set-url", "origin", remoteUrl],
         this.fetchTimeoutMs
       );
 
       // Fetch and checkout branch
-      await this.execWithTimeout(
-        `git -C "${repoPath}" fetch --depth 1 origin ${branch}`,
+      await this.execFileWithTimeout(
+        "git",
+        ["-C", repoPath, "fetch", "--depth", "1", "origin", branch],
         this.fetchTimeoutMs
       );
 
       // Reset to the fetched branch
-      await this.execWithTimeout(
-        `git -C "${repoPath}" checkout -B ${branch} origin/${branch}`,
+      await this.execFileWithTimeout(
+        "git",
+        ["-C", repoPath, "checkout", "-B", branch, `origin/${branch}`],
         this.fetchTimeoutMs
       );
 
@@ -261,14 +266,20 @@ export class RepoManager {
   }
 
   /**
-   * Executes a command with a timeout.
+   * Executes a git command with explicit arguments and a timeout.
+   * Using execFile with an array of arguments prevents shell injection —
+   * arguments are passed directly to the process without shell interpretation.
    */
-  private async execWithTimeout(command: string, timeoutMs: number): Promise<string> {
+  private async execFileWithTimeout(
+    file: string,
+    args: string[],
+    timeoutMs: number
+  ): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const result = await this.runner.exec(command, {
+      const result = await this.runner.execFile(file, args, {
         signal: controller.signal,
         maxBuffer: 50 * 1024 * 1024, // 50MB buffer
       });

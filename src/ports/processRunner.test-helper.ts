@@ -7,6 +7,7 @@ import type { ProcessRunner } from "./processRunner.js";
 export function createStubProcessRunner(overrides?: Partial<ProcessRunner>): ProcessRunner {
   return {
     exec: vi.fn().mockResolvedValue({ stdout: "", stderr: "" }),
+    execFile: vi.fn().mockResolvedValue({ stdout: "", stderr: "" }),
     execSync: vi.fn().mockReturnValue(""),
     spawn: vi.fn().mockReturnValue(createStubChildProcess()),
     ...overrides,

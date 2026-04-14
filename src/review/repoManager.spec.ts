@@ -58,8 +58,9 @@ describe("RepoManager", () => {
       const result = await repoManager.ensureRepo(repoInfo, branch, token);
 
       expect(result).toBe(path.join(testReposDir, "github-testowner-testrepo"));
-      expect(processRunner.exec).toHaveBeenCalledWith(
-        expect.stringContaining("git clone"),
+      expect(processRunner.execFile).toHaveBeenCalledWith(
+        "git",
+        expect.arrayContaining(["clone"]),
         expect.any(Object)
       );
     });
@@ -72,8 +73,9 @@ describe("RepoManager", () => {
       const result = await repoManager.ensureRepo(repoInfo, branch, token);
 
       expect(result).toBe(path.join(testReposDir, "github-testowner-testrepo"));
-      expect(processRunner.exec).toHaveBeenCalledWith(
-        expect.stringContaining("git -C"),
+      expect(processRunner.execFile).toHaveBeenCalledWith(
+        "git",
+        expect.arrayContaining(["-C"]),
         expect.any(Object)
       );
     });
@@ -98,8 +100,9 @@ describe("RepoManager", () => {
 
       await repoManager.ensureRepo(repoInfo, branch, token);
 
-      expect(processRunner.exec).toHaveBeenCalledWith(
-        expect.stringContaining("https://test-token@github.com/testowner/testrepo.git"),
+      expect(processRunner.execFile).toHaveBeenCalledWith(
+        "git",
+        expect.arrayContaining(["https://test-token@github.com/testowner/testrepo.git"]),
         expect.any(Object)
       );
     });
@@ -116,15 +119,33 @@ describe("RepoManager", () => {
 
       await repoManager.ensureRepo(azureRepoInfo, branch, token);
 
-      expect(processRunner.exec).toHaveBeenCalledWith(
-        expect.stringContaining("https://test-token@dev.azure.com/myorg/myproject/_git/azurerepo"),
+      expect(processRunner.execFile).toHaveBeenCalledWith(
+        "git",
+        expect.arrayContaining([
+          "https://test-token@dev.azure.com/myorg/myproject/_git/azurerepo",
+        ]),
         expect.any(Object)
       );
     });
 
+    it("passes branch as a separate argument, not a shell string", async () => {
+      const maliciousBranch = "main; rm -rf /";
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+      await repoManager.ensureRepo(repoInfo, maliciousBranch, token);
+
+      // Shell metacharacters are inert because execFile passes args directly to git
+      expect(processRunner.execFile).toHaveBeenCalledWith(
+        "git",
+        expect.arrayContaining([maliciousBranch]),
+        expect.any(Object)
+      );
+      expect(processRunner.exec).not.toHaveBeenCalled();
+    });
+
     it("throws error when clone fails", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-      processRunner.exec.mockRejectedValue(new Error("Clone failed"));
+      processRunner.execFile.mockRejectedValue(new Error("Clone failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to clone repository"
@@ -135,7 +156,7 @@ describe("RepoManager", () => {
       fileSystem.stat.mockResolvedValue({
         isDirectory: () => true,
       } as unknown as Stats);
-      processRunner.exec.mockRejectedValue(new Error("Fetch failed"));
+      processRunner.execFile.mockRejectedValue(new Error("Fetch failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to update repository"
@@ -144,7 +165,7 @@ describe("RepoManager", () => {
 
     it("cleans up partial clone on failure", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-      processRunner.exec.mockRejectedValue(new Error("Clone failed"));
+      processRunner.execFile.mockRejectedValue(new Error("Clone failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow();
       expect(fileSystem.rm).toHaveBeenCalledWith(
@@ -302,7 +323,7 @@ describe("RepoManager", () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
 
       // Simulate a command that rejects with AbortError when signal fires
-      processRunner.exec.mockImplementation(async (_cmd, options) => {
+      processRunner.execFile.mockImplementation(async (_file, _args, options) => {
         return new Promise((_resolve, reject) => {
           const timeoutId = setTimeout(() => {
             reject(new Error("Should have been aborted"));
