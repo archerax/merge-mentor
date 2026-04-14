@@ -11,7 +11,7 @@ export interface FastReviewResult {
 }
 
 /** Supported AI provider types. */
-export type AIProviderType = "copilot" | "copilot-sdk" | "opencode" | "cursor";
+export type AIProviderType = "copilot" | "copilot-sdk" | "opencode" | "opencode-sdk" | "cursor";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {
@@ -57,6 +57,8 @@ export interface ExecutePromptOptions {
   readonly diffFiles?: string[];
   /** Optional callback invoked with streaming output data chunks. */
   readonly onStreamData?: (chunk: string) => void;
+  /** Hint for the type of review prompt being sent (avoids substring inference). */
+  readonly promptType?: "file-review" | "cross-file-review" | "batched-file-review" | "fast-review";
 }
 
 /**

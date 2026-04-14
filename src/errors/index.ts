@@ -36,6 +36,19 @@ export class CopilotSdkError extends MergeMentorError {
 }
 
 /**
+ * Error thrown when the OpenCode SDK fails or is unavailable.
+ */
+export class OpenCodeSdkError extends MergeMentorError {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = "OpenCodeSdkError";
+  }
+}
+
+/**
  * Error thrown when configuration is missing or invalid.
  */
 export class ConfigurationError extends MergeMentorError {

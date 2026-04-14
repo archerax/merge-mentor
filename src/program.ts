@@ -48,6 +48,8 @@ export interface ReviewOptions {
   copilotSdkTimeout?: number;
   opencodeModel?: string;
   opencodeTimeout?: number;
+  opencodeSdkModel?: string;
+  opencodeSdkTimeout?: number;
   cursorModel?: string;
   cursorTimeout?: number;
   // Comment filtering
@@ -102,6 +104,8 @@ export async function executeReview(
     copilotSdkTimeout: options.copilotSdkTimeout,
     opencodeModel: options.opencodeModel,
     opencodeTimeout: options.opencodeTimeout,
+    opencodeSdkModel: options.opencodeSdkModel,
+    opencodeSdkTimeout: options.opencodeSdkTimeout,
     cursorModel: options.cursorModel,
     cursorTimeout: options.cursorTimeout,
     skipExistingIssues: options.skipExistingIssues,
@@ -123,10 +127,10 @@ export async function executeReview(
 
   // Validate and resolve AI provider
   const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "copilot-sdk", "opencode", "cursor"].includes(aiProvider)) {
+  if (!["copilot", "copilot-sdk", "opencode", "opencode-sdk", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", or "cursor".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".`
     );
   }
 
@@ -154,6 +158,10 @@ export async function executeReview(
     case "opencode":
       aiModel = config.opencodeModel;
       aiTimeoutMs = config.opencodeTimeoutMs;
+      break;
+    case "opencode-sdk":
+      aiModel = config.opencodeSdkModel;
+      aiTimeoutMs = config.opencodeSdkTimeoutMs;
       break;
     case "cursor":
       aiModel = config.cursorModel;
@@ -458,7 +466,7 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
   .option(
     "--provider <provider>",
-    "AI provider (copilot, opencode, or cursor). Env: MM_AI_PROVIDER"
+    "AI provider (copilot, copilot-sdk, opencode, opencode-sdk, or cursor). Env: MM_AI_PROVIDER"
   )
   .option("--write", "Post comments to PR (default is dry-run mode)", false)
   .option("--verbose", "Enable verbose output", true)
@@ -501,6 +509,12 @@ program
   )
   .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
   .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
+  .option("--opencode-sdk-model <model>", "OpenCode SDK model name. Env: MM_OPENCODE_SDK_MODEL")
+  .option(
+    "--opencode-sdk-timeout <ms>",
+    "OpenCode SDK timeout in ms. Env: MM_OPENCODE_SDK_TIMEOUT",
+    parseInt
+  )
   .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
   .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
   // Comment filtering
@@ -541,6 +555,8 @@ program
         copilotSdkTimeout: options.copilotSdkTimeout,
         opencodeModel: options.opencodeModel,
         opencodeTimeout: options.opencodeTimeout,
+        opencodeSdkModel: options.opencodeSdkModel,
+        opencodeSdkTimeout: options.opencodeSdkTimeout,
         cursorModel: options.cursorModel,
         cursorTimeout: options.cursorTimeout,
         skipExistingIssues: options.skipExistingIssues,

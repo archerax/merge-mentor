@@ -190,8 +190,16 @@ describe("Config", () => {
       ).toBe("copilot");
 
       expect(
+        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "copilot-sdk" })).aiProvider
+      ).toBe("copilot-sdk");
+
+      expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode" })).aiProvider
       ).toBe("opencode");
+
+      expect(
+        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode-sdk" })).aiProvider
+      ).toBe("opencode-sdk");
 
       expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "cursor" })).aiProvider
@@ -226,6 +234,36 @@ describe("Config", () => {
       const config = loadConfig(undefined, env);
 
       expect(config.opencodeTimeoutMs).toBeUndefined();
+    });
+
+    it("should load MM_OPENCODE_SDK_MODEL from environment", () => {
+      const env = createStubEnvironment({
+        MM_OPENCODE_SDK_MODEL: "claude-4.5-sonnet",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.opencodeSdkModel).toBe("claude-4.5-sonnet");
+    });
+
+    it("should load MM_OPENCODE_SDK_TIMEOUT from environment", () => {
+      const env = createStubEnvironment({
+        MM_OPENCODE_SDK_TIMEOUT: "90000",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.opencodeSdkTimeoutMs).toBe(90000);
+    });
+
+    it("should ignore MM_OPENCODE_SDK_TIMEOUT when zero or negative", () => {
+      const env = createStubEnvironment({
+        MM_OPENCODE_SDK_TIMEOUT: "0",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.opencodeSdkTimeoutMs).toBeUndefined();
     });
 
     it("should load MM_CURSOR_MODEL from environment", () => {

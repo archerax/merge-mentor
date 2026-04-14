@@ -438,7 +438,7 @@ describe("CLI", () => {
       };
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", or "cursor".'
+        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".'
       );
     });
   });
