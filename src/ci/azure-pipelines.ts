@@ -58,6 +58,7 @@ export function resolveAzurePipelinesContext(env: Environment): CIContext | null
     ciSystem: "azure-pipelines",
     platform: "azure",
     prNumber,
+    workspacePath: env.get("BUILD_SOURCESDIRECTORY"),
     azureToken: env.get("SYSTEM_ACCESSTOKEN"),
     azureOrg,
     azureProject: env.get("SYSTEM_TEAMPROJECT"),

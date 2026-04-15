@@ -74,6 +74,7 @@ export function resolveGitHubActionsContext(
     ciSystem: "github-actions",
     platform: "github",
     prNumber,
+    workspacePath: env.get("GITHUB_WORKSPACE"),
     githubToken: env.get("GITHUB_TOKEN"),
     githubOwner,
     githubRepo,

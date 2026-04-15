@@ -141,6 +141,18 @@ describe("resolveGitHubActionsContext", () => {
     expect(ctx?.githubToken).toBe("secret-token");
   });
 
+  test("populates workspacePath from GITHUB_WORKSPACE when set", () => {
+    const env = makeGitHubEnv({ GITHUB_WORKSPACE: "/home/runner/work/myrepo/myrepo" });
+    const ctx = resolveGitHubActionsContext(env);
+    expect(ctx?.workspacePath).toBe("/home/runner/work/myrepo/myrepo");
+  });
+
+  test("workspacePath is undefined when GITHUB_WORKSPACE is not set", () => {
+    const env = makeGitHubEnv();
+    const ctx = resolveGitHubActionsContext(env);
+    expect(ctx?.workspacePath).toBeUndefined();
+  });
+
   test("returns platform as github", () => {
     const env = makeGitHubEnv();
     const ctx = resolveGitHubActionsContext(env);
@@ -217,6 +229,18 @@ describe("resolveAzurePipelinesContext", () => {
     const env = makeAzureEnv({ BUILD_REPOSITORY_NAME: "alpha-repo" });
     const ctx = resolveAzurePipelinesContext(env);
     expect(ctx?.azureRepo).toBe("alpha-repo");
+  });
+
+  test("populates workspacePath from BUILD_SOURCESDIRECTORY when set", () => {
+    const env = makeAzureEnv({ BUILD_SOURCESDIRECTORY: "/home/vsts/work/1/s" });
+    const ctx = resolveAzurePipelinesContext(env);
+    expect(ctx?.workspacePath).toBe("/home/vsts/work/1/s");
+  });
+
+  test("workspacePath is undefined when BUILD_SOURCESDIRECTORY is not set", () => {
+    const env = makeAzureEnv();
+    const ctx = resolveAzurePipelinesContext(env);
+    expect(ctx?.workspacePath).toBeUndefined();
   });
 
   test("returns platform as azure", () => {

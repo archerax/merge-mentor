@@ -92,6 +92,12 @@ interface ReviewEngineOptions {
   readonly streamingLines?: number;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). */
   readonly tempPath?: string;
+  /**
+   * Path to a pre-existing local repository checkout.
+   * When provided (e.g. in CI where the repo is already checked out),
+   * the engine uses this path directly and skips cloning.
+   */
+  readonly localWorkspacePath?: string;
   /** Output writer for console output. Default: consoleOutputWriter */
   readonly output?: OutputWriter;
   /** File system abstraction for I/O operations. Default: nodeFs */
@@ -239,8 +245,8 @@ export class ReviewEngine {
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prIdentifier);
 
-    // Ensure repo is cloned for CLI agent workspace access (required for review)
-    const repoPath = await this.ensureRepoCloned(prDetails.baseBranch);
+    // Use pre-existing workspace (CI checkout) or clone the repo for CLI agent access
+    const repoPath = await this.resolveWorkspace(prDetails.baseBranch);
 
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
@@ -483,6 +489,21 @@ export class ReviewEngine {
     );
     this.log(`Found ${existingComments.length} existing bot comments`);
     return existingComments;
+  }
+
+  /**
+   * Returns the path to the repository workspace for CLI agent access.
+   * Uses a pre-existing local checkout when available (e.g. in CI), otherwise
+   * clones the repository to a local temp directory.
+   */
+  private async resolveWorkspace(branch: string): Promise<string> {
+    const localPath = this.options.localWorkspacePath;
+    if (localPath) {
+      this.log(`📦 Using CI workspace: ${localPath}`);
+      this.logger.info({ localPath }, "Using pre-existing CI workspace, skipping clone");
+      return localPath;
+    }
+    return this.ensureRepoCloned(branch);
   }
 
   /**

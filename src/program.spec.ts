@@ -474,6 +474,7 @@ describe("CLI", () => {
         GITHUB_TOKEN: "gha-token",
         GITHUB_REPOSITORY: "myorg/myrepo",
         GITHUB_REF: "refs/pull/7/merge",
+        GITHUB_WORKSPACE: "/home/runner/work/myrepo/myrepo",
       };
 
       const azureEnv = {
@@ -483,6 +484,7 @@ describe("CLI", () => {
         SYSTEM_TEAMPROJECT: "myproject",
         BUILD_REPOSITORY_NAME: "myrepo",
         SYSTEM_PULLREQUEST_PULLREQUESTID: "7",
+        BUILD_SOURCESDIRECTORY: "/home/vsts/work/1/s",
       };
 
       it("detects GitHub Actions and resolves PR from GITHUB_REF", async () => {
@@ -545,6 +547,19 @@ describe("CLI", () => {
 
         await expect(executeReview(options, { env: createStubEnv({}) })).rejects.toThrow(
           "--ci flag was set but no supported CI environment was detected"
+        );
+      });
+
+      it("passes CI workspace path through to engine options", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined });
+
+        await executeReview(options, { env: createStubEnv(githubEnv) });
+
+        expect(ReviewEngine).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.any(String),
+          expect.any(String),
+          expect.objectContaining({ localWorkspacePath: "/home/runner/work/myrepo/myrepo" })
         );
       });
 

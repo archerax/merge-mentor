@@ -56,6 +56,12 @@ export interface ReviewOptions {
   cursorTimeout?: number;
   // Comment filtering
   skipExistingIssues?: string;
+  /**
+   * Path to a pre-existing local repository workspace.
+   * Automatically set in CI mode from GITHUB_WORKSPACE / BUILD_SOURCESDIRECTORY.
+   * When set, the engine skips cloning and uses this directory directly.
+   */
+  localWorkspacePath?: string;
 }
 
 interface ReviewExecutionResult {
@@ -80,6 +86,7 @@ function mergeCIContext(options: ReviewOptions, ci: CIContext): ReviewOptions {
     pr: options.pr ?? ci.prNumber,
     platform: options.platform ?? ci.platform,
     write: options.write ?? true,
+    localWorkspacePath: options.localWorkspacePath ?? ci.workspacePath,
     githubToken: options.githubToken ?? ci.githubToken,
     githubRepoOwner: options.githubRepoOwner ?? ci.githubOwner,
     githubRepoName: options.githubRepoName ?? ci.githubRepo,
@@ -241,6 +248,7 @@ export async function executeReview(
     streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
     tempPath: config.tempPath,
+    localWorkspacePath: resolvedOptions.localWorkspacePath,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
