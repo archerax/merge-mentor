@@ -153,7 +153,10 @@ export class ReviewEngine {
     const providerOptions = {
       model,
       timeoutMs,
-      token: resolvedProviderType === "copilot" ? resolvedOptions?.copilotToken : undefined,
+      token:
+        resolvedProviderType === "copilot" || resolvedProviderType === "copilot-sdk"
+          ? resolvedOptions?.copilotToken
+          : undefined,
       tempPath,
     };
 

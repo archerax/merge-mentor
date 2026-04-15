@@ -11,7 +11,7 @@ pnpm check            # Build + test + lint
 
 ## Project Structure
 
-- `src/ai/` – AI provider abstraction (Copilot, OpenCode, Cursor)
+- `src/ai/` – AI provider abstraction (Copilot, OpenCode)
 - `src/platforms/` – GitHub & Azure DevOps adapters
 - `src/review/` – Review engine, comment management, deduplication
 - `src/audit/` – Audit logging for security/compliance

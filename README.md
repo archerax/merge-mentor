@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI, OpenCode CLI, and Cursor CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI and OpenCode CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -26,16 +26,13 @@ merge-mentor review --pr 123 --write
 # Use OpenCode CLI instead of Copilot
 merge-mentor review --pr 123 --provider opencode --write
 
-# Use Cursor CLI
-merge-mentor review --pr 123 --provider cursor --write
-
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
 ```
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI, OpenCode CLI, and Cursor CLI
+- **Multi-Provider Support** - Works with GitHub Copilot CLI and OpenCode CLI
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Specialist Review Types** - Focused reviews for testing, security, or performance concerns
@@ -55,18 +52,12 @@ npx merge-mentor review --pr 123
 - **AI CLI Tool** - At least one must be installed and accessible in PATH:
   - **GitHub Copilot CLI** (default):
     ```bash
-    npm install -g @githubnext/github-copilot-cli
+    npm install -g @github/copilot
     ```
   - **OpenCode CLI**:
     ```bash
     # Install OpenCode CLI (follow official instructions)
     # https://opencode.dev
-    ```
-  - **Cursor CLI**:
-    ```bash
-    # Install Cursor CLI
-    curl https://cursor.com/install -fsS | bash
-    # Ensure cursor-agent is in your PATH
     ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
@@ -158,7 +149,7 @@ set MM_PLATFORM=azure
 **Linux/macOS:**
 
 ```bash
-# Select AI provider (copilot, opencode, or cursor)
+# Select AI provider (copilot or opencode)
 export MM_AI_PROVIDER=copilot
 
 # Copilot-specific settings
@@ -168,10 +159,6 @@ export MM_COPILOT_TIMEOUT=180000
 # OpenCode-specific settings (when using --provider opencode)
 export MM_OPENCODE_MODEL=claude-sonnet-4.6
 export MM_OPENCODE_TIMEOUT=180000
-
-# Cursor-specific settings (when using --provider cursor)
-export MM_CURSOR_MODEL=claude-sonnet-4.6
-export MM_CURSOR_TIMEOUT=180000
 
 ```
 
@@ -188,10 +175,6 @@ $env:MM_COPILOT_TIMEOUT="180000"
 # OpenCode settings
 $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 $env:MM_OPENCODE_TIMEOUT="180000"
-
-# Cursor settings
-$env:MM_CURSOR_MODEL="claude-sonnet-4.6"
-$env:MM_CURSOR_TIMEOUT="180000"
 
 **Or use command-line parameters:**
 ```bash
@@ -352,11 +335,6 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 
 - Check OpenCode documentation for supported models
 
-**Cursor CLI**: Configure via `MM_CURSOR_MODEL` environment variable or `--cursor-model` CLI parameter.
-
-- Supports multiple AI models (claude-sonnet-4.6, claude-haiku-4.5, claude-sonnet-4.5, claude-opus-4.5)
-- Check Cursor CLI documentation for latest supported models
-
 ## Usage
 
 ```bash
@@ -368,9 +346,6 @@ merge-mentor review --pr 123 --write
 
 # Use OpenCode CLI instead of Copilot
 merge-mentor review --pr 123 --provider opencode --write
-
-# Use Cursor CLI
-merge-mentor review --pr 123 --provider cursor --write
 
 # Azure DevOps
 merge-mentor review --pr 456 --platform azure --write
@@ -450,7 +425,7 @@ merge-mentor review --pr 123 --review-type testing --write
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|opencode\|cursor>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--provider <copilot\|opencode>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
 | `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
@@ -476,12 +451,12 @@ merge-mentor review --pr 123 --review-type testing --write
 **AI Provider Configuration:**
 | Option | Description | Env Variable |
 |--------|-------------|--------------|
+| `--copilot-token <token>` | GitHub token for Copilot CLI/SDK auth (CI use) | `MM_COPILOT_TOKEN` |
 | `--copilot-model <model>` | Copilot model name | `MM_COPILOT_MODEL` |
 | `--copilot-timeout <ms>` | Copilot timeout in ms | `MM_COPILOT_TIMEOUT` |
 | `--opencode-model <model>` | OpenCode model name | `MM_OPENCODE_MODEL` |
 | `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
-| `--cursor-model <model>` | Cursor model name | `MM_CURSOR_MODEL` |
-| `--cursor-timeout <ms>` | Cursor timeout in ms | `MM_CURSOR_TIMEOUT` |
+
 
 **Comment Filtering:**
 | Option | Description | Env Variable | Default |
@@ -922,7 +897,6 @@ Increase timeout for large PRs:
 ```bash
 export MM_COPILOT_TIMEOUT=300000  # 5 minutes (for Copilot)
 export MM_OPENCODE_TIMEOUT=300000  # 5 minutes (for OpenCode)
-export MM_CURSOR_TIMEOUT=300000  # 5 minutes (for Cursor)
 ```
 
 ### Exit Codes
