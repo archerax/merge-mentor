@@ -463,6 +463,104 @@ describe("CLI", () => {
         'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".'
       );
     });
+
+    describe("CI mode", () => {
+      function createStubEnv(vars: Record<string, string>) {
+        return { get: (key: string) => vars[key] };
+      }
+
+      const githubEnv = {
+        GITHUB_ACTIONS: "true",
+        GITHUB_TOKEN: "gha-token",
+        GITHUB_REPOSITORY: "myorg/myrepo",
+        GITHUB_REF: "refs/pull/7/merge",
+      };
+
+      const azureEnv = {
+        TF_BUILD: "True",
+        SYSTEM_ACCESSTOKEN: "build-service-token",
+        SYSTEM_TEAMFOUNDATIONCOLLECTIONURI: "https://dev.azure.com/myorg/",
+        SYSTEM_TEAMPROJECT: "myproject",
+        BUILD_REPOSITORY_NAME: "myrepo",
+        SYSTEM_PULLREQUEST_PULLREQUESTID: "7",
+      };
+
+      it("detects GitHub Actions and resolves PR from GITHUB_REF", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined });
+
+        await executeReview(options, { env: createStubEnv(githubEnv) });
+
+        expect(loadConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ githubToken: "gha-token" })
+        );
+      });
+
+      it("defaults write to true in CI mode", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined, write: undefined });
+
+        await executeReview(options, { env: createStubEnv(githubEnv) });
+
+        expect(ReviewEngine).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.any(String),
+          expect.any(String),
+          expect.objectContaining({ dryRun: false })
+        );
+      });
+
+      it("respects explicit --no-write in CI mode", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined, write: false });
+
+        await executeReview(options, { env: createStubEnv(githubEnv) });
+
+        expect(ReviewEngine).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.any(String),
+          expect.any(String),
+          expect.objectContaining({ dryRun: true })
+        );
+      });
+
+      it("MM_AZURE_TOKEN takes priority over SYSTEM_ACCESSTOKEN", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined, platform: "azure" });
+        const env = createStubEnv({ ...azureEnv, MM_AZURE_TOKEN: "my-pat" });
+
+        await executeReview(options, { env });
+
+        expect(loadConfig).toHaveBeenCalledWith(expect.objectContaining({ azureToken: "my-pat" }));
+      });
+
+      it("falls back to SYSTEM_ACCESSTOKEN when MM_AZURE_TOKEN is not set", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined, platform: "azure" });
+
+        await executeReview(options, { env: createStubEnv(azureEnv) });
+
+        expect(loadConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ azureToken: "build-service-token" })
+        );
+      });
+
+      it("throws when --ci is set but no CI environment is detected", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined });
+
+        await expect(executeReview(options, { env: createStubEnv({}) })).rejects.toThrow(
+          "--ci flag was set but no supported CI environment was detected"
+        );
+      });
+
+      it("throws when CI is detected but PR number cannot be resolved", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined });
+        const env = createStubEnv({
+          GITHUB_ACTIONS: "true",
+          GITHUB_TOKEN: "t",
+          GITHUB_REPOSITORY: "o/r",
+        });
+
+        await expect(executeReview(options, { env })).rejects.toThrow(
+          "could not determine PR number"
+        );
+      });
+    });
   });
 
   describe("displayResults", () => {

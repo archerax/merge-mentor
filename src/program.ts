@@ -112,7 +112,16 @@ export async function executeReview(
       );
     }
     output.log(`\n🤖 CI mode: detected ${ciContext.ciSystem}\n`);
-    resolvedOptions = mergeCIContext(options, ciContext);
+
+    // Pre-load MM_* token overrides from env so they take priority over
+    // CI-detected tokens (e.g. SYSTEM_ACCESSTOKEN may lack permission to
+    // post PR comments; users can supply a PAT via MM_AZURE_TOKEN instead).
+    const optionsWithEnvTokens: ReviewOptions = {
+      ...options,
+      azureToken: options.azureToken ?? (env.get("MM_AZURE_TOKEN") || undefined),
+      githubToken: options.githubToken ?? (env.get("MM_GITHUB_TOKEN") || undefined),
+    };
+    resolvedOptions = mergeCIContext(optionsWithEnvTokens, ciContext);
   }
 
   if (resolvedOptions.pr === undefined) {

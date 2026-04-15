@@ -822,6 +822,18 @@ steps:
 `--ci` automatically reads `SYSTEM_ACCESSTOKEN`, the collection URI (for org), `SYSTEM_TEAMPROJECT`, `BUILD_REPOSITORY_NAME`, and `SYSTEM_PULLREQUEST_PULLREQUESTID` from the Azure Pipelines environment.
 
 > **Note:** `SYSTEM_ACCESSTOKEN` must be explicitly mapped in the pipeline step via the `env` block as shown above.
+>
+> **Permissions:** The Build Service account typically has Reader-only access and **cannot post PR comments** by default. In most organisations you'll need to provide a PAT (Personal Access Token) with _Code (Read)_ and _Pull Request Threads (Read & Write)_ scopes instead:
+>
+> ```yaml
+>   - script: npx merge-mentor review --ci
+>     displayName: Run Review
+>     env:
+>       SYSTEM_ACCESSTOKEN: $(System.AccessToken)   # used for repo/PR metadata
+>       MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT)          # PAT with PR comment permission
+> ```
+>
+> `MM_AZURE_TOKEN` takes priority over `SYSTEM_ACCESSTOKEN` when set. Store your PAT as a pipeline secret variable named `MERGE_MENTOR_PAT` (or any name you prefer) in the pipeline library or variable group.
 
 ### Overriding CI-detected values
 
