@@ -82,4 +82,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to npm
-        run: npm publish
+        run: npm publish merge-mentor-${{ steps.version.outputs.VERSION }}.tgz --use-oidc
+
