@@ -499,6 +499,14 @@ export class ReviewEngine {
   private async resolveWorkspace(branch: string): Promise<string> {
     const localPath = this.options.localWorkspacePath;
     if (localPath) {
+      try {
+        await this.fileSystem.access(localPath);
+      } catch {
+        throw new Error(
+          `CI workspace path does not exist or is not accessible: ${localPath}. ` +
+            "Ensure the repository has been checked out before running merge-mentor."
+        );
+      }
       this.log(`📦 Using CI workspace: ${localPath}`);
       this.logger.info({ localPath }, "Using pre-existing CI workspace, skipping clone");
       return localPath;

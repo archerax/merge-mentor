@@ -42,9 +42,9 @@ export function resolveAzurePipelinesContext(env: Environment): CIContext | null
   }
 
   const prIdRaw = env.get("SYSTEM_PULLREQUEST_PULLREQUESTID");
-  const prNumber = prIdRaw ? Number.parseInt(prIdRaw, 10) : undefined;
+  const prNumber = prIdRaw !== undefined ? Number.parseInt(prIdRaw, 10) : undefined;
 
-  if (!prNumber || Number.isNaN(prNumber)) {
+  if (prNumber === undefined || Number.isNaN(prNumber) || prNumber < 1) {
     throw new Error(
       "Azure Pipelines CI detected but could not determine PR number. " +
         "Ensure the pipeline is triggered by a pull request, or pass --pr explicitly."

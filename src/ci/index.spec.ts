@@ -135,6 +135,31 @@ describe("resolveGitHubActionsContext", () => {
     expect(ctx?.githubRepo).toBe("widget");
   });
 
+  test("falls back to GITHUB_REPOSITORY_OWNER when GITHUB_REPOSITORY has no slash", () => {
+    const env = createStubEnvironment({
+      GITHUB_ACTIONS: "true",
+      GITHUB_TOKEN: "gh-token",
+      GITHUB_REF: "refs/pull/42/merge",
+      GITHUB_REPOSITORY_OWNER: "fallback-org",
+    });
+    const ctx = resolveGitHubActionsContext(env);
+    expect(ctx?.githubOwner).toBe("fallback-org");
+    expect(ctx?.githubRepo).toBeUndefined();
+  });
+
+  test("falls back to GITHUB_REPOSITORY_OWNER when GITHUB_REPOSITORY has leading slash", () => {
+    const env = createStubEnvironment({
+      GITHUB_ACTIONS: "true",
+      GITHUB_TOKEN: "gh-token",
+      GITHUB_REF: "refs/pull/42/merge",
+      GITHUB_REPOSITORY: "/myrepo",
+      GITHUB_REPOSITORY_OWNER: "fallback-org",
+    });
+    const ctx = resolveGitHubActionsContext(env);
+    expect(ctx?.githubOwner).toBe("fallback-org");
+    expect(ctx?.githubRepo).toBe("myrepo");
+  });
+
   test("populates token from GITHUB_TOKEN", () => {
     const env = makeGitHubEnv({ GITHUB_TOKEN: "secret-token" });
     const ctx = resolveGitHubActionsContext(env);
@@ -188,6 +213,16 @@ describe("resolveAzurePipelinesContext", () => {
 
   test("throws when SYSTEM_PULLREQUEST_PULLREQUESTID is not a valid number", () => {
     const env = makeAzureEnv({ SYSTEM_PULLREQUEST_PULLREQUESTID: "not-a-number" });
+    expect(() => resolveAzurePipelinesContext(env)).toThrow("could not determine PR number");
+  });
+
+  test("throws when SYSTEM_PULLREQUEST_PULLREQUESTID is 0", () => {
+    const env = makeAzureEnv({ SYSTEM_PULLREQUEST_PULLREQUESTID: "0" });
+    expect(() => resolveAzurePipelinesContext(env)).toThrow("could not determine PR number");
+  });
+
+  test("throws when SYSTEM_PULLREQUEST_PULLREQUESTID is negative", () => {
+    const env = makeAzureEnv({ SYSTEM_PULLREQUEST_PULLREQUESTID: "-1" });
     expect(() => resolveAzurePipelinesContext(env)).toThrow("could not determine PR number");
   });
 

@@ -181,6 +181,47 @@ describe("ReviewEngine", () => {
     });
   });
 
+  describe("workspace resolution", () => {
+    it("uses localWorkspacePath directly when provided and accessible", async () => {
+      const prDetails = createPRDetails();
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const { nodeFs } = await import("../ports/index.js");
+      vi.mocked(nodeFs.access).mockResolvedValue(undefined);
+
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false,
+        localWorkspacePath: "/preexisting/checkout",
+      });
+
+      await engine.reviewPR(123);
+
+      expect(nodeFs.access).toHaveBeenCalledWith("/preexisting/checkout");
+      expect(mockEnsureRepo).not.toHaveBeenCalled();
+    });
+
+    it("throws a clear error when localWorkspacePath does not exist", async () => {
+      const prDetails = createPRDetails();
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const { nodeFs } = await import("../ports/index.js");
+      vi.mocked(nodeFs.access).mockRejectedValue(new Error("ENOENT"));
+
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false,
+        localWorkspacePath: "/nonexistent/path",
+      });
+
+      await expect(engine.reviewPR(123)).rejects.toThrow(
+        "CI workspace path does not exist or is not accessible: /nonexistent/path"
+      );
+    });
+  });
+
   describe("reviewPR", () => {
     it("throws ValidationError for negative PR number", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]");

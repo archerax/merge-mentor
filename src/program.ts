@@ -605,6 +605,10 @@ program
       return parsed;
     }
   )
+  .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
   .action(async (options: ReviewOptions) => {
     try {
       if (!options.ci && options.pr === undefined) {

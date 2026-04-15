@@ -66,9 +66,15 @@ export function resolveGitHubActionsContext(
   }
 
   const repository = env.get("GITHUB_REPOSITORY") ?? "";
-  const [githubOwner, githubRepo] = repository.includes("/")
-    ? (repository.split("/", 2) as [string, string])
-    : [env.get("GITHUB_REPOSITORY_OWNER"), undefined];
+  let githubOwner: string | undefined;
+  let githubRepo: string | undefined;
+  if (repository.includes("/")) {
+    const parts = repository.split("/", 2);
+    githubOwner = parts[0] || env.get("GITHUB_REPOSITORY_OWNER");
+    githubRepo = parts[1] || undefined;
+  } else {
+    githubOwner = env.get("GITHUB_REPOSITORY_OWNER");
+  }
 
   return {
     ciSystem: "github-actions",

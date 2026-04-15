@@ -780,6 +780,8 @@ jobs:
     permissions:
       pull-requests: write  # Required to post comments
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -829,11 +831,10 @@ steps:
 >   - script: npx merge-mentor review --ci
 >     displayName: Run Review
 >     env:
->       SYSTEM_ACCESSTOKEN: $(System.AccessToken)   # used for repo/PR metadata
->       MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT)          # PAT with PR comment permission
+>       MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT)   # PAT with PR comment permission
 > ```
 >
-> `MM_AZURE_TOKEN` takes priority over `SYSTEM_ACCESSTOKEN` when set. Store your PAT as a pipeline secret variable named `MERGE_MENTOR_PAT` (or any name you prefer) in the pipeline library or variable group.
+> When `MM_AZURE_TOKEN` is set, `SYSTEM_ACCESSTOKEN` is not required. Store your PAT as a pipeline secret variable named `MERGE_MENTOR_PAT` (or any name you prefer) in the pipeline library or variable group.
 
 ### Overriding CI-detected values
 
@@ -848,6 +849,9 @@ merge-mentor review --ci --pr 42
 
 # Dry-run in CI (preview without posting)
 merge-mentor review --ci --no-write
+
+# Use a specific local checkout instead of the CI-detected workspace
+merge-mentor review --ci --local-workspace-path /custom/checkout/path
 ```
 
 ### Manual setup (without --ci)
