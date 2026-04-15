@@ -764,6 +764,8 @@ Only analyzes changed files on re-reviews, saving time and cost. Cache stored in
 
 ## CI/CD Integration
 
+Use the `--ci` flag to automatically detect the CI environment and pick up the PR number, repository, and token from well-known environment variables. This is the recommended approach — no manual wiring of PR numbers or repo details needed.
+
 ### GitHub Actions
 
 ```yaml
@@ -775,6 +777,8 @@ on:
 jobs:
   review:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # Required to post comments
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -784,12 +788,12 @@ jobs:
         run: npm install -g @githubnext/github-copilot-cli
 
       - name: Run Review
+        run: npx merge-mentor review --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO_OWNER: ${{ github.repository_owner }}
-          GITHUB_REPO_NAME: ${{ github.event.repository.name }}
-        run: npx merge-mentor review --pr ${{ github.event.pull_request.number }} --write
 ```
+
+`--ci` automatically reads `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, and the PR number from the GitHub Actions environment. `--write` defaults to `true` in CI mode so comments are posted to the PR.
 
 ### Azure Pipelines
 
@@ -809,17 +813,48 @@ steps:
   - script: npm install -g @githubnext/github-copilot-cli
     displayName: Install Copilot CLI
 
-  - script: |
-      npx merge-mentor review \
-        --pr $(System.PullRequest.PullRequestId) \
-        --platform azure \
-        --write
+  - script: npx merge-mentor review --ci
     displayName: Run Review
     env:
-      MM_AZURE_TOKEN: $(AZURE_DEVOPS_TOKEN)
-      MM_AZURE_ORG: $(System.TeamFoundationCollectionUri)
-      MM_AZURE_PROJECT: $(System.TeamProject)
-      MM_AZURE_REPO: $(Build.Repository.Name)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+```
+
+`--ci` automatically reads `SYSTEM_ACCESSTOKEN`, the collection URI (for org), `SYSTEM_TEAMPROJECT`, `BUILD_REPOSITORY_NAME`, and `SYSTEM_PULLREQUEST_PULLREQUESTID` from the Azure Pipelines environment.
+
+> **Note:** `SYSTEM_ACCESSTOKEN` must be explicitly mapped in the pipeline step via the `env` block as shown above.
+
+### Overriding CI-detected values
+
+Explicit flags always take priority over CI-detected values, so you can still override individual options:
+
+```bash
+# Use a different AI provider, but let CI handle the rest
+merge-mentor review --ci --provider copilot-sdk
+
+# Override the PR number (e.g. for testing)
+merge-mentor review --ci --pr 42
+
+# Dry-run in CI (preview without posting)
+merge-mentor review --ci --no-write
+```
+
+### Manual setup (without --ci)
+
+You can still provide all values explicitly via environment variables or CLI flags if preferred:
+
+```bash
+# GitHub Actions (manual)
+npx merge-mentor review \
+  --pr ${{ github.event.pull_request.number }} \
+  --write
+# with env: MM_GITHUB_TOKEN, MM_GITHUB_REPO_OWNER, MM_GITHUB_REPO_NAME
+
+# Azure Pipelines (manual)
+npx merge-mentor review \
+  --pr $(System.PullRequest.PullRequestId) \
+  --platform azure \
+  --write
+# with env: MM_AZURE_TOKEN, MM_AZURE_ORG, MM_AZURE_PROJECT, MM_AZURE_REPO
 ```
 
 ## Logging

@@ -149,6 +149,16 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
   };
 }
 
+function createReviewOptions(overrides: Partial<ReviewOptions> = {}): ReviewOptions {
+  return {
+    pr: 42,
+    ci: false,
+    write: false,
+    verbose: true,
+    ...overrides,
+  };
+}
+
 describe("CLI", () => {
   let _consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -166,11 +176,10 @@ describe("CLI", () => {
 
   describe("executeReview", () => {
     it("executes review with default GitHub platform in dry-run mode", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
-      };
+      });
 
       const result = await executeReview(options);
 
@@ -197,12 +206,11 @@ describe("CLI", () => {
     });
 
     it("executes review with Azure platform", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         platform: "azure",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -212,11 +220,10 @@ describe("CLI", () => {
     });
 
     it("executes review in write mode", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: true,
         verbose: false,
-      };
+      });
 
       await executeReview(options);
 
@@ -238,11 +245,10 @@ describe("CLI", () => {
         createMockConfig({ defaultPlatform: "azure" as const })
       );
 
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -252,12 +258,11 @@ describe("CLI", () => {
     });
 
     it("throws error for invalid platform", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         platform: "invalid",
         write: false,
         verbose: true,
-      };
+      });
 
       await expect(executeReview(options)).rejects.toThrow(
         'Invalid platform "invalid". Must be "github" or "azure".'
@@ -265,12 +270,11 @@ describe("CLI", () => {
     });
 
     it("validates configuration for selected platform", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         platform: "github",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -278,12 +282,11 @@ describe("CLI", () => {
     });
 
     it("creates GitHub adapter when platform is github", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         platform: "github",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -291,12 +294,11 @@ describe("CLI", () => {
     });
 
     it("creates Azure adapter when platform is azure", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         platform: "azure",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -304,11 +306,10 @@ describe("CLI", () => {
     });
 
     it("logs starting message with dry-run label", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -319,11 +320,10 @@ describe("CLI", () => {
     });
 
     it("logs starting message without dry-run label in write mode", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: true,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -337,12 +337,11 @@ describe("CLI", () => {
     });
 
     it("passes --runs option to ReviewEngine", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
         runs: 3,
-      };
+      });
 
       await executeReview(options);
 
@@ -359,11 +358,10 @@ describe("CLI", () => {
     it("uses config default for runs when --runs not specified", async () => {
       vi.mocked(loadConfig).mockReturnValue(createMockConfig({ reviewRuns: 2 }));
 
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -383,11 +381,10 @@ describe("CLI", () => {
       });
       vi.mocked(loadConfig).mockReturnValue(customConfig);
 
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -409,12 +406,11 @@ describe("CLI", () => {
         })
       );
 
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         provider: "opencode",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -437,12 +433,11 @@ describe("CLI", () => {
         })
       );
 
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         provider: "cursor",
         write: false,
         verbose: true,
-      };
+      });
 
       await executeReview(options);
 
@@ -458,12 +453,11 @@ describe("CLI", () => {
     });
 
     it("throws error for invalid provider", async () => {
-      const options: ReviewOptions = {
-        pr: 42,
+      const options = createReviewOptions({
         provider: "invalid",
         write: false,
         verbose: true,
-      };
+      });
 
       await expect(executeReview(options)).rejects.toThrow(
         'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".'

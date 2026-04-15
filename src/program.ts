@@ -3,6 +3,7 @@ import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs
 import { join } from "node:path";
 import { Command } from "commander";
 import type { AIProviderType } from "./ai/types.js";
+import { type CIContext, detectCIEnvironment } from "./ci/index.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "./constants.js";
 import { initLogger, logger } from "./logger.js";
@@ -19,10 +20,11 @@ import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
 
 export interface ReviewOptions {
-  pr: number;
+  pr?: number;
+  ci: boolean;
   platform?: string;
   provider?: string;
-  write: boolean;
+  write?: boolean;
   verbose: boolean;
   runs?: number;
   reviewType?: string;
@@ -68,6 +70,27 @@ interface ProgramDeps {
 }
 
 /**
+ * Merges a resolved CI context into review options.
+ * Explicit CLI flags always take priority over CI-detected values.
+ * In CI mode, `write` defaults to `true` (post comments) unless explicitly overridden.
+ */
+function mergeCIContext(options: ReviewOptions, ci: CIContext): ReviewOptions {
+  return {
+    ...options,
+    pr: options.pr ?? ci.prNumber,
+    platform: options.platform ?? ci.platform,
+    write: options.write ?? true,
+    githubToken: options.githubToken ?? ci.githubToken,
+    githubRepoOwner: options.githubRepoOwner ?? ci.githubOwner,
+    githubRepoName: options.githubRepoName ?? ci.githubRepo,
+    azureToken: options.azureToken ?? ci.azureToken,
+    azureOrg: options.azureOrg ?? ci.azureOrg,
+    azureProject: options.azureProject ?? ci.azureProject,
+    azureRepo: options.azureRepo ?? ci.azureRepo,
+  };
+}
+
+/**
  * Execute the review command logic.
  * Extracted for testability.
  */
@@ -76,49 +99,74 @@ export async function executeReview(
   deps: ProgramDeps = {}
 ): Promise<ReviewExecutionResult> {
   const output = deps.output ?? consoleOutputWriter;
+  const env = deps.env ?? processEnvironment;
+
+  // Resolve CI context when --ci flag is set
+  let resolvedOptions = options;
+  if (options.ci) {
+    const ciContext = detectCIEnvironment(env);
+    if (!ciContext) {
+      throw new Error(
+        "--ci flag was set but no supported CI environment was detected. " +
+          "Expected GITHUB_ACTIONS=true (GitHub Actions) or TF_BUILD=True (Azure Pipelines)."
+      );
+    }
+    output.log(`\n🤖 CI mode: detected ${ciContext.ciSystem}\n`);
+    resolvedOptions = mergeCIContext(options, ciContext);
+  }
+
+  if (resolvedOptions.pr === undefined) {
+    throw new Error(
+      "PR number is required. Pass --pr <number> or use --ci in a supported CI environment."
+    );
+  }
+
+  const pr = resolvedOptions.pr;
+
   logger.info(
     {
-      pr: options.pr,
-      platform: options.platform,
-      provider: options.provider,
-      write: options.write,
+      pr,
+      platform: resolvedOptions.platform,
+      provider: resolvedOptions.provider,
+      write: resolvedOptions.write,
+      ci: resolvedOptions.ci,
     },
     "Review command initiated"
   );
 
   const config = loadConfig({
-    platform: options.platform,
-    githubToken: options.githubToken,
-    githubRepoOwner: options.githubRepoOwner,
-    githubRepoName: options.githubRepoName,
-    azureToken: options.azureToken,
-    azureOrg: options.azureOrg,
-    azureProject: options.azureProject,
-    azureRepo: options.azureRepo,
-    commentIdentifier: options.commentIdentifier,
-    tempPath: options.tempPath,
-    aiProvider: options.provider,
-    copilotModel: options.copilotModel,
-    copilotTimeout: options.copilotTimeout,
-    copilotSdkModel: options.copilotSdkModel,
-    copilotSdkTimeout: options.copilotSdkTimeout,
-    opencodeModel: options.opencodeModel,
-    opencodeTimeout: options.opencodeTimeout,
-    opencodeSdkModel: options.opencodeSdkModel,
-    opencodeSdkTimeout: options.opencodeSdkTimeout,
-    cursorModel: options.cursorModel,
-    cursorTimeout: options.cursorTimeout,
-    skipExistingIssues: options.skipExistingIssues,
-    reviewRuns: options.runs,
-    reviewType: options.reviewType,
-    streamingEnabled: options.stream !== false ? undefined : false,
-    streamingLines: options.streamLines,
+    platform: resolvedOptions.platform,
+    githubToken: resolvedOptions.githubToken,
+    githubRepoOwner: resolvedOptions.githubRepoOwner,
+    githubRepoName: resolvedOptions.githubRepoName,
+    azureToken: resolvedOptions.azureToken,
+    azureOrg: resolvedOptions.azureOrg,
+    azureProject: resolvedOptions.azureProject,
+    azureRepo: resolvedOptions.azureRepo,
+    commentIdentifier: resolvedOptions.commentIdentifier,
+    tempPath: resolvedOptions.tempPath,
+    aiProvider: resolvedOptions.provider,
+    copilotModel: resolvedOptions.copilotModel,
+    copilotTimeout: resolvedOptions.copilotTimeout,
+    copilotSdkModel: resolvedOptions.copilotSdkModel,
+    copilotSdkTimeout: resolvedOptions.copilotSdkTimeout,
+    opencodeModel: resolvedOptions.opencodeModel,
+    opencodeTimeout: resolvedOptions.opencodeTimeout,
+    opencodeSdkModel: resolvedOptions.opencodeSdkModel,
+    opencodeSdkTimeout: resolvedOptions.opencodeSdkTimeout,
+    cursorModel: resolvedOptions.cursorModel,
+    cursorTimeout: resolvedOptions.cursorTimeout,
+    skipExistingIssues: resolvedOptions.skipExistingIssues,
+    reviewRuns: resolvedOptions.runs,
+    reviewType: resolvedOptions.reviewType,
+    streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
+    streamingLines: resolvedOptions.streamLines,
   });
 
   // Initialize logger with configured temp path
   initLogger(config.tempPath);
 
-  const platform = (options.platform || config.defaultPlatform) as Platform;
+  const platform = (resolvedOptions.platform || config.defaultPlatform) as Platform;
 
   if (!["github", "azure"].includes(platform)) {
     logger.error({ platform }, "Invalid platform specified");
@@ -126,7 +174,7 @@ export async function executeReview(
   }
 
   // Validate and resolve AI provider
-  const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
+  const aiProvider = (resolvedOptions.provider || config.aiProvider) as AIProviderType;
   if (!["copilot", "copilot-sdk", "opencode", "opencode-sdk", "cursor"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
@@ -143,8 +191,8 @@ export async function executeReview(
     adapter = new AzureDevOpsAdapter(config);
   }
 
-  const dryRun = !options.write;
-  const reviewRuns = options.runs ?? config.reviewRuns;
+  const dryRun = !resolvedOptions.write;
+  const reviewRuns = resolvedOptions.runs ?? config.reviewRuns;
 
   // Select provider-specific model and timeout
   let aiModel: string | undefined;
@@ -174,25 +222,25 @@ export async function executeReview(
 
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun,
-    verbose: options.verbose,
+    verbose: resolvedOptions.verbose,
     aiModel,
     aiTimeoutMs,
     copilotToken: config.copilotToken,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
-    reviewType: options.reviewType ?? config.reviewType,
-    streamingEnabled: options.stream !== false && config.streamingEnabled,
-    streamingLines: options.streamLines ?? config.streamingLines,
+    reviewType: resolvedOptions.reviewType ?? config.reviewType,
+    streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
+    streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
     tempPath: config.tempPath,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
   const providerLabel = `[${aiProvider}]`;
   output.log(
-    `\n🔍 Starting code review for PR #${options.pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
+    `\n🔍 Starting code review for PR #${pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
   );
 
-  const result = await engine.reviewPR(options.pr);
+  const result = await engine.reviewPR(pr);
   return { result, adapter, platform };
 }
 
@@ -462,13 +510,18 @@ program
 program
   .command("review")
   .description("Review a pull request")
-  .requiredOption("--pr <number>", "Pull request number", parseInt)
+  .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
+  .option(
+    "--ci",
+    "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
+    false
+  )
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
   .option(
     "--provider <provider>",
     "AI provider (copilot, copilot-sdk, opencode, opencode-sdk, or cursor). Env: MM_AI_PROVIDER"
   )
-  .option("--write", "Post comments to PR (default is dry-run mode)", false)
+  .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
   .option("--verbose", "Enable verbose output", true)
   .option("--runs <number>", "Number of review runs (1-5). Env: MM_REVIEW_RUNS", (value) => {
     const parsed = Number.parseInt(value, 10);
@@ -537,6 +590,15 @@ program
   )
   .action(async (options: ReviewOptions) => {
     try {
+      if (!options.ci && options.pr === undefined) {
+        consoleOutputWriter.error(
+          "\n❌ Error: --pr <number> is required, or use --ci to auto-detect in a CI environment.\n"
+        );
+        process.exit(1);
+      }
+
+      const { result, adapter, platform } = await executeReview(options);
+
       const config = loadConfig({
         platform: options.platform,
         githubToken: options.githubToken,
@@ -564,8 +626,6 @@ program
         reviewType: options.reviewType,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-
-      const { result, adapter, platform } = await executeReview(options);
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
       displayResults(
         result,
