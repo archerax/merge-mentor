@@ -106,6 +106,37 @@ describe("AI Prompts", () => {
       expect(prompt).toContain("Issue spans multiple files");
       expect(prompt).toContain("Issue is NEW to this PR");
     });
+
+    it("should include existing comments section when provided", () => {
+      const comments = "Reviewer noted a security issue on line 5";
+      const prompt = buildCrossFilePrompt(prDetails, filesSummary, [], comments);
+
+      expect(prompt).toContain("EXISTING PR COMMENTS:");
+      expect(prompt).toContain(comments);
+      expect(prompt).toContain("Focus on NEW system-level concerns not already covered");
+    });
+
+    it("should include repo context section when provided", () => {
+      const repoContext = "Always use TypeScript strict mode";
+      const prompt = buildCrossFilePrompt(prDetails, filesSummary, [], undefined, repoContext);
+
+      expect(prompt).toContain("# REPOSITORY-SPECIFIC GUIDELINES");
+      expect(prompt).toContain(repoContext);
+    });
+
+    it("should include workspace section when repoPath is provided", () => {
+      const prompt = buildCrossFilePrompt(
+        prDetails,
+        filesSummary,
+        [],
+        undefined,
+        undefined,
+        "/path/to/repo"
+      );
+
+      expect(prompt).toContain("# WORKSPACE ACCESS ENABLED");
+      expect(prompt).toContain("@workspace /search");
+    });
   });
 
   describe("buildFilesSummary", () => {
@@ -214,6 +245,32 @@ describe("AI Prompts", () => {
       expect(prompt).toContain("# WORKSPACE ACCESS ENABLED");
       expect(prompt).toContain("@workspace /search");
       expect(prompt).toContain("@file:");
+    });
+
+    it("should include existing comments section when provided", () => {
+      const existingComments = "Previously noted: missing null check on line 20";
+      const prompt = buildBatchedFileReviewPrompt(mockManifest, existingComments);
+
+      expect(prompt).toContain(existingComments);
+      expect(prompt).toContain("Do NOT flag issues already mentioned above");
+    });
+
+    it("should add rule 5 when existingCommentsContext is provided", () => {
+      const prompt = buildBatchedFileReviewPrompt(mockManifest, "some prior comment");
+
+      expect(prompt).toContain("5. AVOID duplicating issues in EXISTING COMMENTS above");
+    });
+
+    it("should omit rule 5 when no existingCommentsContext", () => {
+      const prompt = buildBatchedFileReviewPrompt(mockManifest);
+
+      expect(prompt).not.toContain("5. AVOID duplicating issues");
+    });
+
+    it("uses @file: syntax when repoPath is provided", () => {
+      const prompt = buildBatchedFileReviewPrompt(mockManifest, undefined, undefined, "/some/repo");
+
+      expect(prompt).toContain("@file:.mergementor/diffs/test.diff");
     });
   });
 });

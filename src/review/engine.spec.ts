@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, test, vi } from "vitest";
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
+import { createFixedClock } from "../ports/clock.test-helper.js";
+import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
+import { DiffStorage } from "./diffStorage.js";
 import { ReviewEngine } from "./engine.js";
 
 // Stub nodeFs so engine and DiffStorage never touch the real filesystem during tests
@@ -1204,5 +1207,87 @@ describe("ReviewEngine", () => {
       expect(result.commentErrors.length).toBeGreaterThan(0);
       expect(result.commentErrors[0]).toContain("API rate limit exceeded");
     });
+  });
+});
+
+describe("DiffStorage", () => {
+  it("logs warning when patch has too few lines (header-only patch)", async () => {
+    const fs = createStubFileSystem();
+    const clock = createFixedClock();
+    const storage = new DiffStorage("/tmp/test", fs, clock);
+    const shortPatch = "@@ -1,2 +1,2 @@\n- old\n+ new";
+
+    await storage.storeDiffs("pr-1", [
+      {
+        filename: "file.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: shortPatch,
+      },
+    ]);
+
+    // File was still written despite the short patch
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+
+  it("silently ignores ENOENT errors during cleanup", async () => {
+    const fs = createStubFileSystem({
+      rm: vi.fn().mockRejectedValue(Object.assign(new Error("not found"), { code: "ENOENT" })),
+    });
+    const storage = new DiffStorage("/base", fs);
+
+    await expect(storage.cleanup("pr-1")).resolves.toBeUndefined();
+  });
+
+  it("logs warning for non-ENOENT errors during cleanup", async () => {
+    const fs = createStubFileSystem({
+      rm: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("permission denied"), { code: "EACCES" })),
+    });
+    const storage = new DiffStorage("/base", fs);
+
+    await expect(storage.cleanup("pr-1")).resolves.toBeUndefined();
+  });
+
+  it("silently ignores ENOENT errors during cleanupAll", async () => {
+    const fs = createStubFileSystem({
+      rm: vi.fn().mockRejectedValue(Object.assign(new Error("not found"), { code: "ENOENT" })),
+    });
+    const storage = new DiffStorage("/base", fs);
+
+    await expect(storage.cleanupAll()).resolves.toBeUndefined();
+  });
+
+  it("logs warning for non-ENOENT errors during cleanupAll", async () => {
+    const fs = createStubFileSystem({
+      rm: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("permission denied"), { code: "EACCES" })),
+    });
+    const storage = new DiffStorage("/base", fs);
+
+    await expect(storage.cleanupAll()).resolves.toBeUndefined();
+  });
+
+  it("skips files without a patch", async () => {
+    const fs = createStubFileSystem();
+    const clock = createFixedClock();
+    const storage = new DiffStorage("/base", fs, clock);
+
+    await storage.storeDiffs("pr-2", [
+      { filename: "no-patch.ts", status: "modified", additions: 0, deletions: 0 },
+    ]);
+
+    // manifest written but no diff file for the patch-less file
+    const writeFileCalls = vi.mocked(fs.writeFile).mock.calls;
+    const manifestCall = writeFileCalls.find((args) =>
+      (args[0] as string).endsWith("manifest.json")
+    );
+    expect(manifestCall).toBeDefined();
+    if (!manifestCall) throw new Error("manifest not written");
+    const manifest = JSON.parse(manifestCall[1] as string) as { files: unknown[] };
+    expect(manifest.files).toHaveLength(0);
   });
 });

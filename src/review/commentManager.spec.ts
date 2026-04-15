@@ -499,5 +499,43 @@ describe("CommentManager", () => {
       const createActions = actions.filter((a) => a.type === "create" && a.path);
       expect(createActions).toHaveLength(0); // Should match by ID, not create duplicate
     });
+
+    it("skips already-matched comment in legacy fallback (covers alreadyMatched branch)", () => {
+      const manager = createCommentManager();
+      // Use a legacy-format comment (no finding-id marker) matching both findings
+      const legacyCommentBody =
+        "### 🐛 Bug Issue\n\n**Severity**: 🟠 High\n\n**Issue**: Test message\n\n---\n[AI Code Review Bot]";
+      const existingComments: ExistingComment[] = [
+        { id: 42, body: legacyCommentBody, path: "test.ts", line: 10 },
+      ];
+      // Two identical findings — second one will find the comment already matched
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({ line: 10, category: "bug", message: "Test message" }),
+            createFileFinding({ line: 10, category: "bug", message: "Test message" }),
+          ],
+        },
+      ];
+      const crossFileResult = createCrossFileResult();
+
+      const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
+
+      // First finding matches the legacy comment; second should create a new comment
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(1);
+    });
+  });
+
+  describe("formatInlineComment without filename", () => {
+    it("omits finding-id marker when no filename is provided", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ category: "bug", line: 5 });
+
+      const result = manager.formatInlineComment(finding);
+
+      expect(result).not.toContain("<!-- finding-id:");
+    });
   });
 });

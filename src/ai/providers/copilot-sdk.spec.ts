@@ -360,6 +360,21 @@ describe("CopilotSdkProvider", () => {
 
       expect(MockCopilotClient).toHaveBeenCalledTimes(2);
     });
+
+    it("resets cached client and retries when CopilotClient constructor throws", async () => {
+      const provider = createProvider(2);
+      // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with new
+      MockCopilotClient.mockImplementationOnce(function () {
+        throw new Error("client startup failed");
+      });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(MockCopilotClient).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("model and token config", () => {
@@ -684,6 +699,173 @@ describe("CopilotSdkProvider", () => {
 
       expect(result.fileResults).toHaveLength(0);
       expect(result.crossFileResult.findings).toHaveLength(0);
+    });
+  });
+
+  describe("validateReasoning warnings", () => {
+    it("still parses finding when reasoning is shorter than minimum length", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 5,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Issue",
+            suggestion: "Fix it",
+            reasoning: "Too short.", // < 50 chars triggers warn
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/test.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toBe("Too short.");
+    });
+
+    it("still parses finding when reasoning lacks verification keywords", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 10,
+            severity: "high",
+            confidence: "high",
+            category: "bug",
+            message: "Potential null dereference at this location in code",
+            suggestion: "Add a null check before accessing the property",
+            reasoning:
+              "This code path does not handle the case where the value could be null at runtime.",
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/test.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toContain("does not handle");
+    });
+
+    it("covers reasoning branch in parseBatchedFileReview", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        file_results: {
+          "src/api.ts": {
+            findings: [
+              {
+                line: 3,
+                severity: "high",
+                confidence: "high",
+                category: "security",
+                message: "SQL injection vulnerability found in query builder",
+                suggestion: "Use parameterized queries for all SQL operations",
+                reasoning: "Brief.", // < 50 chars, triggers validateReasoning warn
+              },
+            ],
+          },
+        },
+      });
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result[0].findings[0].reasoning).toBe("Brief.");
+    });
+
+    it("covers reasoning without verification in parseFastReview", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        summary: "Issues found",
+        findings: [
+          {
+            file: "src/core.ts",
+            line: 5,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Function has too many responsibilities and is hard to maintain",
+            suggestion: "Split into smaller single-responsibility functions",
+            reasoning:
+              "The function handles multiple unrelated tasks and this makes it hard to test.",
+          },
+        ],
+      });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults[0].findings[0].reasoning).toContain("unrelated tasks");
+    });
+  });
+
+  describe("inferPromptType branches", () => {
+    it("infers batched-file-review when prompt contains file_results", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ file_results: {} });
+
+      const resultPromise = provider.executePrompt(
+        "Analyze all changes and return file_results for each file"
+      );
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeDefined();
+    });
+
+    it("infers cross-file-review when prompt contains cross-file", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({});
+
+      const resultPromise = provider.executePrompt(
+        "Perform a cross-file architectural analysis of the changes"
+      );
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeDefined();
+    });
+
+    it("infers fast-review when prompt contains both fast and review", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({});
+
+      const resultPromise = provider.executePrompt("Please do a fast review of these changes");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeDefined();
+    });
+
+    it("falls back to unknown for unrecognized prompt text", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({});
+
+      const resultPromise = provider.executePrompt(
+        "Please analyze the general quality of the codebase"
+      );
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe("parseJSON malformed JSON", () => {
+    it("throws JsonParseError when content has braces but invalid JSON", async () => {
+      const provider = createProvider();
+      mockSession.sendAndWait.mockResolvedValue({
+        type: "assistant.message",
+        data: { content: "{not: valid json at all}" },
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      const rejection = resultPromise.catch((e: unknown) => e);
+      await vi.runAllTimersAsync();
+      const error = await rejection;
+
+      expect(error).toBeInstanceOf(Error);
     });
   });
 });

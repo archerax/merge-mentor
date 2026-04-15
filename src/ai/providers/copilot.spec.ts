@@ -487,4 +487,235 @@ Usage by model:
       expect(transcriptContent).toContain(prompt);
     });
   });
+
+  describe("validateReasoning warnings", () => {
+    it("still parses finding when reasoning is shorter than minimum length", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 3,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Missing type",
+            suggestion: "Add type annotation",
+            reasoning: "Too short.", // < 50 chars triggers warn
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/foo.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toBe("Too short.");
+    });
+
+    it("still parses finding when reasoning lacks verification keywords", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 7,
+            severity: "high",
+            confidence: "high",
+            category: "bug",
+            message: "Unhandled promise rejection in this async call path",
+            suggestion: "Wrap in try/catch or add .catch() handler to the promise",
+            reasoning:
+              "The async call does not appear to handle rejection and this could cause problems.",
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/foo.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toContain("does not appear to handle");
+    });
+  });
+
+  describe("parseBatchedFileReview", () => {
+    it("returns empty array when file_results is missing", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({});
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("parses findings for multiple files", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        file_results: {
+          "src/a.ts": {
+            findings: [
+              {
+                line: 5,
+                severity: "high",
+                confidence: "high",
+                category: "bug",
+                message: "Null pointer",
+                suggestion: "Add null check",
+                reasoning: "Value is null at this point. Verified by tracing the call chain.",
+                isPreExisting: false,
+              },
+            ],
+          },
+          "src/b.ts": { findings: [] },
+        },
+      });
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result).toHaveLength(2);
+      const fileA = result.find((r) => r.filename === "src/a.ts");
+      expect(fileA?.findings).toHaveLength(1);
+      expect(fileA?.findings[0].severity).toBe("high");
+    });
+
+    it("warns on short reasoning in batched findings", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        file_results: {
+          "src/c.ts": {
+            findings: [
+              {
+                line: 2,
+                severity: "medium",
+                confidence: "medium",
+                category: "quality",
+                message: "Missing return type",
+                suggestion: "Add return type",
+                reasoning: "Short.", // < 50 chars
+              },
+            ],
+          },
+        },
+      });
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result[0].findings[0].reasoning).toBe("Short.");
+    });
+
+    it("warns on reasoning without verification keywords in batched findings", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        file_results: {
+          "src/d.ts": {
+            findings: [
+              {
+                line: 8,
+                severity: "high",
+                confidence: "high",
+                category: "security",
+                message: "User input used in SQL without sanitization is dangerous",
+                suggestion: "Use parameterized queries for all database operations",
+                reasoning:
+                  "The value from req.body is passed directly into the SQL expression string.",
+              },
+            ],
+          },
+        },
+      });
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result[0].findings[0].reasoning).toContain("passed directly");
+    });
+  });
+
+  describe("parseFastReview", () => {
+    it("splits file findings and cross-file findings", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        summary: "Fast review complete",
+        findings: [
+          {
+            file: "src/main.ts",
+            line: 10,
+            severity: "high",
+            confidence: "high",
+            category: "bug",
+            message: "Null dereference",
+            suggestion: "Add null check",
+            reasoning: "The value is null here. Verified by tracing the assignment.",
+            isPreExisting: false,
+          },
+          {
+            severity: "medium",
+            confidence: "medium",
+            category: "architecture",
+            message: "Tight coupling between modules",
+            reasoning: "Confirmed coupling by checking the import graph dependencies.",
+          },
+        ],
+      });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults).toHaveLength(1);
+      expect(result.fileResults[0].filename).toBe("src/main.ts");
+      expect(result.crossFileResult.findings).toHaveLength(1);
+      expect(result.crossFileResult.overallAssessment).toBe("Fast review complete");
+    });
+
+    it("handles finding with no file or line (cross-file finding)", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        summary: "Some issues",
+        findings: [
+          {
+            severity: "low",
+            confidence: "medium",
+            category: "design",
+            message: "God object pattern detected in codebase",
+            reasoning: "Scanned the entire codebase and found one class handles too many things.",
+          },
+        ],
+      });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults).toHaveLength(0);
+      expect(result.crossFileResult.findings).toHaveLength(1);
+    });
+
+    it("handles empty findings", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({ summary: "Clean", findings: [] });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults).toHaveLength(0);
+      expect(result.crossFileResult.findings).toHaveLength(0);
+    });
+
+    it("warns on short reasoning in fast review findings", () => {
+      const provider = createCopilotProvider();
+      const response = createAIResponse({
+        summary: "Done",
+        findings: [
+          {
+            file: "src/x.ts",
+            line: 1,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Missing validation",
+            suggestion: "Add validation",
+            reasoning: "Short.", // < 50 chars
+          },
+        ],
+      });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults[0].findings[0].reasoning).toBe("Short.");
+    });
+  });
 });

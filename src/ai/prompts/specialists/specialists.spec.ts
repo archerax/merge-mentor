@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import type { GeneralCrossFileContext } from "./general.js";
+import { buildGeneralCrossFilePrompt, buildGeneralFileReviewPrompt } from "./general.js";
 import type { PerformanceCrossFileContext } from "./performance.js";
 import {
   buildPerformanceCrossFilePrompt,
@@ -733,6 +735,191 @@ describe("Specialized Review Prompts", () => {
       // All should still be valid prompts
       expect(securityPrompt).toContain("# YOUR ROLE");
       expect(perfPrompt).toContain("# YOUR ROLE");
+    });
+  });
+});
+
+describe("General Review Prompts", () => {
+  const mockManifest: DiffManifest = {
+    prIdentifier: "test-pr-42",
+    files: [
+      {
+        filename: "src/index.ts",
+        status: "modified",
+        diffPath: "index.diff",
+        additions: 15,
+        deletions: 3,
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  };
+
+  const mockPrDetails: PRDetails = {
+    number: 42,
+    title: "Refactor auth module",
+    description: "Refactors the authentication flow for clarity",
+    author: "dev",
+    baseBranch: "main",
+    headBranch: "refactor/auth",
+  };
+
+  describe("buildGeneralFileReviewPrompt", () => {
+    it("builds a valid prompt for file review", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+      expect(prompt).toContain("# YOUR ROLE");
+      expect(prompt).toContain("src/index.ts");
+      expect(prompt).toContain("modified");
+    });
+
+    it("uses plain @filename references without repoPath", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+      expect(prompt).toContain("@index.diff");
+      expect(prompt).not.toContain("@file:.mergementor/diffs/");
+    });
+
+    it("uses @file: syntax with .mergementor prefix when repoPath is provided", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, "/repo");
+
+      expect(prompt).toContain("@.mergementor/diffs/index.diff");
+      expect(prompt).toContain("# WORKSPACE ACCESS ENABLED");
+    });
+
+    it("includes existing comments section when provided", () => {
+      const comments = "Existing comment about line 5";
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, comments);
+
+      expect(prompt).toContain("# EXISTING PR COMMENTS");
+      expect(prompt).toContain(comments);
+      expect(prompt).toContain("Focus on NEW issues not already covered");
+    });
+
+    it("omits existing comments section when not provided", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+      expect(prompt).not.toContain("# EXISTING PR COMMENTS");
+    });
+
+    it("adds rule 5 about existing comments when comments are provided", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, "some comment");
+
+      expect(prompt).toContain("5. AVOID duplicating issues in EXISTING COMMENTS above");
+    });
+
+    it("omits rule 5 when no existing comments", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+      expect(prompt).not.toContain("5. AVOID duplicating issues");
+    });
+
+    it("includes workspace section when repoPath is provided", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, "/some/repo");
+
+      expect(prompt).toContain("# WORKSPACE ACCESS ENABLED");
+      expect(prompt).toContain("@workspace /search");
+    });
+
+    it("omits workspace section when repoPath is not provided", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+      expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
+    });
+  });
+
+  describe("buildGeneralCrossFilePrompt", () => {
+    const baseContext: GeneralCrossFileContext = {
+      filesSummary: "- src/index.ts (modified, +15/-3)",
+      fileReviewResults: [],
+    };
+
+    it("builds a valid cross-file prompt", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
+
+      expect(prompt).toContain("# YOUR ROLE");
+      expect(prompt).toContain("Refactor auth module");
+    });
+
+    it("includes PR description", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
+
+      expect(prompt).toContain("Refactors the authentication flow for clarity");
+    });
+
+    it("shows no description placeholder when description is empty", () => {
+      const prNoDesc = { ...mockPrDetails, description: "" };
+      const prompt = buildGeneralCrossFilePrompt(prNoDesc, baseContext);
+
+      expect(prompt).toContain("No description provided");
+    });
+
+    it("includes findings summary when file results have findings", () => {
+      const context: GeneralCrossFileContext = {
+        filesSummary: "- src/index.ts (modified, +15/-3)",
+        fileReviewResults: [
+          {
+            filename: "src/index.ts",
+            findings: [
+              {
+                line: 10,
+                severity: "high",
+                confidence: "high",
+                category: "bug",
+                message: "issue",
+                suggestion: "fix",
+                reasoning: "reason",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ],
+      };
+
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, context);
+
+      expect(prompt).toContain("src/index.ts: 1 finding(s)");
+    });
+
+    it("shows no individual issues when all files have empty findings", () => {
+      const context: GeneralCrossFileContext = {
+        filesSummary: "- src/index.ts (modified, +15/-3)",
+        fileReviewResults: [{ filename: "src/index.ts", findings: [] }],
+      };
+
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, context);
+
+      expect(prompt).toContain("No individual issues found");
+    });
+
+    it("includes existing comments section when provided", () => {
+      const context: GeneralCrossFileContext = {
+        ...baseContext,
+        existingCommentsContext: "Comment about architecture",
+      };
+
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, context);
+
+      expect(prompt).toContain("EXISTING PR COMMENTS:");
+      expect(prompt).toContain("Comment about architecture");
+    });
+
+    it("omits existing comments section when not provided", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
+
+      expect(prompt).not.toContain("EXISTING PR COMMENTS:");
+    });
+
+    it("includes workspace section when repoPath is provided", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, "/some/repo");
+
+      expect(prompt).toContain("# WORKSPACE ACCESS ENABLED");
+      expect(prompt).toContain("@workspace /search");
+    });
+
+    it("omits workspace section when repoPath is not provided", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
+
+      expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
     });
   });
 });

@@ -770,4 +770,102 @@ describe("OpenCodeSdkProvider", () => {
       expect(result.crossFileResult.findings).toHaveLength(0);
     });
   });
+
+  describe("validateReasoning warnings", () => {
+    it("should still parse finding when reasoning is shorter than minimum length", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 2,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Missing validation",
+            suggestion: "Add input validation",
+            reasoning: "Too short.", // < 50 chars triggers warn
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/handler.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toBe("Too short.");
+    });
+
+    it("should still parse finding when reasoning lacks verification keywords", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        findings: [
+          {
+            line: 15,
+            severity: "high",
+            confidence: "high",
+            category: "security",
+            message: "User input is used in SQL query without sanitization",
+            suggestion: "Use parameterized queries to prevent SQL injection attacks here",
+            reasoning:
+              "The input from the request is concatenated directly into the SQL string expression.",
+            isPreExisting: false,
+          },
+        ],
+      });
+
+      const result = provider.parseFileReview("src/db.ts", response);
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].reasoning).toContain("concatenated directly");
+    });
+
+    it("should cover reasoning branch in parseBatchedFileReview", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        file_results: {
+          "src/api.ts": {
+            findings: [
+              {
+                line: 5,
+                severity: "high",
+                confidence: "high",
+                category: "bug",
+                message: "Missing error handler",
+                suggestion: "Add error handler",
+                reasoning: "Short.", // < 50 chars, triggers validateReasoning
+              },
+            ],
+          },
+        },
+      });
+
+      const result = provider.parseBatchedFileReview(response);
+
+      expect(result[0].findings[0].reasoning).toBe("Short.");
+    });
+
+    it("should cover reasoning without verification in parseFastReview", () => {
+      const provider = createProvider();
+      const response = createAIResponse({
+        summary: "Review done",
+        findings: [
+          {
+            file: "src/utils.ts",
+            line: 20,
+            severity: "medium",
+            confidence: "medium",
+            category: "quality",
+            message: "Function is too large and has too many responsibilities here",
+            suggestion: "Split into smaller focused functions to improve readability",
+            reasoning:
+              "The function body is very long and handles multiple unrelated things at once.",
+          },
+        ],
+      });
+
+      const result = provider.parseFastReview(response);
+
+      expect(result.fileResults[0].findings[0].reasoning).toContain("unrelated things");
+    });
+  });
 });
