@@ -18,6 +18,7 @@ import {
 } from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
+import packageJson from "../package.json" with { type: "json" };
 
 export interface ReviewOptions {
   pr?: number;
@@ -523,7 +524,7 @@ program
   .description(
     "Automated code review bot using AI providers (Copilot CLI, OpenCode CLI, Cursor CLI)"
   )
-  .version("1.12.0");
+  .version(packageJson.version);
 
 program
   .command("review")
