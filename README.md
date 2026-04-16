@@ -48,17 +48,22 @@ npx merge-mentor review --pr 123
 
 ## Prerequisites
 
-- **Node.js 24+**
-- **AI CLI Tool** - At least one must be installed and accessible in PATH:
-  - **GitHub Copilot CLI** (default):
+- **Node.js 22+**
+- **AI SDK** - GitHub Copilot SDK (default) must be installed and accessible:
+  - **GitHub Copilot SDK** (default):
     ```bash
     npm install -g @github/copilot
     ```
-  - **OpenCode CLI**:
-    ```bash
-    # Install OpenCode CLI (follow official instructions)
-    # https://opencode.dev
-    ```
+  - **Alternative Providers** (optional):
+    - **GitHub Copilot CLI**:
+      ```bash
+      npm install -g @github/copilot
+      ```
+    - **OpenCode CLI**:
+      ```bash
+      # Install OpenCode CLI (follow official instructions)
+      # https://opencode.dev
+      ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 **Supported Platforms**: Windows, macOS, and Linux
@@ -144,15 +149,19 @@ set MM_PLATFORM=azure
 
 ### AI Provider Configuration
 
-**Default Provider**: GitHub Copilot CLI (`copilot`)
+**Default Provider**: GitHub Copilot SDK (`copilot-sdk`)
 
 **Linux/macOS:**
 
 ```bash
-# Select AI provider (copilot or opencode)
-export MM_AI_PROVIDER=copilot
+# Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk, or cursor)
+export MM_AI_PROVIDER=copilot-sdk
 
-# Copilot-specific settings
+# Copilot SDK-specific settings
+export MM_COPILOT_SDK_MODEL=claude-sonnet-4.6
+export MM_COPILOT_SDK_TIMEOUT=180000
+
+# Copilot CLI-specific settings (when using --provider copilot)
 export MM_COPILOT_MODEL=claude-sonnet-4.6
 export MM_COPILOT_TIMEOUT=180000
 
@@ -166,9 +175,13 @@ export MM_OPENCODE_TIMEOUT=180000
 
 ````powershell
 # Select AI provider
-$env:MM_AI_PROVIDER="copilot"
+$env:MM_AI_PROVIDER="copilot-sdk"
 
-# Copilot settings
+# Copilot SDK settings
+$env:MM_COPILOT_SDK_MODEL="claude-sonnet-4.6"
+$env:MM_COPILOT_SDK_TIMEOUT="180000"
+
+# Copilot CLI settings
 $env:MM_COPILOT_MODEL="claude-sonnet-4.6"
 $env:MM_COPILOT_TIMEOUT="180000"
 
@@ -179,9 +192,9 @@ $env:MM_OPENCODE_TIMEOUT="180000"
 **Or use command-line parameters:**
 ```bash
 merge-mentor review --pr 123 \
-  --provider opencode \
-  --opencode-model claude-sonnet-4.6 \
-  --opencode-timeout 180000
+  --provider copilot-sdk \
+  --copilot-sdk-model claude-sonnet-4.6 \
+  --copilot-sdk-timeout 180000
 ````
 
 ### Optional Settings
@@ -759,7 +772,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
 
       - name: Install Copilot CLI
         run: npm install -g @githubnext/github-copilot-cli
@@ -785,7 +798,7 @@ pool:
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: "24.x"
+      versionSpec: "22.x"
 
   - script: npm install -g @githubnext/github-copilot-cli
     displayName: Install Copilot CLI

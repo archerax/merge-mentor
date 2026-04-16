@@ -23,6 +23,12 @@ export interface StreamingDisplayOptions {
   readonly columns?: number;
   /** Whether the terminal is a TTY. Default: process.stdout.isTTY */
   readonly isTTY?: boolean;
+  /**
+   * CI mode: stream each line of output as plain text without ANSI codes or
+   * the rolling window. Enabled automatically forces to true so output appears
+   * in CI logs even when there is no TTY attached.
+   */
+  readonly ciMode?: boolean;
 }
 
 /**
@@ -42,6 +48,7 @@ export class StreamingDisplay {
   private readonly prefix: string;
   private readonly title: string;
   private readonly enabled: boolean;
+  private readonly ciMode: boolean;
   private readonly output: OutputWriter;
   private readonly clock: Clock;
   private readonly terminalColumns: number;
@@ -69,7 +76,10 @@ export class StreamingDisplay {
     this.maxLines = options.maxLines ?? 5;
     this.prefix = options.prefix ?? "  │ ";
     this.title = options.title ?? "🤖 AI Processing...";
-    this.enabled = options.enabled ?? options.isTTY ?? process.stdout.isTTY === true;
+    this.ciMode = options.ciMode ?? false;
+    // CI mode forces streaming on even without a TTY so output appears in CI logs.
+    this.enabled =
+      options.enabled ?? (this.ciMode ? true : (options.isTTY ?? process.stdout.isTTY === true));
     this.output = options.output ?? consoleOutputWriter;
     this.clock = options.clock ?? systemClock;
     this.terminalColumns = options.columns ?? (process.stdout.columns || 80);
@@ -93,6 +103,12 @@ export class StreamingDisplay {
       return;
     }
 
+    // In CI mode write lines directly without ANSI codes or circular buffering
+    if (this.ciMode) {
+      this.pushCI(filtered);
+      return;
+    }
+
     // Combine with any partial line from previous push
     const combined = this.partialLine + filtered;
 
@@ -113,9 +129,10 @@ export class StreamingDisplay {
 
   /**
    * Clear the display area, removing all streaming output from the terminal.
+   * No-op in CI mode since plain-text lines are not overwritten.
    */
   clear(): void {
-    if (!this.enabled || !this.hasRendered) {
+    if (!this.enabled || !this.hasRendered || this.ciMode) {
       return;
     }
 
@@ -135,11 +152,25 @@ export class StreamingDisplay {
 
   /**
    * Finalize the display. By default clears the display area.
+   * In CI mode, flushes any buffered partial line and returns.
    *
    * @param preserve - If true, preserve the last displayed state instead of clearing
    */
   finish(preserve: boolean = false): void {
     if (!this.enabled) {
+      return;
+    }
+
+    if (this.ciMode) {
+      // Flush any remaining partial line
+      if (this.partialLine.length > 0) {
+        if (!this.hasRendered) {
+          this.output.write(`${this.title}\n`);
+          this.hasRendered = true;
+        }
+        this.output.write(`${this.prefix}${this.partialLine}\n`);
+        this.partialLine = "";
+      }
       return;
     }
 
@@ -170,6 +201,26 @@ export class StreamingDisplay {
     this.bufferIndex = 0;
     this.lineCount = 0;
     this.partialLine = "";
+  }
+
+  /**
+   * CI-mode push: write complete lines directly as plain text without ANSI codes.
+   * The title is written once before the first line of output.
+   */
+  private pushCI(filtered: string): void {
+    const combined = this.partialLine + filtered;
+    const lines = combined.split("\n");
+    this.partialLine = lines.pop() ?? "";
+
+    if (lines.length > 0) {
+      if (!this.hasRendered) {
+        this.output.write(`${this.title}\n`);
+        this.hasRendered = true;
+      }
+      for (const line of lines) {
+        this.output.write(`${this.prefix}${line}\n`);
+      }
+    }
   }
 
   /**

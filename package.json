@@ -31,7 +31,7 @@
     "static-analysis"
   ],
   "author": "archerax",
-  "license": "UNLICENSED",
+  "license": "PROPRIETARY",
   "preferGlobal": true,
   "type": "module",
   "engines": {

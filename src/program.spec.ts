@@ -523,6 +523,14 @@ describe("CLI", () => {
         );
       });
 
+      it("auto-detects Azure platform from CI environment without --platform flag", async () => {
+        const options = createReviewOptions({ ci: true, pr: undefined });
+
+        await executeReview(options, { env: createStubEnv(azureEnv) });
+
+        expect(loadConfig).toHaveBeenCalledWith(expect.objectContaining({ platform: "azure" }));
+      });
+
       it("MM_AZURE_TOKEN takes priority over SYSTEM_ACCESSTOKEN", async () => {
         const options = createReviewOptions({ ci: true, pr: undefined, platform: "azure" });
         const env = createStubEnv({ ...azureEnv, MM_AZURE_TOKEN: "my-pat" });

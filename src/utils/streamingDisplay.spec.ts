@@ -111,6 +111,111 @@ describe("StreamingDisplay", () => {
     });
   });
 
+  describe("CI Mode", () => {
+    it("enables output without a TTY", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("ci line\n");
+
+      expect(writes(output).length).toBeGreaterThan(0);
+    });
+
+    it("writes lines as plain text without ANSI codes", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("hello\nworld\n");
+
+      const joined = writes(output).join("");
+      expect(joined).not.toContain("\x1B[");
+      expect(joined).toContain("hello");
+      expect(joined).toContain("world");
+    });
+
+    it("writes the title once before the first line", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false, title: "🤖 Test" });
+
+      display.push("first line\n");
+      display.push("second line\n");
+
+      const allWrites = writes(output);
+      const titleWrites = allWrites.filter((s) => s.includes("🤖 Test"));
+      expect(titleWrites).toHaveLength(1);
+      expect(allWrites[0]).toContain("🤖 Test");
+    });
+
+    it("writes each line with the configured prefix", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false, prefix: ">> " });
+
+      display.push("content\n");
+
+      const joined = writes(output).join("");
+      expect(joined).toContain(">> content");
+    });
+
+    it("buffers partial lines until newline arrives", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("partial");
+      const beforeNewline = writes(output).filter((s) => s.includes("partial"));
+      expect(beforeNewline).toHaveLength(0);
+
+      display.push(" done\n");
+      const joined = writes(output).join("");
+      expect(joined).toContain("partial done");
+    });
+
+    it("clear() is a no-op and does not emit ANSI codes", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("line\n");
+      const countBefore = writes(output).length;
+
+      display.clear();
+
+      expect(writes(output).length).toBe(countBefore);
+    });
+
+    it("finish() flushes a buffered partial line", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("partial without newline");
+      display.finish();
+
+      const joined = writes(output).join("");
+      expect(joined).toContain("partial without newline");
+    });
+
+    it("finish() writes title when flushing a partial line that is the first output", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false, title: "🤖 Test" });
+
+      display.push("only partial");
+      display.finish();
+
+      const joined = writes(output).join("");
+      expect(joined).toContain("🤖 Test");
+      expect(joined).toContain("only partial");
+    });
+
+    it("respects explicit enabled: false even in CI mode", () => {
+      const { display, output } = createDisplay({ ciMode: true, enabled: false });
+
+      display.push("should not appear\n");
+
+      expect(writes(output)).toHaveLength(0);
+    });
+
+    it("handles multiple lines in a single push", () => {
+      const { display, output } = createDisplay({ ciMode: true, isTTY: false });
+
+      display.push("line1\nline2\nline3\n");
+
+      const joined = writes(output).join("");
+      expect(joined).toContain("line1");
+      expect(joined).toContain("line2");
+      expect(joined).toContain("line3");
+    });
+  });
+
   describe("Push Method", () => {
     it("does nothing when disabled", () => {
       const { display, output } = createDisplay({ enabled: false });

@@ -30,7 +30,7 @@ export interface Config {
   readonly github: GitHubConfig;
   readonly azure: AzureConfig;
   readonly botCommentIdentifier: string;
-  /** AI provider to use for code reviews. Default: copilot */
+  /** AI provider to use for code reviews. Default: copilot-sdk */
   readonly aiProvider: AIProviderType;
   readonly copilotToken?: string;
   readonly copilotModel?: string;
@@ -211,7 +211,7 @@ function validateAIProvider(value: string | undefined): AIProviderType {
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }
-  return "copilot"; // Default to copilot for backward compatibility
+  return "copilot-sdk"; // Default to copilot-sdk
 }
 
 function validateReviewType(value: string | undefined): ReviewType {

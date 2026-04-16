@@ -18,7 +18,7 @@ describe("Config", () => {
       expect(config.azure.project).toBe("");
       expect(config.azure.repo).toBe("");
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
-      expect(config.aiProvider).toBe("copilot");
+      expect(config.aiProvider).toBe("copilot-sdk");
       expect(config.skipPreExisting).toBe(true);
       expect(config.reviewRuns).toBe(1);
     });
@@ -174,14 +174,14 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("opencode");
     });
 
-    it("should default MM_AI_PROVIDER to copilot for invalid values", () => {
+    it("should default MM_AI_PROVIDER to copilot-sdk for invalid values", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "invalid",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.aiProvider).toBe("copilot");
+      expect(config.aiProvider).toBe("copilot-sdk");
     });
 
     it("should accept all valid MM_AI_PROVIDER values", () => {

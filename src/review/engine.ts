@@ -90,6 +90,8 @@ interface ReviewEngineOptions {
   readonly streamingEnabled?: boolean;
   /** Number of lines in streaming display. Default: 5 */
   readonly streamingLines?: number;
+  /** CI mode: stream AI output as plain text for capture in CI logs. Default: false */
+  readonly ciMode?: boolean;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). */
   readonly tempPath?: string;
   /**
@@ -204,6 +206,7 @@ export class ReviewEngine {
       maxLines: this.streamingLines,
       title: `🤖 ${context}`,
       enabled: this.streamingEnabled,
+      ciMode: this.options.ciMode,
     });
 
     return {

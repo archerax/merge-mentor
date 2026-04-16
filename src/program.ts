@@ -247,6 +247,7 @@ export async function executeReview(
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
     streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
+    ciMode: resolvedOptions.ci,
     tempPath: config.tempPath,
     localWorkspacePath: resolvedOptions.localWorkspacePath,
   });
@@ -533,7 +534,7 @@ program
     "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
     false
   )
-  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM", "github")
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--provider <provider>",
     "AI provider (copilot, copilot-sdk, opencode, opencode-sdk, or cursor). Env: MM_AI_PROVIDER"

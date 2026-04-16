@@ -7,6 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Default AI Provider**: Changed default AI provider from `copilot` (CLI) to `copilot-sdk` (SDK)
+  - Copilot SDK provides better performance and reliability compared to CLI
+  - To use the CLI variant, explicitly set `MM_AI_PROVIDER=copilot` or use `--provider copilot`
+  - All other providers (opencode, opencode-sdk, cursor) remain unchanged
+  - Existing configurations with explicit provider settings are unaffected
+
+## [1.26.0] - 2026-04-15
+
+### Fixed
+
+- **Copilot Token Handling**: Fixed bug in Copilot token validation and usage
+
+## [1.25.0] - 2026-04-15
+
+### Changed
+
+- Internal release pipeline improvements
+
+## [1.24.0] - 2026-04-15
+
+### Changed
+
+- Internal release pipeline improvements
+
+## [1.23.0] - 2026-04-15
+
+### Changed
+
+- Internal release pipeline improvements
+
+## [1.22.0] - 2026-04-15
+
+### Changed
+
+- CI/CD pipeline authentication token handling
+
+## [1.21.0] - 2026-04-15
+
+### Added
+
+- **CI/CD Integration**: New `--ci` flag for automatic detection and integration with GitHub Actions and Azure Pipelines
+  - Auto-detects CI environment and sources PR number, repository, platform, and auth tokens
+  - Supports GitHub Actions (reads `GITHUB_ACTIONS`, `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH`)
+  - Supports Azure Pipelines (reads `TF_BUILD`, `SYSTEM_ACCESSTOKEN`, collection URI, team project, repo)
+  - `--write` defaults to `true` in CI mode for automatic comment posting
+  - Handles both dev.azure.com and visualstudio.com URL formats
+  - See README for CI/CD Integration examples with GitHub Actions and Azure Pipelines
+- **OpenCode SDK Provider**: New native SDK provider for OpenCode CLI
+  - Improves reliability compared to CLI-based execution
+  - Configure via `MM_AI_PROVIDER=opencode-sdk` or `--provider opencode-sdk`
+  - Supports model selection via `MM_OPENCODE_SDK_MODEL` and `MM_OPENCODE_SDK_TIMEOUT`
+- **Sensitive Data Redaction**: Logs now redact sensitive information (tokens, credentials)
+  - Tokens and API keys are masked in log output
+  - Improves security when sharing logs for debugging
+
+### Changed
+
+- **CI Mode Workspace Handling**: Reuses current workspace instead of cloning repository in CI mode
+  - Faster execution in CI/CD pipelines
+  - Reduces disk usage and network traffic
+- **Azure DevOps Token Priority**: `MM_AZURE_TOKEN` now takes priority over `SYSTEM_ACCESSTOKEN` in CI mode
+
+### Fixed
+
+- **GitHub API Pagination**: Fixed pagination handling for repositories with many pull requests
+- **Security**: Fixed potential command injection vulnerability in branch name handling
+- **Copilot SDK**: Upgraded to latest Copilot SDK version for improved stability
+- **Build Issues**: Various build and test fixes
+
+## [1.20.0] - 2026-03-27
+
+### Changed
+
+- Internal release and dependency updates
+
+## [1.19.0] - 2026-03-27
+
+### Changed
+
+- Build improvements
+
+## [1.18.0] - 2026-03-27
+
+### Changed
+
+- Lock file updates
+
+## [1.17.0] - 2026-03-27
+
+### Changed
+
+- Release pipeline updates
+
+## [1.16.0] - 2026-03-27
+
+### Fixed
+
+- **Copilot SDK Dependency**: Fixed dependency version compatibility
+
+## [1.14.0] - 2026-03-26
+
+### Changed
+
+- Workflow improvements
+
+## [1.13.0] - 2026-03-25
+
+### Added
+
+- **Copilot SDK Provider**: New native SDK provider for GitHub Copilot
+  - Replaces CLI-based Copilot execution with direct SDK integration
+  - Improves performance and reliability for code reviews
+  - Configure via `MM_AI_PROVIDER=copilot-sdk` or `--provider copilot-sdk`
+  - Supports model selection via `MM_COPILOT_SDK_MODEL` and `MM_COPILOT_SDK_TIMEOUT`
+  - Enhanced validation and error handling
+
+### Changed
+
+- Code refactoring and test improvements
+- Package dependency updates
+
 ## [1.12.0] - 2026-02-08
 
 ### Added
