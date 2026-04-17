@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-04-17
+
 ### Added
 
 - **File Ignore List**: New `--ignore` CLI flag to exclude files and directories from code review
