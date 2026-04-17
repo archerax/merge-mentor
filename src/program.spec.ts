@@ -107,6 +107,9 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
       headBranch: "feature/test",
     },
     filesReviewed: 3,
+    filesSkipped: 0,
+    filesIgnored: 0,
+    ignoredFiles: [],
     fileResults: [
       {
         filename: "file1.ts",
@@ -144,7 +147,6 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
     },
     commentsCreated: 2,
     commentErrors: [],
-    filesSkipped: 0,
     ...overrides,
   };
 }

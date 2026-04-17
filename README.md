@@ -471,6 +471,11 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
 
 
+**File Filtering:**
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--ignore <pattern>` | Glob pattern for files to ignore (repeatable) | `**/generated/**` |
+
 **Comment Filtering:**
 | Option | Description | Env Variable | Default |
 |--------|-------------|--------------|---------|
@@ -503,7 +508,22 @@ export MM_SKIP_EXISTING_ISSUES=true  # default
 merge-mentor review --pr 123 --skip-existing-issues true
 ```
 
-### Auto-Resolution with Explanations
+### Ignoring Files and Directories
+
+Exclude files from review using glob patterns. By default, all changed files are reviewed:
+
+```bash
+# Ignore single pattern
+merge-mentor review --pr 123 --ignore '*.test.ts' --write
+
+# Ignore multiple patterns (repeatable flag)
+merge-mentor review --pr 123 --ignore '*.test.ts' --ignore 'dist/**' --ignore 'coverage/**' --write
+
+# Common patterns
+merge-mentor review --pr 123 --ignore '**/*.test.ts' --ignore '**/*.spec.ts' --ignore 'node_modules/**' --write
+```
+
+Ignored files are logged for transparency in the review output.
 
 When code is fixed, the bot resolves comments with an explanation:
 

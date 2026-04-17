@@ -55,6 +55,8 @@ export interface ReviewOptions {
   opencodeSdkTimeout?: number;
   // Comment filtering
   skipExistingIssues?: string;
+  // File filtering
+  ignore?: string[];
   /**
    * Path to a pre-existing local repository workspace.
    * Automatically set in CI mode from GITHUB_WORKSPACE / BUILD_SOURCESDIRECTORY.
@@ -243,6 +245,7 @@ export async function executeReview(
     ciMode: resolvedOptions.ci,
     tempPath: config.tempPath,
     localWorkspacePath: resolvedOptions.localWorkspacePath,
+    ignorePatterns: resolvedOptions.ignore,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -455,6 +458,15 @@ export function displayResults(
   output.log(`Review Type: ${reviewType}`);
   output.log("");
   output.log(`Files Reviewed: ${result.filesReviewed}`);
+  if (result.filesSkipped > 0) {
+    output.log(`Files Skipped: ${result.filesSkipped}`);
+  }
+  if (result.filesIgnored > 0) {
+    output.log(`Files Ignored: ${result.filesIgnored}`);
+    result.ignoredFiles.forEach((file) => {
+      output.log(`  - ${file}`);
+    });
+  }
   output.log(
     `Total Issues Found: ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)}`
   );
@@ -581,6 +593,12 @@ program
   .option(
     "--skip-existing-issues <bool>",
     "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
+  )
+  // File filtering
+  .option(
+    "--ignore <pattern>",
+    "Glob pattern for files to ignore (repeatable). Default ignores **/generated/**",
+    (pattern: string, previous: string[] = []) => [...previous, pattern]
   )
   // Streaming options
   .option("--no-stream", "Disable streaming output display")

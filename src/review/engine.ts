@@ -46,6 +46,7 @@ import type {
 } from "../platforms/types.js";
 import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from "../ports/index.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
+import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
@@ -60,6 +61,8 @@ export interface ReviewResult {
   readonly prDetails: PRDetails;
   readonly filesReviewed: number;
   readonly filesSkipped: number;
+  readonly filesIgnored: number;
+  readonly ignoredFiles: readonly string[];
   readonly fileResults: readonly FileReviewResult[];
   readonly crossFileResult: CrossFileReviewResult;
   readonly commentsCreated: number;
@@ -100,6 +103,8 @@ interface ReviewEngineOptions {
    * the engine uses this path directly and skips cloning.
    */
   readonly localWorkspacePath?: string;
+  /** Glob patterns for files to ignore in review. */
+  readonly ignorePatterns?: string[];
   /** Output writer for console output. Default: consoleOutputWriter */
   readonly output?: OutputWriter;
   /** File system abstraction for I/O operations. Default: nodeFs */
@@ -247,7 +252,7 @@ export class ReviewEngine {
     this.log(`Starting review of PR #${prNumber}...`);
     this.auditLogger.logReviewStart(prNumber, this.platformName, runs, reviewType);
 
-    const { prDetails, files } = await this.fetchPRData(prNumber);
+    const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prIdentifier);
 
@@ -257,6 +262,29 @@ export class ReviewEngine {
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
+
+    // Check if all files are ignored (but there were files originally)
+    if (files.length === 0 && ignoredFiles.length > 0) {
+      this.log(
+        "\n⚠️  Warning: All changed files are ignored by your patterns. No review will be performed.\n"
+      );
+      this.logger.warn({ prNumber }, "All changed files ignored");
+      return {
+        prDetails,
+        filesReviewed: 0,
+        filesSkipped: 0,
+        filesIgnored: ignoredFiles.length,
+        ignoredFiles,
+        fileResults: [],
+        crossFileResult: {
+          overallAssessment: "No files to review",
+          findings: [],
+          recommendations: [],
+        },
+        commentsCreated: 0,
+        commentErrors: [],
+      };
+    }
 
     // Fast review combines file and cross-file analysis in a single pass
     if (reviewType === "fast") {
@@ -367,6 +395,8 @@ export class ReviewEngine {
       prDetails,
       filesReviewed: fileResults.length - filesSkipped,
       filesSkipped,
+      filesIgnored: ignoredFiles.length,
+      ignoredFiles,
       fileResults,
       crossFileResult,
       ...commentStats,
@@ -384,7 +414,10 @@ export class ReviewEngine {
     runs: number,
     existingComments: readonly ExistingComment[],
     repoPath?: string
-  ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
+  ): Promise<{
+    fileResults: FileReviewResult[];
+    crossFileResult: CrossFileReviewResult;
+  }> {
     const allFileResults: FileReviewResult[][] = [];
     const allCrossFileResults: CrossFileReviewResult[] = [];
 
@@ -464,22 +497,42 @@ export class ReviewEngine {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private async fetchPRData(prNumber: number): Promise<{ prDetails: PRDetails; files: PRFile[] }> {
+  private async fetchPRData(prNumber: number): Promise<{
+    prDetails: PRDetails;
+    files: PRFile[];
+    ignoredFiles: string[];
+  }> {
     this.log("Fetching PR details...");
     this.logger.debug({ prNumber }, "Fetching PR data");
     const prDetails = await this.platform.getPRDetails(prNumber);
-    const files = await this.platform.getPRFiles(prNumber);
+    const allFiles = await this.platform.getPRFiles(prNumber);
+
+    // Filter files based on ignore patterns
+    const ignorePatterns = getIgnorePatterns(this.options.ignorePatterns);
+    const { kept: files, ignored: ignoredFiles } = filterPRFiles(allFiles, ignorePatterns);
+
+    if (ignoredFiles.length > 0) {
+      this.log(`Ignoring ${ignoredFiles.length} file(s):`);
+      ignoredFiles.forEach((file) => {
+        this.log(`  - ${file}`);
+      });
+    }
+
     this.logger.info(
       {
         prNumber,
-        filesCount: files.length,
+        totalFiles: allFiles.length,
+        ignoredFiles: ignoredFiles.length,
+        keptFiles: files.length,
         title: prDetails.title,
         author: prDetails.author,
       },
       "PR data fetched"
     );
-    this.log(`Found ${files.length} changed files`);
-    return { prDetails, files };
+    this.log(
+      `Found ${files.length} changed files (${allFiles.length} total, ${ignoredFiles.length} ignored)`
+    );
+    return { prDetails, files, ignoredFiles };
   }
 
   private async fetchExistingComments(prNumber: number) {
@@ -749,7 +802,12 @@ export class ReviewEngine {
       // Ensure we have results for all files (fill in missing ones with empty results)
       const resultMap = new Map(results.map((r) => [r.filename, r]));
       const completeResults: FileReviewResult[] = filesWithPatches.map((file) => {
-        return resultMap.get(file.filename) ?? { filename: file.filename, findings: [] };
+        return (
+          resultMap.get(file.filename) ?? {
+            filename: file.filename,
+            findings: [],
+          }
+        );
       });
 
       return completeResults;
@@ -1027,7 +1085,10 @@ export class ReviewEngine {
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     repoPath?: string
-  ): Promise<{ fileResults: FileReviewResult[]; crossFileResult: CrossFileReviewResult }> {
+  ): Promise<{
+    fileResults: FileReviewResult[];
+    crossFileResult: CrossFileReviewResult;
+  }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
 
     // Extract PR number for audit logging

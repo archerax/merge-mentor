@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **File Ignore List**: New `--ignore` CLI flag to exclude files and directories from code review
+  - Accept repeatable glob patterns: `--ignore '*.test.ts' --ignore 'dist/**'`
+  - Ignored files are logged transparently in review output
+  - Prevents unnecessary AI processing and API calls for excluded files
+
 ## [1.28.0] - 2026-04-17
 
 ### Changed

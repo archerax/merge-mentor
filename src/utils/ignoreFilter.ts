@@ -1,0 +1,56 @@
+import { isMatch } from "micromatch";
+import type { PRFile } from "../platforms/types.js";
+
+/**
+ * Default ignore patterns. Currently empty—all changed files are reviewed by default.
+ * Users can specify patterns via --ignore CLI flag to exclude specific files.
+ */
+const DEFAULT_IGNORE_PATTERNS: string[] = [];
+
+/**
+ * Merges default ignore patterns with user-provided patterns.
+ * User patterns extend the defaults (currently empty by default).
+ *
+ * @param userPatterns - User-provided glob patterns
+ * @returns Merged array of default + user patterns
+ */
+export function getIgnorePatterns(userPatterns: string[] = []): string[] {
+  return [...DEFAULT_IGNORE_PATTERNS, ...userPatterns];
+}
+
+/**
+ * Checks if a file path matches any of the provided glob patterns.
+ *
+ * @param filePath - File path to check
+ * @param patterns - Array of glob patterns to match against
+ * @returns true if the file matches any pattern, false otherwise
+ */
+export function shouldIgnoreFile(filePath: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => isMatch(filePath, pattern));
+}
+
+/**
+ * Filters PR files based on ignore patterns.
+ * Files matching any ignore pattern are excluded from the result.
+ *
+ * @param files - Array of PR files to filter
+ * @param ignorePatterns - Glob patterns for files to ignore
+ * @returns Filtered array of files, along with ignored file paths
+ */
+export function filterPRFiles(
+  files: PRFile[],
+  ignorePatterns: string[] = []
+): { kept: PRFile[]; ignored: string[] } {
+  const kept: PRFile[] = [];
+  const ignored: string[] = [];
+
+  for (const file of files) {
+    if (shouldIgnoreFile(file.filename, ignorePatterns)) {
+      ignored.push(file.filename);
+    } else {
+      kept.push(file);
+    }
+  }
+
+  return { kept, ignored };
+}
