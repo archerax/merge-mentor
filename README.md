@@ -159,15 +159,15 @@ export MM_AI_PROVIDER=copilot-sdk
 
 # Copilot SDK-specific settings
 export MM_COPILOT_SDK_MODEL=claude-sonnet-4.6
-export MM_COPILOT_SDK_TIMEOUT=180000
+export MM_COPILOT_SDK_TIMEOUT=3600000
 
 # Copilot CLI-specific settings (when using --provider copilot)
 export MM_COPILOT_MODEL=claude-sonnet-4.6
-export MM_COPILOT_TIMEOUT=180000
+export MM_COPILOT_TIMEOUT=3600000
 
 # OpenCode-specific settings (when using --provider opencode)
 export MM_OPENCODE_MODEL=claude-sonnet-4.6
-export MM_OPENCODE_TIMEOUT=180000
+export MM_OPENCODE_TIMEOUT=3600000
 
 ```
 
@@ -179,22 +179,22 @@ $env:MM_AI_PROVIDER="copilot-sdk"
 
 # Copilot SDK settings
 $env:MM_COPILOT_SDK_MODEL="claude-sonnet-4.6"
-$env:MM_COPILOT_SDK_TIMEOUT="180000"
+$env:MM_COPILOT_SDK_TIMEOUT="3600000"
 
 # Copilot CLI settings
 $env:MM_COPILOT_MODEL="claude-sonnet-4.6"
-$env:MM_COPILOT_TIMEOUT="180000"
+$env:MM_COPILOT_TIMEOUT="3600000"
 
 # OpenCode settings
 $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
-$env:MM_OPENCODE_TIMEOUT="180000"
+$env:MM_OPENCODE_TIMEOUT="3600000"
 
 **Or use command-line parameters:**
 ```bash
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
   --copilot-sdk-model claude-sonnet-4.6 \
-  --copilot-sdk-timeout 180000
+  --copilot-sdk-timeout 3600000
 ````
 
 ### Optional Settings
@@ -908,8 +908,8 @@ merge-mentor creates several directories in your project root for different purp
 Increase timeout for large PRs:
 
 ```bash
-export MM_COPILOT_TIMEOUT=300000  # 5 minutes (for Copilot)
-export MM_OPENCODE_TIMEOUT=300000  # 5 minutes (for OpenCode)
+export MM_COPILOT_TIMEOUT=3600000  # 1 hour (for Copilot)
+export MM_OPENCODE_TIMEOUT=3600000  # 1 hour (for OpenCode)
 ```
 
 ### Exit Codes

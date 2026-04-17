@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-04-17
+
+### Changed
+
+- **Default AI Timeout**: Increased default AI provider timeout from 5 minutes (300000ms) to 1 hour (3600000ms)
+  - Provides more time for AI models to analyze and review larger pull requests
+  - Reduces timeout errors on complex code reviews
+  - Environment variables: `MM_COPILOT_TIMEOUT`, `MM_COPILOT_SDK_TIMEOUT`, `MM_OPENCODE_TIMEOUT`, `MM_OPENCODE_SDK_TIMEOUT`
+  - CLI parameters: `--copilot-timeout`, `--copilot-sdk-timeout`, `--opencode-timeout`, `--opencode-sdk-timeout`
+
 ## [1.27.0] - 2026-04-17
 
 ### Changed
