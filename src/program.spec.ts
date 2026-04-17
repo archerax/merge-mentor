@@ -425,33 +425,6 @@ describe("CLI", () => {
       );
     });
 
-    it("uses cursor provider when specified via --provider", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({
-          cursorModel: "claude-sonnet-4.6",
-          cursorTimeoutMs: 180000,
-        })
-      );
-
-      const options = createReviewOptions({
-        provider: "cursor",
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "cursor",
-        expect.objectContaining({
-          aiModel: "claude-sonnet-4.6",
-          aiTimeoutMs: 180000,
-        })
-      );
-    });
-
     it("throws error for invalid provider", async () => {
       const options = createReviewOptions({
         provider: "invalid",
@@ -460,7 +433,7 @@ describe("CLI", () => {
       });
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".'
+        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", or "opencode-sdk".'
       );
     });
 
@@ -993,7 +966,7 @@ describe("CLI", () => {
 
     it("generates a report with correct header for non-dry-run mode", () => {
       const result = createMockReviewResult({});
-      const report = generateMarkdownReport(result, "cursor", false);
+      const report = generateMarkdownReport(result, "copilot-sdk", false);
 
       expect(report).toContain("### 📝 Review Actions");
       expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");
@@ -1196,7 +1169,6 @@ describe("CLI", () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking opencode CLI"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking cursor CLI"));
     });
 
     it("checks only specified provider with --provider", async () => {
@@ -1207,9 +1179,6 @@ describe("CLI", () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("Checking opencode CLI")
-      );
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Checking cursor CLI")
       );
     });
 

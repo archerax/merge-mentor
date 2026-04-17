@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
+import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { type CIContext, detectCIEnvironment } from "./ci/index.js";
 import { loadConfig, type Platform, validateConfig } from "./config.js";
@@ -18,7 +19,6 @@ import {
 } from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
-import packageJson from "../package.json" with { type: "json" };
 
 export interface ReviewOptions {
   pr?: number;
@@ -53,8 +53,6 @@ export interface ReviewOptions {
   opencodeTimeout?: number;
   opencodeSdkModel?: string;
   opencodeSdkTimeout?: number;
-  cursorModel?: string;
-  cursorTimeout?: number;
   // Comment filtering
   skipExistingIssues?: string;
   /**
@@ -171,8 +169,6 @@ export async function executeReview(
     opencodeTimeout: resolvedOptions.opencodeTimeout,
     opencodeSdkModel: resolvedOptions.opencodeSdkModel,
     opencodeSdkTimeout: resolvedOptions.opencodeSdkTimeout,
-    cursorModel: resolvedOptions.cursorModel,
-    cursorTimeout: resolvedOptions.cursorTimeout,
     skipExistingIssues: resolvedOptions.skipExistingIssues,
     reviewRuns: resolvedOptions.runs,
     reviewType: resolvedOptions.reviewType,
@@ -192,10 +188,10 @@ export async function executeReview(
 
   // Validate and resolve AI provider
   const aiProvider = (resolvedOptions.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "copilot-sdk", "opencode", "opencode-sdk", "cursor"].includes(aiProvider)) {
+  if (!["copilot", "copilot-sdk", "opencode", "opencode-sdk"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", "opencode-sdk", or "cursor".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", or "opencode-sdk".`
     );
   }
 
@@ -227,10 +223,6 @@ export async function executeReview(
     case "opencode-sdk":
       aiModel = config.opencodeSdkModel;
       aiTimeoutMs = config.opencodeSdkTimeoutMs;
-      break;
-    case "cursor":
-      aiModel = config.cursorModel;
-      aiTimeoutMs = config.cursorTimeoutMs;
       break;
     default:
       aiModel = config.copilotModel;
@@ -521,9 +513,7 @@ const program = new Command();
 
 program
   .name("merge-mentor")
-  .description(
-    "Automated code review bot using AI providers (Copilot CLI, OpenCode CLI, Cursor CLI)"
-  )
+  .description("Automated code review bot using AI providers (Copilot CLI, OpenCode CLI)")
   .version(packageJson.version);
 
 program
@@ -538,7 +528,7 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--provider <provider>",
-    "AI provider (copilot, copilot-sdk, opencode, opencode-sdk, or cursor). Env: MM_AI_PROVIDER"
+    "AI provider (copilot, copilot-sdk, opencode, opencode-sdk). Env: MM_AI_PROVIDER"
   )
   .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
   .option("--verbose", "Enable verbose output", true)
@@ -587,8 +577,6 @@ program
     "OpenCode SDK timeout in ms. Env: MM_OPENCODE_SDK_TIMEOUT",
     parseInt
   )
-  .option("--cursor-model <model>", "Cursor model name. Env: MM_CURSOR_MODEL")
-  .option("--cursor-timeout <ms>", "Cursor timeout in ms. Env: MM_CURSOR_TIMEOUT", parseInt)
   // Comment filtering
   .option(
     "--skip-existing-issues <bool>",
@@ -642,8 +630,6 @@ program
         opencodeTimeout: options.opencodeTimeout,
         opencodeSdkModel: options.opencodeSdkModel,
         opencodeSdkTimeout: options.opencodeSdkTimeout,
-        cursorModel: options.cursorModel,
-        cursorTimeout: options.cursorTimeout,
         skipExistingIssues: options.skipExistingIssues,
         reviewRuns: options.runs,
         reviewType: options.reviewType,
@@ -780,7 +766,7 @@ program
 program
   .command("doctor")
   .description("Check AI provider CLI installations and configuration")
-  .option("--provider <provider>", "Check specific provider (copilot, opencode, cursor)")
+  .option("--provider <provider>", "Check specific provider (copilot, opencode)")
   .action((options: { provider?: string }) => {
     const output = consoleOutputWriter;
     const env = processEnvironment;
@@ -790,9 +776,7 @@ program
     output.log(`CWD: ${process.cwd()}`);
     output.log(`PATH length: ${(env.get("PATH") || env.get("Path") || "").length} chars\n`);
 
-    const providersToCheck = options.provider
-      ? [options.provider]
-      : ["copilot", "opencode", "cursor"];
+    const providersToCheck = options.provider ? [options.provider] : ["copilot", "opencode"];
 
     for (const provider of providersToCheck) {
       output.log(`\n📦 Checking ${provider} CLI:`);

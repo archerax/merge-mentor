@@ -3,7 +3,6 @@ import { ConfigurationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
 import { CopilotProvider } from "./providers/copilot.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
-import { CursorProvider } from "./providers/cursor.js";
 import { OpenCodeProvider } from "./providers/opencode.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
 import type { AIProviderType } from "./types.js";
@@ -27,11 +26,6 @@ describe("createAIProvider", () => {
   it("should create OpenCodeSdkProvider for 'opencode-sdk' type", () => {
     const provider = createAIProvider("opencode-sdk");
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
-  });
-
-  it("should create CursorProvider for 'cursor' type", () => {
-    const provider = createAIProvider("cursor");
-    expect(provider).toBeInstanceOf(CursorProvider);
   });
 
   it("should pass options to CopilotProvider", () => {
@@ -70,21 +64,12 @@ describe("createAIProvider", () => {
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
   });
 
-  it("should pass options to CursorProvider", () => {
-    const provider = createAIProvider("cursor", {
-      model: "claude-haiku-4.5",
-      timeoutMs: 180000,
-      maxRetries: 4,
-    });
-    expect(provider).toBeInstanceOf(CursorProvider);
-  });
-
   it("should throw ConfigurationError for unsupported provider type", () => {
     expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
       ConfigurationError
     );
     expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
-      "Unsupported AI provider: invalid. Valid options are: copilot, copilot-sdk, opencode, opencode-sdk, cursor"
+      "Unsupported AI provider: invalid. Valid options are: copilot, copilot-sdk, opencode, opencode-sdk"
     );
   });
 

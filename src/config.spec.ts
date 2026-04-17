@@ -200,10 +200,6 @@ describe("Config", () => {
       expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode-sdk" })).aiProvider
       ).toBe("opencode-sdk");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "cursor" })).aiProvider
-      ).toBe("cursor");
     });
 
     it("should load MM_OPENCODE_MODEL from environment", () => {
@@ -264,36 +260,6 @@ describe("Config", () => {
       const config = loadConfig(undefined, env);
 
       expect(config.opencodeSdkTimeoutMs).toBeUndefined();
-    });
-
-    it("should load MM_CURSOR_MODEL from environment", () => {
-      const env = createStubEnvironment({
-        MM_CURSOR_MODEL: "claude-haiku-4.5",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.cursorModel).toBe("claude-haiku-4.5");
-    });
-
-    it("should load MM_CURSOR_TIMEOUT from environment", () => {
-      const env = createStubEnvironment({
-        MM_CURSOR_TIMEOUT: "180000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.cursorTimeoutMs).toBe(180000);
-    });
-
-    it("should ignore MM_CURSOR_TIMEOUT when zero or negative", () => {
-      const env = createStubEnvironment({
-        MM_CURSOR_TIMEOUT: "0",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.cursorTimeoutMs).toBeUndefined();
     });
 
     it("should support all MM_ prefixed environment variables", () => {
@@ -368,7 +334,7 @@ describe("Config", () => {
           azureProject: "project",
           azureRepo: "az-repo",
           commentIdentifier: "[CLI Bot]",
-          aiProvider: "cursor",
+          aiProvider: "copilot-sdk",
           copilotModel: "claude-haiku-4.5",
           copilotTimeout: 90000,
           skipExistingIssues: "false",
@@ -386,7 +352,7 @@ describe("Config", () => {
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[CLI Bot]");
-      expect(config.aiProvider).toBe("cursor");
+      expect(config.aiProvider).toBe("copilot-sdk");
       expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(90000);
       expect(config.skipPreExisting).toBe(false);

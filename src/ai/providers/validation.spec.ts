@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as logger from "../../logger.js";
 import type { AIResponse } from "../types.js";
 import { CopilotProvider } from "./copilot.js";
-import { CursorProvider } from "./cursor.js";
 import { OpenCodeProvider } from "./opencode.js";
 
 describe("AI Provider Reasoning Validation", () => {
@@ -324,86 +323,6 @@ describe("AI Provider Reasoning Validation", () => {
               suggestion: "Use parameterized query",
               reasoning:
                 "Checked line 45 and confirmed SQL concatenation. Verified no sanitization in lines 40-50. Scanned for validation utilities and found none applied.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
-
-      provider.parseFileReview("test.ts", response);
-
-      expect(getWarnMock()).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("CursorProvider", () => {
-    it("validates reasoning quality in file review", () => {
-      const provider = new CursorProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue",
-              suggestion: "Fix",
-              reasoning: "Wrong", // Too short
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue",
-              suggestion: "Fix",
-              reasoning: "Wrong",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
-
-      provider.parseFileReview("test.ts", response);
-
-      expect(getWarnMock()).toHaveBeenCalled();
-    });
-
-    it("accepts reasoning with checkmark verification format", () => {
-      const provider = new CursorProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 78,
-              severity: "medium",
-              confidence: "high",
-              category: "quality",
-              message: "Use const instead of let",
-              suggestion: "Change to const",
-              reasoning:
-                "✓ Confirmed line 78: let declaration for immutable value. ✓ Scanned usage: never reassigned. ✓ Checked codebase pattern: const preferred.",
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 78,
-              severity: "medium",
-              confidence: "high",
-              category: "quality",
-              message: "Use const instead of let",
-              suggestion: "Change to const",
-              reasoning:
-                "✓ Confirmed line 78: let declaration for immutable value. ✓ Scanned usage: never reassigned. ✓ Checked codebase pattern: const preferred.",
               isPreExisting: false,
             },
           ],

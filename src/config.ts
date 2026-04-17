@@ -41,8 +41,6 @@ export interface Config {
   readonly opencodeTimeoutMs?: number;
   readonly opencodeSdkModel?: string;
   readonly opencodeSdkTimeoutMs?: number;
-  readonly cursorModel?: string;
-  readonly cursorTimeoutMs?: number;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
@@ -101,13 +99,6 @@ export function loadConfig(
           10
         )
       : undefined;
-  const cursorTimeoutMs =
-    (cliOverrides?.cursorTimeout ?? env.get("MM_CURSOR_TIMEOUT"))
-      ? Number.parseInt(
-          cliOverrides?.cursorTimeout?.toString() ?? env.get("MM_CURSOR_TIMEOUT") ?? "",
-          10
-        )
-      : undefined;
 
   const reviewRuns = validateReviewRuns(
     cliOverrides?.reviewRuns?.toString() ?? env.get("MM_REVIEW_RUNS")
@@ -142,8 +133,6 @@ export function loadConfig(
     opencodeSdkModel: cliOverrides?.opencodeSdkModel ?? env.get("MM_OPENCODE_SDK_MODEL"),
     opencodeSdkTimeoutMs:
       opencodeSdkTimeoutMs && opencodeSdkTimeoutMs > 0 ? opencodeSdkTimeoutMs : undefined,
-    cursorModel: cliOverrides?.cursorModel ?? env.get("MM_CURSOR_MODEL"),
-    cursorTimeoutMs: cursorTimeoutMs && cursorTimeoutMs > 0 ? cursorTimeoutMs : undefined,
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
     reviewRuns,
@@ -179,8 +168,6 @@ interface CliOverrides {
   readonly opencodeTimeout?: number;
   readonly opencodeSdkModel?: string;
   readonly opencodeSdkTimeout?: number;
-  readonly cursorModel?: string;
-  readonly cursorTimeout?: number;
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
   readonly reviewType?: string;
@@ -201,13 +188,7 @@ function validateReviewRuns(value: string | undefined): number {
 }
 
 function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = [
-    "copilot",
-    "copilot-sdk",
-    "opencode",
-    "opencode-sdk",
-    "cursor",
-  ];
+  const validProviders: AIProviderType[] = ["copilot", "copilot-sdk", "opencode", "opencode-sdk"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

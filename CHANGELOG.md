@@ -12,8 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Default AI Provider**: Changed default AI provider from `copilot` (CLI) to `copilot-sdk` (SDK)
   - Copilot SDK provides better performance and reliability compared to CLI
   - To use the CLI variant, explicitly set `MM_AI_PROVIDER=copilot` or use `--provider copilot`
-  - All other providers (opencode, opencode-sdk, cursor) remain unchanged
+  - All other providers (opencode, opencode-sdk) remain unchanged
   - Existing configurations with explicit provider settings are unaffected
+
+### Removed
+
+- **Cursor CLI Provider Support**: Removed support for Cursor CLI provider (`cursor`)
+  - Cursor CLI is no longer available as an AI provider option
+  - Existing configurations using Cursor will need to switch to another provider (copilot, copilot-sdk, opencode, opencode-sdk)
 
 ## [1.26.0] - 2026-04-15
 
@@ -205,7 +211,7 @@ export MM_REVIEW_TYPE=testing
   - Removed `--provider openai` option and all OpenAI-specific CLI options
   - Removed `openai` npm dependency and SDK-based provider implementation
   - OpenAI provider was architecturally incompatible with local repository cloning approach
-  - CLI-based providers (Copilot, OpenCode, Cursor) can now read local files directly
+  - CLI-based providers (Copilot, OpenCode) can now read local files directly
   - Simplified codebase by focusing on CLI-based providers only
 
 ## [1.12.0] - 2026-01-30
@@ -312,9 +318,7 @@ export MM_REVIEW_TYPE=testing
 
 ### Added
 
-- **Multi-AI provider support**: Select your preferred AI provider for reviews. Supports GitHub Copilot CLI (default), OpenCode CLI, and Cursor CLI. Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable.
-
-- **Cursor CLI provider**: New AI provider option using Cursor's AI capabilities. Configure with `--provider cursor` or `export AI_PROVIDER=cursor`. Supports model selection via `CURSOR_MODEL` environment variable.
+- **Multi-AI provider support**: Select your preferred AI provider for reviews. Supports GitHub Copilot CLI (default) and OpenCode CLI. Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable.
 
 - **OpenCode CLI provider**: Alternative AI provider using OpenCode CLI. Configure with `--provider opencode` or `export AI_PROVIDER=opencode`. Supports model selection via `OPENCODE_MODEL` environment variable.
 
@@ -333,13 +337,8 @@ export AI_PROVIDER=opencode
 export OPENCODE_MODEL=claude-sonnet-4.5
 merge-mentor review --pr 123 --write
 
-# Use Cursor CLI
-export AI_PROVIDER=cursor
-export CURSOR_MODEL=claude-haiku-4.5
-merge-mentor review --pr 123 --write
-
 # Or via CLI flag (overrides environment variable)
-merge-mentor review --pr 123 --provider cursor --write
+merge-mentor review --pr 123 --provider opencode --write
 ```
 
 ## [1.5.0] - 2025-12-27

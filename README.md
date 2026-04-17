@@ -154,7 +154,7 @@ set MM_PLATFORM=azure
 **Linux/macOS:**
 
 ```bash
-# Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk, or cursor)
+# Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk)
 export MM_AI_PROVIDER=copilot-sdk
 
 # Copilot SDK-specific settings
