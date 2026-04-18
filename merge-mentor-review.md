@@ -11,7 +11,7 @@
 
 `merge-mentor` is a well-engineered, production-ready CLI tool for AI-powered pull request code review. It demonstrates strong TypeScript discipline, a clean layered architecture, and a comprehensive test suite. The codebase avoids the most common pitfalls — there is no `any` in production code, errors are explicitly typed, and dependencies are consistently injected. The primary areas for improvement are in refactoring one oversized orchestration class, eliminating a handful of DRY violations, filling a few test coverage gaps, and correcting a version string mismatch that ships to end users.
 
-**Overall score: 8.4 / 10**
+**Overall score: 8.45 / 10**
 
 ---
 
@@ -289,20 +289,30 @@ type CommentActionType = "create" | "update" | "resolve" | "dismiss";
 
 ---
 
-### 6. Fix jitter-after-cap bug in `rateLimitHandler.ts`
+### 6. ✅ Fix jitter-after-cap bug in `rateLimitHandler.ts`
 
 **File:** `src/utils/rateLimitHandler.ts`  
-**Severity:** Medium (correctness)
+**Severity:** Medium (correctness)  
+**Status:** FIXED
 
-The exponential backoff jitter is applied **after** the `maxDelayMs` cap, allowing the actual delay to exceed the configured maximum. Move the cap to the outside:
+The exponential backoff jitter was being applied **after** the `maxDelayMs` cap, allowing the actual delay to exceed the configured maximum. This has been corrected in the implementation.
+
+**Solution implemented:**
 
 ```typescript
-// Current (approximate)
-const delay = Math.min(base * Math.pow(2, attempt), maxDelayMs) + randomJitter;
-
-// Fixed
-const delay = Math.min(base * Math.pow(2, attempt) + randomJitter, maxDelayMs);
+function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
+  const exponentialDelay = baseDelayMs * 2 ** attempt;
+  const jitter = Math.random() * 0.3 * exponentialDelay; // 30% jitter
+  const delay = Math.min(exponentialDelay + jitter, maxDelayMs); // Cap is applied after jitter
+  return Math.floor(delay);
+}
 ```
+
+The jitter is now correctly added to the exponential delay **before** the cap is applied, ensuring the final delay never exceeds `maxDelayMs`.
+
+**Test coverage:**
+
+- `src/utils/rateLimitHandler.spec.ts` line 281–304: "caps delay at maxDelayMs" test verifies the behavior with multiple retries and exponential backoff.
 
 ---
 
@@ -373,12 +383,12 @@ interface ReviewEngineOptions {
 | Code Quality   | 8.5 / 10     | Strong naming and errors; config has DRY violations and an unsafe cast |
 | Testing        | 8 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
 | Security       | 8.5 / 10     | Good token redaction; token in git URL, audit is non-blocking          |
-| Performance    | 8 / 10       | Async-first; sequential multi-run, jitter-after-cap bug                |
+| Performance    | 8.5 / 10     | Async-first; jitter-after-cap bug fixed; sequential multi-run remains  |
 | Tooling        | 8.5 / 10     | Strong pipeline; version mismatch ships to users                       |
 | Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
 | Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
 | Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall**    | **8.4 / 10** | **Production-ready with targeted improvements**                        |
+| **Overall**    | **8.45 / 10** | **Production-ready with targeted improvements**                        |
 
 ---
 
