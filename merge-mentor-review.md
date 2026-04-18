@@ -11,7 +11,7 @@
 
 `merge-mentor` is a well-engineered, production-ready CLI tool for AI-powered pull request code review. It demonstrates strong TypeScript discipline, a clean layered architecture, and a comprehensive test suite. The codebase avoids the most common pitfalls — there is no `any` in production code, errors are explicitly typed, and dependencies are consistently injected. The primary areas for improvement are in refactoring one oversized orchestration class, eliminating a handful of DRY violations, filling a few test coverage gaps, and correcting a version string mismatch that ships to end users.
 
-**Overall score: 8.45 / 10**
+**Overall score: 8.5 / 10**
 
 ---
 
@@ -316,24 +316,36 @@ The jitter is now correctly added to the exponential delay **before** the cap is
 
 ---
 
-### 7. Align `CATEGORY_EMOJI` keys with the `FindingCategory` type
+### 7. ✅ Align `CATEGORY_EMOJI` keys with the `FindingCategory` type
 
 **File:** `src/constants.ts`  
-**Severity:** Medium (type drift)
+**Severity:** Medium (type drift)  
+**Status:** FIXED
 
-The constant map contains four keys not present in the `FindingCategory` union:
-`missing-coverage`, `bad-naming`, `incorrect-assertions`, `missing-mocks`.
+The constant map contained four dead keys not present in the `FindingCategory` union type: `missing-coverage`, `bad-naming`, `incorrect-assertions`, `missing-mocks`. These keys were removed, and the type annotation was strengthened.
 
-Either:
-
-- **Remove** the extra keys if they are dead code, or
-- **Add** them to the `FindingCategory` union and handle them in the review engine.
-
-Use TypeScript's `Record<FindingCategory, string>` type for the map to make this a compile-time error if they diverge again:
+**Solution implemented:**
 
 ```typescript
-export const CATEGORY_EMOJI: Record<FindingCategory, string> = { ... };
+import type { FindingCategory } from "./platforms/types.js";
+
+export const CATEGORY_EMOJI: Record<FindingCategory, string> = {
+  bug: "🐛",
+  security: "🔒",
+  performance: "⚡",
+  quality: "📝",
+  documentation: "📚",
+  architecture: "🏗️",
+  design: "🎨",
+  testing: "🧪",
+} as const;
 ```
+
+Using `Record<FindingCategory, string>` ensures the type system enforces that the object keys exactly match the `FindingCategory` union. Any future drift will be caught at compile time.
+
+**Test coverage:**
+
+- `src/constants.spec.ts`: Updated to verify exactly 8 categories are present, matching the `FindingCategory` type.
 
 ---
 
@@ -380,7 +392,7 @@ interface ReviewEngineOptions {
 | Category       | Score        | Key Notes                                                              |
 | -------------- | ------------ | ---------------------------------------------------------------------- |
 | Architecture   | 9 / 10       | Excellent ports/adapters; `ReviewEngine` is the sole outlier           |
-| Code Quality   | 8.5 / 10     | Strong naming and errors; config has DRY violations and an unsafe cast |
+| Code Quality   | 9 / 10       | Strong naming and errors; DRY violations in timeout parsing remain                 |
 | Testing        | 8 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
 | Security       | 8.5 / 10     | Good token redaction; token in git URL, audit is non-blocking          |
 | Performance    | 8.5 / 10     | Async-first; jitter-after-cap bug fixed; sequential multi-run remains  |
@@ -388,7 +400,7 @@ interface ReviewEngineOptions {
 | Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
 | Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
 | Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall**    | **8.45 / 10** | **Production-ready with targeted improvements**                        |
+| **Overall**    | **8.5 / 10** | **Production-ready with targeted improvements** |
 
 ---
 

@@ -97,5 +97,9 @@ describe("Constants", () => {
       expect(categories).toContain("design");
       expect(categories).toContain("testing");
     });
+
+    it("should have exactly 8 categories matching FindingCategory type", () => {
+      expect(Object.keys(CATEGORY_EMOJI)).toHaveLength(8);
+    });
   });
 });

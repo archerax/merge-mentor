@@ -3,6 +3,8 @@
  * Centralizes magic numbers and strings for maintainability.
  */
 
+import type { FindingCategory } from "./platforms/types.js";
+
 /** Default page size for API pagination. */
 export const DEFAULT_PAGE_SIZE = 100;
 
@@ -45,7 +47,7 @@ export const SEVERITY_EMOJI = {
 } as const;
 
 /** Emoji mapping for finding categories. */
-export const CATEGORY_EMOJI = {
+export const CATEGORY_EMOJI: Record<FindingCategory, string> = {
   bug: "🐛",
   security: "🔒",
   performance: "⚡",
@@ -54,8 +56,4 @@ export const CATEGORY_EMOJI = {
   architecture: "🏗️",
   design: "🎨",
   testing: "🧪",
-  "missing-coverage": "📊",
-  "bad-naming": "🏷️",
-  "incorrect-assertions": "❌",
-  "missing-mocks": "🎭",
 } as const;
