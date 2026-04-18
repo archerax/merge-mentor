@@ -105,41 +105,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copilot SDK**: Upgraded to latest Copilot SDK version for improved stability
 - **Build Issues**: Various build and test fixes
 
-## [1.20.0] - 2026-03-27
-
-### Changed
-
-- Internal release and dependency updates
-
-## [1.19.0] - 2026-03-27
-
-### Changed
-
-- Build improvements
-
-## [1.18.0] - 2026-03-27
-
-### Changed
-
-- Lock file updates
-
-## [1.17.0] - 2026-03-27
-
-### Changed
-
-- Release pipeline updates
-
 ## [1.16.0] - 2026-03-27
 
 ### Fixed
 
 - **Copilot SDK Dependency**: Fixed dependency version compatibility
-
-## [1.14.0] - 2026-03-26
-
-### Changed
-
-- Workflow improvements
 
 ## [1.13.0] - 2026-03-25
 
@@ -187,6 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Assertion Verification**: Ensures assertions match test behavior and use appropriate matchers
   - **Mock Framework Usage**: Validates proper mocking patterns (C#: Moq/NSubstitute, TypeScript: Vitest/Jest)
 - **Environment Variable Configuration** - New `MM_REVIEW_TYPE` environment variable to set default review type
+- **Streaming Output Display**: Real-time feedback showing the last 5 lines of AI model output during reviews
+   - New `--no-stream` flag to disable streaming output
+   - New `--stream-lines <n>` option to configure number of lines (1-20)
+   - Environment variables `MM_STREAMING_ENABLED` and `MM_STREAMING_LINES` for configuration
+   - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
 
 ### Removed
 
@@ -234,16 +209,6 @@ export MM_REVIEW_TYPE=testing
   - OpenAI provider was architecturally incompatible with local repository cloning approach
   - CLI-based providers (Copilot, OpenCode) can now read local files directly
   - Simplified codebase by focusing on CLI-based providers only
-
-## [1.12.0] - 2026-01-30
-
-### Added
-
-- **Streaming Output Display**: Real-time feedback showing the last 5 lines of AI model output during reviews
-  - New `--no-stream` flag to disable streaming output
-  - New `--stream-lines <n>` option to configure number of lines (1-20)
-  - Environment variables `MM_STREAMING_ENABLED` and `MM_STREAMING_LINES` for configuration
-  - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
 
 ## [1.11.0] - 2026-01-14
 
@@ -339,9 +304,9 @@ export MM_REVIEW_TYPE=testing
 
 ### Added
 
-- **Multi-AI provider support**: Select your preferred AI provider for reviews. Supports GitHub Copilot CLI (default) and OpenCode CLI. Set the provider via the `--provider` flag or the `AI_PROVIDER` environment variable.
+- **Multi-AI provider support**: Select your preferred AI provider for reviews. Supports GitHub Copilot CLI (default) and OpenCode CLI. Set the provider via the `--provider` flag or the `MM_AI_PROVIDER` environment variable.
 
-- **OpenCode CLI provider**: Alternative AI provider using OpenCode CLI. Configure with `--provider opencode` or `export AI_PROVIDER=opencode`. Supports model selection via `OPENCODE_MODEL` environment variable.
+- **OpenCode CLI provider**: Alternative AI provider using OpenCode CLI. Configure with `--provider opencode` or `export MM_AI_PROVIDER=opencode`. Supports model selection via `MM_OPENCODE_MODEL` environment variable.
 
 ### Changed
 
@@ -354,8 +319,8 @@ Existing configurations work without changes (defaults to Copilot CLI). To use a
 
 ```bash
 # Use OpenCode CLI
-export AI_PROVIDER=opencode
-export OPENCODE_MODEL=claude-sonnet-4.5
+export MM_AI_PROVIDER=opencode
+export MM_OPENCODE_MODEL=claude-sonnet-4.5
 merge-mentor review --pr 123 --write
 
 # Or via CLI flag (overrides environment variable)
@@ -390,7 +355,7 @@ merge-mentor review --pr 123 --provider opencode --write
 
 ### Added
 
-- **Multi-run mode**: Catch more issues by running multiple review passes and automatically combining unique findings. Use `--runs 3` for critical code reviews or `--runs 5` for security-sensitive changes. The bot automatically removes duplicates and keeps the highest-confidence findings.
+- **Multi-run mode**: Catch more issues by running multiple review passes and automatically combining unique findings. Use `--runs 3` for critical code reviews or `--runs 5` for security-sensitive changes. The bot automatically removes duplicates and aggregates findings.
 
 - **More thorough analysis**: Enhanced AI prompts now systematically check for logic errors, security vulnerabilities, performance issues, and code quality across multiple passes in a single run.
 
@@ -401,33 +366,14 @@ merge-mentor review --pr 123 --provider opencode --write
 merge-mentor review --pr 123 --runs 3 --write
 
 # Or set a default in your environment
-export REVIEW_RUNS=3
+export MM_RUNS=3
 ```
 
 ## [1.2.0] - 2025-12-24
 
 ### Added
 
-- **Confidence filtering**: Only high-confidence issues are posted by default, reducing noise in your reviews. Each comment shows its confidence level with an emoji indicator (🟢 High, 🟡 Medium, 🔴 Low).
-
 - **Skip pre-existing issues**: The bot now detects problems that existed before your PR and ignores them, so you only see feedback on your actual changes.
-
-- **Resolution explanations**: When issues are fixed, the bot posts a comment explaining what was resolved before closing the thread.
-
-### Configuration
-
-Control filtering behavior with environment variables:
-
-```bash
-# Only post high-confidence issues (default)
-export MIN_COMMENT_CONFIDENCE=high
-
-# Skip issues that existed before the PR (default: true)
-export SKIP_PREEXISTING_ISSUES=true
-
-# Post explanations when resolving (default: true)
-export POST_RESOLUTION_COMMENTS=true
-```
 
 ### Fixed
 
@@ -510,9 +456,9 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 npm install -g merge-mentor
 
 # Configure (one-time setup)
-export GITHUB_TOKEN=your_token
-export GITHUB_REPO_OWNER=your_username
-export GITHUB_REPO_NAME=your_repo
+export MM_GITHUB_TOKEN=your_token
+export MM_GITHUB_OWNER=your_username
+export MM_GITHUB_REPO=your_repo
 
 # Review a PR (dry-run)
 merge-mentor review --pr 123

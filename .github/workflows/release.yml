@@ -83,4 +83,3 @@ jobs:
 
       - name: Publish to npm
         run: npm publish merge-mentor-${{ steps.version.outputs.VERSION }}.tgz
-

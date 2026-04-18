@@ -40,11 +40,8 @@ npx merge-mentor review --pr 123
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
 - **Multi-Run Mode** - Aggregate findings from multiple passes for thoroughness
-- **Confidence Filtering** - Only posts high-confidence issues by default
-- **Auto-Resolution** - Detects when issues are fixed and resolves comments
 - **Dry-Run Mode** - Preview changes before posting with detailed markdown reports (default)
 - **Streaming Output** - Real-time feedback showing AI model output during reviews
-- **Extensible Architecture** - Easy to add new specialist review types (see [EXTENDING.md](./EXTENDING.md))
 
 ## Prerequisites
 
@@ -203,12 +200,10 @@ merge-mentor review --pr 123 \
 
 ```bash
 # Comment filtering
-export MM_MIN_COMMENT_CONFIDENCE=high  # high, medium, or low
 export MM_SKIP_EXISTING_ISSUES=true
-export MM_POST_RESOLUTION_COMMENTS=true
 
 # Multi-run mode
-export MM_REVIEW_RUNS=1  # 1-5 runs
+export MM_RUNS=1  # 1-5 runs
 
 # Review type (specialist reviews)
 export MM_REVIEW_TYPE=general  # general, testing, security, performance, or fast
@@ -234,9 +229,7 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 
 ```bash
 merge-mentor review --pr 123 \
-  --min-comment-confidence medium \
   --skip-existing-issues true \
-  --post-resolution-comments true \
   --runs 3 \
   --review-type testing \
   --comment-identifier "[custom-bot]"
@@ -289,19 +282,6 @@ Audit logs can be filtered and analyzed for:
 
 By default, merge-mentor stores temporary files in `./.mergementor` relative to the current working directory. You can customize this location using the `MM_TEMP_PATH` environment variable or `--temp-path` CLI flag.
 
-**Directory Structure:**
-
-```
-.mergementor/                    # Default base directory (configurable)
-├── cache/                       # Review state cache (for incremental reviews)
-├── diffs/                       # PR diff files for AI analysis
-├── logs/                        # Timestamped log files with audit trails
-├── repos/                       # Cloned repositories (for context loading)
-├── reports/                     # Markdown review reports (dry-run mode)
-├── temp/                        # Temporary files (prompts, outputs)
-└── transcripts/                 # AI session transcripts (for debugging)
-```
-
 **Configuration Examples:**
 
 ```bash
@@ -315,13 +295,10 @@ export MM_TEMP_PATH=./temp/mm
 merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 ```
 
-**Note:** The entire directory structure is recreated under the configured path. This is useful for:
+**Important Directories:**
 
-- Using a faster disk for temporary storage
-- Isolating data in containerized environments
-- Controlling disk usage by location
-- Centralized temporary storage in CI/CD pipelines
-- Identifying patterns in review failures
+- **logs** - Timestamped log files for debugging and audit trails (`.mergementor/logs/`)
+- **reports** - Markdown review reports from dry-run mode (`.mergementor/reports/`)
 
 ### Token Permissions
 
@@ -470,7 +447,6 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--opencode-model <model>` | OpenCode model name | `MM_OPENCODE_MODEL` |
 | `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
 
-
 **File Filtering:**
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -479,24 +455,12 @@ merge-mentor review --pr 123 --review-type testing --write
 **Comment Filtering:**
 | Option | Description | Env Variable | Default |
 |--------|-------------|--------------|---------|
-| `--min-comment-confidence <level>` | Minimum confidence (high, medium, low) | `MM_MIN_COMMENT_CONFIDENCE` | `high` |
 | `--skip-existing-issues <bool>` | Skip pre-existing issues (true/false) | `MM_SKIP_EXISTING_ISSUES` | `true` |
-| `--post-resolution-comments <bool>` | Post resolution comments (true/false) | `MM_POST_RESOLUTION_COMMENTS` | `true` |
 | `--comment-identifier <id>` | Bot comment identifier | `MM_COMMENT_IDENTIFIER` | `[merge-mentor]` |
 
 **Note:** Command-line parameters always override environment variables.
 
 ## Key Features Explained
-
-### Confidence-Based Filtering
-
-Only high-confidence issues are posted by default to reduce noise:
-
-```bash
-export MM_MIN_COMMENT_CONFIDENCE=high  # high (default), medium, or low
-# Or use CLI parameter:
-merge-mentor review --pr 123 --min-comment-confidence medium
-```
 
 ### Pre-Existing Issue Detection
 
@@ -690,12 +654,6 @@ merge-mentor review --pr 456 --review-type testing --write
 
 # Thorough testing analysis with multiple passes
 merge-mentor review --pr 456 --review-type testing --runs 3 --write
-
-# Combined with confidence filtering for critical test gaps only
-merge-mentor review --pr 456 \
-  --review-type testing \
-  --min-comment-confidence high \
-  --write
 ```
 
 ### Streaming Output Display
@@ -786,7 +744,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write  # Required to post comments
+      pull-requests: write # Required to post comments
     steps:
       - uses: actions/checkout@v4
 
@@ -795,7 +753,7 @@ jobs:
           node-version: "22"
 
       - name: Install Copilot CLI
-        run: npm install -g @githubnext/github-copilot-cli
+        run: npm install -g @github/copilot
 
       - name: Run Review
         run: npx merge-mentor review --ci
@@ -820,7 +778,7 @@ steps:
     inputs:
       versionSpec: "22.x"
 
-  - script: npm install -g @githubnext/github-copilot-cli
+  - script: npm install -g @github/copilot
     displayName: Install Copilot CLI
 
   - script: npx merge-mentor review --ci
@@ -836,10 +794,10 @@ steps:
 > **Permissions:** The Build Service account typically has Reader-only access and **cannot post PR comments** by default. In most organisations you'll need to provide a PAT (Personal Access Token) with _Code (Read)_ and _Pull Request Threads (Read & Write)_ scopes instead:
 >
 > ```yaml
->   - script: npx merge-mentor review --ci
->     displayName: Run Review
->     env:
->       MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT)   # PAT with PR comment permission
+> - script: npx merge-mentor review --ci
+>   displayName: Run Review
+>   env:
+>     MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT) # PAT with PR comment permission
 > ```
 >
 > When `MM_AZURE_TOKEN` is set, `SYSTEM_ACCESSTOKEN` is not required. Store your PAT as a pipeline secret variable named `MERGE_MENTOR_PAT` (or any name you prefer) in the pipeline library or variable group.
@@ -881,7 +839,7 @@ npx merge-mentor review \
 # with env: MM_AZURE_TOKEN, MM_AZURE_ORG, MM_AZURE_PROJECT, MM_AZURE_REPO
 ```
 
-## Logging
+## File Organization and Logging
 
 Logs are written to timestamped files in `.mergementor/logs/merge-mentor_YYYY-MM-DD_HH-mm-ss.log` in your current directory. Each review run generates its own log file, preserving historical logs for debugging and audit purposes.
 
@@ -897,29 +855,7 @@ tail -f .mergementor/logs/merge-mentor_2025-01-06_18-40-30.log
 export LOG_LEVEL=debug  # debug, info, warn, error
 ```
 
-## File Organization
-
-merge-mentor creates several directories in your project root for different purposes:
-
-```
-.mergementor/
-├── cache/                          # Review state caching
-│   └── Github-myrepo-PR123.json     # Platform-aware cache files
-├── diffs/                          # Temporary diff storage for batched reviews
-│   └── Azure-MyProject-PR456/       # Platform-aware diff directories
-├── logs/                           # Timestamped log files
-│   └── merge-mentor_2025-01-06_18-40-30.log
-├── reports/                        # Dry-run markdown reports
-│   └── Github-myrepo-PR123-review-report.md
-└── temp/                           # Temporary files for large prompts
-    └── prompt-abc123.txt             # Auto-cleaned after use
-```
-
-**Key improvements**:
-
-- **Unique identifiers**: Cache and diff files use `{Platform}-{Project}-PR{Number}` format to prevent conflicts
-- **Historical preservation**: Each run creates new timestamped log files instead of overwriting
-- **Platform isolation**: Multiple platforms and projects can be used without file conflicts
+Review reports from dry-run mode are saved to `.mergementor/reports/` as markdown files for easy review and archival.
 
 ## Troubleshooting
 
@@ -936,18 +872,6 @@ export MM_OPENCODE_TIMEOUT=3600000  # 1 hour (for OpenCode)
 
 - `0` - Success or configuration issue
 - `1` - Review failed or critical issues found
-
-## Extending merge-mentor
-
-Want to add a new specialist review type (e.g., accessibility, internationalization, API design)?
-
-See [EXTENDING.md](./EXTENDING.md) for a comprehensive guide including:
-
-- Architecture patterns
-- Step-by-step implementation guide
-- Complete code examples
-- Testing strategies
-- Best practices and common pitfalls
 
 ## License
 

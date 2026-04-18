@@ -455,7 +455,7 @@ describe("CommentManager", () => {
         (a) => a.type === "create" && a.path === "test.ts"
       );
       expect(createdComment).toBeDefined();
-      if (!createdComment || !createdComment.body) {
+      if (!createdComment?.body) {
         throw new Error("Expected comment to be created with body");
       }
 

@@ -3,7 +3,7 @@
 **Version reviewed:** 1.26.0  
 **Test suite:** 1,186 tests — all passing  
 **Test coverage threshold:** 85%  
-**Reviewer:** GitHub Copilot  
+**Reviewer:** GitHub Copilot
 
 ---
 
@@ -47,9 +47,12 @@ Dependency injection is used throughout. No class reaches for a singleton or a g
 **DRY violation in `src/config.ts`.** The pattern for parsing an optional integer timeout from an environment variable or CLI override is repeated five times (lines 76–110) with no shared helper. See Improvement #3.
 
 **Unvalidated cast in `config.ts` line 119:**
+
 ```typescript
-defaultPlatform: ((cliOverrides?.platform ?? env.get("MM_PLATFORM")) as Platform) || "github"
+defaultPlatform: ((cliOverrides?.platform ??
+  env.get("MM_PLATFORM")) as Platform) || "github";
 ```
+
 The `as Platform` assertion bypasses the existing `validatePlatform()` function. If an invalid string is provided, the error will surface later and be harder to diagnose.
 
 **`CATEGORY_EMOJI` type drift in `src/constants.ts`.** The map contains four keys — `missing-coverage`, `bad-naming`, `incorrect-assertions`, `missing-mocks` — that do not exist in the `FindingCategory` union type. These are either dead entries or the union type is incomplete. See Improvement #9.
@@ -57,9 +60,11 @@ The `as Platform` assertion bypasses the existing `validatePlatform()` function.
 **Inconsistent error types in `program.ts`.** In `executeReview` (line 135), the guard `throw new Error("PR number is required")` uses the base `Error` class rather than the project's `ConfigurationError`. Callers cannot distinguish this from an unexpected runtime error.
 
 **`skipPreExisting` default logic is non-obvious:**
+
 ```typescript
 const skipPreExisting = (envValue ?? "true") !== "false";
 ```
+
 A missing value defaults to `"true"` and the comparison is inverted. This is correct but easy to misread. Expressing the default as `envValue !== "false" && envValue !== undefined` — or inverting the flag name — would be clearer.
 
 ---
@@ -78,16 +83,16 @@ A missing value defaults to `"true"` and the comparison is inverted. This is cor
 
 **Untested production files:**
 
-| File | Reason this matters |
-|---|---|
-| `src/utils/diffStorage.ts` | Caches diffs; corrupted or missing cache causes silent fallback |
-| `src/utils/prIdentifier.ts` | Parses the `-PR<n>` identifier; wrong parse produces wrong PR number |
-| `src/ci/azure-pipelines.ts` | CI detection for Azure DevOps |
-| `src/ci/github-actions.ts` | CI detection for GitHub Actions |
-| `src/ci/detector.ts` | Selects which CI adapter to use |
-| `src/ai/prompts/specialists/general.ts` | Specialist prompt content |
-| `src/ai/prompts/specialists/performance.ts` | Specialist prompt content |
-| `src/ai/prompts/specialists/security.ts` | Specialist prompt content |
+| File                                        | Reason this matters                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `src/utils/diffStorage.ts`                  | Caches diffs; corrupted or missing cache causes silent fallback      |
+| `src/utils/prIdentifier.ts`                 | Parses the `-PR<n>` identifier; wrong parse produces wrong PR number |
+| `src/ci/azure-pipelines.ts`                 | CI detection for Azure DevOps                                        |
+| `src/ci/github-actions.ts`                  | CI detection for GitHub Actions                                      |
+| `src/ci/detector.ts`                        | Selects which CI adapter to use                                      |
+| `src/ai/prompts/specialists/general.ts`     | Specialist prompt content                                            |
+| `src/ai/prompts/specialists/performance.ts` | Specialist prompt content                                            |
+| `src/ai/prompts/specialists/security.ts`    | Specialist prompt content                                            |
 
 See Improvement #8.
 
@@ -151,13 +156,17 @@ See Improvement #8.
 ### Concerns
 
 **Jitter applied after the delay cap in `rateLimitHandler.ts`.** The current computation is approximately:
+
 ```typescript
 delay = Math.min(exponential, maxDelayMs) + jitter;
 ```
+
 This means the actual delay can exceed `maxDelayMs` when jitter is large. The correct order is:
+
 ```typescript
 delay = Math.min(exponential + jitter, maxDelayMs);
 ```
+
 See Improvement #7.
 
 **`displayResults` in `program.ts` calls `loadConfig()` a second time.** `executeReview` already loads the config and could pass it through. The redundant load is harmless today but wastes I/O and could cause subtle inconsistency if config values change between the two calls.
@@ -181,6 +190,7 @@ These are ranked by a combination of user-visible impact and implementation effo
 ---
 
 ### 1. ✅ Fix the hardcoded version string in `program.ts`
+
 **File:** `src/program.ts`, line 526  
 **Severity:** High (user-visible bug)  
 **Status:** FIXED
@@ -188,6 +198,7 @@ These are ranked by a combination of user-visible impact and implementation effo
 The CLI was advertising version `1.12.0` when the package is actually `1.26.0`.
 
 **Solution implemented:**
+
 ```typescript
 import packageJson from "../package.json" with { type: "json" };
 
@@ -202,6 +213,7 @@ This ensures the CLI always displays the correct version from `package.json` wit
 ---
 
 ### 2. Split `ReviewEngine` into focused collaborators
+
 **File:** `src/review/engine.ts` (1,268 lines)  
 **Severity:** High (maintainability)
 
@@ -216,21 +228,25 @@ The engine currently owns: file batching, workspace cloning, line-number validat
 ---
 
 ### 3. Extract `parseOptionalTimeout()` helper in `config.ts`
+
 **File:** `src/config.ts`, lines 76–110  
 **Severity:** Medium (DRY violation)
 
 The pattern appears five times:
+
 ```typescript
 const raw = cliOverrides?.someTimeout ?? env.get("MM_SOME_TIMEOUT");
 const value = raw !== undefined ? Number.parseInt(raw, 10) : undefined;
 ```
 
 Extract once:
+
 ```typescript
 function parseOptionalTimeout(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
   const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) throw new ConfigurationError("timeout", `Invalid value: ${raw}`);
+  if (!Number.isFinite(n) || n <= 0)
+    throw new ConfigurationError("timeout", `Invalid value: ${raw}`);
   return n;
 }
 ```
@@ -240,6 +256,7 @@ This also adds the validation that is currently absent (no check for `NaN` or ne
 ---
 
 ### 4. Expand language detection to cover common languages
+
 **File:** `src/ai/languageDetector.ts`  
 **Severity:** Medium (feature quality)
 
@@ -258,18 +275,22 @@ Each language should carry appropriate specialist prompt fragments (idiomatic pa
 ---
 
 ### 5. Add `"update"` and `"resolve"` to `CommentActionType`
+
 **File:** `src/platforms/types.ts`  
 **Severity:** Medium (feature completeness)
 
 `CommentActionType = "create"` is the only supported action. Once a PR author fixes a finding, there is no way for the tool to mark the comment resolved or update it with a "fixed" acknowledgment. Adding:
+
 ```typescript
 type CommentActionType = "create" | "update" | "resolve" | "dismiss";
 ```
+
 …and implementing the action in both platform adapters would close the feedback loop.
 
 ---
 
 ### 6. Fix jitter-after-cap bug in `rateLimitHandler.ts`
+
 **File:** `src/utils/rateLimitHandler.ts`  
 **Severity:** Medium (correctness)
 
@@ -286,6 +307,7 @@ const delay = Math.min(base * Math.pow(2, attempt) + randomJitter, maxDelayMs);
 ---
 
 ### 7. Align `CATEGORY_EMOJI` keys with the `FindingCategory` type
+
 **File:** `src/constants.ts`  
 **Severity:** Medium (type drift)
 
@@ -293,10 +315,12 @@ The constant map contains four keys not present in the `FindingCategory` union:
 `missing-coverage`, `bad-naming`, `incorrect-assertions`, `missing-mocks`.
 
 Either:
+
 - **Remove** the extra keys if they are dead code, or
 - **Add** them to the `FindingCategory` union and handle them in the review engine.
 
 Use TypeScript's `Record<FindingCategory, string>` type for the map to make this a compile-time error if they diverge again:
+
 ```typescript
 export const CATEGORY_EMOJI: Record<FindingCategory, string> = { ... };
 ```
@@ -304,6 +328,7 @@ export const CATEGORY_EMOJI: Record<FindingCategory, string> = { ... };
 ---
 
 ### 8. Add test specs for currently untested files
+
 **Severity:** Medium (test coverage)
 
 Priority order:
@@ -316,6 +341,7 @@ Priority order:
 ---
 
 ### 9. Export config validator functions from `config.ts`
+
 **File:** `src/config.ts`  
 **Severity:** Low–Medium (reusability)
 
@@ -324,6 +350,7 @@ Priority order:
 ---
 
 ### 10. Make multi-run delay configurable
+
 **File:** `src/review/engine.ts`  
 **Severity:** Low (ergonomics)
 
@@ -340,19 +367,19 @@ interface ReviewEngineOptions {
 
 ## Scorecard
 
-| Category | Score | Key Notes |
-|---|---|---|
-| Architecture | 9 / 10 | Excellent ports/adapters; `ReviewEngine` is the sole outlier |
-| Code Quality | 8.5 / 10 | Strong naming and errors; config has DRY violations and an unsafe cast |
-| Testing | 8 / 10 | 1,186 tests + 85% threshold; 8 untested files, no integration test |
-| Security | 8.5 / 10 | Good token redaction; token in git URL, audit is non-blocking |
-| Performance | 8 / 10 | Async-first; sequential multi-run, jitter-after-cap bug |
-| Tooling | 8.5 / 10 | Strong pipeline; version mismatch ships to users |
-| Documentation | 7.5 / 10 | Good JSDoc; no architecture diagram or ADRs |
-| Error Handling | 9 / 10 | Comprehensive hierarchy; one `new Error()` in program.ts |
-| Type Safety | 9.5 / 10 | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall** | **8.4 / 10** | **Production-ready with targeted improvements** |
+| Category       | Score        | Key Notes                                                              |
+| -------------- | ------------ | ---------------------------------------------------------------------- |
+| Architecture   | 9 / 10       | Excellent ports/adapters; `ReviewEngine` is the sole outlier           |
+| Code Quality   | 8.5 / 10     | Strong naming and errors; config has DRY violations and an unsafe cast |
+| Testing        | 8 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
+| Security       | 8.5 / 10     | Good token redaction; token in git URL, audit is non-blocking          |
+| Performance    | 8 / 10       | Async-first; sequential multi-run, jitter-after-cap bug                |
+| Tooling        | 8.5 / 10     | Strong pipeline; version mismatch ships to users                       |
+| Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
+| Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
+| Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
+| **Overall**    | **8.4 / 10** | **Production-ready with targeted improvements**                        |
 
 ---
 
-*Report generated by GitHub Copilot. All line number references were verified against the repository at the time of review.*
+_Report generated by GitHub Copilot. All line number references were verified against the repository at the time of review._

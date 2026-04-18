@@ -37,13 +37,16 @@ Move changes from `[Unreleased]` section to a new versioned section in `CHANGELO
 ## [X.Y.Z] - YYYY-MM-DD
 
 ### Added
+
 - Feature 1
 - Feature 2
 
 ### Changed
+
 - Change 1
 
 ### Fixed
+
 - Bug fix 1
 ```
 
@@ -65,6 +68,7 @@ pnpm check
 ```
 
 This runs:
+
 - `pnpm build` - TypeScript compilation and production build
 - `pnpm test` - Unit tests
 - `pnpm lint` - Formatting and linting checks
@@ -74,6 +78,7 @@ This runs:
 ### Step 4: Bump Version
 
 Use `pnpm version` to automatically:
+
 - Update `package.json` version
 - Create a git tag (e.g., `v1.28.0`)
 - Create a version commit
@@ -90,6 +95,7 @@ pnpm version major
 ```
 
 This command:
+
 1. Updates `package.json` version field
 2. Creates a commit with message "X.Y.Z"
 3. Creates an annotated git tag `vX.Y.Z`
@@ -169,6 +175,7 @@ git push origin main --no-verify
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format:
 
 **Allowed Sections:**
+
 - `Added` - New features
 - `Changed` - Changes to existing functionality
 - `Deprecated` - Soon-to-be removed features
@@ -182,17 +189,21 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format:
 ## [1.28.0] - 2026-04-17
 
 ### Added
+
 - New specialist review type for database optimization
 
 ### Changed
+
 - **Default AI Timeout**: Increased from 5 minutes to 1 hour
   - Provides more time for complex PRs
   - Reduces timeout errors
 
 ### Fixed
+
 - Bug in token validation for Copilot SDK
 
 ### Security
+
 - Updated dependencies to patch vulnerability in lodash
 ```
 
@@ -242,6 +253,7 @@ Check `.github/workflows/` for CI/CD configuration.
 ## Questions?
 
 Refer to:
+
 - [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - [pnpm version documentation](https://pnpm.io/cli/version)
