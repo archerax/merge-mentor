@@ -56,6 +56,30 @@ export interface Config {
 }
 
 /**
+ * Parses an optional timeout value from string or number.
+ * Returns undefined if not provided or if the value is not a positive number.
+ * Invalid values (NaN, zero, negative) are silently ignored.
+ *
+ * @param raw - Raw timeout value (string, number, or undefined)
+ * @returns Parsed timeout in milliseconds, or undefined if not provided or invalid
+ *
+ * @internal Used internally by loadConfig for consistent timeout parsing
+ */
+function parseOptionalTimeout(raw: string | number | undefined): number | undefined {
+  if (raw === undefined || raw === "") {
+    return undefined;
+  }
+
+  const value = typeof raw === "string" ? Number.parseInt(raw, 10) : raw;
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+/**
  * Loads configuration from environment variables or CLI overrides.
  *
  * @param cliOverrides - Optional CLI parameter overrides
@@ -71,34 +95,18 @@ export function loadConfig(
   cliOverrides?: Partial<CliOverrides>,
   env: Environment = processEnvironment
 ): Config {
-  const copilotTimeoutMs =
-    (cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT"))
-      ? Number.parseInt(
-          cliOverrides?.copilotTimeout?.toString() ?? env.get("MM_COPILOT_TIMEOUT") ?? "",
-          10
-        )
-      : undefined;
-  const copilotSdkTimeoutMs =
-    (cliOverrides?.copilotSdkTimeout ?? env.get("MM_COPILOT_SDK_TIMEOUT"))
-      ? Number.parseInt(
-          cliOverrides?.copilotSdkTimeout?.toString() ?? env.get("MM_COPILOT_SDK_TIMEOUT") ?? "",
-          10
-        )
-      : undefined;
-  const opencodeTimeoutMs =
-    (cliOverrides?.opencodeTimeout ?? env.get("MM_OPENCODE_TIMEOUT"))
-      ? Number.parseInt(
-          cliOverrides?.opencodeTimeout?.toString() ?? env.get("MM_OPENCODE_TIMEOUT") ?? "",
-          10
-        )
-      : undefined;
-  const opencodeSdkTimeoutMs =
-    (cliOverrides?.opencodeSdkTimeout ?? env.get("MM_OPENCODE_SDK_TIMEOUT"))
-      ? Number.parseInt(
-          cliOverrides?.opencodeSdkTimeout?.toString() ?? env.get("MM_OPENCODE_SDK_TIMEOUT") ?? "",
-          10
-        )
-      : undefined;
+  const copilotTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT")
+  );
+  const copilotSdkTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.copilotSdkTimeout ?? env.get("MM_COPILOT_SDK_TIMEOUT")
+  );
+  const opencodeTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.opencodeTimeout ?? env.get("MM_OPENCODE_TIMEOUT")
+  );
+  const opencodeSdkTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.opencodeSdkTimeout ?? env.get("MM_OPENCODE_SDK_TIMEOUT")
+  );
 
   const reviewRuns = validateReviewRuns(
     cliOverrides?.reviewRuns?.toString() ?? env.get("MM_REVIEW_RUNS")
@@ -124,15 +132,13 @@ export function loadConfig(
     aiProvider,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
     copilotModel: cliOverrides?.copilotModel ?? env.get("MM_COPILOT_MODEL"),
-    copilotTimeoutMs: copilotTimeoutMs && copilotTimeoutMs > 0 ? copilotTimeoutMs : undefined,
+    copilotTimeoutMs,
     copilotSdkModel: cliOverrides?.copilotSdkModel ?? env.get("MM_COPILOT_SDK_MODEL"),
-    copilotSdkTimeoutMs:
-      copilotSdkTimeoutMs && copilotSdkTimeoutMs > 0 ? copilotSdkTimeoutMs : undefined,
+    copilotSdkTimeoutMs,
     opencodeModel: cliOverrides?.opencodeModel ?? env.get("MM_OPENCODE_MODEL"),
-    opencodeTimeoutMs: opencodeTimeoutMs && opencodeTimeoutMs > 0 ? opencodeTimeoutMs : undefined,
+    opencodeTimeoutMs,
     opencodeSdkModel: cliOverrides?.opencodeSdkModel ?? env.get("MM_OPENCODE_SDK_MODEL"),
-    opencodeSdkTimeoutMs:
-      opencodeSdkTimeoutMs && opencodeSdkTimeoutMs > 0 ? opencodeSdkTimeoutMs : undefined,
+    opencodeSdkTimeoutMs,
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
     reviewRuns,
