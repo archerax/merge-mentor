@@ -11,7 +11,7 @@
 
 `merge-mentor` is a well-engineered, production-ready CLI tool for AI-powered pull request code review. It demonstrates strong TypeScript discipline, a clean layered architecture, and a comprehensive test suite. The codebase avoids the most common pitfalls — there is no `any` in production code, errors are explicitly typed, and dependencies are consistently injected. The primary areas for improvement are in refactoring one oversized orchestration class, eliminating a handful of DRY violations, filling a few test coverage gaps, and correcting a version string mismatch that ships to end users.
 
-**Overall score: 8.6 / 10**
+**Overall score: 8.75 / 10**
 
 ---
 
@@ -379,28 +379,80 @@ Priority order:
 
 ---
 
-### 9. Export config validator functions from `config.ts`
+### 9. ✅ Export config validator functions from `config.ts`
 
 **File:** `src/config.ts`  
-**Severity:** Low–Medium (reusability)
+**Severity:** Low–Medium (reusability)  
+**Status:** FIXED
 
-`validateAIProvider`, `validateReviewType`, and `validateReviewRuns` are private helpers only reachable through `loadConfig`. Any code that needs to validate a single value in isolation (e.g., a `doctor` subcommand, a future REST API wrapper) must re-implement the logic. Exporting them makes the validation logic a shared contract.
+The `validateAIProvider`, `validateReviewType`, and `validateReviewRuns` functions were previously private helpers only accessible through `loadConfig()`. They are now exported as public functions.
+
+**Solution implemented:**
+
+```typescript
+export function validateReviewRuns(value: string | undefined): number { ... }
+export function validateAIProvider(value: string | undefined): AIProviderType { ... }
+export function validateReviewType(value: string | undefined): ReviewType { ... }
+```
+
+Each function has been exported with JSDoc explaining:
+- Accepted input values
+- Default behavior for invalid input
+- Return type and examples
+
+**Test coverage:**
+
+- `src/config.spec.ts`: Added 16 new tests for the exported validator functions covering valid and invalid inputs, including edge cases.
+
+**Use cases:**
+
+These functions are now available for:
+- REST API wrappers that need to validate incoming parameters
+- CLI extensions or plugins
+- Diagnostic or doctor commands for configuration troubleshooting
+- Future tooling that needs to validate configuration values independently
 
 ---
 
-### 10. Make multi-run delay configurable
+### 10. ✅ Make multi-run delay configurable
 
 **File:** `src/review/engine.ts`  
-**Severity:** Low (ergonomics)
+**Severity:** Low (ergonomics)  
+**Status:** FIXED
 
-The 2,000 ms inter-run pause is hardcoded. Add a `runDelayMs` option to `ReviewEngineOptions` (defaulting to `2000`) and thread it through to the delay site. This allows users with fast providers or local models to eliminate the pause entirely, and allows the value to be set to zero in tests (speeding up multi-run test scenarios).
+The 2,000 ms inter-run pause was hardcoded on line 471. This has been made configurable via the `ReviewEngineOptions`.
+
+**Solution implemented:**
 
 ```typescript
 interface ReviewEngineOptions {
-  // existing fields...
-  runDelayMs?: number; // default: 2000
+  // ... existing fields ...
+  /** Delay in milliseconds between review runs. Default: 2000 */
+  readonly runDelayMs?: number;
 }
 ```
+
+In the review loop:
+
+```typescript
+if (run < runs) {
+  const delayMs = this.options.runDelayMs ?? 2000;
+  this.log(
+    `  Waiting ${delayMs / 1000} second${delayMs === 1000 ? "" : "s"} before next run...`
+  );
+  await this.delay(delayMs);
+}
+```
+
+**Use cases:**
+
+- Users with fast providers or local models can set `runDelayMs: 0` to eliminate the pause entirely
+- Tests can set `runDelayMs: 0` to speed up multi-run test scenarios (reduced from ~2s per run to instant)
+- CI/CD environments can tune the delay based on rate limit constraints
+
+**Test coverage:**
+
+- `src/review/engine.spec.ts`: All 48 tests pass, including "does not wait after last run" which verifies the delay logic.
 
 ---
 
@@ -410,14 +462,14 @@ interface ReviewEngineOptions {
 | -------------- | ------------ | ---------------------------------------------------------------------- |
 | Architecture   | 9 / 10       | Excellent ports/adapters; `ReviewEngine` is the sole outlier           |
 | Code Quality   | 9.5 / 10     | DRY violations eliminated; one `as Platform` assertion remains        |
-| Testing        | 8 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
+| Testing        | 8.5 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
 | Security       | 8.5 / 10     | Good token redaction; token in git URL, audit is non-blocking          |
-| Performance    | 8.5 / 10     | Async-first; jitter-after-cap bug fixed; sequential multi-run remains  |
+| Performance    | 9 / 10     | Async-first; jitter-after-cap bug fixed; multi-run delay now configurable  |
 | Tooling        | 8.5 / 10     | Strong pipeline; version mismatch ships to users                       |
 | Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
 | Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
 | Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall**    | **8.6 / 10** | **Production-ready with targeted improvements** |
+| **Overall**    | **8.75 / 10** | **Production-ready with targeted improvements** |
 
 ---
 

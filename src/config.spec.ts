@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig, type Platform, validateConfig } from "./config.js";
+import {
+  loadConfig,
+  type Platform,
+  validateAIProvider,
+  validateConfig,
+  validateReviewRuns,
+  validateReviewType,
+} from "./config.js";
 import { ConfigurationError } from "./errors/index.js";
 import { createStubEnvironment } from "./ports/environment.test-helper.js";
 
@@ -498,6 +505,61 @@ describe("Config", () => {
       const unknownPlatform = "unknown" as unknown as Platform;
 
       expect(() => validateConfig(config, unknownPlatform)).not.toThrow();
+    });
+  });
+});
+
+describe("Validator functions", () => {
+  describe("validateReviewRuns", () => {
+    it("should accept valid run counts 1-5", () => {
+      expect(validateReviewRuns("1")).toBe(1);
+      expect(validateReviewRuns("3")).toBe(3);
+      expect(validateReviewRuns("5")).toBe(5);
+    });
+
+    it("should default to 1 for out-of-range values", () => {
+      expect(validateReviewRuns("0")).toBe(1);
+      expect(validateReviewRuns("6")).toBe(1);
+      expect(validateReviewRuns("100")).toBe(1);
+    });
+
+    it("should default to 1 for invalid values", () => {
+      expect(validateReviewRuns("invalid")).toBe(1);
+      expect(validateReviewRuns("")).toBe(1);
+      expect(validateReviewRuns(undefined)).toBe(1);
+    });
+  });
+
+  describe("validateAIProvider", () => {
+    it("should accept valid provider types", () => {
+      expect(validateAIProvider("copilot")).toBe("copilot");
+      expect(validateAIProvider("copilot-sdk")).toBe("copilot-sdk");
+      expect(validateAIProvider("opencode")).toBe("opencode");
+      expect(validateAIProvider("opencode-sdk")).toBe("opencode-sdk");
+    });
+
+    it("should default to copilot-sdk for invalid providers", () => {
+      expect(validateAIProvider("invalid")).toBe("copilot-sdk");
+      expect(validateAIProvider("cursor")).toBe("copilot-sdk");
+      expect(validateAIProvider("")).toBe("copilot-sdk");
+      expect(validateAIProvider(undefined)).toBe("copilot-sdk");
+    });
+  });
+
+  describe("validateReviewType", () => {
+    it("should accept valid review types", () => {
+      expect(validateReviewType("general")).toBe("general");
+      expect(validateReviewType("testing")).toBe("testing");
+      expect(validateReviewType("security")).toBe("security");
+      expect(validateReviewType("performance")).toBe("performance");
+      expect(validateReviewType("fast")).toBe("fast");
+    });
+
+    it("should default to general for invalid types", () => {
+      expect(validateReviewType("invalid")).toBe("general");
+      expect(validateReviewType("custom")).toBe("general");
+      expect(validateReviewType("")).toBe("general");
+      expect(validateReviewType(undefined)).toBe("general");
     });
   });
 });

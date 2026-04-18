@@ -105,6 +105,8 @@ interface ReviewEngineOptions {
   readonly localWorkspacePath?: string;
   /** Glob patterns for files to ignore in review. */
   readonly ignorePatterns?: string[];
+  /** Delay in milliseconds between review runs. Default: 2000 */
+  readonly runDelayMs?: number;
   /** Output writer for console output. Default: consoleOutputWriter */
   readonly output?: OutputWriter;
   /** File system abstraction for I/O operations. Default: nodeFs */
@@ -467,8 +469,11 @@ export class ReviewEngine {
 
         // Delay between runs to avoid rate limits (except after last run)
         if (run < runs) {
-          this.log("  Waiting 2 seconds before next run...");
-          await this.delay(2000);
+          const delayMs = this.options.runDelayMs ?? 2000;
+          this.log(
+            `  Waiting ${delayMs / 1000} second${delayMs === 1000 ? "" : "s"} before next run...`
+          );
+          await this.delay(delayMs);
         }
       } catch (error) {
         this.logger.error({ prNumber, run, error: (error as Error).message }, "Review run failed");

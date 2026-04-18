@@ -182,7 +182,21 @@ interface CliOverrides {
   readonly tempPath?: string;
 }
 
-function validateReviewRuns(value: string | undefined): number {
+/**
+ * Validates the number of review runs.
+ * Accepted values are 1-5. Values outside this range default to 1.
+ *
+ * @param value - Review run count as string or undefined
+ * @returns Validated run count (1-5), or 1 if invalid
+ *
+ * @example
+ * ```typescript
+ * validateReviewRuns("3"); // 3
+ * validateReviewRuns("10"); // 1 (default, out of range)
+ * validateReviewRuns(undefined); // 1 (default)
+ * ```
+ */
+export function validateReviewRuns(value: string | undefined): number {
   if (!value) {
     return 1; // Default to 1 run
   }
@@ -193,7 +207,23 @@ function validateReviewRuns(value: string | undefined): number {
   return parsed;
 }
 
-function validateAIProvider(value: string | undefined): AIProviderType {
+/**
+ * Validates the AI provider type.
+ * Supported providers are: copilot, copilot-sdk, opencode, opencode-sdk.
+ * Unknown values default to copilot-sdk.
+ *
+ * @param value - AI provider name as string or undefined
+ * @returns Validated provider type, or 'copilot-sdk' if invalid
+ *
+ * @example
+ * ```typescript
+ * validateAIProvider("copilot"); // "copilot"
+ * validateAIProvider("opencode-sdk"); // "opencode-sdk"
+ * validateAIProvider("unknown"); // "copilot-sdk" (default)
+ * validateAIProvider(undefined); // "copilot-sdk" (default)
+ * ```
+ */
+export function validateAIProvider(value: string | undefined): AIProviderType {
   const validProviders: AIProviderType[] = ["copilot", "copilot-sdk", "opencode", "opencode-sdk"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
@@ -201,7 +231,23 @@ function validateAIProvider(value: string | undefined): AIProviderType {
   return "copilot-sdk"; // Default to copilot-sdk
 }
 
-function validateReviewType(value: string | undefined): ReviewType {
+/**
+ * Validates the review type.
+ * Supported types are: general, testing, security, performance, fast.
+ * Unknown values default to general.
+ *
+ * @param value - Review type name as string or undefined
+ * @returns Validated review type, or 'general' if invalid
+ *
+ * @example
+ * ```typescript
+ * validateReviewType("security"); // "security"
+ * validateReviewType("performance"); // "performance"
+ * validateReviewType("unknown"); // "general" (default)
+ * validateReviewType(undefined); // "general" (default)
+ * ```
+ */
+export function validateReviewType(value: string | undefined): ReviewType {
   const validTypes: ReviewType[] = ["general", "testing", "security", "performance", "fast"];
   if (value && validTypes.includes(value as ReviewType)) {
     return value as ReviewType;
