@@ -23,6 +23,7 @@ interface ExecOptions {
   maxBuffer?: number;
   encoding?: BufferEncoding;
   timeout?: number;
+  env?: Record<string, string>;
 }
 
 /** Abstraction over child process execution for testability. */

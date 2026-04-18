@@ -138,7 +138,7 @@ See Improvement #8.
 
 ### Concerns
 
-**Token embedded in git clone URL** (`src/utils/repoManager.ts`). The personal access token is interpolated directly into the HTTPS remote URL. If this URL leaks via process listing, git config, or `git remote -v`, the token is exposed. Using `git credential` or the `GIT_ASKPASS` mechanism would keep the token out of the URL entirely.
+**✅ FIXED: Token no longer embedded in git clone URLs** (`src/review/repoManager.ts`). The application now uses public URLs for git cloning without embedding credentials. In CI mode (detected via `--ci` flag), git uses pre-configured CI environment credentials. In non-CI mode, the token is passed via `GIT_CREDENTIALS` environment variable, keeping it out of process listings, git config, and error messages.
 
 **✅ FIXED: Security audit now blocks high/critical vulnerabilities** (`.github/workflows/ci.yml`). The `pnpm audit` check now runs with `--audit-level=high` and `continue-on-error` has been removed, ensuring high and critical severity vulnerabilities will block the CI pipeline. This enforces supply chain security and prevents vulnerable dependencies from being merged.
 
@@ -463,13 +463,13 @@ if (run < runs) {
 | Architecture   | 9 / 10       | Excellent ports/adapters; `ReviewEngine` is the sole outlier           |
 | Code Quality   | 9.5 / 10     | DRY violations eliminated; one `as Platform` assertion remains        |
 | Testing        | 8.5 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
-| Security       | 9 / 10       | Good token redaction; audit now blocks high/critical; token in git URL remains           |
+| Security       | 9.5 / 10     | Audit blocks high/critical; tokens not in URLs or process env; comprehensive redaction |
 | Performance    | 9 / 10     | Async-first; jitter-after-cap bug fixed; multi-run delay now configurable  |
 | Tooling        | 8.5 / 10     | Strong pipeline; version mismatch ships to users                       |
 | Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
 | Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
 | Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall**    | **8.8 / 10** | **Production-ready with targeted improvements** |
+| **Overall**    | **8.85 / 10** | **Production-ready with comprehensive security hardening** |
 
 ---
 

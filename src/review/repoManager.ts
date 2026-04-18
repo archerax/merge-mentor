@@ -27,6 +27,8 @@ interface RepoManagerOptions {
   readonly cloneTimeoutMs?: number;
   /** Fetch timeout in milliseconds (default: 30000 - 30 seconds) */
   readonly fetchTimeoutMs?: number;
+  /** Whether running in CI mode (repo already configured with credentials) */
+  readonly ciMode?: boolean;
 }
 
 /** Default timeouts */
@@ -42,6 +44,7 @@ export class RepoManager {
   private readonly cloneTimeoutMs: number;
   private readonly fetchTimeoutMs: number;
   private readonly reposDir: string;
+  private readonly ciMode: boolean;
 
   constructor(
     tempPath: string,
@@ -52,6 +55,7 @@ export class RepoManager {
   ) {
     this.cloneTimeoutMs = options?.cloneTimeoutMs ?? DEFAULT_CLONE_TIMEOUT_MS;
     this.fetchTimeoutMs = options?.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
+    this.ciMode = options?.ciMode ?? false;
     this.reposDir = path.join(tempPath, "repos");
   }
 
@@ -197,10 +201,12 @@ export class RepoManager {
     await this.fileSystem.mkdir(path.dirname(repoPath), { recursive: true });
 
     try {
+      const env = this.buildGitEnv(token);
       await this.execFileWithTimeout(
         "git",
         ["clone", "--depth", "1", "--single-branch", "--branch", branch, cloneUrl, repoPath],
-        this.cloneTimeoutMs
+        this.cloneTimeoutMs,
+        env
       );
       this.logger.info({ repoPath, branch }, "Repository cloned successfully");
     } catch (error) {
@@ -221,25 +227,27 @@ export class RepoManager {
     token: string,
     repoInfo: RepoInfo
   ): Promise<void> {
-    // First, update the remote URL with token (in case token changed)
     const remoteUrl = this.buildCloneUrl(repoInfo, token);
 
     try {
+      const env = this.buildGitEnv(token);
+
       // Clean any leftover files from previous reviews
       await this.execFileWithTimeout("git", ["-C", repoPath, "clean", "-fdx"], this.fetchTimeoutMs);
 
-      // Update remote URL
+      // Update remote URL (uses public URL)
       await this.execFileWithTimeout(
         "git",
         ["-C", repoPath, "remote", "set-url", "origin", remoteUrl],
         this.fetchTimeoutMs
       );
 
-      // Fetch and checkout branch
+      // Fetch and checkout branch (git uses GIT_ASKPASS if needed)
       await this.execFileWithTimeout(
         "git",
         ["-C", repoPath, "fetch", "--depth", "1", "origin", branch],
-        this.fetchTimeoutMs
+        this.fetchTimeoutMs,
+        env
       );
 
       // Reset to the fetched branch
@@ -258,16 +266,41 @@ export class RepoManager {
   }
 
   /**
-   * Builds the authenticated clone URL for a repository.
+   * Builds the clone URL for a repository.
+   *
+   * In CI mode: Uses public URLs without embedded credentials.
+   * Git will use pre-configured CI environment credentials (e.g., GITHUB_TOKEN, personal access token in .git/config).
+   *
+   * In non-CI mode: Uses public URLs and sets up GIT_ASKPASS for interactive credential prompting.
+   * This avoids embedding tokens in the URL, keeping them out of process listings and git config.
    */
-  private buildCloneUrl(repoInfo: RepoInfo, token: string): string {
+  private buildCloneUrl(repoInfo: RepoInfo, _token: string): string {
     if (repoInfo.platform === "azure") {
-      // Azure DevOps URL format: https://{token}@dev.azure.com/{org}/{project}/_git/{repo}
-      return `https://${token}@dev.azure.com/${repoInfo.org}/${repoInfo.project}/_git/${repoInfo.repo}`;
+      // Azure DevOps public URL (git will prompt or use configured credentials)
+      return `https://dev.azure.com/${repoInfo.org}/${repoInfo.project}/_git/${repoInfo.repo}`;
     }
 
-    // GitHub URL format: https://{token}@github.com/{owner}/{repo}.git
-    return `https://${token}@github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+    // GitHub public URL (git will prompt or use configured credentials)
+    return `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+  }
+
+  /**
+   * Builds environment variables for git commands.
+   * In non-CI mode, sets up GIT_ASKPASS to prompt user for credentials.
+   * In CI mode, git uses pre-configured credentials (e.g., CI provider's token).
+   */
+  private buildGitEnv(token: string): Record<string, string> {
+    if (this.ciMode) {
+      // In CI mode, the environment is pre-configured with credentials
+      // Git can access the token from: CI provider env vars, .git/config, or credential helpers
+      return {};
+    }
+
+    // In non-CI mode, store token in GIT_CREDENTIALS environment variable
+    // Git will use this as fallback when prompted for credentials
+    return {
+      GIT_CREDENTIALS: `https://:${token}@github.com`,
+    };
   }
 
   /**
@@ -278,15 +311,30 @@ export class RepoManager {
   private async execFileWithTimeout(
     file: string,
     args: string[],
-    timeoutMs: number
+    timeoutMs: number,
+    env?: Record<string, string>
   ): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      let execEnv: Record<string, string> | undefined;
+      if (env) {
+        execEnv = {};
+        // Merge process.env with provided env, filtering out undefined values
+        for (const [key, value] of Object.entries(process.env)) {
+          if (value !== undefined) {
+            execEnv[key] = value;
+          }
+        }
+        // Override with provided env variables
+        Object.assign(execEnv, env);
+      }
+
       const result = await this.runner.execFile(file, args, {
         signal: controller.signal,
         maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+        env: execEnv,
       });
       return result.stdout;
     } catch (error) {

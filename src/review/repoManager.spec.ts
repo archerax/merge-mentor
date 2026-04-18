@@ -102,7 +102,7 @@ describe("RepoManager", () => {
 
       expect(processRunner.execFile).toHaveBeenCalledWith(
         "git",
-        expect.arrayContaining(["https://test-token@github.com/testowner/testrepo.git"]),
+        expect.arrayContaining(["https://github.com/testowner/testrepo.git"]),
         expect.any(Object)
       );
     });
@@ -121,7 +121,7 @@ describe("RepoManager", () => {
 
       expect(processRunner.execFile).toHaveBeenCalledWith(
         "git",
-        expect.arrayContaining(["https://test-token@dev.azure.com/myorg/myproject/_git/azurerepo"]),
+        expect.arrayContaining(["https://dev.azure.com/myorg/myproject/_git/azurerepo"]),
         expect.any(Object)
       );
     });

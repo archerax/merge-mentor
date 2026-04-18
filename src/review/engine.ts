@@ -176,7 +176,7 @@ export class ReviewEngine {
       skipPreExisting: resolvedOptions?.skipPreExisting,
     });
     this.stateCache = new ReviewStateCache(tempPath);
-    this.repoManager = new RepoManager(tempPath);
+    this.repoManager = new RepoManager(tempPath, { ciMode: resolvedOptions?.ciMode });
     this.options = resolvedOptions ?? {};
     this.streamingEnabled = resolvedOptions?.streamingEnabled ?? true;
     this.streamingLines = resolvedOptions?.streamingLines ?? 5;
