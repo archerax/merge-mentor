@@ -1,6 +1,28 @@
 /**
- * Formats unified diffs with pre-calculated line numbers for easier AI consumption.
- * This helps AI models accurately identify line numbers without manual counting.
+ * Diff formatting utilities for AI consumption.
+ *
+ * Converts unified diffs into a numbered format that makes it trivial for AI models
+ * to identify line numbers without manual counting. This is essential for generating
+ * accurate inline code review comments.
+ *
+ * The numbered format shows:
+ * - Line number in the new file (or `-` for deleted lines)
+ * - Diff marker: `+` for added, `-` for removed, ` ` for context
+ * - Line content
+ *
+ * @example
+ * ```typescript
+ * const patch = `@@ -10,3 +10,4 @@ function test() {
+ *  context line
+ * +added line
+ *  more context`;
+ * const result = convertToNumberedDiff(patch);
+ * // Output:
+ * // @@ -10,3 +10,4 @@ function test()
+ * //      10 | context line
+ * //    + 11 | added line
+ * //      12 | more context
+ * ```
  */
 
 interface NumberedLine {

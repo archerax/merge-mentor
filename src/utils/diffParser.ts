@@ -1,6 +1,28 @@
 /**
- * Parses a unified diff patch to extract valid line numbers for inline comments.
- * GitHub API only allows comments on lines that are part of the diff.
+ * Diff parsing utilities for extracting valid comment line numbers.
+ *
+ * GitHub's API only allows inline comments on specific lines in a PR:
+ * - Lines that were added (prefixed with `+`)
+ * - Context lines (prefixed with ` `) near the changes
+ * - NOT on removed lines (prefixed with `-`)
+ *
+ * This module extracts which line numbers are valid for commenting and helps
+ * map AI-suggested line numbers to the nearest valid line if needed.
+ *
+ * @example
+ * ```typescript
+ * const patch = `@@ -10,5 +10,6 @@
+ *  context
+ * +new line
+ * -old line
+ *  more context`;
+ *
+ * const validLines = getValidDiffLines(patch);
+ * // Set containing line numbers that can be commented on
+ *
+ * const nearest = findNearestValidLine(13, validLines);
+ * // If line 13 is not commentable, find the closest valid line
+ * ```
  */
 
 /**

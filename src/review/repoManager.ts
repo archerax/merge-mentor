@@ -1,3 +1,39 @@
+/**
+ * Repository management for coding standard extraction.
+ *
+ * Maintains persistent clones of repositories for extracting coding standards
+ * and conventions used in code review context. The ReviewEngine uses RepoManager
+ * to clone the PR's repository and extract patterns from existing code.
+ *
+ * Key responsibilities:
+ * - Clone repositories from GitHub or Azure DevOps
+ * - Update existing clones via `git fetch` (more efficient than re-cloning)
+ * - Extract coding standards from repository contents
+ * - Handle authentication tokens securely (redacted in logs)
+ * - Support CI mode (repository already checked out)
+ *
+ * Clones are stored in `{tempPath}/repos/{platform}/{owner}/{repo}` for reuse
+ * across multiple PR reviews. This avoids redundant cloning while keeping
+ * credentials and temporary data isolated.
+ *
+ * Timeouts:
+ * - Clone: 2 minutes (includes network transfer and object checkout)
+ * - Fetch: 30 seconds (updates existing clone, usually faster)
+ *
+ * @example
+ * ```typescript
+ * const manager = new RepoManager('.mergementor');
+ *
+ * const repoPath = await manager.ensureRepo(
+ *   { owner: 'archerax', repo: 'merge-mentor', platform: 'github' },
+ *   'main',
+ *   githubToken
+ * );
+ *
+ * const standards = await manager.extractCodingStandards(repoPath);
+ * ```
+ */
+
 import path from "node:path";
 import { createChildLogger } from "../logger.js";
 import {
@@ -12,22 +48,29 @@ import { redactToken } from "../utils/redact.js";
 
 /** Repository information for cloning. */
 export interface RepoInfo {
+  /** Repository owner or organization name */
   readonly owner: string;
+  /** Repository name */
   readonly repo: string;
+  /** Platform: 'github' for GitHub, 'azure' for Azure DevOps */
   readonly platform: "github" | "azure";
-  /** For Azure DevOps: organization name */
+  /** Azure DevOps organization name (required if platform === 'azure') */
   readonly org?: string;
-  /** For Azure DevOps: project name */
+  /** Azure DevOps project name (required if platform === 'azure') */
   readonly project?: string;
 }
 
-/** Options for repository operations. */
+/**
+ * Configuration options for repository operations.
+ *
+ * Controls timeouts and behavior for cloning and fetching repositories.
+ */
 interface RepoManagerOptions {
   /** Clone timeout in milliseconds (default: 120000 - 2 minutes) */
   readonly cloneTimeoutMs?: number;
   /** Fetch timeout in milliseconds (default: 30000 - 30 seconds) */
   readonly fetchTimeoutMs?: number;
-  /** Whether running in CI mode (repo already configured with credentials) */
+  /** Whether running in CI mode (repository already configured with credentials) */
   readonly ciMode?: boolean;
 }
 
@@ -37,7 +80,9 @@ const DEFAULT_FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
  * Manages persistent repository clones for context extraction.
+ *
  * Handles cloning, updating, and extracting coding standards from repositories.
+ * Supports both GitHub and Azure DevOps platforms with automatic authentication.
  */
 export class RepoManager {
   private readonly logger = createChildLogger({ component: "RepoManager" });
@@ -46,6 +91,15 @@ export class RepoManager {
   private readonly reposDir: string;
   private readonly ciMode: boolean;
 
+  /**
+   * Creates a new repository manager.
+   *
+   * @param tempPath - Base temporary directory (will create `repos/` subdirectory)
+   * @param options - Configuration for timeouts and CI mode
+   * @param fileSystem - File system operations (dependency injection, defaults to nodeFs)
+   * @param runner - Process runner for git commands (dependency injection, defaults to nodeProcessRunner)
+   * @param clock - Clock for timestamps (dependency injection, defaults to systemClock)
+   */
   constructor(
     tempPath: string,
     options?: RepoManagerOptions,
@@ -61,12 +115,43 @@ export class RepoManager {
 
   /**
    * Ensures the repository is cloned and up-to-date, then returns the path.
-   * Clones the repo if not present, or fetches updates if it exists.
    *
-   * @param repoInfo - Repository information
-   * @param branch - Branch to checkout
-   * @param token - Authentication token
-   * @returns Path to the cloned repository
+   * Clones the repo if not present, or fetches updates if it exists (more efficient).
+   * After cloning/updating, checks out the specified branch.
+   *
+   * Authentication is handled automatically via the token parameter (added to clone URL).
+   * For CI mode, assumes credentials are already configured in the environment.
+   *
+   * @param repoInfo - Repository identification (owner, repo, platform, org, project)
+   * @param branch - Branch to checkout after clone/fetch
+   * @param token - Authentication token (GitHub token or Azure PAT)
+   * @returns Absolute path to the cloned repository
+   * @throws Error if clone fails, fetch fails, or branch doesn't exist
+   *
+   * @example
+   * ```typescript
+   * const manager = new RepoManager('.mergementor');
+   *
+   * // GitHub
+   * const path = await manager.ensureRepo(
+   *   { owner: 'archerax', repo: 'merge-mentor', platform: 'github' },
+   *   'main',
+   *   githubToken
+   * );
+   *
+   * // Azure DevOps
+   * const azurePath = await manager.ensureRepo(
+   *   {
+   *     owner: 'myorg',
+   *     repo: 'my-repo',
+   *     platform: 'azure',
+   *     org: 'myorg',
+   *     project: 'MyProject'
+   *   },
+   *   'develop',
+   *   azurePAT
+   * );
+   * ```
    */
   async ensureRepo(repoInfo: RepoInfo, branch: string, token: string): Promise<string> {
     const repoPath = this.getRepoPath(repoInfo);

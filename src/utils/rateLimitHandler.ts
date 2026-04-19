@@ -3,6 +3,31 @@ import { type Clock, systemClock } from "../ports/index.js";
 
 /**
  * Rate limit handling utilities for API requests.
+ *
+ * Provides automatic retry logic with exponential backoff and jitter for rate-limited API calls.
+ * Supports multiple error formats from GitHub, Azure DevOps, and standard HTTP responses.
+ *
+ * Key features:
+ * - Automatic detection of rate limit errors from various platforms
+ * - Exponential backoff with jitter to prevent thundering herd
+ * - Server-provided retry-after values when available
+ * - Configurable max retries and delay bounds
+ * - Custom error detection and retry-after extraction
+ *
+ * @example
+ * ```typescript
+ * // Wrap a single async call
+ * const result = await withRateLimitHandling(
+ *   () => octokit.pulls.get({ owner, repo, pull_number: 123 })
+ * );
+ *
+ * // Create a reusable wrapper
+ * const rateLimitedFetch = withRateLimit(
+ *   (url: string) => fetch(url).then(r => r.json()),
+ *   { maxRetries: 5, baseDelayMs: 1000 }
+ * );
+ * const data = await rateLimitedFetch("https://api.example.com/data");
+ * ```
  */
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -33,6 +58,25 @@ interface RateLimitInfo {
 
 /**
  * Checks if an error is a rate limit error (HTTP 429 or similar).
+ *
+ * Detects rate limit errors from multiple sources:
+ * - GitHub/Octokit: HTTP 403 with "rate limit" in message
+ * - Standard HTTP: HTTP 429 status code
+ * - Azure DevOps: HTTP 429 via statusCode property
+ *
+ * @param error - The error object to check
+ * @returns True if the error is rate limit related, false otherwise
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await fetchData();
+ * } catch (error) {
+ *   if (isRateLimitError(error)) {
+ *     console.log("Hit rate limit, retrying...");
+ *   }
+ * }
+ * ```
  */
 export function isRateLimitError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -57,8 +101,30 @@ export function isRateLimitError(error: unknown): boolean {
 }
 
 /**
- * Extracts Retry-After value from error response.
- * Returns milliseconds to wait, or undefined if not available.
+ * Extracts retry-after delay from error response headers.
+ *
+ * Supports multiple retry strategies:
+ * - Retry-After header (in seconds or HTTP-date)
+ * - X-RateLimit-Reset header (GitHub, Unix timestamp in seconds)
+ *
+ * Returns the delay in milliseconds if available, or undefined if not present.
+ *
+ * @param error - The error object containing response headers
+ * @param clock - Clock for time calculations (defaults to system clock)
+ * @returns Milliseconds to wait before retrying, or undefined if not available
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await fetchData();
+ * } catch (error) {
+ *   const delayMs = extractRetryAfter(error);
+ *   if (delayMs) {
+ *     await sleep(delayMs);
+ *     // Retry now
+ *   }
+ * }
+ * ```
  */
 export function extractRetryAfter(error: unknown, clock: Clock = systemClock): number | undefined {
   if (!error || typeof error !== "object") return undefined;
@@ -100,6 +166,13 @@ export function extractRetryAfter(error: unknown, clock: Clock = systemClock): n
 
 /**
  * Analyzes an error to extract rate limit information.
+ *
+ * Determines if an error is rate limit related and extracts the retry delay
+ * from either server headers or defaults to exponential backoff calculation.
+ *
+ * @param error - The error to analyze
+ * @param options - Configuration including custom rate limit checks
+ * @returns Object with isRateLimit flag and retryAfterMs delay
  */
 function getRateLimitInfo(error: unknown, options: RateLimitOptions): RateLimitInfo {
   const checkRateLimit = options.isRateLimitError || isRateLimitError;
@@ -117,6 +190,20 @@ function getRateLimitInfo(error: unknown, options: RateLimitOptions): RateLimitI
 
 /**
  * Calculates exponential backoff delay with jitter.
+ *
+ * Uses the formula: delay = min(baseDelay * 2^attempt + jitter, maxDelayMs)
+ * Jitter is 0-30% of exponential delay to prevent thundering herd problems.
+ *
+ * @param attempt - The retry attempt number (0-based)
+ * @param baseDelayMs - Base delay in milliseconds
+ * @param maxDelayMs - Maximum delay cap in milliseconds
+ * @returns Calculated delay in milliseconds
+ *
+ * @example
+ * ```typescript
+ * calculateBackoffDelay(0, 1000, 30000); // ~1000-1300ms
+ * calculateBackoffDelay(3, 1000, 30000); // ~8000-10400ms (capped at 30s)
+ * ```
  */
 function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
   const exponentialDelay = baseDelayMs * 2 ** attempt;
@@ -127,6 +214,11 @@ function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs:
 
 /**
  * Waits for specified milliseconds.
+ *
+ * Used internally for retry delays. Wraps setTimeout in a Promise for async/await usage.
+ *
+ * @param ms - Milliseconds to wait
+ * @returns Promise that resolves after the specified delay
  */
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -197,15 +289,22 @@ export async function withRateLimitHandling<T>(
 }
 
 /**
- * Creates a rate-limit-aware wrapper around API methods.
+ * Creates a rate-limit-aware wrapper around async functions.
+ *
+ * Automatically retries the wrapped function on rate limit errors with exponential backoff.
+ * Non-rate-limit errors are thrown immediately without retry.
+ *
+ * @param fn - Async function to wrap
+ * @param options - Rate limit configuration (retries, delays, custom detectors)
+ * @returns Wrapped function with the same signature and automatic retry logic
  *
  * @example
  * ```typescript
- * const rateLimitedOctokit = {
- *   pulls: {
- *     get: withRateLimit((params) => octokit.pulls.get(params))
- *   }
- * };
+ * const rateLimitedFetch = withRateLimit(
+ *   (url: string) => fetch(url).then(r => r.json()),
+ *   { maxRetries: 3, baseDelayMs: 1000 }
+ * );
+ * const data = await rateLimitedFetch("https://api.example.com/data");
  * ```
  */
 export function withRateLimit<TArgs extends unknown[], TResult>(

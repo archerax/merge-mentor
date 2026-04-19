@@ -1,0 +1,35 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "markdown": {
+    "entryDocument": "README.md",
+    "hideBreadcrumbs": false,
+    "hideInPageTOC": false,
+    "indexFormat": "table"
+  },
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.test-helper.ts"
+  ],
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "sort": ["source-order"],
+  "categorizeByGroup": true,
+  "searchInComments": true,
+  "includeVersion": true,
+  "name": "Merge Mentor API Documentation",
+  "hideGenerator": false,
+  "theme": "markdown",
+  "navigationLinks": {
+    "GitHub": "https://github.com/archerax/MergeMentor",
+    "Issues": "https://github.com/archerax/MergeMentor/issues"
+  },
+  "logLevel": "Warn"
+}

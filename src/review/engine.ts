@@ -1,3 +1,46 @@
+/**
+ * Core review orchestration engine.
+ *
+ * The ReviewEngine is the central orchestrator for the code review process, managing:
+ * - PR file fetching and diff analysis
+ * - AI-driven review (file-by-file and cross-file analysis)
+ * - Comment lifecycle management (create/deduplicate/post)
+ * - Review result caching to avoid re-reviewing unchanged files
+ * - Repository cloning for coding standard extraction
+ * - Multiple review runs with aggregated findings
+ *
+ * Supported review types:
+ * - general: Comprehensive code review covering style, logic, and best practices
+ * - security: Security vulnerability and threat model analysis
+ * - testing: Test coverage, quality, and edge case analysis
+ * - performance: Performance bottlenecks, complexity analysis, optimization opportunities
+ *
+ * Multiple review runs execute sequentially (with delay) and aggregate findings through
+ * fingerprinting to deduplicate across runs. This improves finding diversity and robustness.
+ *
+ * The engine uses dependency injection for all I/O:
+ * - PlatformAdapter: GitHub or Azure DevOps integration
+ * - AIProviderClient: Copilot, OpenCode, or other AI models
+ * - OutputWriter: Display results to console or CI logs
+ * - FileSystem: Read/write operations for cache, diffs, repos
+ * - ProcessRunner: Execute git commands for cloning/fetching
+ * - Clock: Timestamp generation for audit trails
+ *
+ * @example
+ * ```typescript
+ * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
+ *   reviewType: 'security',
+ *   reviewRuns: 2,
+ *   dryRun: false,
+ * });
+ *
+ * const result = await engine.reviewPR(123);
+ * console.log(`Found ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)} issues`);
+ * ```
+ *
+ * @module
+ */
+
 import path from "node:path";
 import {
   type AIProviderClient,
@@ -56,66 +99,115 @@ import { FindingAggregator } from "./findingAggregator.js";
 import { RepoManager } from "./repoManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
-/** Result of a complete PR review. */
+/**
+ * Complete results from a pull request review.
+ *
+ * Contains file-by-file findings, cross-file analysis, and comment creation results.
+ * Use this to determine if the review succeeded, what issues were found, and what
+ * comments were posted.
+ */
 export interface ReviewResult {
+  /** PR details from the platform (number, title, author, etc.) */
   readonly prDetails: PRDetails;
+  /** Number of files reviewed (non-ignored, with content changes) */
   readonly filesReviewed: number;
+  /** Number of files skipped (no diff, binary files, etc.) */
   readonly filesSkipped: number;
+  /** Number of files ignored (match ignore patterns) */
   readonly filesIgnored: number;
+  /** List of ignored file paths (for debugging) */
   readonly ignoredFiles: readonly string[];
+  /** File-level review results (one per reviewed file, findings per file) */
   readonly fileResults: readonly FileReviewResult[];
+  /** Cross-file analysis results (architecture, patterns, testing coverage) */
   readonly crossFileResult: CrossFileReviewResult;
+  /** Number of comments successfully posted to the PR */
   readonly commentsCreated: number;
+  /** Error messages from failed comment postings (doesn't stop review) */
   readonly commentErrors: readonly string[];
 }
 
-/** Options for configuring the review engine. */
+/**
+ * Configuration options for ReviewEngine.
+ *
+ * Supports both AI provider selection, performance tuning, and behavioral flags.
+ * Includes backward compatibility for legacy copilot-specific options.
+ */
 interface ReviewEngineOptions {
+  /** Enable verbose logging (debug-level events) */
   readonly verbose?: boolean;
+  /** Dry run mode: review PR but don't post comments. Useful for testing */
   readonly dryRun?: boolean;
   /** @deprecated Use aiModel instead */
   readonly copilotModel?: string;
   /** @deprecated Use aiTimeoutMs instead */
   readonly copilotTimeoutMs?: number;
-  /** Copilot GitHub token for CLI authentication */
+  /** Copilot GitHub token for CLI authentication (copilot/copilot-sdk only) */
   readonly copilotToken?: string;
-  /** Model to use for the AI provider */
+  /** Model identifier for the AI provider (e.g., "gpt-5.2-codex", "claude-opus") */
   readonly aiModel?: string;
-  /** Timeout in milliseconds for AI provider operations */
+  /** Timeout in milliseconds for AI provider API calls (default: 30000) */
   readonly aiTimeoutMs?: number;
-  /** Skip pre-existing issues (issues not introduced in this PR). */
+  /** Skip pre-existing issues introduced before this PR (default: true) */
   readonly skipPreExisting?: boolean;
-  /** Number of review runs (1-5). Multiple runs aggregate findings. */
+  /** Number of independent review runs (1-5). Multiple runs aggregate findings (default: 1) */
   readonly reviewRuns?: number;
-  /** Type of review to perform (general, testing, security, performance). Default: general */
+  /** Review type: 'general', 'security', 'testing', or 'performance' (default: 'general') */
   readonly reviewType?: string;
-  /** Enable streaming output display. Default: true (if TTY) */
+  /** Enable streaming display of AI output (default: true if TTY) */
   readonly streamingEnabled?: boolean;
-  /** Number of lines in streaming display. Default: 5 */
+  /** Maximum lines to display in streaming view (default: 5) */
   readonly streamingLines?: number;
-  /** CI mode: stream AI output as plain text for capture in CI logs. Default: false */
+  /** CI mode: output as plain text (non-interactive, for log capture) */
   readonly ciMode?: boolean;
-  /** Base path for temporary files (cache, diffs, logs, repos, etc.). */
+  /** Base path for temporary storage (cache, diffs, repos, logs). Defaults to .mergementor in cwd */
   readonly tempPath?: string;
   /**
-   * Path to a pre-existing local repository checkout.
-   * When provided (e.g. in CI where the repo is already checked out),
-   * the engine uses this path directly and skips cloning.
+   * Path to a pre-checked-out repository (e.g., in CI pipelines).
+   * When provided, skips cloning and uses this path for coding standard extraction.
    */
   readonly localWorkspacePath?: string;
-  /** Glob patterns for files to ignore in review. */
+  /** Glob patterns for files to skip during review (e.g., ['*.test.ts', 'dist/**']) */
   readonly ignorePatterns?: string[];
-  /** Delay in milliseconds between review runs. Default: 2000 */
+  /** Delay in milliseconds between review runs (default: 2000) */
   readonly runDelayMs?: number;
-  /** Output writer for console output. Default: consoleOutputWriter */
+  /** Output writer for console output (dependency injection, defaults to consoleOutputWriter) */
   readonly output?: OutputWriter;
-  /** File system abstraction for I/O operations. Default: nodeFs */
+  /** File system abstraction for I/O (dependency injection, defaults to nodeFs) */
   readonly fileSystem?: FileSystem;
 }
 
 /**
  * Orchestrates the PR review process.
- * Coordinates between platform adapters, AI provider, and comment management.
+ *
+ * Central coordinator that brings together:
+ * 1. **Platform Integration**: Fetches PR details, files, existing comments from GitHub or Azure
+ * 2. **AI Analysis**: Sends files to AI provider for review (file-level and cross-file)
+ * 3. **Comment Management**: Creates/updates/deduplicates PR comments
+ * 4. **State Management**: Caches review state to avoid re-reviewing unchanged files
+ * 5. **Repository Management**: Clones repo to extract coding standards
+ *
+ * Supports multiple review runs with finding aggregation. Each run executes independently,
+ * findings are deduped by fingerprint, and recommendations are merged.
+ *
+ * @example
+ * ```typescript
+ * // Create engine with GitHub adapter
+ * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
+ *   reviewType: 'security',
+ *   reviewRuns: 2,
+ *   dryRun: false,
+ * });
+ *
+ * // Review a pull request
+ * const result = await engine.reviewPR(123);
+ * if (result.fileResults.length > 0) {
+ *   console.log(`Found issues in ${result.fileResults.length} files`);
+ * }
+ * if (result.commentErrors.length > 0) {
+ *   console.error(`Failed to post ${result.commentErrors.length} comments`);
+ * }
+ * ```
  */
 export class ReviewEngine {
   private readonly platform: PlatformAdapter;
@@ -132,6 +224,43 @@ export class ReviewEngine {
   private readonly streamingEnabled: boolean;
   private readonly streamingLines: number;
 
+  /**
+   * Creates a new ReviewEngine.
+   *
+   * Supports two constructor signatures for backward compatibility:
+   * - New: `ReviewEngine(platform, botId, providerType, options)`
+   * - Legacy: `ReviewEngine(platform, botId, options)` - assumes copilot provider
+   *
+   * The constructor initializes all internal components:
+   * - AI provider client (Copilot, OpenCode, Cursor)
+   * - Comment manager for bot comment tracking
+   * - Review state cache for unchanged file optimization
+   * - Repository manager for cloning and standard extraction
+   * - All injected dependencies (file system, process runner, clock)
+   *
+   * @param platform - GitHub or Azure DevOps platform adapter
+   * @param botIdentifier - Identifier for bot comments (e.g., '[Merge Mentor]')
+   * @param providerType - AI provider type ('copilot', 'opencode', 'cursor', etc.)
+   *                       or full options object for legacy signature support
+   * @param options - Configuration options (omitted in legacy signature)
+   * @throws Error if options contain invalid values (e.g., reviewRuns > 5)
+   *
+   * @example
+   * ```typescript
+   * // Modern signature
+   * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
+   *   aiModel: 'gpt-5.2-codex',
+   *   reviewType: 'security',
+   *   reviewRuns: 2,
+   * });
+   *
+   * // Legacy signature (assumes copilot provider)
+   * const legacyEngine = new ReviewEngine(githubAdapter, '[Bot]', {
+   *   copilotModel: 'gpt-5.2',
+   *   reviewType: 'general',
+   * });
+   * ```
+   */
   constructor(
     platform: PlatformAdapter,
     botIdentifier: string,

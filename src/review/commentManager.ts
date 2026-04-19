@@ -1,3 +1,39 @@
+/**
+ * PR comment management and deduplication.
+ *
+ * Manages the lifecycle of AI-generated code review comments, handling:
+ * - Deduplication: Avoids posting duplicate findings (same file, line, issue)
+ * - Pre-existing filtering: Optionally skips issues not introduced in this PR
+ * - Comment matching: Tracks existing bot comments to prevent redundancy
+ * - Summary generation: Creates a summary comment with key findings
+ *
+ * The CommentManager uses fingerprinting to match findings:
+ * - Fingerprint = filename + line + category + first 10 words of message
+ * - Exact duplicates are skipped (same comment already posted)
+ * - Variations in wording on the same issue are treated as duplicates
+ *
+ * Pre-existing filtering uses the `prInfo.addedLines` to detect if an issue
+ * is newly introduced (on added lines) or pre-existing. This prevents noise
+ * when reviewing large refactors where old issues would otherwise surface.
+ *
+ * @example
+ * ```typescript
+ * const manager = new CommentManager('[Bot]', { skipPreExisting: true });
+ *
+ * const actions = manager.determineActions(
+ *   existingBotComments,
+ *   fileReviewResults,
+ *   crossFileResult
+ * );
+ *
+ * for (const action of actions) {
+ *   if (action.type === 'create') {
+ *     await platform.postComment(action.data);
+ *   }
+ * }
+ * ```
+ */
+
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import type {
@@ -9,15 +45,22 @@ import type {
   FindingSeverity,
 } from "../platforms/types.js";
 
-/** Options for configuring comment filtering behavior. */
+/**
+ * Configuration options for comment management behavior.
+ *
+ * Controls how existing findings are filtered and deduplicated.
+ */
 interface CommentManagerOptions {
-  /** Skip pre-existing issues (issues not introduced in this PR). */
+  /** Skip findings on lines not modified in this PR (pre-existing issues). Default: true */
   readonly skipPreExisting?: boolean;
 }
 
 /**
  * Manages PR comment lifecycle (create).
- * Tracks bot comments and determines required actions.
+ *
+ * Tracks bot comments and determines required actions (create new comments).
+ * Uses fingerprinting to deduplicate identical findings across multiple review runs
+ * or to avoid re-posting comments that already exist.
  */
 export class CommentManager {
   private readonly botIdentifier: string;
@@ -25,6 +68,21 @@ export class CommentManager {
   private readonly skipPreExisting: boolean;
   private readonly logger = createChildLogger({ component: "CommentManager" });
 
+  /**
+   * Creates a new comment manager for a bot.
+   *
+   * @param botIdentifier - Unique identifier used to tag and recognize bot comments
+   * @param options - Configuration for filtering behavior
+   *
+   * @example
+   * ```typescript
+   * // Create manager that includes pre-existing issues
+   * const manager = new CommentManager('[Merge Mentor]', { skipPreExisting: false });
+   *
+   * // Create manager that skips pre-existing issues (default)
+   * const smartManager = new CommentManager('[Bot]');
+   * ```
+   */
   constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
     this.skipPreExisting = options?.skipPreExisting ?? true;
@@ -33,20 +91,35 @@ export class CommentManager {
   /**
    * Determines comment actions based on existing comments and new findings.
    *
-   * @param existingComments - Bot comments already on the PR
-   * @param fileResults - Results from file-by-file review
-   * @param crossFileResult - Results from cross-file analysis
-   * @returns Array of actions to perform (create)
+   * Analyzes findings and existing comments to determine what actions should be taken:
+   * - Creates inline comments for each finding not already commented
+   * - Creates or skips summary comment based on existence
+   *
+   * Uses fingerprinting to match findings: `filename:line:category:first10words`.
+   * This enables reliable deduplication even when finding text varies slightly.
+   *
+   * Pre-existing filtering can be applied: if skipPreExisting=true, findings on
+   * lines not modified in this PR are skipped (using prInfo.addedLines).
+   *
+   * @param existingComments - Bot comments already posted to the PR
+   * @param fileResults - File-level review results from AI analysis
+   * @param crossFileResult - Cross-file analysis results (for summary)
+   * @returns Array of comment actions to perform (all type: "create")
    *
    * @example
    * ```typescript
-   * const manager = new CommentManager('[Bot]');
+   * const manager = new CommentManager('[Bot]', { skipPreExisting: true });
+   *
    * const actions = manager.determineActions(
-   *   existingComments,
-   *   fileResults,
-   *   crossFileResult
+   *   await platform.getPRComments(),
+   *   fileReviewResults,
+   *   crossFileAnalysisResult
    * );
-   * console.log(`${actions.length} actions to perform`);
+   *
+   * console.log(`Will post ${actions.length} comments`);
+   * for (const action of actions) {
+   *   await platform.postComment(action);
+   * }
    * ```
    */
   determineActions(

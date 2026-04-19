@@ -2,19 +2,41 @@ import { isMatch } from "micromatch";
 import type { PRFile } from "../platforms/types.js";
 
 /**
- * Default ignore patterns. Currently empty—all changed files are reviewed by default.
- * Users can specify patterns via --ignore CLI flag to exclude specific files.
+ * File ignore filtering utilities for PR reviews.
+ *
+ * Determines which files in a PR should be skipped during code review based on
+ * glob pattern matching. Uses micromatch for pattern matching against file paths.
+ *
+ * Default patterns are empty (all files reviewed by default), but users can
+ * specify patterns via the CLI --ignore flag to exclude specific files.
+ *
+ * @example
+ * ```typescript
+ * const files = [
+ *   "src/index.ts",
+ *   "dist/index.js",
+ *   "node_modules/package.json",
+ *   "README.md"
+ * ];
+ *
+ * const result = filterPRFiles(files, [
+ *   "dist/**",
+ *   "node_modules/**",
+ *   "*.lock"
+ * ]);
+ * // result.kept = [src/index.ts, README.md]
+ * // result.ignored = [dist/index.js, node_modules/package.json]
+ * ```
  */
-const DEFAULT_IGNORE_PATTERNS: string[] = [];
-
 /**
  * Merges default ignore patterns with user-provided patterns.
  * User patterns extend the defaults (currently empty by default).
  *
- * @param userPatterns - User-provided glob patterns
- * @returns Merged array of default + user patterns
+ * @param userPatterns - User-provided glob patterns to ignore
+ * @returns Merged array of default + user patterns for matching
  */
 export function getIgnorePatterns(userPatterns: string[] = []): string[] {
+  const DEFAULT_IGNORE_PATTERNS: string[] = [];
   return [...DEFAULT_IGNORE_PATTERNS, ...userPatterns];
 }
 

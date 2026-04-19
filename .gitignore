@@ -38,3 +38,6 @@ package-lock.json
 # MergeMentor temporary files (cache, diffs, logs, repos, reports, transcripts)
 # Default location: .mergementor/ (configurable via MM_TEMP_PATH)
 .mergementor/
+
+# Generated API documentation
+docs/api/

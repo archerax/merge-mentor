@@ -1,6 +1,36 @@
 import { detectLanguage } from "./languageDetector.js";
 
 /**
+ * Test file mapping utilities for code reviews.
+ *
+ * Identifies test files and locates corresponding test files for production code.
+ * Supports multiple test naming conventions across TypeScript and C# ecosystems.
+ *
+ * Recognized patterns:
+ * - TypeScript/JavaScript: `*.test.ts`, `*.spec.ts`, `*.test.tsx`, `*.spec.tsx`
+ * - C#: `*Test.cs`, `*Tests.cs` (case-insensitive)
+ *
+ * This helps the review engine understand which files are tests vs production code
+ * and enables language-specific testing analysis.
+ *
+ * @example
+ * ```typescript
+ * // Identify test files
+ * isTestFile("UserService.test.ts");     // true
+ * isTestFile("UserServiceTests.cs");     // true
+ * isTestFile("UserService.ts");          // false
+ *
+ * // Find test files for production code
+ * const files = ["UserService.ts", "UserService.test.ts", "app.tsx"];
+ * findTestFileForProduction("UserService.ts", files);
+ * // Returns "UserService.test.ts"
+ *
+ * findTestFileForProduction("app.tsx", files);
+ * // Returns undefined (no test file exists)
+ * ```
+ */
+
+/**
  * Determines if a file is a test file based on naming conventions.
  *
  * @param filename - The name or path of the file

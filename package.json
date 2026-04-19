@@ -16,6 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "npx prettier **/*.{md,yml} && biome check && knip",
     "lint:fix": "npx prettier --write **/*.{md,yml} && biome check --write && knip --fix",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch",
     "prepare": "husky"
   },
   "keywords": [
@@ -63,6 +65,8 @@
     "husky": "^9.1.7",
     "knip": "^6.3.1",
     "prettier": "^3.8.2",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.11.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
   }

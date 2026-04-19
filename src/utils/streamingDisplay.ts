@@ -1,6 +1,32 @@
 /**
- * Streaming display utility for showing rolling AI output in the terminal.
- * Provides real-time feedback during long-running AI CLI operations.
+ * Streaming display utilities for terminal output.
+ *
+ * Provides real-time feedback during long-running AI CLI operations by displaying
+ * a rolling window of the most recent lines in the terminal. Automatically detects
+ * TTY capability and supports both interactive terminals and CI environments.
+ *
+ * Features:
+ * - Circular buffer showing the last N lines of output
+ * - ANSI escape codes to overwrite previous output (TTY mode)
+ * - CI mode for plain text output in CI/CD logs
+ * - Debounced rendering to prevent excessive terminal updates
+ * - Control character filtering for safety
+ * - Configurable prefixes, titles, and dimensions
+ *
+ * @example
+ * ```typescript
+ * // Interactive terminal
+ * const display = new StreamingDisplay({ maxLines: 10, title: "Processing..." });
+ * display.push("Processing file 1...\n");
+ * display.push("Processing file 2...\n");
+ * display.finish(); // Clear display
+ *
+ * // CI environment (auto-detected or explicit)
+ * const ciDisplay = new StreamingDisplay({ ciMode: true });
+ * ciDisplay.push("Step 1\n");
+ * ciDisplay.push("Step 2\n");
+ * ciDisplay.finish(true); // Preserve output in logs
+ * ```
  */
 
 import { type Clock, consoleOutputWriter, type OutputWriter, systemClock } from "../ports/index.js";
