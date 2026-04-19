@@ -18,6 +18,8 @@
     "lint:fix": "npx prettier --write **/*.{md,yml} && biome check --write && knip --fix",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
+    "docs:site": "typedoc --options typedoc.site.json",
+    "docs:serve": "pnpm docs:site && node scripts/docs-serve.mjs",
     "prepare": "husky"
   },
   "keywords": [

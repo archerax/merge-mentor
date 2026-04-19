@@ -1,12 +1,7 @@
 {
   "entryPoints": ["src"],
   "entryPointStrategy": "expand",
-  "out": "docs/api",
-  "plugin": ["typedoc-plugin-markdown"],
-  "entryFileName": "README",
-  "hideBreadcrumbs": false,
-  "hidePageHeader": false,
-  "indexFormat": "table",
+  "out": "docs/site",
   "exclude": [
     "**/node_modules/**",
     "**/dist/**",
