@@ -1,5 +1,6 @@
 import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 
 /**
@@ -67,7 +68,7 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
 ${workspaceSection}
 # TASK
@@ -322,12 +323,11 @@ Your working directory is set to the repository root.
 `
     : "";
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer performing holistic architectural analysis of a pull request.
 ${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 Changed Files:
 ${filesSummary}

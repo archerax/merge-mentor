@@ -1,4 +1,5 @@
-import { approveAll, CopilotClient } from "@github/copilot-sdk";
+import type { PermissionHandler, PermissionRequest } from "@github/copilot-sdk";
+import { CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { CopilotSdkError, JsonParseError, ValidationError } from "../../errors/index.js";
@@ -82,6 +83,39 @@ type PromptType =
   | "batched-file-review"
   | "fast-review"
   | "unknown";
+
+const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set([
+  "shell",
+  "write",
+  "mcp",
+  "url",
+  "custom-tool",
+]);
+
+/**
+ * Creates a permission handler for review sessions.
+ *
+ * Approves read-only workspace access (needed to inspect source files) and
+ * denies all other tool categories — shell execution, file writes, MCP calls,
+ * URL fetches, and custom tools — so that attacker-controlled content inside a
+ * PR cannot trigger destructive side effects.
+ *
+ * @param logger - Child logger used to emit warn-level entries for denied requests.
+ */
+export function createReviewPermissionHandler(
+  logger: ReturnType<typeof createChildLogger>
+): PermissionHandler {
+  return (request) => {
+    if (DENIED_PERMISSION_KINDS.has(request.kind)) {
+      logger.warn(
+        { permissionKind: request.kind, toolCallId: request.toolCallId },
+        "Blocked tool request during review (tool allowlist)"
+      );
+      return { kind: "denied-by-permission-request-hook" };
+    }
+    return { kind: "approved" };
+  };
+}
 
 /**
  * AI provider implementation using the @github/copilot-sdk package.
@@ -213,7 +247,7 @@ export class CopilotSdkProvider implements AIProviderClient {
       model: this.model,
       workingDirectory: options?.workingDirectory,
       streaming: true,
-      onPermissionRequest: approveAll,
+      onPermissionRequest: createReviewPermissionHandler(this.logger),
     });
 
     try {

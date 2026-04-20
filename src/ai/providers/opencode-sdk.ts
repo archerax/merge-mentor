@@ -352,6 +352,17 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       opencodeConfig.model = this.model;
     }
 
+    // Restrict the agent to read-only access. Deny shell execution, file edits,
+    // web fetches, and external-directory access so that attacker-controlled PR
+    // content cannot trigger destructive side effects.
+    opencodeConfig.permission = {
+      edit: "deny",
+      bash: "deny",
+      webfetch: "deny",
+      doom_loop: "deny",
+      external_directory: "deny",
+    };
+
     const { client, server } = await createOpencode({
       timeout: SERVER_STARTUP_TIMEOUT_MS,
       config: opencodeConfig,

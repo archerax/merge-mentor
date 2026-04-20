@@ -1,5 +1,6 @@
 import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 
 /**
@@ -54,7 +55,7 @@ export function buildSecurityFileReviewPrompt(manifest: DiffManifest, repoPath?:
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 You are a **Security Researcher** performing a security-focused code review.
 Your ONLY job is to find security vulnerabilities.
 ${workspaceSection}
@@ -457,13 +458,12 @@ Your working directory is set to the repository root.
 `
     : "";
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Security researcher performing system-level security analysis of a pull request.
 Your focus is on cross-file security concerns and architectural security issues.
 ${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 Changed Files:
 ${filesSummary}

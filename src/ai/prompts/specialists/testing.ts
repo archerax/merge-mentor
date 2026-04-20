@@ -1,5 +1,6 @@
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import type { TestingCrossFileContext, TestingReviewContext } from "./types.js";
 
@@ -163,7 +164,7 @@ Common test patterns to look for:
 **Your task:** Evaluate whether this production file needs tests based on its content.
 `;
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 You are a **Test Quality Expert** performing a testing-focused code review.
 Your ONLY job is to evaluate test coverage, test quality, and code testability.
 ${workspaceSection}${languageGuidance}
@@ -594,13 +595,12 @@ export function buildTestingCrossFilePrompt(
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert test architect performing holistic test coverage analysis across a pull request.
 Your focus is on testing patterns, coverage gaps, and test architecture.
 ${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 Changed Files:
 ${context.filesSummary}

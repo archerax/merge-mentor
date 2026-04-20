@@ -422,7 +422,7 @@ describe("OpenCodeSdkProvider", () => {
 
       expect(mockCreateOpencode).toHaveBeenCalledWith(
         expect.objectContaining({
-          config: { model: "claude-sonnet-4" },
+          config: expect.objectContaining({ model: "claude-sonnet-4" }),
         })
       );
     });
@@ -437,7 +437,50 @@ describe("OpenCodeSdkProvider", () => {
 
       expect(mockCreateOpencode).toHaveBeenCalledWith(
         expect.objectContaining({
-          config: {},
+          config: expect.not.objectContaining({ model: expect.anything() }),
+        })
+      );
+    });
+  });
+
+  describe("permission config", () => {
+    it("passes permission restrictions to createOpencode config", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            permission: {
+              edit: "deny",
+              bash: "deny",
+              webfetch: "deny",
+              doom_loop: "deny",
+              external_directory: "deny",
+            },
+          }),
+        })
+      );
+    });
+
+    it("includes permission restrictions alongside model when both are set", async () => {
+      const provider = createProvider(1, 5000, "gpt-4.1");
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            model: "gpt-4.1",
+            permission: expect.objectContaining({ bash: "deny", edit: "deny" }),
+          }),
         })
       );
     });

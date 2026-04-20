@@ -1,5 +1,6 @@
 import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 
 /**
@@ -57,7 +58,7 @@ export function buildPerformanceFileReviewPrompt(
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 You are a **Performance Engineer** performing a performance-focused code review.
 Your ONLY job is to find performance issues and inefficiencies.
 ${workspaceSection}
@@ -478,13 +479,12 @@ Your working directory is set to the repository root.
 `
     : "";
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Performance engineer performing system-level performance analysis of a pull request.
 Your focus is on cross-file performance concerns and architectural performance issues.
 ${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 Changed Files:
 ${filesSummary}

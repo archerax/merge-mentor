@@ -20,12 +20,11 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
 
 vi.mock("@github/copilot-sdk", () => ({
   CopilotClient: MockCopilotClient,
-  approveAll: vi.fn(),
 }));
 
 import { CopilotSdkError, ValidationError } from "../../errors/index.js";
 import type { AIResponse } from "../types.js";
-import { CopilotSdkProvider } from "./copilot-sdk.js";
+import { CopilotSdkProvider, createReviewPermissionHandler } from "./copilot-sdk.js";
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
@@ -867,5 +866,106 @@ describe("CopilotSdkProvider", () => {
 
       expect(error).toBeInstanceOf(Error);
     });
+  });
+
+  describe("permission handler in createSession", () => {
+    it("passes onPermissionRequest to createSession", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ onPermissionRequest: expect.any(Function) })
+      );
+    });
+  });
+});
+
+describe("createReviewPermissionHandler", () => {
+  function createStubLogger() {
+    return {
+      warn: vi.fn(),
+      debug: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+    } as unknown as ReturnType<typeof import("../../logger.js").createChildLogger>;
+  }
+
+  it("approves read permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "read" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "approved" });
+  });
+
+  it("denies shell permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "shell" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+  });
+
+  it("denies write permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "write" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+  });
+
+  it("denies mcp permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "mcp" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+  });
+
+  it("denies url permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "url" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+  });
+
+  it("denies custom-tool permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "custom-tool" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+  });
+
+  it("logs a warning when a request is denied", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    handler({ kind: "shell", toolCallId: "tc-42" }, { sessionId: "s1" });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionKind: "shell", toolCallId: "tc-42" }),
+      expect.any(String)
+    );
+  });
+
+  it("does not log a warning when a request is approved", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    handler({ kind: "read" }, { sessionId: "s1" });
+
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

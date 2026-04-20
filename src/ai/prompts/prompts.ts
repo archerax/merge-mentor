@@ -1,5 +1,6 @@
 import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
 import type { DiffManifest } from "../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "./securityPreamble.js";
 import { buildSeverityContextSection } from "./severityContext.js";
 
 /**
@@ -82,12 +83,11 @@ Your working directory is set to the repository root.
 `
     : "";
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer performing holistic architectural analysis of a pull request.
 ${repoContextSection}${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 Changed Files:
 ${filesSummary}

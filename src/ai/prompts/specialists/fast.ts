@@ -1,5 +1,6 @@
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 
 function buildWorkspaceSection(repoPath?: string): string {
@@ -56,7 +57,7 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer performing comprehensive analysis in a single pass. You will analyze both:
 1. **File-level issues**: Line-by-line bugs, security flaws, performance problems
 2. **Architectural concerns**: Cross-file integration issues, system-level design problems
@@ -64,8 +65,7 @@ Expert code reviewer performing comprehensive analysis in a single pass. You wil
 Be thorough and strict in catching issues at both levels.
 ${workspaceSection}
 # PR CONTEXT
-Title: ${prDetails.title}
-Description: ${prDetails.description || "No description provided"}
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
 # TASK
 Perform a COMPLETE review of this PR covering:
