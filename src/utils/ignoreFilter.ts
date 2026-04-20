@@ -1,5 +1,7 @@
-import { isMatch } from "micromatch";
+import micromatch from "micromatch";
 import type { PRFile } from "../platforms/types.js";
+
+const { isMatch } = micromatch;
 
 /**
  * File ignore filtering utilities for PR reviews.

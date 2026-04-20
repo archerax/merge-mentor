@@ -280,16 +280,27 @@ export class RepoManager {
     token: string,
     repoPath: string
   ): Promise<void> {
-    const cloneUrl = this.buildCloneUrl(repoInfo, token);
+    const cloneUrl = this.buildCloneUrl(repoInfo);
 
     // Ensure parent directory exists
     await this.fileSystem.mkdir(path.dirname(repoPath), { recursive: true });
 
     try {
-      const env = this.buildGitEnv(token);
+      const authArgs = this.buildAuthArgs(token, repoInfo.platform);
+      const env = this.buildGitEnv();
       await this.execFileWithTimeout(
         "git",
-        ["clone", "--depth", "1", "--single-branch", "--branch", branch, cloneUrl, repoPath],
+        [
+          ...authArgs,
+          "clone",
+          "--depth",
+          "1",
+          "--single-branch",
+          "--branch",
+          branch,
+          cloneUrl,
+          repoPath,
+        ],
         this.cloneTimeoutMs,
         env
       );
@@ -312,25 +323,32 @@ export class RepoManager {
     token: string,
     repoInfo: RepoInfo
   ): Promise<void> {
-    const remoteUrl = this.buildCloneUrl(repoInfo, token);
+    const remoteUrl = this.buildCloneUrl(repoInfo);
 
     try {
-      const env = this.buildGitEnv(token);
+      const authArgs = this.buildAuthArgs(token, repoInfo.platform);
+      const env = this.buildGitEnv();
 
       // Clean any leftover files from previous reviews
-      await this.execFileWithTimeout("git", ["-C", repoPath, "clean", "-fdx"], this.fetchTimeoutMs);
+      await this.execFileWithTimeout(
+        "git",
+        ["-C", repoPath, "clean", "-fdx"],
+        this.fetchTimeoutMs,
+        env
+      );
 
-      // Update remote URL (uses public URL)
+      // Update remote URL (uses public URL without embedded credentials)
       await this.execFileWithTimeout(
         "git",
         ["-C", repoPath, "remote", "set-url", "origin", remoteUrl],
-        this.fetchTimeoutMs
+        this.fetchTimeoutMs,
+        env
       );
 
-      // Fetch and checkout branch (git uses GIT_ASKPASS if needed)
+      // Fetch with inline auth via -c http.extraHeader (not stored in .git/config)
       await this.execFileWithTimeout(
         "git",
-        ["-C", repoPath, "fetch", "--depth", "1", "origin", branch],
+        [...authArgs, "-C", repoPath, "fetch", "--depth", "1", "origin", branch],
         this.fetchTimeoutMs,
         env
       );
@@ -339,7 +357,8 @@ export class RepoManager {
       await this.execFileWithTimeout(
         "git",
         ["-C", repoPath, "checkout", "-B", branch, `origin/${branch}`],
-        this.fetchTimeoutMs
+        this.fetchTimeoutMs,
+        env
       );
 
       this.logger.info({ repoPath, branch }, "Repository updated successfully");
@@ -351,41 +370,53 @@ export class RepoManager {
   }
 
   /**
-   * Builds the clone URL for a repository.
+   * Builds the public clone URL for a repository (no embedded credentials).
    *
-   * In CI mode: Uses public URLs without embedded credentials.
-   * Git will use pre-configured CI environment credentials (e.g., GITHUB_TOKEN, personal access token in .git/config).
-   *
-   * In non-CI mode: Uses public URLs and sets up GIT_ASKPASS for interactive credential prompting.
-   * This avoids embedding tokens in the URL, keeping them out of process listings and git config.
+   * Credentials are passed separately via `buildAuthArgs` using `-c http.extraHeader`,
+   * which keeps tokens out of URLs, process listings (for the URL itself), and .git/config.
    */
-  private buildCloneUrl(repoInfo: RepoInfo, _token: string): string {
+  private buildCloneUrl(repoInfo: RepoInfo): string {
     if (repoInfo.platform === "azure") {
-      // Azure DevOps public URL (git will prompt or use configured credentials)
       return `https://dev.azure.com/${repoInfo.org}/${repoInfo.project}/_git/${repoInfo.repo}`;
     }
-
-    // GitHub public URL (git will prompt or use configured credentials)
     return `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
   }
 
   /**
-   * Builds environment variables for git commands.
-   * In non-CI mode, sets up GIT_ASKPASS to prompt user for credentials.
-   * In CI mode, git uses pre-configured credentials (e.g., CI provider's token).
+   * Builds git `-c` arguments to pass credentials inline via HTTP extra headers.
+   *
+   * Uses `http.<host>/.extraHeader` so the Authorization header is injected per-request
+   * for this command only — it is never written to `.git/config` or any file on disk.
+   *
+   * GitHub: `x-access-token:<token>` (standard PAT/OAuth format)
+   * Azure DevOps: `:<token>` (empty username + PAT as password, per Microsoft docs)
+   *
+   * In CI mode no extra args are returned; the CI environment supplies credentials.
    */
-  private buildGitEnv(token: string): Record<string, string> {
+  private buildAuthArgs(token: string, platform: "github" | "azure"): string[] {
     if (this.ciMode) {
-      // In CI mode, the environment is pre-configured with credentials
-      // Git can access the token from: CI provider env vars, .git/config, or credential helpers
-      return {};
+      return [];
     }
 
-    // In non-CI mode, store token in GIT_CREDENTIALS environment variable
-    // Git will use this as fallback when prompted for credentials
-    return {
-      GIT_CREDENTIALS: `https://:${token}@github.com`,
-    };
+    const host = platform === "azure" ? "https://dev.azure.com" : "https://github.com";
+    const credentials = platform === "azure" ? `:${token}` : `x-access-token:${token}`;
+    const encoded = Buffer.from(credentials).toString("base64");
+
+    return ["-c", `http.${host}/.extraHeader=Authorization: Basic ${encoded}`];
+  }
+
+  /**
+   * Builds environment variables for git commands.
+   *
+   * Sets `GIT_TERMINAL_PROMPT=0` to prevent git from falling back to interactive
+   * credential prompts — authentication is handled via `buildAuthArgs` instead.
+   * In CI mode no overrides are needed; the CI environment is already configured.
+   */
+  private buildGitEnv(): Record<string, string> {
+    if (this.ciMode) {
+      return {};
+    }
+    return { GIT_TERMINAL_PROMPT: "0" };
   }
 
   /**

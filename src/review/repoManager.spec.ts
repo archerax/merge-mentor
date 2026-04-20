@@ -126,6 +126,88 @@ describe("RepoManager", () => {
       );
     });
 
+    it("passes GitHub credentials via -c http.extraHeader, not in clone URL", async () => {
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+      await repoManager.ensureRepo(repoInfo, branch, token);
+
+      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
+        (c[1] as string[]).includes("clone")
+      );
+      expect(cloneCall).toBeDefined();
+      const args = cloneCall?.[1] as string[];
+
+      // Credentials injected via -c, not in URL
+      expect(args).toContain("-c");
+      const headerArg = args.find((a) => a.startsWith("http.https://github.com/.extraHeader="));
+      expect(headerArg).toBeDefined();
+      expect(headerArg).toContain("Authorization: Basic");
+      // Public URL — no token embedded
+      const urlArg = args.find((a) => a.startsWith("https://github.com"));
+      expect(urlArg).not.toContain(token);
+    });
+
+    it("passes Azure DevOps credentials via -c http.extraHeader using empty-username PAT format", async () => {
+      const azureRepoInfo: RepoInfo = {
+        owner: "azureowner",
+        repo: "azurerepo",
+        platform: "azure",
+        org: "myorg",
+        project: "myproject",
+      };
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+      await repoManager.ensureRepo(azureRepoInfo, branch, token);
+
+      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
+        (c[1] as string[]).includes("clone")
+      );
+      expect(cloneCall).toBeDefined();
+      const args = cloneCall?.[1] as string[];
+
+      // Credentials injected via -c scoped to dev.azure.com
+      const headerArg = args.find((a) => a.startsWith("http.https://dev.azure.com/.extraHeader="));
+      expect(headerArg).toBeDefined();
+      expect(headerArg).toContain("Authorization: Basic");
+      // Verify empty-username format: `:token` encodes to base64 starting with `:` decoded
+      const encodedPart = headerArg?.split("Authorization: Basic ")[1] ?? "";
+      const decoded = Buffer.from(encodedPart, "base64").toString();
+      expect(decoded).toBe(`:${token}`);
+    });
+
+    it("sets GIT_TERMINAL_PROMPT=0 to prevent interactive credential prompts", async () => {
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+      await repoManager.ensureRepo(repoInfo, branch, token);
+
+      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
+        (c[1] as string[]).includes("clone")
+      );
+      expect(cloneCall).toBeDefined();
+      const opts = cloneCall?.[2] as { env?: Record<string, string> };
+      expect(opts.env?.GIT_TERMINAL_PROMPT).toBe("0");
+    });
+
+    it("does not pass auth args in CI mode", async () => {
+      const ciManager = new RepoManager(
+        testTempPath,
+        { ciMode: true },
+        fileSystem,
+        processRunner,
+        clock
+      );
+      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+      await ciManager.ensureRepo(repoInfo, branch, token);
+
+      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
+        (c[1] as string[]).includes("clone")
+      );
+      expect(cloneCall).toBeDefined();
+      const args = cloneCall?.[1] as string[];
+      expect(args).not.toContain("-c");
+    });
+
     it("passes branch as a separate argument, not a shell string", async () => {
       const maliciousBranch = "main; rm -rf /";
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
