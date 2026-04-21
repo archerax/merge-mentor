@@ -1,6 +1,6 @@
 # merge-mentor
 
-Automated code review bot powered by AI CLI tools. Supports multiple AI providers including GitHub Copilot CLI and OpenCode CLI. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+Automated code review bot powered by AI providers. Supports GitHub Copilot and OpenCode via both CLI and SDK integrations. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ npx merge-mentor review --pr 123
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot CLI and OpenCode CLI
+- **Multi-Provider Support** - Works with GitHub Copilot and OpenCode via CLI and SDK providers
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Specialist Review Types** - Focused reviews for testing, security, or performance concerns
@@ -46,21 +46,16 @@ npx merge-mentor review --pr 123
 ## Prerequisites
 
 - **Node.js 22+**
-- **AI SDK** - GitHub Copilot SDK (default) must be installed and accessible:
-  - **GitHub Copilot SDK** (default):
+- **AI providers** require these CLIs to be installed manually:
+  - **Copilot CLI** (required for `copilot-sdk` and `copilot`):
     ```bash
     npm install -g @github/copilot
     ```
-  - **Alternative Providers** (optional):
-    - **GitHub Copilot CLI**:
-      ```bash
-      npm install -g @github/copilot
-      ```
-    - **OpenCode CLI**:
-      ```bash
-      # Install OpenCode CLI (follow official instructions)
-      # https://opencode.dev
-      ```
+  - **OpenCode CLI** (required for `opencode-sdk` and `opencode`):
+    ```bash
+    # Install OpenCode CLI (follow official instructions)
+    # https://opencode.dev
+    ```
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 **Supported Platforms**: Windows, macOS, and Linux
@@ -154,15 +149,11 @@ set MM_PLATFORM=azure
 # Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk)
 export MM_AI_PROVIDER=copilot-sdk
 
-# Copilot SDK-specific settings
-export MM_COPILOT_SDK_MODEL=claude-sonnet-4.6
-export MM_COPILOT_SDK_TIMEOUT=3600000
-
-# Copilot CLI-specific settings (when using --provider copilot)
+# Copilot settings (shared by copilot and copilot-sdk)
 export MM_COPILOT_MODEL=claude-sonnet-4.6
 export MM_COPILOT_TIMEOUT=3600000
 
-# OpenCode-specific settings (when using --provider opencode)
+# OpenCode settings (shared by opencode and opencode-sdk)
 export MM_OPENCODE_MODEL=claude-sonnet-4.6
 export MM_OPENCODE_TIMEOUT=3600000
 
@@ -170,29 +161,26 @@ export MM_OPENCODE_TIMEOUT=3600000
 
 **Windows (PowerShell):**
 
-````powershell
+```powershell
 # Select AI provider
 $env:MM_AI_PROVIDER="copilot-sdk"
 
-# Copilot SDK settings
-$env:MM_COPILOT_SDK_MODEL="claude-sonnet-4.6"
-$env:MM_COPILOT_SDK_TIMEOUT="3600000"
-
-# Copilot CLI settings
+# Copilot settings (shared by copilot and copilot-sdk)
 $env:MM_COPILOT_MODEL="claude-sonnet-4.6"
 $env:MM_COPILOT_TIMEOUT="3600000"
 
-# OpenCode settings
+# OpenCode settings (shared by opencode and opencode-sdk)
 $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 $env:MM_OPENCODE_TIMEOUT="3600000"
+```
 
 **Or use command-line parameters:**
 ```bash
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
-  --copilot-sdk-model claude-sonnet-4.6 \
-  --copilot-sdk-timeout 3600000
-````
+  --copilot-model claude-sonnet-4.6 \
+  --copilot-timeout 3600000
+```
 
 ### Optional Settings
 
@@ -317,14 +305,14 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 
 ### Available Models
 
-**Copilot CLI**: Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
+**Copilot** (used by both `copilot` and `copilot-sdk`): Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
 
 - `claude-sonnet-4.6` (default)
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
 - `claude-opus-4.5`
 
-**OpenCode CLI**: Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
+**OpenCode** (used by both `opencode` and `opencode-sdk`): Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
 
 - Check OpenCode documentation for supported models
 
@@ -418,7 +406,7 @@ merge-mentor review --pr 123 --review-type testing --write
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|opencode>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--provider <copilot\|copilot-sdk\|opencode\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
 | `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
@@ -515,14 +503,6 @@ merge-mentor review --pr 123 --ignore '**/*.test.ts' --ignore '**/*.spec.ts' --i
 ```
 
 Ignored files are logged for transparency in the review output.
-
-When code is fixed, the bot resolves comments with an explanation:
-
-```bash
-export MM_POST_RESOLUTION_COMMENTS=true  # default
-# Or use CLI parameter:
-merge-mentor review --pr 123 --post-resolution-comments true
-```
 
 ### Multi-Run Mode
 

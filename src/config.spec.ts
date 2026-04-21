@@ -303,7 +303,6 @@ describe("Config", () => {
         MM_COPILOT_TIMEOUT: "60000",
         MM_MIN_COMMENT_CONFIDENCE: "low",
         MM_SKIP_EXISTING_ISSUES: "false",
-        MM_POST_RESOLUTION_COMMENTS: "false",
         MM_REVIEW_RUNS: "3",
       });
 

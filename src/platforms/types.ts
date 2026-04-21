@@ -102,8 +102,6 @@ export interface CommentAction {
   readonly path?: string;
   readonly line?: number;
   readonly body?: string;
-  /** Reason for resolution (used for resolution comments). */
-  readonly resolutionReason?: string;
 }
 
 /** Repository information for context loading. */
