@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-04-21
+
+### Added
+
+- **Dual Git Backend**: New `isomorphic` git backend powered by [isomorphic-git](https://isomorphic-git.org/) as an alternative to the default system `git` binary
+  - Select via `MM_GIT_BACKEND=isomorphic` or `--git-backend isomorphic`
+  - Pure JavaScript — no system `git` binary required
+  - Tokens are passed via HTTP auth callbacks, never through process arguments or `.git/config`
+  - Supports GitHub and Azure DevOps authentication (PAT and CI mode)
+  - Default backend remains `cli` (system git); `isomorphic` is opt-in
+  - Known limitation: `git clean -fdx` is not supported in the isomorphic backend; only tracked files are reset between reviews
+- **`GitClient` abstraction**: Internal port/adapter interface (`clone`, `fetch`, `checkout`, `clean`, `setRemoteUrl`) enabling future git backends without changing the review engine
+- **`validateGitBackend()` config validator**: Exported function for validating `MM_GIT_BACKEND` values (defaults to `'cli'` for unknown values)
+
 ## [1.30.0] - 2026-04-20
 
 ### Fixed

@@ -43,6 +43,7 @@ function createTestConfig(): Config {
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
     aiProvider: "copilot",
+    gitBackend: "cli",
     skipPreExisting: true,
     reviewRuns: 1,
     reviewType: "general",

@@ -208,6 +208,9 @@ export MM_RUNS=1  # 1-5 runs
 # Review type (specialist reviews)
 export MM_REVIEW_TYPE=general  # general, testing, security, performance, or fast
 
+# Git backend for cloning repositories (default: cli uses system git binary)
+export MM_GIT_BACKEND=cli  # cli or isomorphic
+
 # Bot identifier
 export MM_COMMENT_IDENTIFIER="[merge-mentor]"
 
@@ -416,6 +419,7 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|opencode>` | AI provider to use | `MM_AI_PROVIDER` | `copilot` |
+| `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
 | `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
@@ -461,6 +465,29 @@ merge-mentor review --pr 123 --review-type testing --write
 **Note:** Command-line parameters always override environment variables.
 
 ## Key Features Explained
+
+### Git Backends
+
+merge-mentor supports two backends for cloning and fetching repositories used for coding standard extraction:
+
+| Backend | Description | Default |
+|---------|-------------|---------|
+| `cli` | Uses the system `git` binary via child process | ✅ Yes |
+| `isomorphic` | Uses [isomorphic-git](https://isomorphic-git.org/) — pure JS, no binary required | No |
+
+The `cli` backend is the battle-tested default. The `isomorphic` backend eliminates the dependency on a system `git` binary and avoids passing tokens through process arguments (improving security in some environments), but is newer and considered experimental.
+
+```bash
+# Use the default system git binary
+merge-mentor review --pr 123 --write
+
+# Use pure-JS git (no system git binary required)
+MM_GIT_BACKEND=isomorphic merge-mentor review --pr 123 --write
+# or
+merge-mentor review --pr 123 --git-backend isomorphic --write
+```
+
+> **Note:** The `isomorphic` backend does not support `git clean -fdx` (untracked file removal). Only tracked files are reset between reviews. This is a known limitation of the isomorphic-git library.
 
 ### Pre-Existing Issue Detection
 

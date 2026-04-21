@@ -16,10 +16,6 @@
  * across multiple PR reviews. This avoids redundant cloning while keeping
  * credentials and temporary data isolated.
  *
- * Timeouts:
- * - Clone: 2 minutes (includes network transfer and object checkout)
- * - Fetch: 30 seconds (updates existing clone, usually faster)
- *
  * @example
  * ```typescript
  * const manager = new RepoManager('.mergementor');
@@ -36,15 +32,10 @@
 
 import path from "node:path";
 import { createChildLogger } from "../logger.js";
-import {
-  type Clock,
-  type FileSystem,
-  nodeFs,
-  nodeProcessRunner,
-  type ProcessRunner,
-  systemClock,
-} from "../ports/index.js";
+import { type Clock, type FileSystem, nodeFs, systemClock } from "../ports/index.js";
 import { redactToken } from "../utils/redact.js";
+import type { GitAuth, GitClient } from "./gitClient.js";
+import { createGitClient } from "./gitClients/factory.js";
 
 /** Repository information for cloning. */
 export interface RepoInfo {
@@ -63,20 +54,14 @@ export interface RepoInfo {
 /**
  * Configuration options for repository operations.
  *
- * Controls timeouts and behavior for cloning and fetching repositories.
+ * Controls behavior for cloning and fetching repositories.
+ * Timeout and git execution details are configured on the `GitClient`
+ * (e.g. `CliGitClient`) and passed in via the `gitClient` constructor parameter.
  */
 interface RepoManagerOptions {
-  /** Clone timeout in milliseconds (default: 120000 - 2 minutes) */
-  readonly cloneTimeoutMs?: number;
-  /** Fetch timeout in milliseconds (default: 30000 - 30 seconds) */
-  readonly fetchTimeoutMs?: number;
   /** Whether running in CI mode (repository already configured with credentials) */
   readonly ciMode?: boolean;
 }
-
-/** Default timeouts */
-const DEFAULT_CLONE_TIMEOUT_MS = 120_000; // 2 minutes
-const DEFAULT_FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
  * Manages persistent repository clones for context extraction.
@@ -86,29 +71,25 @@ const DEFAULT_FETCH_TIMEOUT_MS = 30_000; // 30 seconds
  */
 export class RepoManager {
   private readonly logger = createChildLogger({ component: "RepoManager" });
-  private readonly cloneTimeoutMs: number;
-  private readonly fetchTimeoutMs: number;
   private readonly reposDir: string;
   private readonly ciMode: boolean;
 
   /**
    * Creates a new repository manager.
    *
-   * @param tempPath - Base temporary directory (will create `repos/` subdirectory)
-   * @param options - Configuration for timeouts and CI mode
+   * @param tempPath   - Base temporary directory (will create `repos/` subdirectory)
+   * @param options    - Configuration for CI mode
+   * @param gitClient  - Git operations adapter (defaults to `CliGitClient` backed by system git)
    * @param fileSystem - File system operations (dependency injection, defaults to nodeFs)
-   * @param runner - Process runner for git commands (dependency injection, defaults to nodeProcessRunner)
-   * @param clock - Clock for timestamps (dependency injection, defaults to systemClock)
+   * @param clock      - Clock for timestamps (dependency injection, defaults to systemClock)
    */
   constructor(
     tempPath: string,
     options?: RepoManagerOptions,
+    private readonly gitClient: GitClient = createGitClient("cli"),
     private readonly fileSystem: FileSystem = nodeFs,
-    private readonly runner: ProcessRunner = nodeProcessRunner,
     private readonly clock: Clock = systemClock
   ) {
-    this.cloneTimeoutMs = options?.cloneTimeoutMs ?? DEFAULT_CLONE_TIMEOUT_MS;
-    this.fetchTimeoutMs = options?.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
     this.ciMode = options?.ciMode ?? false;
     this.reposDir = path.join(tempPath, "repos");
   }
@@ -286,24 +267,8 @@ export class RepoManager {
     await this.fileSystem.mkdir(path.dirname(repoPath), { recursive: true });
 
     try {
-      const authArgs = this.buildAuthArgs(token, repoInfo.platform);
-      const env = this.buildGitEnv();
-      await this.execFileWithTimeout(
-        "git",
-        [
-          ...authArgs,
-          "clone",
-          "--depth",
-          "1",
-          "--single-branch",
-          "--branch",
-          branch,
-          cloneUrl,
-          repoPath,
-        ],
-        this.cloneTimeoutMs,
-        env
-      );
+      const auth = this.buildGitAuth(token, repoInfo.platform);
+      await this.gitClient.clone(cloneUrl, repoPath, auth, { branch });
       this.logger.info({ repoPath, branch }, "Repository cloned successfully");
     } catch (error) {
       // Clean up partial clone on failure
@@ -326,40 +291,19 @@ export class RepoManager {
     const remoteUrl = this.buildCloneUrl(repoInfo);
 
     try {
-      const authArgs = this.buildAuthArgs(token, repoInfo.platform);
-      const env = this.buildGitEnv();
+      const auth = this.buildGitAuth(token, repoInfo.platform);
 
       // Clean any leftover files from previous reviews
-      await this.execFileWithTimeout(
-        "git",
-        ["-C", repoPath, "clean", "-fdx"],
-        this.fetchTimeoutMs,
-        env
-      );
+      await this.gitClient.clean(repoPath);
 
-      // Update remote URL (uses public URL without embedded credentials)
-      await this.execFileWithTimeout(
-        "git",
-        ["-C", repoPath, "remote", "set-url", "origin", remoteUrl],
-        this.fetchTimeoutMs,
-        env
-      );
+      // Update remote URL (keeps credentials out of stored config)
+      await this.gitClient.setRemoteUrl(repoPath, remoteUrl);
 
-      // Fetch with inline auth via -c http.extraHeader (not stored in .git/config)
-      await this.execFileWithTimeout(
-        "git",
-        [...authArgs, "-C", repoPath, "fetch", "--depth", "1", "origin", branch],
-        this.fetchTimeoutMs,
-        env
-      );
+      // Fetch the latest state of the branch
+      await this.gitClient.fetch(repoPath, branch, auth);
 
-      // Reset to the fetched branch
-      await this.execFileWithTimeout(
-        "git",
-        ["-C", repoPath, "checkout", "-B", branch, `origin/${branch}`],
-        this.fetchTimeoutMs,
-        env
-      );
+      // Reset the working tree to the fetched branch
+      await this.gitClient.checkout(repoPath, branch);
 
       this.logger.info({ repoPath, branch }, "Repository updated successfully");
     } catch (error) {
@@ -372,8 +316,8 @@ export class RepoManager {
   /**
    * Builds the public clone URL for a repository (no embedded credentials).
    *
-   * Credentials are passed separately via `buildAuthArgs` using `-c http.extraHeader`,
-   * which keeps tokens out of URLs, process listings (for the URL itself), and .git/config.
+   * Credentials are passed separately via the `GitClient` auth mechanism,
+   * which keeps tokens out of URLs, process listings, and .git/config.
    */
   private buildCloneUrl(repoInfo: RepoInfo): string {
     if (repoInfo.platform === "azure") {
@@ -383,83 +327,15 @@ export class RepoManager {
   }
 
   /**
-   * Builds git `-c` arguments to pass credentials inline via HTTP extra headers.
+   * Builds a `GitAuth` value from a raw token and platform, respecting CI mode.
    *
-   * Uses `http.<host>/.extraHeader` so the Authorization header is injected per-request
-   * for this command only — it is never written to `.git/config` or any file on disk.
-   *
-   * GitHub: `x-access-token:<token>` (standard PAT/OAuth format)
-   * Azure DevOps: `:<token>` (empty username + PAT as password, per Microsoft docs)
-   *
-   * In CI mode no extra args are returned; the CI environment supplies credentials.
+   * In CI mode the returned auth signals that the environment already has
+   * credentials configured; the `GitClient` should not inject any extra auth.
    */
-  private buildAuthArgs(token: string, platform: "github" | "azure"): string[] {
+  private buildGitAuth(token: string, platform: "github" | "azure"): GitAuth {
     if (this.ciMode) {
-      return [];
+      return { type: "ci" };
     }
-
-    const host = platform === "azure" ? "https://dev.azure.com" : "https://github.com";
-    const credentials = platform === "azure" ? `:${token}` : `x-access-token:${token}`;
-    const encoded = Buffer.from(credentials).toString("base64");
-
-    return ["-c", `http.${host}/.extraHeader=Authorization: Basic ${encoded}`];
-  }
-
-  /**
-   * Builds environment variables for git commands.
-   *
-   * Sets `GIT_TERMINAL_PROMPT=0` to prevent git from falling back to interactive
-   * credential prompts — authentication is handled via `buildAuthArgs` instead.
-   * In CI mode no overrides are needed; the CI environment is already configured.
-   */
-  private buildGitEnv(): Record<string, string> {
-    if (this.ciMode) {
-      return {};
-    }
-    return { GIT_TERMINAL_PROMPT: "0" };
-  }
-
-  /**
-   * Executes a git command with explicit arguments and a timeout.
-   * Using execFile with an array of arguments prevents shell injection —
-   * arguments are passed directly to the process without shell interpretation.
-   */
-  private async execFileWithTimeout(
-    file: string,
-    args: string[],
-    timeoutMs: number,
-    env?: Record<string, string>
-  ): Promise<string> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      let execEnv: Record<string, string> | undefined;
-      if (env) {
-        execEnv = {};
-        // Merge process.env with provided env, filtering out undefined values
-        for (const [key, value] of Object.entries(process.env)) {
-          if (value !== undefined) {
-            execEnv[key] = value;
-          }
-        }
-        // Override with provided env variables
-        Object.assign(execEnv, env);
-      }
-
-      const result = await this.runner.execFile(file, args, {
-        signal: controller.signal,
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-        env: execEnv,
-      });
-      return result.stdout;
-    } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        throw new Error(`Command timed out after ${timeoutMs}ms`);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return { type: "token", token, platform };
   }
 }

@@ -63,6 +63,8 @@ export interface ReviewOptions {
    * When set, the engine skips cloning and uses this directory directly.
    */
   localWorkspacePath?: string;
+  /** Git backend for repository cloning and fetching ('cli' or 'isomorphic'). Default: 'cli' */
+  gitBackend?: string;
 }
 
 interface ReviewExecutionResult {
@@ -176,6 +178,7 @@ export async function executeReview(
     reviewType: resolvedOptions.reviewType,
     streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
     streamingLines: resolvedOptions.streamLines,
+    gitBackend: resolvedOptions.gitBackend,
   });
 
   // Initialize logger with configured temp path
@@ -246,6 +249,7 @@ export async function executeReview(
     tempPath: config.tempPath,
     localWorkspacePath: resolvedOptions.localWorkspacePath,
     ignorePatterns: resolvedOptions.ignore,
+    gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
   });
 
   const modeLabel = dryRun ? "(dry-run)" : "";
@@ -555,6 +559,10 @@ program
     "--review-type <type>",
     "Type of review (general, testing, security, performance, fast). Env: MM_REVIEW_TYPE",
     "general"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
   // GitHub options
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")

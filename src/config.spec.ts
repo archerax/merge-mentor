@@ -4,6 +4,7 @@ import {
   type Platform,
   validateAIProvider,
   validateConfig,
+  validateGitBackend,
   validateReviewRuns,
   validateReviewType,
 } from "./config.js";
@@ -26,6 +27,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("");
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
       expect(config.aiProvider).toBe("copilot-sdk");
+      expect(config.gitBackend).toBe("cli");
       expect(config.skipPreExisting).toBe(true);
       expect(config.reviewRuns).toBe(1);
     });
@@ -207,6 +209,22 @@ describe("Config", () => {
       expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode-sdk" })).aiProvider
       ).toBe("opencode-sdk");
+    });
+
+    it("should load MM_GIT_BACKEND from environment", () => {
+      const env = createStubEnvironment({ MM_GIT_BACKEND: "isomorphic" });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.gitBackend).toBe("isomorphic");
+    });
+
+    it("should default MM_GIT_BACKEND to cli for invalid values", () => {
+      const env = createStubEnvironment({ MM_GIT_BACKEND: "invalid" });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.gitBackend).toBe("cli");
     });
 
     it("should load MM_OPENCODE_MODEL from environment", () => {
@@ -560,6 +578,20 @@ describe("Validator functions", () => {
       expect(validateReviewType("custom")).toBe("general");
       expect(validateReviewType("")).toBe("general");
       expect(validateReviewType(undefined)).toBe("general");
+    });
+  });
+
+  describe("validateGitBackend", () => {
+    it("should return valid backend types", () => {
+      expect(validateGitBackend("cli")).toBe("cli");
+      expect(validateGitBackend("isomorphic")).toBe("isomorphic");
+    });
+
+    it("should default to cli for invalid values", () => {
+      expect(validateGitBackend("invalid")).toBe("cli");
+      expect(validateGitBackend("native")).toBe("cli");
+      expect(validateGitBackend("")).toBe("cli");
+      expect(validateGitBackend(undefined)).toBe("cli");
     });
   });
 });

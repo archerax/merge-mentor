@@ -96,6 +96,8 @@ import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.j
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
+import type { GitBackendType } from "./gitClient.js";
+import { createGitClient } from "./gitClients/factory.js";
 import { RepoManager } from "./repoManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
@@ -160,6 +162,8 @@ interface ReviewEngineOptions {
   readonly streamingLines?: number;
   /** CI mode: output as plain text (non-interactive, for log capture) */
   readonly ciMode?: boolean;
+  /** Git backend for repository cloning and fetching. Default: 'cli' (system git binary) */
+  readonly gitBackend?: string;
   /** Base path for temporary storage (cache, diffs, repos, logs). Defaults to .mergementor in cwd */
   readonly tempPath?: string;
   /**
@@ -305,7 +309,11 @@ export class ReviewEngine {
       skipPreExisting: resolvedOptions?.skipPreExisting,
     });
     this.stateCache = new ReviewStateCache(tempPath);
-    this.repoManager = new RepoManager(tempPath, { ciMode: resolvedOptions?.ciMode });
+    this.repoManager = new RepoManager(
+      tempPath,
+      { ciMode: resolvedOptions?.ciMode },
+      createGitClient((resolvedOptions?.gitBackend ?? "cli") as GitBackendType)
+    );
     this.options = resolvedOptions ?? {};
     this.streamingEnabled = resolvedOptions?.streamingEnabled ?? true;
     this.streamingLines = resolvedOptions?.streamingLines ?? 5;

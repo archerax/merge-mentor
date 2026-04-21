@@ -5,14 +5,14 @@ import type { Clock } from "../ports/clock.js";
 import { createFixedClock } from "../ports/clock.test-helper.js";
 import type { FileSystem } from "../ports/fileSystem.js";
 import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
-import type { ProcessRunner } from "../ports/processRunner.js";
-import { createStubProcessRunner } from "../ports/processRunner.test-helper.js";
+import type { GitClient } from "./gitClient.js";
+import { createStubGitClient } from "./gitClients/gitClient.test-helper.js";
 import { type RepoInfo, RepoManager } from "./repoManager.js";
 
 describe("RepoManager", () => {
   let repoManager: RepoManager;
   let fileSystem: Mocked<FileSystem>;
-  let processRunner: Mocked<ProcessRunner>;
+  let gitClient: Mocked<GitClient>;
   let clock: Clock;
 
   const testTempPath = "/test/.mergementor";
@@ -20,25 +20,19 @@ describe("RepoManager", () => {
 
   beforeEach(() => {
     fileSystem = createStubFileSystem() as Mocked<FileSystem>;
-    processRunner = createStubProcessRunner() as Mocked<ProcessRunner>;
+    gitClient = createStubGitClient() as Mocked<GitClient>;
     clock = createFixedClock("2025-01-15T10:00:00.000Z");
-    repoManager = new RepoManager(testTempPath, undefined, fileSystem, processRunner, clock);
+    repoManager = new RepoManager(testTempPath, undefined, gitClient, fileSystem, clock);
   });
 
   describe("constructor", () => {
     it("uses default options when none provided", () => {
-      const manager = new RepoManager(testTempPath, undefined, fileSystem, processRunner, clock);
+      const manager = new RepoManager(testTempPath, undefined, gitClient, fileSystem, clock);
       expect(manager).toBeDefined();
     });
 
-    it("accepts custom options", () => {
-      const manager = new RepoManager(
-        testTempPath,
-        { cloneTimeoutMs: 60000, fetchTimeoutMs: 15000 },
-        fileSystem,
-        processRunner,
-        clock
-      );
+    it("accepts ciMode option", () => {
+      const manager = new RepoManager(testTempPath, { ciMode: true }, gitClient, fileSystem, clock);
       expect(manager).toBeDefined();
     });
   });
@@ -58,11 +52,7 @@ describe("RepoManager", () => {
       const result = await repoManager.ensureRepo(repoInfo, branch, token);
 
       expect(result).toBe(path.join(testReposDir, "github-testowner-testrepo"));
-      expect(processRunner.execFile).toHaveBeenCalledWith(
-        "git",
-        expect.arrayContaining(["clone"]),
-        expect.any(Object)
-      );
+      expect(gitClient.clone).toHaveBeenCalledOnce();
     });
 
     it("updates repository when it already exists", async () => {
@@ -73,11 +63,7 @@ describe("RepoManager", () => {
       const result = await repoManager.ensureRepo(repoInfo, branch, token);
 
       expect(result).toBe(path.join(testReposDir, "github-testowner-testrepo"));
-      expect(processRunner.execFile).toHaveBeenCalledWith(
-        "git",
-        expect.arrayContaining(["-C"]),
-        expect.any(Object)
-      );
+      expect(gitClient.fetch).toHaveBeenCalledOnce();
     });
 
     it("generates correct path for Azure DevOps repository", async () => {
@@ -95,19 +81,20 @@ describe("RepoManager", () => {
       expect(result).toBe(path.join(testReposDir, "azure-myorg-myproject-azurerepo"));
     });
 
-    it("uses correct clone URL for GitHub", async () => {
+    it("passes GitHub clone URL to gitClient.clone", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
 
       await repoManager.ensureRepo(repoInfo, branch, token);
 
-      expect(processRunner.execFile).toHaveBeenCalledWith(
-        "git",
-        expect.arrayContaining(["https://github.com/testowner/testrepo.git"]),
-        expect.any(Object)
+      expect(gitClient.clone).toHaveBeenCalledWith(
+        "https://github.com/testowner/testrepo.git",
+        expect.any(String),
+        expect.any(Object),
+        expect.objectContaining({ branch })
       );
     });
 
-    it("uses correct clone URL for Azure DevOps", async () => {
+    it("passes Azure DevOps clone URL to gitClient.clone", async () => {
       const azureRepoInfo: RepoInfo = {
         owner: "azureowner",
         repo: "azurerepo",
@@ -119,35 +106,28 @@ describe("RepoManager", () => {
 
       await repoManager.ensureRepo(azureRepoInfo, branch, token);
 
-      expect(processRunner.execFile).toHaveBeenCalledWith(
-        "git",
-        expect.arrayContaining(["https://dev.azure.com/myorg/myproject/_git/azurerepo"]),
-        expect.any(Object)
+      expect(gitClient.clone).toHaveBeenCalledWith(
+        "https://dev.azure.com/myorg/myproject/_git/azurerepo",
+        expect.any(String),
+        expect.any(Object),
+        expect.objectContaining({ branch })
       );
     });
 
-    it("passes GitHub credentials via -c http.extraHeader, not in clone URL", async () => {
+    it("passes token auth to gitClient.clone for GitHub", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
 
       await repoManager.ensureRepo(repoInfo, branch, token);
 
-      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
-        (c[1] as string[]).includes("clone")
+      expect(gitClient.clone).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        { type: "token", token, platform: "github" },
+        expect.any(Object)
       );
-      expect(cloneCall).toBeDefined();
-      const args = cloneCall?.[1] as string[];
-
-      // Credentials injected via -c, not in URL
-      expect(args).toContain("-c");
-      const headerArg = args.find((a) => a.startsWith("http.https://github.com/.extraHeader="));
-      expect(headerArg).toBeDefined();
-      expect(headerArg).toContain("Authorization: Basic");
-      // Public URL — no token embedded
-      const urlArg = args.find((a) => a.startsWith("https://github.com"));
-      expect(urlArg).not.toContain(token);
     });
 
-    it("passes Azure DevOps credentials via -c http.extraHeader using empty-username PAT format", async () => {
+    it("passes token auth to gitClient.clone for Azure DevOps", async () => {
       const azureRepoInfo: RepoInfo = {
         owner: "azureowner",
         repo: "azurerepo",
@@ -159,73 +139,50 @@ describe("RepoManager", () => {
 
       await repoManager.ensureRepo(azureRepoInfo, branch, token);
 
-      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
-        (c[1] as string[]).includes("clone")
+      expect(gitClient.clone).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        { type: "token", token, platform: "azure" },
+        expect.any(Object)
       );
-      expect(cloneCall).toBeDefined();
-      const args = cloneCall?.[1] as string[];
-
-      // Credentials injected via -c scoped to dev.azure.com
-      const headerArg = args.find((a) => a.startsWith("http.https://dev.azure.com/.extraHeader="));
-      expect(headerArg).toBeDefined();
-      expect(headerArg).toContain("Authorization: Basic");
-      // Verify empty-username format: `:token` encodes to base64 starting with `:` decoded
-      const encodedPart = headerArg?.split("Authorization: Basic ")[1] ?? "";
-      const decoded = Buffer.from(encodedPart, "base64").toString();
-      expect(decoded).toBe(`:${token}`);
     });
 
-    it("sets GIT_TERMINAL_PROMPT=0 to prevent interactive credential prompts", async () => {
-      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-
-      await repoManager.ensureRepo(repoInfo, branch, token);
-
-      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
-        (c[1] as string[]).includes("clone")
-      );
-      expect(cloneCall).toBeDefined();
-      const opts = cloneCall?.[2] as { env?: Record<string, string> };
-      expect(opts.env?.GIT_TERMINAL_PROMPT).toBe("0");
-    });
-
-    it("does not pass auth args in CI mode", async () => {
+    it("passes ci auth when ciMode is enabled", async () => {
       const ciManager = new RepoManager(
         testTempPath,
         { ciMode: true },
+        gitClient,
         fileSystem,
-        processRunner,
         clock
       );
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
 
       await ciManager.ensureRepo(repoInfo, branch, token);
 
-      const cloneCall = processRunner.execFile.mock.calls.find((c) =>
-        (c[1] as string[]).includes("clone")
-      );
-      expect(cloneCall).toBeDefined();
-      const args = cloneCall?.[1] as string[];
-      expect(args).not.toContain("-c");
-    });
-
-    it("passes branch as a separate argument, not a shell string", async () => {
-      const maliciousBranch = "main; rm -rf /";
-      fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-
-      await repoManager.ensureRepo(repoInfo, maliciousBranch, token);
-
-      // Shell metacharacters are inert because execFile passes args directly to git
-      expect(processRunner.execFile).toHaveBeenCalledWith(
-        "git",
-        expect.arrayContaining([maliciousBranch]),
+      expect(gitClient.clone).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        { type: "ci" },
         expect.any(Object)
       );
-      expect(processRunner.exec).not.toHaveBeenCalled();
+    });
+
+    it("runs clean, setRemoteUrl, fetch and checkout when updating", async () => {
+      fileSystem.stat.mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+
+      await repoManager.ensureRepo(repoInfo, branch, token);
+
+      expect(gitClient.clean).toHaveBeenCalledOnce();
+      expect(gitClient.setRemoteUrl).toHaveBeenCalledOnce();
+      expect(gitClient.fetch).toHaveBeenCalledOnce();
+      expect(gitClient.checkout).toHaveBeenCalledOnce();
     });
 
     it("throws error when clone fails", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-      processRunner.execFile.mockRejectedValue(new Error("Clone failed"));
+      gitClient.clone.mockRejectedValue(new Error("Clone failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to clone repository"
@@ -234,7 +191,7 @@ describe("RepoManager", () => {
 
     it("redacts token from clone error messages", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-      processRunner.execFile.mockRejectedValue(
+      gitClient.clone.mockRejectedValue(
         new Error(
           `fatal: repository 'https://${token}@github.com/testowner/testrepo.git' not found`
         )
@@ -249,7 +206,7 @@ describe("RepoManager", () => {
       fileSystem.stat.mockResolvedValue({
         isDirectory: () => true,
       } as unknown as Stats);
-      processRunner.execFile.mockRejectedValue(new Error("Fetch failed"));
+      gitClient.fetch.mockRejectedValue(new Error("Fetch failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to update repository"
@@ -260,7 +217,7 @@ describe("RepoManager", () => {
       fileSystem.stat.mockResolvedValue({
         isDirectory: () => true,
       } as unknown as Stats);
-      processRunner.execFile.mockRejectedValue(
+      gitClient.fetch.mockRejectedValue(
         new Error(
           `error: could not read Username for 'https://${token}@github.com': No such device or address`
         )
@@ -273,7 +230,7 @@ describe("RepoManager", () => {
 
     it("cleans up partial clone on failure", async () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-      processRunner.execFile.mockRejectedValue(new Error("Clone failed"));
+      gitClient.clone.mockRejectedValue(new Error("Clone failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow();
       expect(fileSystem.rm).toHaveBeenCalledWith(
@@ -419,34 +376,9 @@ describe("RepoManager", () => {
   });
 
   describe("timeout handling", () => {
-    it("handles clone timeout", async () => {
-      const manager = new RepoManager(
-        testTempPath,
-        { cloneTimeoutMs: 1 },
-        fileSystem,
-        processRunner,
-        clock
-      );
-
+    it("propagates timeout error from gitClient.clone", async () => {
+      gitClient.clone.mockRejectedValue(new Error("Command timed out after 120000ms"));
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
-
-      // Simulate a command that rejects with AbortError when signal fires
-      processRunner.execFile.mockImplementation(async (_file, _args, options) => {
-        return new Promise((_resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error("Should have been aborted"));
-          }, 5000);
-
-          if (options?.signal) {
-            options.signal.addEventListener("abort", () => {
-              clearTimeout(timeoutId);
-              const error = new Error("Command timed out");
-              error.name = "AbortError";
-              reject(error);
-            });
-          }
-        });
-      });
 
       const repoInfo: RepoInfo = {
         owner: "testowner",
@@ -454,7 +386,9 @@ describe("RepoManager", () => {
         platform: "github",
       };
 
-      await expect(manager.ensureRepo(repoInfo, "main", "token")).rejects.toThrow();
+      await expect(repoManager.ensureRepo(repoInfo, "main", "token")).rejects.toThrow(
+        "Failed to clone repository"
+      );
     });
   });
 });

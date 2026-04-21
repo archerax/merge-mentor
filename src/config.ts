@@ -2,6 +2,7 @@ import path from "node:path";
 import type { AIProviderType } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
 import { type Environment, processEnvironment } from "./ports/environment.js";
+import type { GitBackendType } from "./review/gitClient.js";
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
@@ -32,6 +33,8 @@ export interface Config {
   readonly botCommentIdentifier: string;
   /** AI provider to use for code reviews. Default: copilot-sdk */
   readonly aiProvider: AIProviderType;
+  /** Git backend to use for cloning and fetching repositories. Default: cli */
+  readonly gitBackend: GitBackendType;
   readonly copilotToken?: string;
   readonly copilotModel?: string;
   readonly copilotTimeoutMs?: number;
@@ -113,6 +116,7 @@ export function loadConfig(
   );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"));
   const reviewType = validateReviewType(cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"));
+  const gitBackend = validateGitBackend(cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"));
 
   return {
     defaultPlatform: ((cliOverrides?.platform ?? env.get("MM_PLATFORM")) as Platform) || "github",
@@ -130,6 +134,7 @@ export function loadConfig(
     botCommentIdentifier:
       cliOverrides?.commentIdentifier ?? env.get("MM_COMMENT_IDENTIFIER") ?? "[merge-mentor]",
     aiProvider,
+    gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
     copilotModel: cliOverrides?.copilotModel ?? env.get("MM_COPILOT_MODEL"),
     copilotTimeoutMs,
@@ -180,6 +185,7 @@ interface CliOverrides {
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
   readonly tempPath?: string;
+  readonly gitBackend?: string;
 }
 
 /**
@@ -256,7 +262,30 @@ export function validateReviewType(value: string | undefined): ReviewType {
 }
 
 /**
- * Validates configuration for the specified platform.
+ * Validates the git backend type.
+ * Supported backends are: cli, isomorphic.
+ * Unknown values default to cli.
+ *
+ * @param value - Git backend name as string or undefined
+ * @returns Validated backend type, or 'cli' if invalid
+ *
+ * @example
+ * ```typescript
+ * validateGitBackend("isomorphic"); // "isomorphic"
+ * validateGitBackend("cli"); // "cli"
+ * validateGitBackend("unknown"); // "cli" (default)
+ * validateGitBackend(undefined); // "cli" (default)
+ * ```
+ */
+export function validateGitBackend(value: string | undefined): GitBackendType {
+  const validBackends: GitBackendType[] = ["cli", "isomorphic"];
+  if (value && validBackends.includes(value as GitBackendType)) {
+    return value as GitBackendType;
+  }
+  return "cli"; // Default to cli
+}
+
+/**
  *
  * @param config - Configuration object to validate
  * @param platform - Target platform requiring validation
