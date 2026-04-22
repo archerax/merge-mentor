@@ -307,6 +307,8 @@ export class ReviewEngine {
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
+      reviewType: resolvedOptions?.reviewType,
+      model,
     });
     this.stateCache = new ReviewStateCache(tempPath);
     this.repoManager = new RepoManager(

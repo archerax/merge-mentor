@@ -34,6 +34,7 @@
  * ```
  */
 
+import packageJson from "../../package.json" with { type: "json" };
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import type {
@@ -53,6 +54,10 @@ import type {
 interface CommentManagerOptions {
   /** Skip findings on lines not modified in this PR (pre-existing issues). Default: true */
   readonly skipPreExisting?: boolean;
+  /** Review type label shown in comment footers. Default: general. */
+  readonly reviewType?: string;
+  /** Configured AI model identifier shown in comment footers. */
+  readonly model?: string;
 }
 
 /**
@@ -66,6 +71,7 @@ export class CommentManager {
   private readonly botIdentifier: string;
   private readonly summaryMarker = "<!-- AI_CODE_REVIEW_SUMMARY -->";
   private readonly skipPreExisting: boolean;
+  private readonly footer: string;
   private readonly logger = createChildLogger({ component: "CommentManager" });
 
   /**
@@ -86,6 +92,7 @@ export class CommentManager {
   constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
     this.skipPreExisting = options?.skipPreExisting ?? true;
+    this.footer = this.buildFooter(options?.reviewType, options?.model);
   }
 
   /**
@@ -270,7 +277,7 @@ export class CommentManager {
 ${finding.suggestion}
 
 ---
-${this.botIdentifier}${idMarker}`;
+${this.footer}${idMarker}`;
   }
 
   /**
@@ -296,10 +303,78 @@ ${this.botIdentifier}${idMarker}`;
     summary += this.buildCrossFileFindingsSection(crossFileResult);
     summary += this.buildRecommendationsSection(crossFileResult);
 
-    // Append bot identifier
-    summary += `\n---\n${this.botIdentifier}`;
+    summary += `\n---\n${this.footer}`;
 
     return summary;
+  }
+
+  private buildFooter(reviewType?: string, model?: string): string {
+    const footerParts = [
+      `Merge Mentor v${packageJson.version}`,
+      this.formatReviewType(reviewType),
+      this.formatModelName(model),
+    ];
+
+    return `${footerParts.join(", ")}\n<!-- ${this.botIdentifier} -->`;
+  }
+
+  private formatReviewType(reviewType?: string): string {
+    const normalizedType = reviewType?.trim().toLowerCase() || "general";
+    return `${normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1)} review`;
+  }
+
+  private formatModelName(model?: string): string {
+    if (!model || model.trim().length === 0) {
+      return "Default model";
+    }
+
+    const tokenLabels: Record<string, string> = {
+      claude: "Claude",
+      codex: "Codex",
+      flash: "Flash",
+      gemini: "Gemini",
+      gpt: "GPT",
+      haiku: "Haiku",
+      mini: "Mini",
+      nano: "Nano",
+      opus: "Opus",
+      pro: "Pro",
+      sonnet: "Sonnet",
+      turbo: "Turbo",
+    };
+
+    const tokens = model
+      .trim()
+      .split("-")
+      .filter((token) => token.length > 0);
+
+    if (tokens.length === 0) {
+      return "Default model";
+    }
+
+    return tokens
+      .map((token, index) => {
+        const lowerToken = token.toLowerCase();
+        const mappedToken = tokenLabels[lowerToken];
+
+        if (mappedToken) {
+          if (mappedToken === "GPT" && index < tokens.length - 1) {
+            return `${mappedToken}-${tokens[index + 1]}`;
+          }
+          if (index > 0 && tokens[index - 1].toLowerCase() === "gpt") {
+            return "";
+          }
+          return mappedToken;
+        }
+
+        if (/^\d+(\.\d+)*$/.test(token)) {
+          return token;
+        }
+
+        return token.charAt(0).toUpperCase() + token.slice(1);
+      })
+      .filter((token) => token.length > 0)
+      .join(" ");
   }
 
   private buildOverviewSection(
