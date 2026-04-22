@@ -1,4 +1,5 @@
 import { describe, expect, it, test, vi } from "vitest";
+import packageJson from "../../package.json" with { type: "json" };
 import type {
   CrossFileReviewResult,
   ExistingComment,
@@ -18,8 +19,14 @@ vi.mock("../logger.js", () => ({
   }),
 }));
 
-function createCommentManager(): CommentManager {
-  return new CommentManager("[AI Code Review Bot]");
+const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, General review, Default model`;
+
+function createCommentManager(options?: {
+  skipPreExisting?: boolean;
+  reviewType?: string;
+  model?: string;
+}): CommentManager {
+  return new CommentManager("[AI Code Review Bot]", options);
 }
 
 function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
@@ -67,7 +74,8 @@ describe("CommentManager", () => {
       expect(result).toContain("Security Issue");
       expect(result).toContain("SQL injection vulnerability");
       expect(result).toContain("Use parameterized queries");
-      expect(result).toContain("[AI Code Review Bot]");
+      expect(result).toContain(DEFAULT_FOOTER);
+      expect(result).toContain("<!-- [AI Code Review Bot] -->");
     });
 
     test.each([
@@ -127,6 +135,19 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(finding);
 
       expect(result).toContain("Security Issue");
+    });
+
+    it("includes configured review type and model in the footer", () => {
+      const manager = createCommentManager({
+        reviewType: "fast",
+        model: "claude-sonnet-4.6",
+      });
+
+      const result = manager.formatInlineComment(createFileFinding());
+
+      expect(result).toContain(
+        `Merge Mentor v${packageJson.version}, Fast review, claude-sonnet-4.6`
+      );
     });
   });
 
@@ -259,7 +280,8 @@ describe("CommentManager", () => {
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
-      expect(result).toContain("---\n[AI Code Review Bot]");
+      expect(result).toContain(`---\n${DEFAULT_FOOTER}`);
+      expect(result).toContain("<!-- [AI Code Review Bot] -->");
     });
   });
 

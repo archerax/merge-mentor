@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, test, vi } from "vitest";
+import packageJson from "../../package.json" with { type: "json" };
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { createFixedClock } from "../ports/clock.test-helper.js";
@@ -545,6 +546,53 @@ describe("ReviewEngine", () => {
         expect.any(String)
       );
       expect(result.commentsCreated).toBe(2); // 1 inline + 1 summary
+    });
+
+    it("includes version, review type, and model in posted comment footers", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false,
+        reviewType: "security",
+        aiModel: "claude-sonnet-4.6",
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 2,
+              severity: "high",
+              category: "bug",
+              message: "Test issue",
+              suggestion: "Fix it",
+              confidence: "high" as const,
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      expect(mockPlatform.postInlineComment).toHaveBeenCalledWith(
+        123,
+        "test.ts",
+        2,
+        expect.stringContaining(
+          `Merge Mentor v${packageJson.version}, Security review, claude-sonnet-4.6`
+        )
+      );
     });
 
     it("warns when all findings filtered out due to invalid line numbers", async () => {
