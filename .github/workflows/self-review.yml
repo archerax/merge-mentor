@@ -1,0 +1,60 @@
+name: Self Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: self-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review pull request
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+
+      - name: Build CLI
+        run: pnpm build
+
+      - name: Run self review
+        run: pnpm start review --ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.MERGE_MENTOR_GITHUB_TOKEN }}
+          MM_COPILOT_TOKEN: ${{ secrets.MERGE_MENTOR_COPILOT_TOKEN }}
+          MM_AI_PROVIDER: copilot-sdk
+          MM_COPILOT_MODEL: ${{ vars.MERGE_MENTOR_COPILOT_MODEL }}
+          MM_REVIEW_TYPE: ${{ vars.MERGE_MENTOR_REVIEW_TYPE }}
+          MM_REVIEW_RUNS: ${{ vars.MERGE_MENTOR_REVIEW_RUNS }}
