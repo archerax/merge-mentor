@@ -328,53 +328,7 @@ ${this.footer}${idMarker}`;
       return "Default model";
     }
 
-    const tokenLabels: Record<string, string> = {
-      claude: "Claude",
-      codex: "Codex",
-      flash: "Flash",
-      gemini: "Gemini",
-      gpt: "GPT",
-      haiku: "Haiku",
-      mini: "Mini",
-      nano: "Nano",
-      opus: "Opus",
-      pro: "Pro",
-      sonnet: "Sonnet",
-      turbo: "Turbo",
-    };
-
-    const tokens = model
-      .trim()
-      .split("-")
-      .filter((token) => token.length > 0);
-
-    if (tokens.length === 0) {
-      return "Default model";
-    }
-
-    return tokens
-      .map((token, index) => {
-        const lowerToken = token.toLowerCase();
-        const mappedToken = tokenLabels[lowerToken];
-
-        if (mappedToken) {
-          if (mappedToken === "GPT" && index < tokens.length - 1) {
-            return `${mappedToken}-${tokens[index + 1]}`;
-          }
-          if (index > 0 && tokens[index - 1].toLowerCase() === "gpt") {
-            return "";
-          }
-          return mappedToken;
-        }
-
-        if (/^\d+(\.\d+)*$/.test(token)) {
-          return token;
-        }
-
-        return token.charAt(0).toUpperCase() + token.slice(1);
-      })
-      .filter((token) => token.length > 0)
-      .join(" ");
+    return model.trim();
   }
 
   private buildOverviewSection(

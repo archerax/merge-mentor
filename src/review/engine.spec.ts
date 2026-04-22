@@ -590,7 +590,7 @@ describe("ReviewEngine", () => {
         "test.ts",
         2,
         expect.stringContaining(
-          `Merge Mentor v${packageJson.version}, Security review, Claude Sonnet 4.6`
+          `Merge Mentor v${packageJson.version}, Security review, claude-sonnet-4.6`
         )
       );
     });

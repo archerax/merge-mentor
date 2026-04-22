@@ -146,7 +146,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Fast review, Claude Sonnet 4.6`
+        `Merge Mentor v${packageJson.version}, Fast review, claude-sonnet-4.6`
       );
     });
   });
