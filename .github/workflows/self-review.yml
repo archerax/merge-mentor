@@ -50,11 +50,11 @@ jobs:
         run: pnpm build
 
       - name: Run self review
-        run: pnpm start review --ci
+        run: pnpm start review --ci --write
         env:
           GITHUB_TOKEN: ${{ secrets.MERGE_MENTOR_GITHUB_TOKEN }}
           MM_COPILOT_TOKEN: ${{ secrets.MERGE_MENTOR_COPILOT_TOKEN }}
           MM_AI_PROVIDER: copilot-sdk
-          MM_COPILOT_MODEL: ${{ vars.MERGE_MENTOR_COPILOT_MODEL }}
+          MM_AI_MODEL: ${{ vars.MERGE_MENTOR_COPILOT_MODEL }}
           MM_REVIEW_TYPE: ${{ vars.MERGE_MENTOR_REVIEW_TYPE }}
           MM_REVIEW_RUNS: ${{ vars.MERGE_MENTOR_REVIEW_RUNS }}

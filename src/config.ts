@@ -10,6 +10,21 @@ export type Platform = "github" | "azure";
 /** Supported review types for specialized analysis. */
 export type ReviewType = "general" | "testing" | "security" | "performance" | "fast";
 
+/**
+ * Deprecated environment variable aliases retained for v1 compatibility.
+ *
+ * @deprecated Remove these aliases in v2 after deleting fallback support.
+ */
+const DEPRECATED_ENV_VAR_ALIASES = {
+  agentTimeout: "MM_AGENT_TIMEOUT",
+  copilotModel: "MM_COPILOT_MODEL",
+  copilotSdkModel: "MM_COPILOT_SDK_MODEL",
+  opencodeModel: "MM_OPENCODE_MODEL",
+  opencodeSdkModel: "MM_OPENCODE_SDK_MODEL",
+  copilotSdkBaseUrl: "MM_COPILOT_SDK_BASE_URL",
+  copilotSdkApiKey: "MM_COPILOT_SDK_API_KEY",
+} as const;
+
 /** GitHub-specific configuration. */
 export interface GitHubConfig {
   readonly token: string;
@@ -37,18 +52,30 @@ export interface Config {
   readonly gitBackend: GitBackendType;
   readonly copilotToken?: string;
   /** Shared timeout for all AI providers. Preferred over provider-specific timeout aliases. */
+  readonly aiTimeoutMs?: number;
+  /** @deprecated Use aiTimeoutMs instead. */
   readonly agentTimeoutMs?: number;
+  /** Generic model identifier for the active AI provider. */
+  readonly aiModel?: string;
+  /** @deprecated Use aiModel instead. */
   readonly copilotModel?: string;
-  /** @deprecated Use agentTimeoutMs instead. */
+  /** @deprecated Use aiTimeoutMs instead. */
   readonly copilotTimeoutMs?: number;
+  /** @deprecated Use aiModel instead. */
   readonly copilotSdkModel?: string;
-  /** @deprecated Use agentTimeoutMs instead. */
+  /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
+  readonly aiBaseUrl?: string;
+  /** Generic BYOK API key for AI providers that support it. */
+  readonly aiApiKey?: string;
+  /** @deprecated Use aiTimeoutMs instead. */
   readonly copilotSdkTimeoutMs?: number;
+  /** @deprecated Use aiModel instead. */
   readonly opencodeModel?: string;
-  /** @deprecated Use agentTimeoutMs instead. */
+  /** @deprecated Use aiTimeoutMs instead. */
   readonly opencodeTimeoutMs?: number;
+  /** @deprecated Use aiModel instead. */
   readonly opencodeSdkModel?: string;
-  /** @deprecated Use agentTimeoutMs instead. */
+  /** @deprecated Use aiTimeoutMs instead. */
   readonly opencodeSdkTimeoutMs?: number;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
@@ -104,8 +131,11 @@ export function loadConfig(
   cliOverrides?: Partial<CliOverrides>,
   env: Environment = processEnvironment
 ): Config {
-  const agentTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.agentTimeout ?? env.get("MM_AGENT_TIMEOUT")
+  const aiTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.aiTimeout ??
+      cliOverrides?.agentTimeout ??
+      env.get("MM_AI_TIMEOUT") ??
+      env.get(DEPRECATED_ENV_VAR_ALIASES.agentTimeout)
   );
   const copilotTimeoutMs = parseOptionalTimeout(
     cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT")
@@ -145,14 +175,28 @@ export function loadConfig(
     aiProvider,
     gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
-    agentTimeoutMs,
-    copilotModel: cliOverrides?.copilotModel ?? env.get("MM_COPILOT_MODEL"),
+    aiTimeoutMs,
+    agentTimeoutMs: aiTimeoutMs,
+    aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
+    copilotModel: cliOverrides?.copilotModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.copilotModel),
     copilotTimeoutMs,
-    copilotSdkModel: cliOverrides?.copilotSdkModel ?? env.get("MM_COPILOT_SDK_MODEL"),
+    copilotSdkModel:
+      cliOverrides?.copilotSdkModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkModel),
+    aiBaseUrl:
+      cliOverrides?.aiBaseUrl ??
+      cliOverrides?.copilotSdkBaseUrl ??
+      env.get("MM_AI_BASE_URL") ??
+      env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkBaseUrl),
+    aiApiKey:
+      cliOverrides?.aiApiKey ??
+      cliOverrides?.copilotSdkApiKey ??
+      env.get("MM_AI_API_KEY") ??
+      env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkApiKey),
     copilotSdkTimeoutMs,
-    opencodeModel: cliOverrides?.opencodeModel ?? env.get("MM_OPENCODE_MODEL"),
+    opencodeModel: cliOverrides?.opencodeModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.opencodeModel),
     opencodeTimeoutMs,
-    opencodeSdkModel: cliOverrides?.opencodeSdkModel ?? env.get("MM_OPENCODE_SDK_MODEL"),
+    opencodeSdkModel:
+      cliOverrides?.opencodeSdkModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.opencodeSdkModel),
     opencodeSdkTimeoutMs,
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
@@ -181,13 +225,26 @@ interface CliOverrides {
   readonly commentIdentifier?: string;
   readonly aiProvider?: string;
   readonly copilotToken?: string;
+  readonly aiTimeout?: number;
+  /** @deprecated Use aiTimeout instead. */
   readonly agentTimeout?: number;
+  readonly aiModel?: string;
+  /** @deprecated Use aiModel instead. */
   readonly copilotModel?: string;
   readonly copilotTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   readonly copilotSdkModel?: string;
+  readonly aiBaseUrl?: string;
+  readonly aiApiKey?: string;
+  /** @deprecated Use aiBaseUrl instead. */
+  readonly copilotSdkBaseUrl?: string;
+  /** @deprecated Use aiApiKey instead. */
+  readonly copilotSdkApiKey?: string;
   readonly copilotSdkTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   readonly opencodeModel?: string;
   readonly opencodeTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   readonly opencodeSdkModel?: string;
   readonly opencodeSdkTimeout?: number;
   readonly skipExistingIssues?: string;

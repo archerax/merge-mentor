@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, test, vi } from "vitest";
 import packageJson from "../../package.json" with { type: "json" };
+import { createAIProvider } from "../ai/index.js";
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { createFixedClock } from "../ports/clock.test-helper.js";
@@ -179,6 +180,24 @@ describe("ReviewEngine", () => {
         dryRun: true,
       });
       expect(engine).toBeDefined();
+    });
+
+    it("passes Copilot SDK BYOK settings to the provider factory", () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        aiModel: "gpt-5.2-codex",
+        aiBaseUrl: "https://bedrock.example.com/openai/v1",
+        aiApiKey: "bedrock-key",
+      });
+
+      expect(engine).toBeDefined();
+      expect(vi.mocked(createAIProvider)).toHaveBeenCalledWith(
+        "copilot-sdk",
+        expect.objectContaining({
+          model: "gpt-5.2-codex",
+          aiBaseUrl: "https://bedrock.example.com/openai/v1",
+          aiApiKey: "bedrock-key",
+        })
+      );
     });
   });
 

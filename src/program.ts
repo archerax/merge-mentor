@@ -45,13 +45,26 @@ export interface ReviewOptions {
   commentIdentifier?: string;
   // AI provider config
   copilotToken?: string;
+  aiTimeout?: number;
+  /** @deprecated Use aiTimeout instead. */
   agentTimeout?: number;
+  aiModel?: string;
+  /** @deprecated Use aiModel instead. */
   copilotModel?: string;
   copilotTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   copilotSdkModel?: string;
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+  /** @deprecated Use aiBaseUrl instead. */
+  copilotSdkBaseUrl?: string;
+  /** @deprecated Use aiApiKey instead. */
+  copilotSdkApiKey?: string;
   copilotSdkTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   opencodeModel?: string;
   opencodeTimeout?: number;
+  /** @deprecated Use aiModel instead. */
   opencodeSdkModel?: string;
   opencodeSdkTimeout?: number;
   // Comment filtering
@@ -78,6 +91,21 @@ interface ProgramDeps {
   output?: OutputWriter;
   env?: Environment;
 }
+
+/**
+ * Deprecated CLI option aliases retained for v1 compatibility.
+ *
+ * @deprecated Remove these aliases in v2 after deleting Commander option support.
+ */
+const DEPRECATED_CLI_OPTION_ALIASES = {
+  agentTimeout: "--agent-timeout <ms>",
+  copilotModel: "--copilot-model <model>",
+  copilotSdkModel: "--copilot-sdk-model <model>",
+  opencodeModel: "--opencode-model <model>",
+  opencodeSdkModel: "--opencode-sdk-model <model>",
+  copilotSdkBaseUrl: "--copilot-sdk-base-url <url>",
+  copilotSdkApiKey: "--copilot-sdk-api-key <key>",
+} as const;
 
 /**
  * Merges a resolved CI context into review options.
@@ -166,10 +194,16 @@ export async function executeReview(
     commentIdentifier: resolvedOptions.commentIdentifier,
     tempPath: resolvedOptions.tempPath,
     aiProvider: resolvedOptions.provider,
+    aiModel: resolvedOptions.aiModel,
     copilotModel: resolvedOptions.copilotModel,
+    aiTimeout: resolvedOptions.aiTimeout ?? resolvedOptions.agentTimeout,
     agentTimeout: resolvedOptions.agentTimeout,
     copilotTimeout: resolvedOptions.copilotTimeout,
     copilotSdkModel: resolvedOptions.copilotSdkModel,
+    aiBaseUrl: resolvedOptions.aiBaseUrl ?? resolvedOptions.copilotSdkBaseUrl,
+    aiApiKey: resolvedOptions.aiApiKey ?? resolvedOptions.copilotSdkApiKey,
+    copilotSdkBaseUrl: resolvedOptions.copilotSdkBaseUrl,
+    copilotSdkApiKey: resolvedOptions.copilotSdkApiKey,
     copilotSdkTimeout: resolvedOptions.copilotSdkTimeout,
     opencodeModel: resolvedOptions.opencodeModel,
     opencodeTimeout: resolvedOptions.opencodeTimeout,
@@ -216,23 +250,23 @@ export async function executeReview(
 
   // Select provider-specific model and resolve the shared timeout.
   let aiModel: string | undefined;
-  let aiTimeoutMs = config.agentTimeoutMs;
+  let aiTimeoutMs = config.aiTimeoutMs;
 
   switch (aiProvider) {
     case "copilot-sdk":
-      aiModel = config.copilotSdkModel ?? config.copilotModel;
+      aiModel = config.aiModel ?? config.copilotSdkModel ?? config.copilotModel;
       aiTimeoutMs ??= config.copilotSdkTimeoutMs ?? config.copilotTimeoutMs;
       break;
     case "opencode":
-      aiModel = config.opencodeModel;
+      aiModel = config.aiModel ?? config.opencodeModel;
       aiTimeoutMs ??= config.opencodeTimeoutMs;
       break;
     case "opencode-sdk":
-      aiModel = config.opencodeSdkModel ?? config.opencodeModel;
+      aiModel = config.aiModel ?? config.opencodeSdkModel ?? config.opencodeModel;
       aiTimeoutMs ??= config.opencodeSdkTimeoutMs ?? config.opencodeTimeoutMs;
       break;
     default:
-      aiModel = config.copilotModel;
+      aiModel = config.aiModel ?? config.copilotModel;
       aiTimeoutMs ??= config.copilotTimeoutMs;
   }
 
@@ -242,6 +276,8 @@ export async function executeReview(
     aiModel,
     aiTimeoutMs,
     copilotToken: config.copilotToken,
+    aiBaseUrl: config.aiBaseUrl,
+    aiApiKey: config.aiApiKey,
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
@@ -583,33 +619,60 @@ program
   )
   // AI provider config
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option(
-    "--agent-timeout <ms>",
-    "Timeout in ms for all AI providers. Env: MM_AGENT_TIMEOUT",
+    DEPRECATED_CLI_OPTION_ALIASES.agentTimeout,
+    "Deprecated alias for --ai-timeout. Env: MM_AGENT_TIMEOUT",
     parseInt
   )
-  .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.copilotModel,
+    "Deprecated alias for --ai-model. Env: MM_COPILOT_MODEL"
+  )
   .option(
     "--copilot-timeout <ms>",
-    "Copilot timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    "Copilot timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
     parseInt
   )
-  .option("--copilot-sdk-model <model>", "Copilot SDK model name. Env: MM_COPILOT_SDK_MODEL")
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkModel,
+    "Deprecated alias for --ai-model. Env: MM_COPILOT_SDK_MODEL"
+  )
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkBaseUrl,
+    "Deprecated alias for --ai-base-url. Env: MM_COPILOT_SDK_BASE_URL"
+  )
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkApiKey,
+    "Deprecated alias for --ai-api-key. Env: MM_COPILOT_SDK_API_KEY"
+  )
   .option(
     "--copilot-sdk-timeout <ms>",
-    "Copilot SDK timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    "Copilot SDK timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
     parseInt
   )
-  .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.opencodeModel,
+    "Deprecated alias for --ai-model. Env: MM_OPENCODE_MODEL"
+  )
   .option(
     "--opencode-timeout <ms>",
-    "OpenCode timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    "OpenCode timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
     parseInt
   )
-  .option("--opencode-sdk-model <model>", "OpenCode SDK model name. Env: MM_OPENCODE_SDK_MODEL")
+  .option(
+    DEPRECATED_CLI_OPTION_ALIASES.opencodeSdkModel,
+    "Deprecated alias for --ai-model. Env: MM_OPENCODE_SDK_MODEL"
+  )
   .option(
     "--opencode-sdk-timeout <ms>",
-    "OpenCode SDK timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    "OpenCode SDK timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
     parseInt
   )
   // Comment filtering
@@ -663,10 +726,16 @@ program
         commentIdentifier: options.commentIdentifier,
         aiProvider: options.provider,
         copilotToken: options.copilotToken,
+        aiTimeout: options.aiTimeout ?? options.agentTimeout,
+        aiModel: options.aiModel,
         agentTimeout: options.agentTimeout,
         copilotModel: options.copilotModel,
         copilotTimeout: options.copilotTimeout,
         copilotSdkModel: options.copilotSdkModel,
+        aiBaseUrl: options.aiBaseUrl,
+        aiApiKey: options.aiApiKey,
+        copilotSdkBaseUrl: options.copilotSdkBaseUrl,
+        copilotSdkApiKey: options.copilotSdkApiKey,
         copilotSdkTimeout: options.copilotSdkTimeout,
         opencodeModel: options.opencodeModel,
         opencodeTimeout: options.opencodeTimeout,
@@ -863,6 +932,8 @@ program
       output.log(`  AI provider: ${config.aiProvider}`);
       output.log(`  GitHub token: ${config.github.token ? "✅ Set" : "❌ Not set"}`);
       output.log(`  Azure token: ${config.azure.token ? "✅ Set" : "❌ Not set"}`);
+      output.log(`  AI base URL: ${config.aiBaseUrl ? "✅ Set" : "❌ Not set"}`);
+      output.log(`  AI API key: ${config.aiApiKey ? "✅ Set" : "❌ Not set"}`);
       output.log("");
     } catch (error) {
       output.log("⚙️  Configuration: ⚠️  Could not load configuration");

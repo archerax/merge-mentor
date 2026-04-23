@@ -37,6 +37,10 @@ export interface AIProviderOptions {
   readonly timeoutMs?: number;
   readonly model?: string;
   readonly token?: string;
+  /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
+  readonly aiBaseUrl?: string;
+  /** Generic BYOK API key for AI providers that support it. */
+  readonly aiApiKey?: string;
   /** Base path for temporary files (temp, transcripts). */
   readonly tempPath?: string;
   /** Finds executables on PATH (defaults to system finder). */

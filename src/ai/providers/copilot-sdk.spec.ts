@@ -23,7 +23,7 @@ vi.mock("@github/copilot-sdk", () => ({
 }));
 
 import { CopilotSdkError, ValidationError } from "../../errors/index.js";
-import type { AIResponse } from "../types.js";
+import type { AIProviderOptions, AIResponse } from "../types.js";
 import { CopilotSdkProvider, createReviewPermissionHandler } from "./copilot-sdk.js";
 
 function createAIResponse(parsed: unknown): AIResponse {
@@ -43,9 +43,18 @@ describe("CopilotSdkProvider", () => {
     maxRetries = 1,
     timeoutMs = 5000,
     model?: string,
-    token?: string
+    token?: string,
+    aiBaseUrl?: string,
+    aiApiKey?: string
   ): CopilotSdkProvider {
-    return new CopilotSdkProvider({ maxRetries, timeoutMs, model, token });
+    return new CopilotSdkProvider({
+      maxRetries,
+      timeoutMs,
+      model,
+      token,
+      aiBaseUrl,
+      aiApiKey,
+    });
   }
 
   beforeEach(() => {
@@ -71,6 +80,18 @@ describe("CopilotSdkProvider", () => {
     it("accepts custom maxRetries and timeoutMs", () => {
       const provider = new CopilotSdkProvider({ maxRetries: 5, timeoutMs: 30000 });
       expect(provider).toBeDefined();
+    });
+
+    it("throws when Copilot SDK BYOK API key is provided without a base URL", () => {
+      const createProviderWithInvalidByok = () =>
+        new CopilotSdkProvider({
+          aiApiKey: "bedrock-key",
+        } satisfies AIProviderOptions);
+
+      expect(createProviderWithInvalidByok).toThrow(ValidationError);
+      expect(createProviderWithInvalidByok).toThrow(
+        "AI base URL is required when an AI API key is provided."
+      );
     });
   });
 
@@ -461,6 +482,83 @@ describe("CopilotSdkProvider", () => {
       await resultPromise;
 
       expect(MockCopilotClient).toHaveBeenCalledWith(undefined);
+    });
+
+    it("passes OpenAI-compatible BYOK provider settings to createSession", async () => {
+      const provider = createProvider(
+        1,
+        5000,
+        "claude-sonnet-4.6",
+        undefined,
+        "https://bedrock.example.com/openai/v1",
+        "bedrock-key"
+      );
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: {
+            type: "openai",
+            baseUrl: "https://bedrock.example.com/openai/v1",
+            apiKey: "bedrock-key",
+          },
+        })
+      );
+    });
+
+    it("uses the responses wire API for GPT-5 BYOK models", async () => {
+      const provider = createProvider(
+        1,
+        5000,
+        "gpt-5.2-codex",
+        undefined,
+        "https://bedrock.example.com/openai/v1",
+        "bedrock-key"
+      );
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.objectContaining({
+            type: "openai",
+            baseUrl: "https://bedrock.example.com/openai/v1",
+            apiKey: "bedrock-key",
+            wireApi: "responses",
+          }),
+        })
+      );
+    });
+
+    it("allows Copilot SDK BYOK base URLs without an API key", async () => {
+      const provider = createProvider(
+        1,
+        5000,
+        "claude-sonnet-4.6",
+        undefined,
+        "http://localhost:11434/v1"
+      );
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: {
+            type: "openai",
+            baseUrl: "http://localhost:11434/v1",
+          },
+        })
+      );
     });
   });
 

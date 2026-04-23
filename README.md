@@ -150,12 +150,19 @@ set MM_PLATFORM=azure
 export MM_AI_PROVIDER=copilot-sdk
 
 # Shared AI timeout (preferred)
-export MM_AGENT_TIMEOUT=3600000
+export MM_AI_TIMEOUT=3600000
 
-# Copilot settings
+# Generic AI model setting
+export MM_AI_MODEL=gpt-5.2-codex
+
+# Deprecated Copilot-specific model alias (scheduled for removal in v2)
 export MM_COPILOT_MODEL=claude-sonnet-4.6
 
-# OpenCode settings
+# Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
+export MM_AI_BASE_URL=https://your-resource.openai.azure.com/openai/v1/
+export MM_AI_API_KEY=your_provider_api_key
+
+# Deprecated OpenCode-specific model alias (scheduled for removal in v2)
 export MM_OPENCODE_MODEL=claude-sonnet-4.6
 
 ```
@@ -167,12 +174,19 @@ export MM_OPENCODE_MODEL=claude-sonnet-4.6
 $env:MM_AI_PROVIDER="copilot-sdk"
 
 # Shared AI timeout (preferred)
-$env:MM_AGENT_TIMEOUT="3600000"
+$env:MM_AI_TIMEOUT="3600000"
 
-# Copilot settings
+# Generic AI model setting
+$env:MM_AI_MODEL="gpt-5.2-codex"
+
+# Deprecated Copilot-specific model alias (scheduled for removal in v2)
 $env:MM_COPILOT_MODEL="claude-sonnet-4.6"
 
-# OpenCode settings
+# Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
+$env:MM_AI_BASE_URL="https://your-resource.openai.azure.com/openai/v1/"
+$env:MM_AI_API_KEY="your_provider_api_key"
+
+# Deprecated OpenCode-specific model alias (scheduled for removal in v2)
 $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 ```
 
@@ -180,11 +194,24 @@ $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 ```bash
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
-  --copilot-model claude-sonnet-4.6 \
-  --agent-timeout 3600000
+  --ai-model gpt-5.2-codex \
+  --ai-base-url https://your-resource.openai.azure.com/openai/v1/ \
+  --ai-api-key "$FOUNDRY_API_KEY" \
+  --ai-timeout 3600000
 ```
 
-Deprecated provider-specific timeout variables and flags remain supported for backward compatibility.
+For GPT-5 series Copilot SDK BYOK models, merge-mentor automatically uses the SDK `responses`
+wire API recommended by the Copilot SDK BYOK documentation.
+
+Deprecated v1 aliases remain supported for backward compatibility and are scheduled for removal in v2:
+
+- `MM_AGENT_TIMEOUT` / `--agent-timeout`
+- `MM_COPILOT_MODEL` / `--copilot-model`
+- `MM_COPILOT_SDK_MODEL` / `--copilot-sdk-model`
+- `MM_OPENCODE_MODEL` / `--opencode-model`
+- `MM_OPENCODE_SDK_MODEL` / `--opencode-sdk-model`
+- `MM_COPILOT_SDK_BASE_URL` / `--copilot-sdk-base-url`
+- `MM_COPILOT_SDK_API_KEY` / `--copilot-sdk-api-key`
 
 ### Optional Settings
 
@@ -309,14 +336,18 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 
 ### Available Models
 
-**Copilot** (used by both `copilot` and `copilot-sdk`): Configure via `MM_COPILOT_MODEL` environment variable or `--copilot-model` CLI parameter.
+**Preferred**: Configure the active provider model via `MM_AI_MODEL` or `--ai-model`.
+
+**Deprecated aliases**:
+- **Copilot**: `MM_COPILOT_MODEL` or `--copilot-model`
+- **Copilot SDK**: `MM_COPILOT_SDK_MODEL` or `--copilot-sdk-model`
+- **OpenCode**: `MM_OPENCODE_MODEL` or `--opencode-model`
+- **OpenCode SDK**: `MM_OPENCODE_SDK_MODEL` or `--opencode-sdk-model`
 
 - `claude-sonnet-4.6` (default)
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
 - `claude-opus-4.5`
-
-**OpenCode** (used by both `opencode` and `opencode-sdk`): Configure via `MM_OPENCODE_MODEL` environment variable or `--opencode-model` CLI parameter.
 
 - Check OpenCode documentation for supported models
 
@@ -438,9 +469,14 @@ merge-mentor review --pr 123 --review-type testing --write
 | Option | Description | Env Variable |
 |--------|-------------|--------------|
 | `--copilot-token <token>` | GitHub token for Copilot CLI/SDK auth (CI use) | `MM_COPILOT_TOKEN` |
-| `--agent-timeout <ms>` | Timeout in ms for all AI providers | `MM_AGENT_TIMEOUT` |
-| `--copilot-model <model>` | Copilot model name | `MM_COPILOT_MODEL` |
-| `--opencode-model <model>` | OpenCode model name | `MM_OPENCODE_MODEL` |
+| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` |
+| `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` |
+| `--copilot-model <model>` | Deprecated alias for `--ai-model` | `MM_COPILOT_MODEL` |
+| `--copilot-sdk-model <model>` | Deprecated alias for `--ai-model` | `MM_COPILOT_SDK_MODEL` |
+| `--ai-base-url <url>` | Generic OpenAI-compatible BYOK base URL | `MM_AI_BASE_URL` |
+| `--ai-api-key <key>` | Generic BYOK API key | `MM_AI_API_KEY` |
+| `--opencode-model <model>` | Deprecated alias for `--ai-model` | `MM_OPENCODE_MODEL` |
+| `--opencode-sdk-model <model>` | Deprecated alias for `--ai-model` | `MM_OPENCODE_SDK_MODEL` |
 
 **File Filtering:**
 | Option | Description | Default |
@@ -874,7 +910,7 @@ Review reports from dry-run mode are saved to `.mergementor/reports/` as markdow
 Increase timeout for large PRs:
 
 ```bash
-export MM_AGENT_TIMEOUT=3600000  # 1 hour for all AI providers
+export MM_AI_TIMEOUT=3600000  # 1 hour for all AI providers
 ```
 
 ### Exit Codes

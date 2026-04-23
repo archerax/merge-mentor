@@ -84,6 +84,13 @@ type PromptType =
   | "fast-review"
   | "unknown";
 
+interface CopilotSdkByokProviderConfig {
+  readonly type: "openai";
+  readonly baseUrl: string;
+  readonly apiKey?: string;
+  readonly wireApi?: "responses";
+}
+
 const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set([
   "shell",
   "write",
@@ -131,6 +138,8 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly token?: string;
+  private readonly byokBaseUrl?: string;
+  private readonly byokApiKey?: string;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
 
@@ -141,6 +150,9 @@ export class CopilotSdkProvider implements AIProviderClient {
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
     this.token = options?.token;
+    this.byokBaseUrl = this.normalizeOptionalString(options?.aiBaseUrl);
+    this.byokApiKey = this.normalizeOptionalString(options?.aiApiKey);
+    this.validateByokConfig();
   }
 
   /**
@@ -230,6 +242,45 @@ export class CopilotSdkProvider implements AIProviderClient {
     return this.client;
   }
 
+  private normalizeOptionalString(value: string | undefined): string | undefined {
+    const normalized = value?.trim();
+    return normalized && normalized.length > 0 ? normalized : undefined;
+  }
+
+  private validateByokConfig(): void {
+    if (!this.byokBaseUrl && this.byokApiKey) {
+      throw new ValidationError(
+        "aiBaseUrl",
+        "AI base URL is required when an AI API key is provided."
+      );
+    }
+
+    if (!this.byokBaseUrl) {
+      return;
+    }
+
+    try {
+      new URL(this.byokBaseUrl);
+    } catch {
+      throw new ValidationError("aiBaseUrl", "AI base URL must be a valid URL.");
+    }
+  }
+
+  private buildByokProviderConfig(): CopilotSdkByokProviderConfig | undefined {
+    if (!this.byokBaseUrl) {
+      return undefined;
+    }
+
+    return {
+      type: "openai",
+      baseUrl: this.byokBaseUrl,
+      ...(this.byokApiKey ? { apiKey: this.byokApiKey } : {}),
+      ...(this.model?.trim().toLowerCase().startsWith("gpt-5")
+        ? { wireApi: "responses" as const }
+        : {}),
+    };
+  }
+
   private async runSdk(
     prompt: string,
     options?: ExecutePromptOptions
@@ -243,11 +294,13 @@ export class CopilotSdkProvider implements AIProviderClient {
       throw error;
     }
 
+    const provider = this.buildByokProviderConfig();
     const session = await client.createSession({
       model: this.model,
       workingDirectory: options?.workingDirectory,
       streaming: true,
       onPermissionRequest: createReviewPermissionHandler(this.logger),
+      ...(provider ? { provider } : {}),
     });
 
     try {
