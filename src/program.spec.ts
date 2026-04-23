@@ -432,7 +432,7 @@ describe("CLI", () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           aiProvider: "copilot-sdk",
-          agentTimeoutMs: 600000,
+          aiTimeoutMs: 600000,
           copilotTimeoutMs: 120000,
           copilotSdkTimeoutMs: 180000,
         })
@@ -480,6 +480,62 @@ describe("CLI", () => {
         expect.objectContaining({
           aiModel: "claude-haiku-4.5",
           aiTimeoutMs: 420000,
+        })
+      );
+    });
+
+    it("prefers generic aiModel over provider-specific model aliases", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiProvider: "copilot-sdk",
+          aiModel: "gpt-5.2-codex",
+          copilotModel: "claude-haiku-4.5",
+          copilotSdkModel: "claude-sonnet-4.6",
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          aiModel: "gpt-5.2-codex",
+        })
+      );
+    });
+
+    it("passes Copilot SDK BYOK settings to ReviewEngine", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiProvider: "copilot-sdk",
+          copilotSdkModel: "gpt-5.2-codex",
+          aiBaseUrl: "https://bedrock.example.com/openai/v1",
+          aiApiKey: "bedrock-key",
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          aiModel: "gpt-5.2-codex",
+          aiBaseUrl: "https://bedrock.example.com/openai/v1",
+          aiApiKey: "bedrock-key",
         })
       );
     });
@@ -1350,6 +1406,24 @@ describe("CLI", () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("GitHub token: ✅ Set"));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Azure token: ✅ Set"));
+    });
+
+    it("shows generic AI BYOK status without revealing secrets", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiBaseUrl: "https://bedrock.example.com/openai/v1",
+          aiApiKey: "bedrock-key",
+        })
+      );
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("AI base URL: ✅ Set"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("AI API key: ✅ Set"));
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("bedrock-key"));
     });
 
     it("shows token not set when tokens are empty", async () => {

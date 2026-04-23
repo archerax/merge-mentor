@@ -9,8 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Shared agent timeout**: Added `MM_AGENT_TIMEOUT` and `--agent-timeout` as the preferred timeout setting for all AI providers
-  - Deprecated provider-specific timeout aliases remain supported for backward compatibility
+- **Standardized shared AI configuration**: Preferred shared AI settings now use the `MM_AI_*` / `--ai-*` naming family
+  - Preferred names: `MM_AI_TIMEOUT` / `--ai-timeout`, `MM_AI_MODEL` / `--ai-model`, `MM_AI_BASE_URL` / `--ai-base-url`, and `MM_AI_API_KEY` / `--ai-api-key`
+  - Deprecated v1 aliases remain supported for backward compatibility and are explicitly marked in code for removal in v2:
+    - `MM_AGENT_TIMEOUT` / `--agent-timeout`
+    - `MM_COPILOT_MODEL` / `--copilot-model`
+    - `MM_COPILOT_SDK_MODEL` / `--copilot-sdk-model`
+    - `MM_OPENCODE_MODEL` / `--opencode-model`
+    - `MM_OPENCODE_SDK_MODEL` / `--opencode-sdk-model`
+    - `MM_COPILOT_SDK_BASE_URL` / `--copilot-sdk-base-url`
+    - `MM_COPILOT_SDK_API_KEY` / `--copilot-sdk-api-key`
+- **Copilot SDK BYOK naming**: Copilot SDK OpenAI-compatible BYOK settings now flow through generic `ai-*` settings while remaining scoped to `copilot-sdk` behavior in v1
 
 ## [1.31.0] - 2026-04-21
 

@@ -148,6 +148,10 @@ interface ReviewEngineOptions {
   readonly copilotToken?: string;
   /** Model identifier for the AI provider (e.g., "gpt-5.2-codex", "claude-opus") */
   readonly aiModel?: string;
+  /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
+  readonly aiBaseUrl?: string;
+  /** Generic BYOK API key for AI providers that support it. */
+  readonly aiApiKey?: string;
   /** Timeout in milliseconds for AI provider API calls (default: 30000) */
   readonly aiTimeoutMs?: number;
   /** Skip pre-existing issues introduced before this PR (default: true) */
@@ -299,6 +303,8 @@ export class ReviewEngine {
         resolvedProviderType === "copilot" || resolvedProviderType === "copilot-sdk"
           ? resolvedOptions?.copilotToken
           : undefined,
+      aiBaseUrl: resolvedOptions?.aiBaseUrl,
+      aiApiKey: resolvedOptions?.aiApiKey,
       tempPath,
     };
 

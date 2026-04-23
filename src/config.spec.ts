@@ -136,43 +136,53 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBe(60000);
     });
 
-    it("should load MM_AGENT_TIMEOUT from environment", () => {
+    it("should load MM_AI_TIMEOUT from environment", () => {
+      const env = createStubEnvironment({
+        MM_AI_TIMEOUT: "60000",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiTimeoutMs).toBe(60000);
+    });
+
+    it("should support deprecated MM_AGENT_TIMEOUT alias", () => {
       const env = createStubEnvironment({
         MM_AGENT_TIMEOUT: "60000",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.agentTimeoutMs).toBe(60000);
+      expect(config.aiTimeoutMs).toBe(60000);
     });
 
-    it("should ignore MM_AGENT_TIMEOUT when zero or negative", () => {
+    it("should ignore MM_AI_TIMEOUT when zero or negative", () => {
       const env = createStubEnvironment({
-        MM_AGENT_TIMEOUT: "0",
+        MM_AI_TIMEOUT: "0",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.agentTimeoutMs).toBeUndefined();
+      expect(config.aiTimeoutMs).toBeUndefined();
     });
 
-    it("should default MM_AGENT_TIMEOUT to undefined when not set", () => {
+    it("should default MM_AI_TIMEOUT to undefined when not set", () => {
       const env = createStubEnvironment();
       const config = loadConfig(undefined, env);
 
-      expect(config.agentTimeoutMs).toBeUndefined();
+      expect(config.aiTimeoutMs).toBeUndefined();
     });
 
-    it("should prefer MM_AGENT_TIMEOUT over deprecated provider-specific timeouts", () => {
+    it("should prefer MM_AI_TIMEOUT over deprecated provider-specific timeouts", () => {
       const env = createStubEnvironment({
-        MM_AGENT_TIMEOUT: "60000",
+        MM_AI_TIMEOUT: "60000",
         MM_COPILOT_TIMEOUT: "120000",
         MM_OPENCODE_TIMEOUT: "180000",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.agentTimeoutMs).toBe(60000);
+      expect(config.aiTimeoutMs).toBe(60000);
       expect(config.copilotTimeoutMs).toBe(120000);
       expect(config.opencodeTimeoutMs).toBe(180000);
     });
@@ -214,6 +224,16 @@ describe("Config", () => {
       expect(config.copilotModel).toBe("claude-haiku-4.5");
     });
 
+    it("should load MM_AI_MODEL from environment", () => {
+      const env = createStubEnvironment({
+        MM_AI_MODEL: "gpt-5.2-codex",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiModel).toBe("gpt-5.2-codex");
+    });
+
     it("should load MM_AI_PROVIDER from environment", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "opencode",
@@ -222,6 +242,30 @@ describe("Config", () => {
       const config = loadConfig(undefined, env);
 
       expect(config.aiProvider).toBe("opencode");
+    });
+
+    it("should load generic AI BYOK settings from environment", () => {
+      const env = createStubEnvironment({
+        MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
+        MM_AI_API_KEY: "bedrock-key",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
+      expect(config.aiApiKey).toBe("bedrock-key");
+    });
+
+    it("should support deprecated Copilot SDK BYOK environment variable aliases", () => {
+      const env = createStubEnvironment({
+        MM_COPILOT_SDK_BASE_URL: "https://bedrock.example.com/openai/v1",
+        MM_COPILOT_SDK_API_KEY: "bedrock-key",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
+      expect(config.aiApiKey).toBe("bedrock-key");
     });
 
     it("should default MM_AI_PROVIDER to copilot-sdk for invalid values", () => {
@@ -340,9 +384,12 @@ describe("Config", () => {
         MM_AZURE_REPO: "az-repo",
         MM_COMMENT_IDENTIFIER: "[MM Bot]",
         MM_AI_PROVIDER: "opencode",
-        MM_AGENT_TIMEOUT: "180000",
+        MM_AI_TIMEOUT: "180000",
+        MM_AI_MODEL: "gpt-5.2-codex",
         MM_COPILOT_MODEL: "claude-haiku-4.5",
         MM_COPILOT_TIMEOUT: "60000",
+        MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
+        MM_AI_API_KEY: "bedrock-key",
         MM_MIN_COMMENT_CONFIDENCE: "low",
         MM_SKIP_EXISTING_ISSUES: "false",
         MM_REVIEW_RUNS: "3",
@@ -360,9 +407,12 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[MM Bot]");
       expect(config.aiProvider).toBe("opencode");
-      expect(config.agentTimeoutMs).toBe(180000);
+      expect(config.aiTimeoutMs).toBe(180000);
+      expect(config.aiModel).toBe("gpt-5.2-codex");
       expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(60000);
+      expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
+      expect(config.aiApiKey).toBe("bedrock-key");
       expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(3);
     });
@@ -402,9 +452,12 @@ describe("Config", () => {
           azureRepo: "az-repo",
           commentIdentifier: "[CLI Bot]",
           aiProvider: "copilot-sdk",
-          agentTimeout: 180000,
+          aiTimeout: 180000,
+          aiModel: "gpt-5.2-codex",
           copilotModel: "claude-haiku-4.5",
           copilotTimeout: 90000,
+          aiBaseUrl: "https://bedrock.example.com/openai/v1",
+          aiApiKey: "bedrock-key",
           skipExistingIssues: "false",
           reviewRuns: 5,
         },
@@ -421,9 +474,12 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[CLI Bot]");
       expect(config.aiProvider).toBe("copilot-sdk");
-      expect(config.agentTimeoutMs).toBe(180000);
+      expect(config.aiTimeoutMs).toBe(180000);
+      expect(config.aiModel).toBe("gpt-5.2-codex");
       expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(90000);
+      expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
+      expect(config.aiApiKey).toBe("bedrock-key");
       expect(config.skipPreExisting).toBe(false);
       expect(config.reviewRuns).toBe(5);
     });
