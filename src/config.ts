@@ -36,13 +36,19 @@ export interface Config {
   /** Git backend to use for cloning and fetching repositories. Default: cli */
   readonly gitBackend: GitBackendType;
   readonly copilotToken?: string;
+  /** Shared timeout for all AI providers. Preferred over provider-specific timeout aliases. */
+  readonly agentTimeoutMs?: number;
   readonly copilotModel?: string;
+  /** @deprecated Use agentTimeoutMs instead. */
   readonly copilotTimeoutMs?: number;
   readonly copilotSdkModel?: string;
+  /** @deprecated Use agentTimeoutMs instead. */
   readonly copilotSdkTimeoutMs?: number;
   readonly opencodeModel?: string;
+  /** @deprecated Use agentTimeoutMs instead. */
   readonly opencodeTimeoutMs?: number;
   readonly opencodeSdkModel?: string;
+  /** @deprecated Use agentTimeoutMs instead. */
   readonly opencodeSdkTimeoutMs?: number;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
@@ -98,6 +104,9 @@ export function loadConfig(
   cliOverrides?: Partial<CliOverrides>,
   env: Environment = processEnvironment
 ): Config {
+  const agentTimeoutMs = parseOptionalTimeout(
+    cliOverrides?.agentTimeout ?? env.get("MM_AGENT_TIMEOUT")
+  );
   const copilotTimeoutMs = parseOptionalTimeout(
     cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT")
   );
@@ -136,6 +145,7 @@ export function loadConfig(
     aiProvider,
     gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
+    agentTimeoutMs,
     copilotModel: cliOverrides?.copilotModel ?? env.get("MM_COPILOT_MODEL"),
     copilotTimeoutMs,
     copilotSdkModel: cliOverrides?.copilotSdkModel ?? env.get("MM_COPILOT_SDK_MODEL"),
@@ -171,6 +181,7 @@ interface CliOverrides {
   readonly commentIdentifier?: string;
   readonly aiProvider?: string;
   readonly copilotToken?: string;
+  readonly agentTimeout?: number;
   readonly copilotModel?: string;
   readonly copilotTimeout?: number;
   readonly copilotSdkModel?: string;

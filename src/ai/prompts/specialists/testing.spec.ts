@@ -119,6 +119,21 @@ describe("testing specialist prompts", () => {
       expect(prompt).toContain("Test Quality Expert");
       expect(prompt).toContain("GENERAL TESTING STANDARDS");
     });
+
+    test("uses batched file review JSON schema", () => {
+      const context: TestingReviewContext = {
+        filename: "UserService.ts",
+        testFiles: ["UserService.test.ts"],
+        language: "typescript",
+        allChangedFiles: ["UserService.ts", "UserService.test.ts"],
+      };
+
+      const prompt = buildTestingFileReviewPrompt(mockManifest, context);
+
+      expect(prompt).toContain('"file_results"');
+      expect(prompt).toContain('"isPreExisting"');
+      expect(prompt).toContain("Include entry for EVERY file listed");
+    });
   });
 
   describe("buildTestingCrossFilePrompt", () => {
@@ -186,6 +201,21 @@ describe("testing specialist prompts", () => {
       expect(prompt).toContain("Files Without Test Coverage");
       expect(prompt).toContain("UserService.ts");
       expect(prompt).toContain("OrderService.ts");
+    });
+
+    test("uses cross-file schema fields expected by parsers", () => {
+      const context: TestingCrossFileContext = {
+        fileReviewResults: [],
+        productionToTestMap: new Map([["UserService.ts", "UserService.test.ts"]]),
+        allChangedFiles: ["UserService.ts", "UserService.test.ts"],
+        filesSummary: "2 files changed",
+      };
+
+      const prompt = buildTestingCrossFilePrompt(mockPRDetails, context);
+
+      expect(prompt).toContain('"overall_assessment"');
+      expect(prompt).toContain('"affected_files"');
+      expect(prompt).toContain('"recommendations"');
     });
   });
 });

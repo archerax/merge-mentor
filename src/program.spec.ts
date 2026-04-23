@@ -428,6 +428,91 @@ describe("CLI", () => {
       );
     });
 
+    it("prefers shared agent timeout over deprecated provider-specific timeouts", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiProvider: "copilot-sdk",
+          agentTimeoutMs: 600000,
+          copilotTimeoutMs: 120000,
+          copilotSdkTimeoutMs: 180000,
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          aiTimeoutMs: 600000,
+        })
+      );
+    });
+
+    it("uses shared Copilot model and timeout for copilot-sdk when sdk-specific values are unset", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiProvider: "copilot-sdk",
+          copilotModel: "claude-haiku-4.5",
+          copilotTimeoutMs: 420000,
+          copilotSdkModel: undefined,
+          copilotSdkTimeoutMs: undefined,
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          aiModel: "claude-haiku-4.5",
+          aiTimeoutMs: 420000,
+        })
+      );
+    });
+
+    it("uses shared OpenCode model and timeout for opencode-sdk when sdk-specific values are unset", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiProvider: "opencode-sdk",
+          opencodeModel: "claude-sonnet-4.5",
+          opencodeTimeoutMs: 240000,
+          opencodeSdkModel: undefined,
+          opencodeSdkTimeoutMs: undefined,
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "opencode-sdk",
+        expect.objectContaining({
+          aiModel: "claude-sonnet-4.5",
+          aiTimeoutMs: 240000,
+        })
+      );
+    });
+
     it("throws error for invalid provider", async () => {
       const options = createReviewOptions({
         provider: "invalid",

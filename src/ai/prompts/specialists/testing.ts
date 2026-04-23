@@ -2,6 +2,10 @@ import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import {
+  buildBatchedFileResultsOutputFormat,
+  buildCrossFileOutputFormat,
+} from "./outputFormats.js";
 import type { TestingCrossFileContext, TestingReviewContext } from "./types.js";
 
 /**
@@ -542,32 +546,20 @@ Why skip: Arbitrary metric. Focus on important gaps, not percentage goals.
 Message: "Missing unit tests for API endpoint handler"
 Why skip: Didn't verify - comprehensive integration tests exist in tests/integration/. Not all code needs unit tests.
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your testing analysis step-by-step
-2. JSON: Return findings in strict JSON format within markdown code block
-
-\`\`\`json
-{
-  "findings": [
-    {
-      "line": <number>,
-      "severity": "critical" | "high" | "medium" | "low",
-      "confidence": "high" | "medium" | "low",
-      "category": "testing",
-      "message": "<concise issue description>",
-      "suggestion": "<specific actionable fix>",
-      "reasoning": "<chain-of-thought verification with ✓ checks>"
-    }
-  ]
-}
-\`\`\`
-
-**Rules:**
-- Empty findings array if no testing issues found
+${buildBatchedFileResultsOutputFormat({
+  analysisInstruction: "Document your testing analysis step-by-step",
+  severityExample: "medium",
+  categoryExample: "testing",
+  messageExample: "Concise issue description",
+  suggestionExample: "Specific actionable fix",
+  reasoningExample: "Complete verification with coverage analysis and ✓ checks",
+  footer: `**Rules:**
+- Include entry for EVERY file listed, even with empty findings
 - Every finding MUST have complete reasoning with verification steps
 - Line numbers must reference the PRODUCTION file being reviewed (not test file)
 - Use line 0 for file-level issues (missing test file, overall coverage gaps)
+- Only report TESTING issues`,
+})}
 `;
 }
 
@@ -823,33 +815,21 @@ Why skip: Cosmetic issue, doesn't affect testing effectiveness or coverage.
 Message: "Overall code coverage dropped from 85% to 82%"
 Why skip: Metric-focused, not actionable. Focus on specific gaps, not percentages.
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your cross-file testing analysis step-by-step
-2. JSON: Return findings in strict JSON format within markdown code block
-
-\`\`\`json
-{
-  "overallAssessment": "<brief summary of testing approach>",
-  "findings": [
-    {
-      "severity": "critical" | "high" | "medium" | "low",
-      "confidence": "high" | "medium" | "low",
-      "category": "testing",
-      "message": "<concise issue description>",
-      "reasoning": "<chain-of-thought verification with ✓ checks>",
-      "affectedFiles": ["file1.ts", "file2.ts", ...]
-    }
-  ],
-  "recommendations": ["<actionable system-level testing improvements>"]
-}
-\`\`\`
-
-**Rules:**
+${buildCrossFileOutputFormat({
+  intro: `1. ANALYSIS: Document your cross-file testing analysis step-by-step
+2. JSON: Return findings in strict JSON format within markdown code block`,
+  severityExample: "medium",
+  categoryExample: "testing",
+  messageExample: "Concise issue description",
+  reasoningExample: "Complete verification with system-level testing analysis and ✓ checks",
+  overallAssessmentExample: "Brief summary of testing approach",
+  recommendationExample: "Actionable system-level testing improvements",
+  footer: `**Rules:**
 - Empty findings array if no cross-file testing issues found
 - Every finding MUST have complete reasoning with verification steps
-- affectedFiles must list ALL files involved in the testing concern
-- Focus on system-level testing, not individual file coverage
+- affected_files must list ALL files involved in the testing concern
+- Focus on system-level testing, not individual file coverage`,
+})}
 `;
 }
 

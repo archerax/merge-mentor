@@ -267,20 +267,38 @@ export class CopilotSdkProvider implements AIProviderClient {
         }
       }
 
-      const response = await session.sendAndWait(
-        { prompt, ...(attachments.length > 0 ? { attachments } : {}) },
-        this.timeoutMs
-      );
+      try {
+        const response = await session.sendAndWait(
+          { prompt, ...(attachments.length > 0 ? { attachments } : {}) },
+          this.timeoutMs
+        );
 
-      unsubscribe();
+        const content = response?.data.content ?? chunks.join("");
+        if (!content) {
+          throw new CopilotSdkError("No content in response from Copilot SDK");
+        }
 
-      const content = response?.data.content ?? chunks.join("");
-      if (!content) {
-        throw new CopilotSdkError("No content in response from Copilot SDK");
+        const parsed = this.parseJsonResponse(content);
+        return { raw: content, parsed };
+      } catch (error) {
+        const streamedContent = chunks.join("");
+        if (this.isSessionIdleTimeout(error) && streamedContent.trim().length > 0) {
+          const recovered = this.tryRecoverTimedOutResponse(streamedContent);
+          if (recovered) {
+            this.logger.warn(
+              {
+                streamedLength: streamedContent.length,
+                timeoutMs: this.timeoutMs,
+              },
+              "Recovered Copilot SDK response from streamed output after session.idle timeout"
+            );
+            return recovered;
+          }
+        }
+        throw error;
+      } finally {
+        unsubscribe();
       }
-
-      const parsed = this.parseJsonResponse(content);
-      return { raw: content, parsed };
     } finally {
       try {
         await session.disconnect();
@@ -309,6 +327,23 @@ export class CopilotSdkProvider implements AIProviderClient {
       return JSON.parse(jsonMatch[0]);
     } catch (error) {
       throw new JsonParseError((error as Error).message, raw);
+    }
+  }
+
+  private isSessionIdleTimeout(error: unknown): boolean {
+    return error instanceof Error && error.message.includes("waiting for session.idle");
+  }
+
+  private tryRecoverTimedOutResponse(
+    streamedContent: string
+  ): { raw: string; parsed: unknown } | undefined {
+    try {
+      return {
+        raw: streamedContent,
+        parsed: this.parseJsonResponse(streamedContent),
+      };
+    } catch {
+      return undefined;
     }
   }
 

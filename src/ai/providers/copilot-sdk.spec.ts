@@ -259,6 +259,55 @@ describe("CopilotSdkProvider", () => {
       expect(attempt).toBe(3);
     });
 
+    it("recovers parseable streamed JSON after session.idle timeout", async () => {
+      const provider = createProvider();
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.message_delta") {
+          handler({
+            type: "assistant.message_delta",
+            data: { deltaContent: 'Analysis first\n```json\n{"findings":[]}\n```' },
+          });
+        }
+        return () => {};
+      });
+      mockSession.sendAndWait.mockRejectedValue(
+        new Error("Timeout after 5000ms waiting for session.idle")
+      );
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.raw).toContain('{"findings":[]}');
+      expect(result.parsed).toEqual({ findings: [] });
+    });
+
+    it("keeps failing on session.idle timeout when streamed content is not parseable JSON", async () => {
+      const provider = createProvider(1);
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.message_delta") {
+          handler({
+            type: "assistant.message_delta",
+            data: { deltaContent: "Partial analysis without final JSON" },
+          });
+        }
+        return () => {};
+      });
+      mockSession.sendAndWait.mockRejectedValue(
+        new Error("Timeout after 5000ms waiting for session.idle")
+      );
+
+      const promise = provider.executePrompt("Review the following file test.ts");
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      const error = await rejection;
+
+      expect(error).toBeInstanceOf(CopilotSdkError);
+      expect(error.message).toContain("waiting for session.idle");
+    });
+
     it("throws CopilotSdkError after exhausting retries", async () => {
       const provider = createProvider(2);
       mockSession.sendAndWait.mockRejectedValue(new Error("Network error"));

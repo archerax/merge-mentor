@@ -11,8 +11,8 @@ export const DEFAULT_PAGE_SIZE = 100;
 /** Maximum number of retry attempts for failed operations. */
 export const DEFAULT_MAX_RETRIES = 3;
 
-/** Timeout in milliseconds for CLI operations. */
-export const DEFAULT_TIMEOUT_MS = 180000; // 3 minutes
+/** Default timeout in milliseconds for AI provider operations. */
+export const DEFAULT_TIMEOUT_MS = 3_600_000; // 1 hour
 
 /** Base delay in milliseconds between retry attempts. */
 export const RETRY_DELAY_BASE_MS = 1000;

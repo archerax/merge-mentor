@@ -149,13 +149,14 @@ set MM_PLATFORM=azure
 # Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk)
 export MM_AI_PROVIDER=copilot-sdk
 
-# Copilot settings (shared by copilot and copilot-sdk)
-export MM_COPILOT_MODEL=claude-sonnet-4.6
-export MM_COPILOT_TIMEOUT=3600000
+# Shared AI timeout (preferred)
+export MM_AGENT_TIMEOUT=3600000
 
-# OpenCode settings (shared by opencode and opencode-sdk)
+# Copilot settings
+export MM_COPILOT_MODEL=claude-sonnet-4.6
+
+# OpenCode settings
 export MM_OPENCODE_MODEL=claude-sonnet-4.6
-export MM_OPENCODE_TIMEOUT=3600000
 
 ```
 
@@ -165,13 +166,14 @@ export MM_OPENCODE_TIMEOUT=3600000
 # Select AI provider
 $env:MM_AI_PROVIDER="copilot-sdk"
 
-# Copilot settings (shared by copilot and copilot-sdk)
-$env:MM_COPILOT_MODEL="claude-sonnet-4.6"
-$env:MM_COPILOT_TIMEOUT="3600000"
+# Shared AI timeout (preferred)
+$env:MM_AGENT_TIMEOUT="3600000"
 
-# OpenCode settings (shared by opencode and opencode-sdk)
+# Copilot settings
+$env:MM_COPILOT_MODEL="claude-sonnet-4.6"
+
+# OpenCode settings
 $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
-$env:MM_OPENCODE_TIMEOUT="3600000"
 ```
 
 **Or use command-line parameters:**
@@ -179,8 +181,10 @@ $env:MM_OPENCODE_TIMEOUT="3600000"
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
   --copilot-model claude-sonnet-4.6 \
-  --copilot-timeout 3600000
+  --agent-timeout 3600000
 ```
+
+Deprecated provider-specific timeout variables and flags remain supported for backward compatibility.
 
 ### Optional Settings
 
@@ -434,10 +438,9 @@ merge-mentor review --pr 123 --review-type testing --write
 | Option | Description | Env Variable |
 |--------|-------------|--------------|
 | `--copilot-token <token>` | GitHub token for Copilot CLI/SDK auth (CI use) | `MM_COPILOT_TOKEN` |
+| `--agent-timeout <ms>` | Timeout in ms for all AI providers | `MM_AGENT_TIMEOUT` |
 | `--copilot-model <model>` | Copilot model name | `MM_COPILOT_MODEL` |
-| `--copilot-timeout <ms>` | Copilot timeout in ms | `MM_COPILOT_TIMEOUT` |
 | `--opencode-model <model>` | OpenCode model name | `MM_OPENCODE_MODEL` |
-| `--opencode-timeout <ms>` | OpenCode timeout in ms | `MM_OPENCODE_TIMEOUT` |
 
 **File Filtering:**
 | Option | Description | Default |
@@ -871,8 +874,7 @@ Review reports from dry-run mode are saved to `.mergementor/reports/` as markdow
 Increase timeout for large PRs:
 
 ```bash
-export MM_COPILOT_TIMEOUT=3600000  # 1 hour (for Copilot)
-export MM_OPENCODE_TIMEOUT=3600000  # 1 hour (for OpenCode)
+export MM_AGENT_TIMEOUT=3600000  # 1 hour for all AI providers
 ```
 
 ### Exit Codes

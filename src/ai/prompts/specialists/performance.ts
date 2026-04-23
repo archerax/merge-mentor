@@ -2,6 +2,10 @@ import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import {
+  buildBatchedFileResultsOutputFormat,
+  buildCrossFileOutputFormat,
+} from "./outputFormats.js";
 
 /**
  * Builds a workspace access section for prompts.
@@ -391,33 +395,16 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (micro-optimization with no measurable impact)
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your performance analysis step-by-step
-2. JSON: Strict format in markdown code block
-
-\`\`\`json
-{
-  "file_results": {
-    "path/to/file.ts": {
-      "findings": [
-        {
-          "line": 45,
-          "severity": "high",
-          "confidence": "high",
-          "category": "performance",
-          "message": "Clear description of the performance issue",
-          "suggestion": "Specific optimization with code example",
-          "reasoning": "Complexity analysis, scale impact, verification notes",
-          "isPreExisting": false
-        }
-      ]
-    }
-  }
-}
-\`\`\`
-
-REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report PERFORMANCE issues.
+${buildBatchedFileResultsOutputFormat({
+  analysisInstruction: "Document your performance analysis step-by-step",
+  severityExample: "high",
+  categoryExample: "performance",
+  messageExample: "Clear description of the performance issue",
+  suggestionExample: "Specific optimization with code example",
+  reasoningExample: "Complexity analysis, scale impact, verification notes",
+  footer:
+    "REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report PERFORMANCE issues.",
+})}
 `;
 }
 
@@ -653,29 +640,18 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (intentional performance architecture)
 
-# OUTPUT FORMAT
-
-Provide a complete cross-file performance analysis in JSON format:
-
-\`\`\`json
-{
-  "findings": [
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "performance",
-      "message": "Clear description of cross-file performance issue",
-      "affectedFiles": ["file1.ts", "file2.ts"],
-      "reasoning": "Detailed verification of cross-file performance impact with scale analysis and evidence"
-    }
-  ],
-  "overallAssessment": "Brief summary of PR's performance characteristics and architectural performance concerns",
-  "recommendations": [
-    "Actionable performance improvement suggestions"
-  ]
-}
-\`\`\`
-
-Focus on system-level performance: N+1 patterns across modules, resource management, caching architecture, data flow inefficiencies.
+${buildCrossFileOutputFormat({
+  intro: "Provide a complete cross-file performance analysis in JSON format:",
+  severityExample: "high",
+  categoryExample: "performance",
+  messageExample: "Clear description of cross-file performance issue",
+  reasoningExample:
+    "Detailed verification of cross-file performance impact with scale analysis and evidence",
+  overallAssessmentExample:
+    "Brief summary of PR's performance characteristics and architectural performance concerns",
+  recommendationExample: "Actionable performance improvement suggestions",
+  footer:
+    "Focus on system-level performance: N+1 patterns across modules, resource management, caching architecture, data flow inefficiencies.",
+})}
 `;
 }
