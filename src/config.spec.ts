@@ -136,6 +136,47 @@ describe("Config", () => {
       expect(config.copilotTimeoutMs).toBe(60000);
     });
 
+    it("should load MM_AGENT_TIMEOUT from environment", () => {
+      const env = createStubEnvironment({
+        MM_AGENT_TIMEOUT: "60000",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.agentTimeoutMs).toBe(60000);
+    });
+
+    it("should ignore MM_AGENT_TIMEOUT when zero or negative", () => {
+      const env = createStubEnvironment({
+        MM_AGENT_TIMEOUT: "0",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.agentTimeoutMs).toBeUndefined();
+    });
+
+    it("should default MM_AGENT_TIMEOUT to undefined when not set", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
+
+      expect(config.agentTimeoutMs).toBeUndefined();
+    });
+
+    it("should prefer MM_AGENT_TIMEOUT over deprecated provider-specific timeouts", () => {
+      const env = createStubEnvironment({
+        MM_AGENT_TIMEOUT: "60000",
+        MM_COPILOT_TIMEOUT: "120000",
+        MM_OPENCODE_TIMEOUT: "180000",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.agentTimeoutMs).toBe(60000);
+      expect(config.copilotTimeoutMs).toBe(120000);
+      expect(config.opencodeTimeoutMs).toBe(180000);
+    });
+
     it("should ignore MM_COPILOT_TIMEOUT when zero or negative", () => {
       const env = createStubEnvironment({
         MM_COPILOT_TIMEOUT: "0",
@@ -299,6 +340,7 @@ describe("Config", () => {
         MM_AZURE_REPO: "az-repo",
         MM_COMMENT_IDENTIFIER: "[MM Bot]",
         MM_AI_PROVIDER: "opencode",
+        MM_AGENT_TIMEOUT: "180000",
         MM_COPILOT_MODEL: "claude-haiku-4.5",
         MM_COPILOT_TIMEOUT: "60000",
         MM_MIN_COMMENT_CONFIDENCE: "low",
@@ -318,6 +360,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[MM Bot]");
       expect(config.aiProvider).toBe("opencode");
+      expect(config.agentTimeoutMs).toBe(180000);
       expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(60000);
       expect(config.skipPreExisting).toBe(false);
@@ -359,6 +402,7 @@ describe("Config", () => {
           azureRepo: "az-repo",
           commentIdentifier: "[CLI Bot]",
           aiProvider: "copilot-sdk",
+          agentTimeout: 180000,
           copilotModel: "claude-haiku-4.5",
           copilotTimeout: 90000,
           skipExistingIssues: "false",
@@ -377,6 +421,7 @@ describe("Config", () => {
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[CLI Bot]");
       expect(config.aiProvider).toBe("copilot-sdk");
+      expect(config.agentTimeoutMs).toBe(180000);
       expect(config.copilotModel).toBe("claude-haiku-4.5");
       expect(config.copilotTimeoutMs).toBe(90000);
       expect(config.skipPreExisting).toBe(false);

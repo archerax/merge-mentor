@@ -45,6 +45,7 @@ export interface ReviewOptions {
   commentIdentifier?: string;
   // AI provider config
   copilotToken?: string;
+  agentTimeout?: number;
   copilotModel?: string;
   copilotTimeout?: number;
   copilotSdkModel?: string;
@@ -166,6 +167,7 @@ export async function executeReview(
     tempPath: resolvedOptions.tempPath,
     aiProvider: resolvedOptions.provider,
     copilotModel: resolvedOptions.copilotModel,
+    agentTimeout: resolvedOptions.agentTimeout,
     copilotTimeout: resolvedOptions.copilotTimeout,
     copilotSdkModel: resolvedOptions.copilotSdkModel,
     copilotSdkTimeout: resolvedOptions.copilotSdkTimeout,
@@ -212,26 +214,26 @@ export async function executeReview(
   const dryRun = !resolvedOptions.write;
   const reviewRuns = resolvedOptions.runs ?? config.reviewRuns;
 
-  // Select provider-specific model and timeout
+  // Select provider-specific model and resolve the shared timeout.
   let aiModel: string | undefined;
-  let aiTimeoutMs: number | undefined;
+  let aiTimeoutMs = config.agentTimeoutMs;
 
   switch (aiProvider) {
     case "copilot-sdk":
-      aiModel = config.copilotSdkModel;
-      aiTimeoutMs = config.copilotSdkTimeoutMs;
+      aiModel = config.copilotSdkModel ?? config.copilotModel;
+      aiTimeoutMs ??= config.copilotSdkTimeoutMs ?? config.copilotTimeoutMs;
       break;
     case "opencode":
       aiModel = config.opencodeModel;
-      aiTimeoutMs = config.opencodeTimeoutMs;
+      aiTimeoutMs ??= config.opencodeTimeoutMs;
       break;
     case "opencode-sdk":
-      aiModel = config.opencodeSdkModel;
-      aiTimeoutMs = config.opencodeSdkTimeoutMs;
+      aiModel = config.opencodeSdkModel ?? config.opencodeModel;
+      aiTimeoutMs ??= config.opencodeSdkTimeoutMs ?? config.opencodeTimeoutMs;
       break;
     default:
       aiModel = config.copilotModel;
-      aiTimeoutMs = config.copilotTimeoutMs;
+      aiTimeoutMs ??= config.copilotTimeoutMs;
   }
 
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
@@ -581,20 +583,33 @@ program
   )
   // AI provider config
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option(
+    "--agent-timeout <ms>",
+    "Timeout in ms for all AI providers. Env: MM_AGENT_TIMEOUT",
+    parseInt
+  )
   .option("--copilot-model <model>", "Copilot model name. Env: MM_COPILOT_MODEL")
-  .option("--copilot-timeout <ms>", "Copilot timeout in ms. Env: MM_COPILOT_TIMEOUT", parseInt)
+  .option(
+    "--copilot-timeout <ms>",
+    "Copilot timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    parseInt
+  )
   .option("--copilot-sdk-model <model>", "Copilot SDK model name. Env: MM_COPILOT_SDK_MODEL")
   .option(
     "--copilot-sdk-timeout <ms>",
-    "Copilot SDK timeout in ms. Env: MM_COPILOT_SDK_TIMEOUT",
+    "Copilot SDK timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
     parseInt
   )
   .option("--opencode-model <model>", "OpenCode model name. Env: MM_OPENCODE_MODEL")
-  .option("--opencode-timeout <ms>", "OpenCode timeout in ms. Env: MM_OPENCODE_TIMEOUT", parseInt)
+  .option(
+    "--opencode-timeout <ms>",
+    "OpenCode timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
+    parseInt
+  )
   .option("--opencode-sdk-model <model>", "OpenCode SDK model name. Env: MM_OPENCODE_SDK_MODEL")
   .option(
     "--opencode-sdk-timeout <ms>",
-    "OpenCode SDK timeout in ms. Env: MM_OPENCODE_SDK_TIMEOUT",
+    "OpenCode SDK timeout in ms. Deprecated alias for --agent-timeout / MM_AGENT_TIMEOUT.",
     parseInt
   )
   // Comment filtering
@@ -648,6 +663,7 @@ program
         commentIdentifier: options.commentIdentifier,
         aiProvider: options.provider,
         copilotToken: options.copilotToken,
+        agentTimeout: options.agentTimeout,
         copilotModel: options.copilotModel,
         copilotTimeout: options.copilotTimeout,
         copilotSdkModel: options.copilotSdkModel,

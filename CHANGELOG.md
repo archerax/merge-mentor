@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Shared agent timeout**: Added `MM_AGENT_TIMEOUT` and `--agent-timeout` as the preferred timeout setting for all AI providers
+  - Deprecated provider-specific timeout aliases remain supported for backward compatibility
+
 ## [1.31.0] - 2026-04-21
 
 ### Added
