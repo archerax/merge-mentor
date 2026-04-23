@@ -2,6 +2,10 @@ import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import {
+  buildBatchedFileResultsOutputFormat,
+  buildCrossFileOutputFormat,
+} from "./outputFormats.js";
 
 /**
  * Builds a workspace access section for prompts.
@@ -370,33 +374,16 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (mitigated at infrastructure layer)
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your security analysis step-by-step
-2. JSON: Strict format in markdown code block
-
-\`\`\`json
-{
-  "file_results": {
-    "path/to/file.ts": {
-      "findings": [
-        {
-          "line": 45,
-          "severity": "critical",
-          "confidence": "high",
-          "category": "security",
-          "message": "Clear description of the security vulnerability",
-          "suggestion": "Specific remediation with code example",
-          "reasoning": "Attack vector, impact analysis, verification notes",
-          "isPreExisting": false
-        }
-      ]
-    }
-  }
-}
-\`\`\`
-
-REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report SECURITY issues.
+${buildBatchedFileResultsOutputFormat({
+  analysisInstruction: "Document your security analysis step-by-step",
+  severityExample: "critical",
+  categoryExample: "security",
+  messageExample: "Clear description of the security vulnerability",
+  suggestionExample: "Specific remediation with code example",
+  reasoningExample: "Attack vector, impact analysis, verification notes",
+  footer:
+    "REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report SECURITY issues.",
+})}
 `;
 }
 
@@ -627,29 +614,18 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (intentional security architecture)
 
-# OUTPUT FORMAT
-
-Provide a complete cross-file security analysis in JSON format:
-
-\`\`\`json
-{
-  "findings": [
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "security",
-      "message": "Clear description of cross-file security issue",
-      "affectedFiles": ["file1.ts", "file2.ts"],
-      "reasoning": "Detailed verification of cross-file security impact with attack scenario and evidence"
-    }
-  ],
-  "overallAssessment": "Brief summary of PR's security posture and architectural security concerns",
-  "recommendations": [
-    "Actionable security improvement suggestions"
-  ]
-}
-\`\`\`
-
-Focus on system-level security: auth/authz consistency, trust boundaries, security control gaps, cross-component vulnerabilities.
+${buildCrossFileOutputFormat({
+  intro: "Provide a complete cross-file security analysis in JSON format:",
+  severityExample: "high",
+  categoryExample: "security",
+  messageExample: "Clear description of cross-file security issue",
+  reasoningExample:
+    "Detailed verification of cross-file security impact with attack scenario and evidence",
+  overallAssessmentExample:
+    "Brief summary of PR's security posture and architectural security concerns",
+  recommendationExample: "Actionable security improvement suggestions",
+  footer:
+    "Focus on system-level security: auth/authz consistency, trust boundaries, security control gaps, cross-component vulnerabilities.",
+})}
 `;
 }

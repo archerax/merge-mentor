@@ -2,6 +2,7 @@ import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import { buildFastReviewOutputFormat } from "./outputFormats.js";
 
 function buildWorkspaceSection(repoPath?: string): string {
   if (!repoPath) return "";
@@ -255,55 +256,6 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (universally understood constant)
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your analysis step-by-step (all 5 passes)
-2. JSON: Strict format in markdown code block
-
-\`\`\`json
-{
-  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
-  "findings": [
-    {
-      "file": "path/to/file.ts",
-      "line": 45,
-      "severity": "high",
-      "confidence": "high",
-      "category": "bug",
-      "message": "Clear description of the problem",
-      "suggestion": "Specific fix with code example",
-      "reasoning": "Complete verification including data flow, impact, and severity justification",
-      "isPreExisting": false
-    },
-    {
-      "file": "path/to/file.ts",
-      "severity": "medium",
-      "confidence": "high",
-      "category": "maintainability",
-      "message": "File-level concern without specific line",
-      "suggestion": "How to address the issue",
-      "reasoning": "Why this matters for the file overall"
-    },
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "architecture",
-      "message": "Cross-file or system-level concern",
-      "suggestion": "How to address across affected files",
-      "reasoning": "System-wide impact and verification"
-    }
-  ]
-}
-\`\`\`
-
-## Attribution Rules:
-- **Line-specific**: Include both \`file\` and \`line\` (e.g., specific bug at line 45)
-- **File-level**: Include \`file\` but omit \`line\` (e.g., overall complexity concern)
-- **General/PR-level**: Omit both \`file\` and \`line\` (e.g., architectural pattern violation)
-
-REMEMBER: 
-- Consider BOTH file-level AND architectural concerns in your analysis
-- Use appropriate attribution for each finding type
-- The summary should cover both individual code quality and overall architecture
+${buildFastReviewOutputFormat()}
 `;
 }

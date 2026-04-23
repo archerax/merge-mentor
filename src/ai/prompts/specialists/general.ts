@@ -2,6 +2,10 @@ import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import {
+  buildBatchedFileResultsOutputFormat,
+  buildCrossFileOutputFormat,
+} from "./outputFormats.js";
 
 /**
  * Builds a workspace access section for prompts.
@@ -235,33 +239,15 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (universally understood constant)
 
-# OUTPUT FORMAT
-
-1. ANALYSIS: Document your analysis step-by-step
-2. JSON: Strict format in markdown code block
-
-\`\`\`json
-{
-  "file_results": {
-    "path/to/file.ts": {
-      "findings": [
-        {
-          "line": 45,
-          "severity": "high",
-          "confidence": "high",
-          "category": "bug",
-          "message": "Clear description of the problem",
-          "suggestion": "Specific fix with code example",
-          "reasoning": "Complete verification including data flow, impact, and severity justification",
-          "isPreExisting": false
-        }
-      ]
-    }
-  }
-}
-\`\`\`
-
-REMEMBER: Include entry for EVERY file listed, even with empty findings.
+${buildBatchedFileResultsOutputFormat({
+  analysisInstruction: "Document your analysis step-by-step",
+  severityExample: "high",
+  categoryExample: "bug",
+  messageExample: "Clear description of the problem",
+  suggestionExample: "Specific fix with code example",
+  reasoningExample: "Complete verification including data flow, impact, and severity justification",
+  footer: "REMEMBER: Include entry for EVERY file listed, even with empty findings.",
+})}
 `;
 }
 
@@ -443,29 +429,16 @@ Rebuttal:
 
 Decision: ❌ **Don't report** (standard pattern confirmed)
 
-# OUTPUT FORMAT
-
-Provide a complete cross-file analysis in JSON format:
-
-\`\`\`json
-{
-  "findings": [
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "architecture",
-      "message": "Clear description of cross-file issue",
-      "affectedFiles": ["file1.ts", "file2.ts"],
-      "reasoning": "Detailed verification of cross-file impact with evidence"
-    }
-  ],
-  "overallAssessment": "Brief summary of PR quality and architecture",
-  "recommendations": [
-    "Actionable improvement suggestions"
-  ]
-}
-\`\`\`
-
-Focus on system-level concerns: integration issues, architectural inconsistencies, cross-cutting concerns.
+${buildCrossFileOutputFormat({
+  intro: "Provide a complete cross-file analysis in JSON format:",
+  severityExample: "high",
+  categoryExample: "architecture",
+  messageExample: "Clear description of cross-file issue",
+  reasoningExample: "Detailed verification of cross-file impact with evidence",
+  overallAssessmentExample: "Brief summary of PR quality and architecture",
+  recommendationExample: "Actionable improvement suggestions",
+  footer:
+    "Focus on system-level concerns: integration issues, architectural inconsistencies, cross-cutting concerns.",
+})}
 `;
 }

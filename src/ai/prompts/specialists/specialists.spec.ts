@@ -489,7 +489,8 @@ describe("Specialized Review Prompts", () => {
       expect(prompt).toContain("OUTPUT FORMAT");
       expect(prompt).toContain("```json");
       expect(prompt).toContain('"findings"');
-      expect(prompt).toContain('"overallAssessment"');
+      expect(prompt).toContain('"overall_assessment"');
+      expect(prompt).toContain('"affected_files"');
       expect(prompt).toContain('"recommendations"');
     });
 
@@ -650,7 +651,8 @@ describe("Specialized Review Prompts", () => {
       expect(prompt).toContain("OUTPUT FORMAT");
       expect(prompt).toContain("```json");
       expect(prompt).toContain('"findings"');
-      expect(prompt).toContain('"overallAssessment"');
+      expect(prompt).toContain('"overall_assessment"');
+      expect(prompt).toContain('"affected_files"');
       expect(prompt).toContain('"recommendations"');
     });
 
