@@ -3,12 +3,17 @@ import type { AIProviderType } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
 import { type Environment, processEnvironment } from "./ports/environment.js";
 import type { GitBackendType } from "./review/gitClient.js";
+import {
+  type GeneralReviewPhase,
+  parseCustomReviewPhases,
+  type ReviewType,
+  validateReviewType as validateReviewTypeValue,
+} from "./review/reviewSelection.js";
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
 
-/** Supported review types for specialized analysis. */
-export type ReviewType = "general" | "testing" | "security" | "performance" | "fast";
+export type { GeneralReviewPhase, ReviewType } from "./review/reviewSelection.js";
 
 /**
  * Deprecated environment variable aliases retained for v1 compatibility.
@@ -83,6 +88,8 @@ export interface Config {
   readonly reviewRuns: number;
   /** Type of review to perform (general, testing, security, performance). Default: general */
   readonly reviewType: ReviewType;
+  /** Selected general-review phases for custom review mode. */
+  readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Whether to show streaming output from AI providers. Default: true (if TTY) */
   readonly streamingEnabled: boolean;
   /** Number of lines to show in the streaming display. Default: 5 */
@@ -155,6 +162,7 @@ export function loadConfig(
   );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"));
   const reviewType = validateReviewType(cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"));
+  const customReviewPhases = parseCustomReviewPhases(reviewType, cliOverrides?.phases);
   const gitBackend = validateGitBackend(cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"));
 
   return {
@@ -202,6 +210,7 @@ export function loadConfig(
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
     reviewRuns,
     reviewType,
+    customReviewPhases,
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED") !== "false",
     streamingLines:
       cliOverrides?.streamingLines ??
@@ -250,6 +259,7 @@ interface CliOverrides {
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
   readonly reviewType?: string;
+  readonly phases?: string;
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
   readonly tempPath?: string;
@@ -307,7 +317,7 @@ export function validateAIProvider(value: string | undefined): AIProviderType {
 
 /**
  * Validates the review type.
- * Supported types are: general, testing, security, performance, fast.
+ * Supported types are: general, testing, security, performance, fast, custom.
  * Unknown values default to general.
  *
  * @param value - Review type name as string or undefined
@@ -317,16 +327,13 @@ export function validateAIProvider(value: string | undefined): AIProviderType {
  * ```typescript
  * validateReviewType("security"); // "security"
  * validateReviewType("performance"); // "performance"
+ * validateReviewType("custom"); // "custom"
  * validateReviewType("unknown"); // "general" (default)
  * validateReviewType(undefined); // "general" (default)
  * ```
  */
 export function validateReviewType(value: string | undefined): ReviewType {
-  const validTypes: ReviewType[] = ["general", "testing", "security", "performance", "fast"];
-  if (value && validTypes.includes(value as ReviewType)) {
-    return value as ReviewType;
-  }
-  return "general"; // Default to general
+  return validateReviewTypeValue(value);
 }
 
 /**

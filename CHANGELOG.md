@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Custom review type with configurable phases**: Added a new `custom` review type driven by a required `--phases` CLI flag
+  - Phase names are validated against the built-in general-review catalog: `scan`, `security`, `logic`, `performance`, and `monorepo`
+  - Unknown phases, duplicate phases, and missing phases fail fast with validation errors
+  - Selected phases are surfaced in prompts, logs, audit records, comment footers, and markdown reports
+  - The new `monorepo` phase focuses reviews on package boundaries, workspace dependency hygiene, shared tooling, and monorepo conventions
+
 ### Changed
 
 - **Standardized shared AI configuration**: Preferred shared AI settings now use the `MM_AI_*` / `--ai-*` naming family
@@ -192,10 +200,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Mock Framework Usage**: Validates proper mocking patterns (C#: Moq/NSubstitute, TypeScript: Vitest/Jest)
 - **Environment Variable Configuration** - New `MM_REVIEW_TYPE` environment variable to set default review type
 - **Streaming Output Display**: Real-time feedback showing the last 5 lines of AI model output during reviews
-   - New `--no-stream` flag to disable streaming output
-   - New `--stream-lines <n>` option to configure number of lines (1-20)
-   - Environment variables `MM_STREAMING_ENABLED` and `MM_STREAMING_LINES` for configuration
-   - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
+  - New `--no-stream` flag to disable streaming output
+  - New `--stream-lines <n>` option to configure number of lines (1-20)
+  - Environment variables `MM_STREAMING_ENABLED` and `MM_STREAMING_LINES` for configuration
+  - Auto-disables in non-TTY environments (CI/CD pipelines, piped output)
 
 ### Removed
 

@@ -860,7 +860,7 @@ describe("CopilotSdkProvider", () => {
             category: "quality",
             message: "Issue",
             suggestion: "Fix it",
-            reasoning: "Too short.", // < 50 chars triggers warn
+            reasoning: "Too short.", // Short rationale still triggers validation warning
             isPreExisting: false,
           },
         ],
@@ -872,7 +872,7 @@ describe("CopilotSdkProvider", () => {
       expect(result.findings[0].reasoning).toBe("Too short.");
     });
 
-    it("still parses finding when reasoning lacks verification keywords", () => {
+    it("still parses finding when reasoning uses concise evidence and impact wording", () => {
       const provider = createProvider();
       const response = createAIResponse({
         findings: [
@@ -909,7 +909,7 @@ describe("CopilotSdkProvider", () => {
                 category: "security",
                 message: "SQL injection vulnerability found in query builder",
                 suggestion: "Use parameterized queries for all SQL operations",
-                reasoning: "Brief.", // < 50 chars, triggers validateReasoning warn
+                reasoning: "Brief.", // Short rationale still triggers validation warning
               },
             ],
           },

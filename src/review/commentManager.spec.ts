@@ -24,6 +24,7 @@ const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, General review, De
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
   reviewType?: string;
+  customReviewPhases?: readonly ("scan" | "security" | "logic" | "performance" | "monorepo")[];
   model?: string;
 }): CommentManager {
   return new CommentManager("[AI Code Review Bot]", options);
@@ -147,6 +148,19 @@ describe("CommentManager", () => {
 
       expect(result).toContain(
         `Merge Mentor v${packageJson.version}, Fast review, claude-sonnet-4.6`
+      );
+    });
+
+    it("includes custom review phases in the footer", () => {
+      const manager = createCommentManager({
+        reviewType: "custom",
+        customReviewPhases: ["scan", "logic"],
+      });
+
+      const result = manager.formatInlineComment(createFileFinding());
+
+      expect(result).toContain(
+        `Merge Mentor v${packageJson.version}, Custom review [scan → logic], Default model`
       );
     });
   });

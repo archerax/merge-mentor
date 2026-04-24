@@ -409,7 +409,7 @@ export class CopilotSdkProvider implements AIProviderClient {
     filename: string,
     lineOrLocation: string | number
   ): void {
-    const minLength = 50;
+    const minLength = 20;
     const location = typeof lineOrLocation === "number" ? `line ${lineOrLocation}` : lineOrLocation;
 
     if (reasoning.length < minLength) {
@@ -420,19 +420,23 @@ export class CopilotSdkProvider implements AIProviderClient {
           reasoningLength: reasoning.length,
           reasoning: reasoning.substring(0, 100),
         },
-        `Reasoning too short (need ${minLength}+ chars) - finding may lack proper verification`
+        `Reasoning too short (need ${minLength}+ chars) - finding may lack enough evidence`
       );
     }
 
-    const verificationPattern = /verified|checked|confirmed|scanned|✓/i;
-    if (!verificationPattern.test(reasoning)) {
+    const evidencePattern =
+      /line|lines|context|call|query|input|output|state|branch|path|file|diff|import|return|value|guard|validation|check|middleware|parameter|request|response|token|cache|loop|dependency|array|object|function/i;
+    const impactPattern =
+      /crash|error|fail|incorrect|wrong|stale|leak|latency|slow|outage|risk|vulnerab|expos|bypass|break|corrupt|deadlock|race|allow|cause|impact|inconsistent|timeout/i;
+
+    if (!evidencePattern.test(reasoning) || !impactPattern.test(reasoning)) {
       this.logger.warn(
         {
           filename,
           location,
           reasoning: reasoning.substring(0, 150),
         },
-        "Reasoning lacks verification keywords (verified/checked/confirmed/scanned) - may be low quality"
+        "Reasoning should briefly cite the code evidence and the concrete impact"
       );
     }
   }

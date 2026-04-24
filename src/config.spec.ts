@@ -8,7 +8,7 @@ import {
   validateReviewRuns,
   validateReviewType,
 } from "./config.js";
-import { ConfigurationError } from "./errors/index.js";
+import { ConfigurationError, ValidationError } from "./errors/index.js";
 import { createStubEnvironment } from "./ports/environment.test-helper.js";
 
 describe("Config", () => {
@@ -525,6 +525,57 @@ describe("Config", () => {
         loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "fast" })).reviewType
       ).toBe("fast");
     });
+
+    it("loads custom review phases from CLI overrides", () => {
+      const config = loadConfig({
+        reviewType: "custom",
+        phases: "scan, monorepo",
+      });
+
+      expect(config.reviewType).toBe("custom");
+      expect(config.customReviewPhases).toEqual(["scan", "monorepo"]);
+    });
+
+    it("normalizes custom review phase names case-insensitively", () => {
+      const config = loadConfig({
+        reviewType: "custom",
+        phases: "SCAN,performance",
+      });
+
+      expect(config.customReviewPhases).toEqual(["scan", "performance"]);
+    });
+
+    it("throws when custom review type is missing phases", () => {
+      expect(() => loadConfig({ reviewType: "custom" })).toThrow(ValidationError);
+      expect(() => loadConfig({ reviewType: "custom" })).toThrow("--phases is required");
+    });
+
+    it("throws when custom phases contain unknown values", () => {
+      expect(() =>
+        loadConfig({
+          reviewType: "custom",
+          phases: "scan,quality",
+        })
+      ).toThrow(ValidationError);
+    });
+
+    it("throws when custom phases contain duplicates", () => {
+      expect(() =>
+        loadConfig({
+          reviewType: "custom",
+          phases: "scan,SCAN",
+        })
+      ).toThrow('Duplicate phase "scan" is not allowed');
+    });
+
+    it("throws when phases are provided without the custom review type", () => {
+      expect(() =>
+        loadConfig({
+          reviewType: "general",
+          phases: "scan",
+        })
+      ).toThrow("--phases can only be used with --review-type custom");
+    });
   });
 
   describe("validateConfig", () => {
@@ -671,11 +722,11 @@ describe("Validator functions", () => {
       expect(validateReviewType("security")).toBe("security");
       expect(validateReviewType("performance")).toBe("performance");
       expect(validateReviewType("fast")).toBe("fast");
+      expect(validateReviewType("custom")).toBe("custom");
     });
 
     it("should default to general for invalid types", () => {
       expect(validateReviewType("invalid")).toBe("general");
-      expect(validateReviewType("custom")).toBe("general");
       expect(validateReviewType("")).toBe("general");
       expect(validateReviewType(undefined)).toBe("general");
     });

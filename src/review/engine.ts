@@ -14,6 +14,7 @@
  * - security: Security vulnerability and threat model analysis
  * - testing: Test coverage, quality, and edge case analysis
  * - performance: Performance bottlenecks, complexity analysis, optimization opportunities
+ * - custom: General review prompt constrained to user-selected analysis phases
  *
  * Multiple review runs execute sequentially (with delay) and aggregate findings through
  * fingerprinting to deduplicate across runs. This improves finding diversity and robustness.
@@ -99,6 +100,7 @@ import { FindingAggregator } from "./findingAggregator.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { RepoManager } from "./repoManager.js";
+import type { GeneralReviewPhase } from "./reviewSelection.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 /**
@@ -158,8 +160,10 @@ interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Number of independent review runs (1-5). Multiple runs aggregate findings (default: 1) */
   readonly reviewRuns?: number;
-  /** Review type: 'general', 'security', 'testing', or 'performance' (default: 'general') */
+  /** Review type: 'general', 'security', 'testing', 'performance', 'fast', or 'custom' (default: 'general') */
   readonly reviewType?: string;
+  /** Selected general-review phases used when reviewType is 'custom'. */
+  readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Enable streaming display of AI output (default: true if TTY) */
   readonly streamingEnabled?: boolean;
   /** Maximum lines to display in streaming view (default: 5) */
@@ -314,6 +318,7 @@ export class ReviewEngine {
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
       reviewType: resolvedOptions?.reviewType,
+      customReviewPhases: resolvedOptions?.customReviewPhases,
       model,
     });
     this.stateCache = new ReviewStateCache(tempPath);
@@ -337,6 +342,7 @@ export class ReviewEngine {
         skipPreExisting: resolvedOptions?.skipPreExisting,
         reviewRuns: resolvedOptions?.reviewRuns ?? 1,
         reviewType: resolvedOptions?.reviewType ?? "general",
+        reviewPhases: resolvedOptions?.customReviewPhases,
       },
       "ReviewEngine initialized"
     );
@@ -395,9 +401,18 @@ export class ReviewEngine {
 
     const runs = this.options.reviewRuns ?? 1;
     const reviewType = this.options.reviewType ?? "general";
-    this.logger.info({ prNumber, prIdentifier, runs, reviewType }, "Starting PR review");
+    this.logger.info(
+      { prNumber, prIdentifier, runs, reviewType, reviewPhases: this.options.customReviewPhases },
+      "Starting PR review"
+    );
     this.log(`Starting review of PR #${prNumber}...`);
-    this.auditLogger.logReviewStart(prNumber, this.platformName, runs, reviewType);
+    this.auditLogger.logReviewStart(
+      prNumber,
+      this.platformName,
+      runs,
+      reviewType,
+      this.options.customReviewPhases
+    );
 
     const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
@@ -845,7 +860,13 @@ export class ReviewEngine {
       // Store diffs to disk
       const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
       this.logger.info(
-        { prNumber, fileCount: manifest.files.length, diffDir, reviewType },
+        {
+          prNumber,
+          fileCount: manifest.files.length,
+          diffDir,
+          reviewType,
+          reviewPhases: this.options.customReviewPhases,
+        },
         "Stored diffs for batched review"
       );
 
@@ -900,6 +921,18 @@ export class ReviewEngine {
         case "performance":
           prompt = buildPerformanceFileReviewPrompt(manifest, repoPath);
           this.logger.info("Built performance specialist prompt");
+          break;
+        case "custom":
+          prompt = buildGeneralFileReviewPrompt(
+            manifest,
+            commentsContext || undefined,
+            repoPath,
+            this.options.customReviewPhases
+          );
+          this.logger.info(
+            { reviewPhases: this.options.customReviewPhases },
+            "Built custom review prompt"
+          );
           break;
         default:
           prompt = buildGeneralFileReviewPrompt(manifest, commentsContext || undefined, repoPath);
@@ -1184,6 +1217,25 @@ export class ReviewEngine {
 
           prompt = buildPerformanceCrossFilePrompt(prDetails, context, repoPath);
           this.logger.info("Built performance specialist cross-file prompt");
+          break;
+        }
+        case "custom": {
+          const context: GeneralCrossFileContext = {
+            filesSummary,
+            fileReviewResults: fileResults,
+            existingCommentsContext: commentsContext,
+          };
+
+          prompt = buildGeneralCrossFilePrompt(
+            prDetails,
+            context,
+            repoPath,
+            this.options.customReviewPhases
+          );
+          this.logger.info(
+            { reviewPhases: this.options.customReviewPhases },
+            "Built custom review cross-file prompt"
+          );
           break;
         }
         default: {

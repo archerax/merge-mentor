@@ -47,8 +47,8 @@ export interface FileFinding {
   readonly message: string;
   readonly suggestion: string;
   /**
-   * Chain-of-thought reasoning explaining why this is an issue.
-   * Must include: evidence from the code, why it matters, and the impact.
+   * Concise evidence-based rationale explaining why this is an issue.
+   * Should cite the changed code or checked context and the concrete impact.
    */
   readonly reasoning: string;
   /** Whether this issue existed before the PR (in the base branch). */
@@ -62,9 +62,8 @@ export interface CrossFileFinding {
   readonly category: FindingCategory;
   readonly message: string;
   /**
-   * Chain-of-thought reasoning explaining why this is a cross-file issue.
-   * Must include: evidence from each affected file, why these files are related,
-   * and the impact of the issue across the codebase.
+   * Concise evidence-based rationale explaining why this is a cross-file issue.
+   * Should cite the affected files, their relationship, and the concrete system impact.
    */
   readonly reasoning: string;
   readonly affectedFiles: readonly string[];
