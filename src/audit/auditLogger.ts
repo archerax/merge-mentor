@@ -411,7 +411,8 @@ export class AuditLogger {
     platform: string,
     runs: number,
     reviewType?: string,
-    reviewPhases?: readonly string[]
+    reviewPasses?: readonly string[],
+    reviewStrategy?: string
   ): void {
     this.logEvent(
       "review.start",
@@ -423,7 +424,8 @@ export class AuditLogger {
         platform,
         runs,
         reviewType: reviewType ?? "general",
-        ...(reviewPhases && reviewPhases.length > 0 ? { reviewPhases } : {}),
+        ...(reviewPasses && reviewPasses.length > 0 ? { reviewPasses } : {}),
+        ...(reviewStrategy ? { reviewStrategy } : {}),
       }
     );
   }

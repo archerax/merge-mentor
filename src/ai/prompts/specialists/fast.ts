@@ -1,5 +1,6 @@
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import type { GeneralReviewPhase } from "../../../review/reviewSelection.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFastReviewOutputFormat } from "./outputFormats.js";
@@ -29,15 +30,82 @@ Your working directory is set to the repository root.
 `;
 }
 
-/**
- * Builds a prompt for fast review (combined file + cross-file analysis).
- * This combines both file-level and architectural analysis in a single pass for cost savings.
- */
+const FAST_PASS_DETAILS: Record<GeneralReviewPhase, readonly string[]> = {
+  scan: [
+    "- Re-scan the diff for suspicious change patterns and incomplete edits",
+    "- Revisit nearby code paths for inconsistencies introduced by the PR",
+  ],
+  security: [
+    "- Re-check trust boundaries, auth/authz, validation, and exploit paths",
+    "- Revisit secrets, data exposure, and unsafe execution/deserialization risks",
+  ],
+  logic: [
+    "- Revisit edge cases, contracts, and error propagation",
+    "- Re-check state transitions and integration correctness",
+  ],
+  performance: [
+    "- Re-check algorithmic complexity, repeated work, and resource usage",
+    "- Revisit batching, caching, and scalability risks",
+  ],
+  monorepo: [
+    "- Re-check workspace boundaries, package ownership, and dependency placement",
+    "- Revisit shared tooling/config changes for cross-package breakage",
+  ],
+  testing: [
+    "- Re-check missing coverage, weak assertions, flaky patterns, and testability",
+    "- Revisit integration points or behavior changes that likely need tests",
+  ],
+  database: [
+    "- Re-check query correctness, transaction boundaries, and migration safety",
+    "- Revisit indexing, batching, locking, and data consistency concerns",
+  ],
+};
+
+function buildSelectedPassesSection(selectedPasses?: readonly GeneralReviewPhase[]): string {
+  if (!selectedPasses || selectedPasses.length === 0) {
+    return "";
+  }
+
+  return `
+# ADDITIVE REVIEW PASSES
+Baseline review is always active. After the baseline review, run these extra passes in this exact order:
+${selectedPasses.map((phase, index) => `${index + 1}. ${phase}`).join("\n")}
+
+These passes add focus and context. They do **not** restrict what issues you may report.
+`;
+}
+
+function buildAdditionalPassAnalysis(selectedPasses?: readonly GeneralReviewPhase[]): string {
+  if (!selectedPasses || selectedPasses.length === 0) {
+    return "";
+  }
+
+  return `
+## Additional Focused Passes
+${selectedPasses
+  .map(
+    (phase, index) =>
+      `### Additive Pass ${index + 1}: ${phase}\n${FAST_PASS_DETAILS[phase].join("\n")}`
+  )
+  .join("\n\n")}
+`;
+}
+
+function buildAdditionalContextSections(additionalContextSections?: readonly string[]): string {
+  if (!additionalContextSections || additionalContextSections.length === 0) {
+    return "";
+  }
+
+  return `\n${additionalContextSections.join("\n\n")}\n`;
+}
+
 export function buildFastReviewPrompt(
   prDetails: PRDetails,
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoPath?: string
+  repoPath?: string,
+  selectedPasses?: readonly GeneralReviewPhase[],
+  additionalContextSections?: readonly string[]
 ): string {
   const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
@@ -56,15 +124,9 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 `
     : "";
 
-  const workspaceSection = buildWorkspaceSection(repoPath);
-
   return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer performing comprehensive analysis in a single pass. You will analyze both:
-1. **File-level issues**: Line-by-line bugs, security flaws, performance problems
-2. **Architectural concerns**: Cross-file integration issues, system-level design problems
-
-Be thorough and strict in catching issues at both levels.
-${workspaceSection}
+Expert code reviewer performing comprehensive analysis in a single pass. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
+${buildWorkspaceSection(repoPath)}
 # PR CONTEXT
 ${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
 
@@ -76,6 +138,7 @@ Perform a COMPLETE review of this PR covering:
 Files to Review:
 ${filesListing}
 ${commentsSection}
+${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}
 # MANDATORY ANALYSIS STRUCTURE
 
 Before providing JSON, document your analysis:
@@ -103,6 +166,7 @@ Line-by-line observations of suspicious patterns in individual files
 - Cross-file consistency (error handling, patterns)
 - System-level design concerns
 - Dependency relationships
+${buildAdditionalPassAnalysis(selectedPasses)}
 
 ## Findings Summary
 Only after completing all passes above, list findings with appropriate attribution.
@@ -125,19 +189,11 @@ Before reporting any finding, complete this mandatory verification:
 For EACH finding, your reasoning field must include verification notes.
 
 **Required verification elements:**
-- ✓ Confirmation: What you verified ("Confirmed line X has Y")
-- ✓ Context check: What surrounding code you examined
+- ✓ Confirmation: What you verified
+- ✓ Context check: What surrounding code or repo context you examined
 - ✓ Pattern check: Whether you searched for existing solutions
 - ✓ Impact assessment: Concrete consequences of the issue
 - ✓ Severity justification: Why this specific severity level
-
-**Example of proper verification in reasoning:**
-
-    ✓ Confirmed line 45: users[index] access without bounds check
-    ✓ Scanned lines 40-50: no validation present for index parameter
-    ✓ Checked context: index comes from req.query.id (user-controlled input)
-    ✓ Impact: Runtime TypeError crashes server if index >= users.length
-    ✓ Severity justification: high (production crash risk from user input)
 
 # CRITICAL RULES
 1. Only flag NEW issues in added lines (marked with +)
@@ -147,7 +203,8 @@ For EACH finding, your reasoning field must include verification notes.
    - **Line-specific**: Include both file and line number
    - **File-level**: Include file but omit line number
    - **General/PR-level**: Omit both file and line (architectural concerns)
-${existingCommentsContext ? "5. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
+5. Additive passes increase attention and context, but do NOT restrict findings to a narrow category
+${existingCommentsContext ? "6. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
 # SEVERITY THRESHOLDS
 Use these exact criteria:
@@ -190,7 +247,7 @@ Consider: null/undefined, empty arrays, boundary values, concurrent access, cros
 
 # NEVER REPORT
 - **Formatting**: Whitespace, indentation (if project has auto-formatter)
-- **Syntax errors**: Assume all code compiles successfully  
+- **Syntax errors**: Assume all code compiles successfully
 - **Unfamiliar features**: Don't flag language constructs you don't recognize
 - **Obvious documentation**: Getters/setters, self-explanatory functions
 - **Subjective opinions**: Personal preferences without concrete rationale
@@ -224,37 +281,23 @@ Before reporting ANY finding, you must challenge yourself with these questions:
 6. **"Is this actually architectural?"** (for cross-file issues)
    → Example: Issue might be file-level, not system-level
 
+## Attribution Rules
+- **Line-specific**: Include both file and line number
+- **File-level**: Include file and omit line number
+- **General/PR-level**: Omit both file and line
+
 ## Counter-Argument Documentation
 
 For findings that could be questioned, document your self-challenge in the reasoning:
 
-**Example 1 - Report After Challenge:**
-
-Finding: "Missing try-catch around database call"
-
 Counter-Argument Considered:
-"This could be handled by a transaction wrapper or middleware"
+"Could this be intentional or handled elsewhere?"
 
 Rebuttal:
-"✓ Checked codebase: No transaction wrapper exists (@workspace /search transaction wrapper)
-✓ Verified pattern: Other DB calls in src/data/ all use explicit try-catch (checked 8 files)
-✓ This is inconsistent with established pattern"
+"Explain what context you checked and why the concern still stands."
 
-Decision: ✅ **Report** (pattern violation confirmed)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Magic number 3600 should be constant"
-
-Counter-Argument Considered:
-"This is clearly seconds-per-hour, universally understood"
-
-Rebuttal:
-"✓ Verified: 3600 is universally known constant (seconds per hour)
-✓ Context: Used once, meaning obvious from variable name
-✓ Pattern check: No SECONDS_PER_HOUR constant elsewhere in codebase"
-
-Decision: ❌ **Don't report** (universally understood constant)
+Decision:
+Report only if the issue remains material after the challenge above.
 
 ${buildFastReviewOutputFormat()}
 `;

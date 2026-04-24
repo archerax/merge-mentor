@@ -6,6 +6,7 @@ import {
   validateConfig,
   validateGitBackend,
   validateReviewRuns,
+  validateReviewStrategy,
   validateReviewType,
 } from "./config.js";
 import { ConfigurationError, ValidationError } from "./errors/index.js";
@@ -30,6 +31,8 @@ describe("Config", () => {
       expect(config.gitBackend).toBe("cli");
       expect(config.skipPreExisting).toBe(true);
       expect(config.reviewRuns).toBe(1);
+      expect(config.reviewPasses).toEqual([]);
+      expect(config.reviewStrategy).toBe("standard");
     });
 
     it("should load values from environment variables", () => {
@@ -492,6 +495,7 @@ describe("Config", () => {
       const config = loadConfig(undefined, env);
 
       expect(config.reviewType).toBe("fast");
+      expect(config.reviewStrategy).toBe("fast");
     });
 
     it("should default MM_REVIEW_TYPE to general for invalid values", () => {
@@ -533,6 +537,7 @@ describe("Config", () => {
       });
 
       expect(config.reviewType).toBe("custom");
+      expect(config.reviewPasses).toEqual(["scan", "monorepo"]);
       expect(config.customReviewPhases).toEqual(["scan", "monorepo"]);
     });
 
@@ -542,12 +547,15 @@ describe("Config", () => {
         phases: "SCAN,performance",
       });
 
+      expect(config.reviewPasses).toEqual(["scan", "performance"]);
       expect(config.customReviewPhases).toEqual(["scan", "performance"]);
     });
 
     it("throws when custom review type is missing phases", () => {
       expect(() => loadConfig({ reviewType: "custom" })).toThrow(ValidationError);
-      expect(() => loadConfig({ reviewType: "custom" })).toThrow("--phases is required");
+      expect(() => loadConfig({ reviewType: "custom" })).toThrow(
+        "--passes or --phases is required"
+      );
     });
 
     it("throws when custom phases contain unknown values", () => {
@@ -575,6 +583,34 @@ describe("Config", () => {
           phases: "scan",
         })
       ).toThrow("--phases can only be used with --review-type custom");
+    });
+
+    it("loads additive review passes without using legacy review types", () => {
+      const config = loadConfig({
+        passes: "security,database",
+      });
+
+      expect(config.reviewType).toBe("general");
+      expect(config.reviewPasses).toEqual(["security", "database"]);
+    });
+
+    it("merges legacy review type aliases with explicit passes", () => {
+      const config = loadConfig({
+        reviewType: "security",
+        passes: "database",
+      });
+
+      expect(config.reviewPasses).toEqual(["database", "security"]);
+    });
+
+    it("throws when both passes and phases are provided", () => {
+      expect(() =>
+        loadConfig({
+          reviewType: "custom",
+          passes: "security",
+          phases: "scan",
+        })
+      ).toThrow("Use either --passes or --phases, not both.");
     });
   });
 
@@ -729,6 +765,19 @@ describe("Validator functions", () => {
       expect(validateReviewType("invalid")).toBe("general");
       expect(validateReviewType("")).toBe("general");
       expect(validateReviewType(undefined)).toBe("general");
+    });
+  });
+
+  describe("validateReviewStrategy", () => {
+    it("should accept valid review strategies", () => {
+      expect(validateReviewStrategy("standard")).toBe("standard");
+      expect(validateReviewStrategy("fast")).toBe("fast");
+    });
+
+    it("should default to standard for invalid strategies", () => {
+      expect(validateReviewStrategy("invalid")).toBe("standard");
+      expect(validateReviewStrategy("")).toBe("standard");
+      expect(validateReviewStrategy(undefined)).toBe("standard");
     });
   });
 

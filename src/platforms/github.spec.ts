@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../config.js";
+import { resolveReviewProfile } from "../review/reviewSelection.js";
 import { GitHubAdapter } from "./github.js";
 
 const mockOctokitInstance = {
@@ -28,6 +29,8 @@ vi.mock("@octokit/rest", () => ({
 }));
 
 function createTestConfig(): Config {
+  const reviewProfile = resolveReviewProfile({ reviewType: "general" });
+
   return {
     defaultPlatform: "github",
     github: {
@@ -47,6 +50,9 @@ function createTestConfig(): Config {
     skipPreExisting: true,
     reviewRuns: 1,
     reviewType: "general",
+    reviewPasses: reviewProfile.passes,
+    reviewStrategy: reviewProfile.strategy,
+    reviewProfile,
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",

@@ -609,7 +609,7 @@ describe("ReviewEngine", () => {
         "test.ts",
         2,
         expect.stringContaining(
-          `Merge Mentor v${packageJson.version}, Security review, claude-sonnet-4.6`
+          `Merge Mentor v${packageJson.version}, Baseline review + security, claude-sonnet-4.6`
         )
       );
     });
@@ -1078,8 +1078,8 @@ describe("ReviewEngine", () => {
     });
   });
 
-  describe("specialist review types", () => {
-    it("uses security specialist prompts when reviewType is security", async () => {
+  describe("resolved review profiles", () => {
+    it("resolves security reviewType to a baseline review with a security pass", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,
         reviewType: "security",
@@ -1102,11 +1102,12 @@ describe("ReviewEngine", () => {
 
       expect(result).toBeDefined();
       expect(result.filesReviewed).toBe(1);
-      // File review + cross-file analysis = 2 executePrompt calls
       expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# ADDITIVE REVIEW PASSES");
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. security");
     });
 
-    it("uses performance specialist prompts when reviewType is performance", async () => {
+    it("resolves performance reviewType to a baseline review with a performance pass", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,
         reviewType: "performance",
@@ -1130,9 +1131,10 @@ describe("ReviewEngine", () => {
       expect(result).toBeDefined();
       expect(result.filesReviewed).toBe(1);
       expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. performance");
     });
 
-    it("uses testing specialist prompts when reviewType is testing", async () => {
+    it("resolves testing reviewType to a baseline review with a testing pass", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,
         reviewType: "testing",
@@ -1156,9 +1158,11 @@ describe("ReviewEngine", () => {
       expect(result).toBeDefined();
       expect(result.filesReviewed).toBe(1);
       expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. testing");
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# TESTING PASS CONTEXT");
     });
 
-    it("uses fast review mode when reviewType is fast", async () => {
+    it("uses fast strategy when reviewType is fast", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,
         reviewType: "fast",
@@ -1197,13 +1201,12 @@ describe("ReviewEngine", () => {
 
       expect(result).toBeDefined();
       expect(result.filesReviewed).toBe(1);
-      // Fast review uses a single executePrompt call
       expect(mockExecutePrompt).toHaveBeenCalledTimes(1);
       expect(mockParseFastReview).toHaveBeenCalled();
       expect(result.crossFileResult.overallAssessment).toBe("Fast review complete");
     });
 
-    it("uses selected phases when reviewType is custom", async () => {
+    it("uses ordered additive passes when reviewType is custom", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,
         reviewType: "custom",
@@ -1227,14 +1230,13 @@ describe("ReviewEngine", () => {
 
       expect(result).toBeDefined();
       expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# SELECTED REVIEW PHASES");
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# ADDITIVE REVIEW PASSES");
       expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. scan");
       expect(mockExecutePrompt.mock.calls[0][0]).toContain("2. logic");
-      expect(mockExecutePrompt.mock.calls[0][0]).not.toContain("1. security");
-      expect(mockExecutePrompt.mock.calls[1][0]).toContain("# SELECTED REVIEW PHASES");
-      expect(mockExecutePrompt.mock.calls[1][0]).toContain(
-        "Restrict findings to the configured SELECTED REVIEW PHASES above"
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain(
+        "These passes add focus and context. They do **not** restrict what issues you may report."
       );
+      expect(mockExecutePrompt.mock.calls[1][0]).toContain("# ADDITIVE REVIEW PASSES");
     });
 
     it("fast review returns empty results when no files have patches", async () => {

@@ -5,7 +5,13 @@ import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { type CIContext, detectCIEnvironment } from "./ci/index.js";
-import { type GeneralReviewPhase, loadConfig, type Platform, validateConfig } from "./config.js";
+import {
+  loadConfig,
+  type Platform,
+  type ReviewPass,
+  type ReviewStrategy,
+  validateConfig,
+} from "./config.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "./constants.js";
 import { initLogger, logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
@@ -21,8 +27,7 @@ import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import {
   formatReviewPhases,
   formatReviewTypeLabel,
-  formatReviewTypeName,
-  GENERAL_REVIEW_PHASES,
+  REVIEW_PASSES,
 } from "./review/reviewSelection.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
 
@@ -35,7 +40,9 @@ export interface ReviewOptions {
   verbose: boolean;
   runs?: number;
   reviewType?: string;
+  passes?: string;
   phases?: string;
+  strategy?: string;
   stream?: boolean;
   streamLines?: number;
   tempPath?: string;
@@ -219,7 +226,9 @@ export async function executeReview(
     skipExistingIssues: resolvedOptions.skipExistingIssues,
     reviewRuns: resolvedOptions.runs,
     reviewType: resolvedOptions.reviewType,
+    passes: resolvedOptions.passes,
     phases: resolvedOptions.phases,
+    reviewStrategy: resolvedOptions.strategy,
     streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
     streamingLines: resolvedOptions.streamLines,
     gitBackend: resolvedOptions.gitBackend,
@@ -289,6 +298,8 @@ export async function executeReview(
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
+    reviewPasses: config.reviewPasses,
+    reviewStrategy: config.reviewStrategy,
     customReviewPhases: config.customReviewPhases,
     streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
@@ -307,7 +318,8 @@ export async function executeReview(
   output.log(
     `Review mode: ${formatReviewTypeLabel(
       resolvedOptions.reviewType ?? config.reviewType,
-      config.customReviewPhases
+      config.reviewPasses,
+      config.reviewStrategy
     )}\n`
   );
 
@@ -323,22 +335,26 @@ export function generateMarkdownReport(
   aiProvider: AIProviderType,
   dryRun: boolean,
   reviewType = "general",
-  customReviewPhases?: readonly GeneralReviewPhase[]
+  reviewPasses?: readonly ReviewPass[],
+  reviewStrategy: ReviewStrategy = "standard"
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
-  const reviewTypeLabel = formatReviewTypeName(reviewType);
-  const reviewPhases = formatReviewPhases(customReviewPhases);
+  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const formattedPasses = formatReviewPhases(reviewPasses);
 
   let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
 
   // Header with PR details
   report += `**Generated:** ${date}  \n`;
   report += `**AI Provider:** ${aiProvider}  \n`;
-  report += `**Review Type:** ${reviewTypeLabel}  \n`;
-  if (reviewPhases) {
-    report += `**Review Phases:** ${reviewPhases}  \n`;
+  report += `**Review Profile:** ${reviewTypeLabel}  \n`;
+  if (formattedPasses) {
+    report += `**Review Passes:** ${formattedPasses}  \n`;
+  }
+  if (reviewStrategy !== "standard") {
+    report += `**Review Strategy:** ${reviewStrategy}  \n`;
   }
   report += `**PR Title:** ${result.prDetails.title}  \n`;
   report += `**Author:** ${result.prDetails.author}  \n`;
@@ -508,22 +524,26 @@ export function displayResults(
   platform?: Platform,
   aiProvider?: AIProviderType,
   reviewType = "general",
-  customReviewPhases?: readonly GeneralReviewPhase[],
+  reviewPasses?: readonly ReviewPass[],
+  reviewStrategy: ReviewStrategy = "standard",
   tempPath?: string,
   deps: ProgramDeps = {}
 ): void {
   const output = deps.output ?? consoleOutputWriter;
-  const reviewTypeLabel = formatReviewTypeName(reviewType);
-  const reviewPhases = formatReviewPhases(customReviewPhases);
+  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const formattedPasses = formatReviewPhases(reviewPasses);
   output.log("=".repeat(60));
   output.log("📊 Review Complete");
   output.log("=".repeat(60));
   output.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
   output.log(`Author: ${result.prDetails.author}`);
   output.log(`Branch: ${result.prDetails.headBranch} → ${result.prDetails.baseBranch}`);
-  output.log(`Review Type: ${reviewTypeLabel}`);
-  if (reviewPhases) {
-    output.log(`Review Phases: ${reviewPhases}`);
+  output.log(`Review Profile: ${reviewTypeLabel}`);
+  if (formattedPasses) {
+    output.log(`Review Passes: ${formattedPasses}`);
+  }
+  if (reviewStrategy !== "standard") {
+    output.log(`Review Strategy: ${reviewStrategy}`);
   }
   output.log("");
   output.log(`Files Reviewed: ${result.filesReviewed}`);
@@ -562,14 +582,15 @@ export function displayResults(
         aiProvider,
         dryRun,
         reviewType,
-        customReviewPhases
+        reviewPasses,
+        reviewStrategy
       );
       const reportDir = join(tempPath ?? "./.mergementor", "reports");
 
       // Generate unique report filename using platform and project
       const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
       const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
-      const reportFile = join(reportDir, `${prIdentifier}-${reviewType}-review-report.md`);
+      const reportFile = join(reportDir, `${prIdentifier}-review-profile-report.md`);
 
       // Ensure directory exists
       mkdirSync(reportDir, { recursive: true });
@@ -632,9 +653,14 @@ program
     "general"
   )
   .option(
-    "--phases <phaseNames>",
-    `Comma-separated general-review phases for --review-type custom. Use quoted exact names: "${GENERAL_REVIEW_PHASES.join(", ")}"`
+    "--passes <passNames>",
+    `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
   )
+  .option(
+    "--phases <phaseNames>",
+    `Deprecated alias for --passes when used with --review-type custom. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
+  )
+  .option("--strategy <strategy>", "Execution strategy (standard or fast). Env: MM_REVIEW_STRATEGY")
   .option(
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
@@ -781,7 +807,9 @@ program
         skipExistingIssues: options.skipExistingIssues,
         reviewRuns: options.runs,
         reviewType: options.reviewType,
+        passes: options.passes,
         phases: options.phases,
+        reviewStrategy: options.strategy,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
@@ -792,7 +820,8 @@ program
         platform,
         aiProvider,
         reviewType,
-        config.customReviewPhases,
+        config.reviewPasses,
+        config.reviewStrategy,
         config.tempPath
       );
 

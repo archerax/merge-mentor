@@ -6,14 +6,26 @@ import type { GitBackendType } from "./review/gitClient.js";
 import {
   type GeneralReviewPhase,
   parseCustomReviewPhases,
+  parseReviewPasses,
+  type ResolvedReviewProfile,
+  type ReviewPass,
+  type ReviewStrategy,
   type ReviewType,
+  resolveReviewProfile,
+  validateReviewStrategy as validateReviewStrategyValue,
   validateReviewType as validateReviewTypeValue,
 } from "./review/reviewSelection.js";
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
 
-export type { GeneralReviewPhase, ReviewType } from "./review/reviewSelection.js";
+export type {
+  GeneralReviewPhase,
+  ResolvedReviewProfile,
+  ReviewPass,
+  ReviewStrategy,
+  ReviewType,
+} from "./review/reviewSelection.js";
 
 /**
  * Deprecated environment variable aliases retained for v1 compatibility.
@@ -86,9 +98,15 @@ export interface Config {
   readonly skipPreExisting: boolean;
   /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
   readonly reviewRuns: number;
-  /** Type of review to perform (general, testing, security, performance). Default: general */
+  /** Legacy review type alias used to resolve the review profile. Default: general */
   readonly reviewType: ReviewType;
-  /** Selected general-review phases for custom review mode. */
+  /** Ordered additive review passes resolved for this run. */
+  readonly reviewPasses: readonly ReviewPass[];
+  /** Execution strategy for the resolved review profile. */
+  readonly reviewStrategy: ReviewStrategy;
+  /** Fully resolved baseline + passes + strategy profile for this run. */
+  readonly reviewProfile: ResolvedReviewProfile;
+  /** Selected review passes retained for legacy custom-review compatibility. */
   readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Whether to show streaming output from AI providers. Default: true (if TTY) */
   readonly streamingEnabled: boolean;
@@ -162,7 +180,23 @@ export function loadConfig(
   );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"));
   const reviewType = validateReviewType(cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"));
-  const customReviewPhases = parseCustomReviewPhases(reviewType, cliOverrides?.phases);
+  const reviewStrategy = validateReviewStrategy(
+    cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY")
+  );
+  const explicitReviewPasses = parseReviewPasses(
+    cliOverrides?.passes ?? env.get("MM_REVIEW_PASSES")
+  );
+
+  if (cliOverrides?.passes && cliOverrides?.phases) {
+    throw new ConfigurationError("passes", "Use either --passes or --phases, not both.");
+  }
+
+  const legacyCustomReviewPhases = parseCustomReviewPhases(reviewType, cliOverrides?.phases);
+  const resolvedReviewProfile = resolveReviewProfile({
+    reviewType,
+    reviewPasses: explicitReviewPasses ?? legacyCustomReviewPhases,
+    reviewStrategy,
+  });
   const gitBackend = validateGitBackend(cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"));
 
   return {
@@ -210,7 +244,10 @@ export function loadConfig(
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
     reviewRuns,
     reviewType,
-    customReviewPhases,
+    reviewPasses: resolvedReviewProfile.passes,
+    reviewStrategy: resolvedReviewProfile.strategy,
+    reviewProfile: resolvedReviewProfile,
+    customReviewPhases: reviewType === "custom" ? resolvedReviewProfile.passes : undefined,
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED") !== "false",
     streamingLines:
       cliOverrides?.streamingLines ??
@@ -259,7 +296,9 @@ interface CliOverrides {
   readonly skipExistingIssues?: string;
   readonly reviewRuns?: number;
   readonly reviewType?: string;
+  readonly passes?: string;
   readonly phases?: string;
+  readonly reviewStrategy?: string;
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
   readonly tempPath?: string;
@@ -334,6 +373,15 @@ export function validateAIProvider(value: string | undefined): AIProviderType {
  */
 export function validateReviewType(value: string | undefined): ReviewType {
   return validateReviewTypeValue(value);
+}
+
+/**
+ * Validates the review strategy.
+ * Supported strategies are: standard, fast.
+ * Unknown values default to standard.
+ */
+export function validateReviewStrategy(value: string | undefined): ReviewStrategy {
+  return validateReviewStrategyValue(value);
 }
 
 /**
