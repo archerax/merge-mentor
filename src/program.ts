@@ -5,7 +5,7 @@ import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { type CIContext, detectCIEnvironment } from "./ci/index.js";
-import { loadConfig, type Platform, validateConfig } from "./config.js";
+import { type GeneralReviewPhase, loadConfig, type Platform, validateConfig } from "./config.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "./constants.js";
 import { initLogger, logger } from "./logger.js";
 import { AzureDevOpsAdapter } from "./platforms/azure.js";
@@ -18,6 +18,12 @@ import {
   processEnvironment,
 } from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
+import {
+  formatReviewPhases,
+  formatReviewTypeLabel,
+  formatReviewTypeName,
+  GENERAL_REVIEW_PHASES,
+} from "./review/reviewSelection.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
 
 export interface ReviewOptions {
@@ -29,6 +35,7 @@ export interface ReviewOptions {
   verbose: boolean;
   runs?: number;
   reviewType?: string;
+  phases?: string;
   stream?: boolean;
   streamLines?: number;
   tempPath?: string;
@@ -212,6 +219,7 @@ export async function executeReview(
     skipExistingIssues: resolvedOptions.skipExistingIssues,
     reviewRuns: resolvedOptions.runs,
     reviewType: resolvedOptions.reviewType,
+    phases: resolvedOptions.phases,
     streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
     streamingLines: resolvedOptions.streamLines,
     gitBackend: resolvedOptions.gitBackend,
@@ -281,6 +289,7 @@ export async function executeReview(
     skipPreExisting: config.skipPreExisting,
     reviewRuns,
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
+    customReviewPhases: config.customReviewPhases,
     streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
     ciMode: resolvedOptions.ci,
@@ -295,6 +304,12 @@ export async function executeReview(
   output.log(
     `\n🔍 Starting code review for PR #${pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
   );
+  output.log(
+    `Review mode: ${formatReviewTypeLabel(
+      resolvedOptions.reviewType ?? config.reviewType,
+      config.customReviewPhases
+    )}\n`
+  );
 
   const result = await engine.reviewPR(pr);
   return { result, adapter, platform };
@@ -307,18 +322,24 @@ export function generateMarkdownReport(
   result: ReviewResult,
   aiProvider: AIProviderType,
   dryRun: boolean,
-  reviewType = "general"
+  reviewType = "general",
+  customReviewPhases?: readonly GeneralReviewPhase[]
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
+  const reviewTypeLabel = formatReviewTypeName(reviewType);
+  const reviewPhases = formatReviewPhases(customReviewPhases);
 
   let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
 
   // Header with PR details
   report += `**Generated:** ${date}  \n`;
   report += `**AI Provider:** ${aiProvider}  \n`;
-  report += `**Review Type:** ${reviewType}  \n`;
+  report += `**Review Type:** ${reviewTypeLabel}  \n`;
+  if (reviewPhases) {
+    report += `**Review Phases:** ${reviewPhases}  \n`;
+  }
   report += `**PR Title:** ${result.prDetails.title}  \n`;
   report += `**Author:** ${result.prDetails.author}  \n`;
   report += `**Branch:** \`${result.prDetails.headBranch}\` → \`${result.prDetails.baseBranch}\`  \n\n`;
@@ -487,17 +508,23 @@ export function displayResults(
   platform?: Platform,
   aiProvider?: AIProviderType,
   reviewType = "general",
+  customReviewPhases?: readonly GeneralReviewPhase[],
   tempPath?: string,
   deps: ProgramDeps = {}
 ): void {
   const output = deps.output ?? consoleOutputWriter;
+  const reviewTypeLabel = formatReviewTypeName(reviewType);
+  const reviewPhases = formatReviewPhases(customReviewPhases);
   output.log("=".repeat(60));
   output.log("📊 Review Complete");
   output.log("=".repeat(60));
   output.log(`PR: #${result.prDetails.number} - ${result.prDetails.title}`);
   output.log(`Author: ${result.prDetails.author}`);
   output.log(`Branch: ${result.prDetails.headBranch} → ${result.prDetails.baseBranch}`);
-  output.log(`Review Type: ${reviewType}`);
+  output.log(`Review Type: ${reviewTypeLabel}`);
+  if (reviewPhases) {
+    output.log(`Review Phases: ${reviewPhases}`);
+  }
   output.log("");
   output.log(`Files Reviewed: ${result.filesReviewed}`);
   if (result.filesSkipped > 0) {
@@ -530,7 +557,13 @@ export function displayResults(
   // Generate and save markdown report
   if (aiProvider && adapter && platform) {
     try {
-      const markdownReport = generateMarkdownReport(result, aiProvider, dryRun, reviewType);
+      const markdownReport = generateMarkdownReport(
+        result,
+        aiProvider,
+        dryRun,
+        reviewType,
+        customReviewPhases
+      );
       const reportDir = join(tempPath ?? "./.mergementor", "reports");
 
       // Generate unique report filename using platform and project
@@ -595,8 +628,12 @@ program
   })
   .option(
     "--review-type <type>",
-    "Type of review (general, testing, security, performance, fast). Env: MM_REVIEW_TYPE",
+    "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
     "general"
+  )
+  .option(
+    "--phases <phaseNames>",
+    `Comma-separated general-review phases for --review-type custom. Use quoted exact names: "${GENERAL_REVIEW_PHASES.join(", ")}"`
   )
   .option(
     "--git-backend <backend>",
@@ -744,6 +781,7 @@ program
         skipExistingIssues: options.skipExistingIssues,
         reviewRuns: options.runs,
         reviewType: options.reviewType,
+        phases: options.phases,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
@@ -754,6 +792,7 @@ program
         platform,
         aiProvider,
         reviewType,
+        config.customReviewPhases,
         config.tempPath
       );
 

@@ -793,6 +793,7 @@ describe("General Review Prompts", () => {
       const prompt = buildGeneralFileReviewPrompt(mockManifest, comments);
 
       expect(prompt).toContain("# EXISTING PR COMMENTS");
+      expect(prompt).toContain("<untrusted-existing-pr-comments>");
       expect(prompt).toContain(comments);
       expect(prompt).toContain("Focus on NEW issues not already covered");
     });
@@ -826,6 +827,37 @@ describe("General Review Prompts", () => {
       const prompt = buildGeneralFileReviewPrompt(mockManifest);
 
       expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
+    });
+
+    it("supports custom selected phases for file review", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, undefined, [
+        "scan",
+        "logic",
+      ]);
+
+      expect(prompt).toContain("# SELECTED REVIEW PHASES");
+      expect(prompt).toContain("1. scan");
+      expect(prompt).toContain("2. logic");
+      expect(prompt).toContain("Restrict findings to the configured SELECTED REVIEW PHASES above");
+      expect(prompt).toContain("Prefer high-confidence, actionable findings.");
+      expect(prompt).toContain("# SIGNAL BAR");
+      expect(prompt).toContain("do not include your analysis in the response");
+      expect(prompt).toContain(
+        "Use only these categories: bug, security, performance, quality, documentation"
+      );
+      expect(prompt).not.toContain("## Pass 2: security");
+      expect(prompt).not.toContain(
+        "- **Security**: Any potential vulnerability, no matter how small"
+      );
+    });
+
+    it("includes monorepo-specific guidance when monorepo phase is selected", () => {
+      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, undefined, ["monorepo"]);
+
+      expect(prompt).toContain("1. monorepo");
+      expect(prompt).toContain("Package boundary violations and private cross-package imports");
+      expect(prompt).toContain("**monorepo**: Package boundaries, workspace dependency hygiene");
+      expect(prompt).toContain("**Monorepo hygiene**: Boundary violations");
     });
   });
 
@@ -902,6 +934,7 @@ describe("General Review Prompts", () => {
       const prompt = buildGeneralCrossFilePrompt(mockPrDetails, context);
 
       expect(prompt).toContain("EXISTING PR COMMENTS:");
+      expect(prompt).toContain("<untrusted-existing-pr-comments>");
       expect(prompt).toContain("Comment about architecture");
     });
 
@@ -922,6 +955,34 @@ describe("General Review Prompts", () => {
       const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
 
       expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
+    });
+
+    it("supports custom selected phases for cross-file review", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, undefined, [
+        "scan",
+        "performance",
+      ]);
+
+      expect(prompt).toContain("# SELECTED REVIEW PHASES");
+      expect(prompt).toContain("1. scan");
+      expect(prompt).toContain("2. performance");
+      expect(prompt).toContain(
+        "- **performance**: Algorithmic complexity, caching, resource usage"
+      );
+      expect(prompt).toContain("# INTERNAL REVIEW PASSES");
+      expect(prompt).toContain("Return ONLY the JSON code block");
+      expect(prompt).not.toContain("- Security: Authentication/authorization consistent?");
+    });
+
+    it("includes monorepo checklist items when monorepo phase is selected", () => {
+      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, undefined, [
+        "monorepo",
+      ]);
+
+      expect(prompt).toContain("1. monorepo");
+      expect(prompt).toContain(
+        "- **monorepo**: Package boundaries, dependency graph hygiene, shared tooling conventions, and workspace structure"
+      );
     });
   });
 });

@@ -45,6 +45,7 @@ import type {
   FileReviewResult,
   FindingSeverity,
 } from "../platforms/types.js";
+import { formatReviewTypeLabel, type GeneralReviewPhase } from "./reviewSelection.js";
 
 /**
  * Configuration options for comment management behavior.
@@ -56,6 +57,8 @@ interface CommentManagerOptions {
   readonly skipPreExisting?: boolean;
   /** Review type label shown in comment footers. Default: general. */
   readonly reviewType?: string;
+  /** Configured phases shown in custom review footers. */
+  readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Configured AI model identifier shown in comment footers. */
   readonly model?: string;
 }
@@ -92,7 +95,11 @@ export class CommentManager {
   constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
     this.skipPreExisting = options?.skipPreExisting ?? true;
-    this.footer = this.buildFooter(options?.reviewType, options?.model);
+    this.footer = this.buildFooter(
+      options?.reviewType,
+      options?.customReviewPhases,
+      options?.model
+    );
   }
 
   /**
@@ -308,19 +315,25 @@ ${this.footer}${idMarker}`;
     return summary;
   }
 
-  private buildFooter(reviewType?: string, model?: string): string {
+  private buildFooter(
+    reviewType?: string,
+    customReviewPhases?: readonly GeneralReviewPhase[],
+    model?: string
+  ): string {
     const footerParts = [
       `Merge Mentor v${packageJson.version}`,
-      this.formatReviewType(reviewType),
+      this.formatReviewType(reviewType, customReviewPhases),
       this.formatModelName(model),
     ];
 
     return `${footerParts.join(", ")}\n<!-- ${this.botIdentifier} -->`;
   }
 
-  private formatReviewType(reviewType?: string): string {
-    const normalizedType = reviewType?.trim().toLowerCase() || "general";
-    return `${normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1)} review`;
+  private formatReviewType(
+    reviewType?: string,
+    customReviewPhases?: readonly GeneralReviewPhase[]
+  ): string {
+    return formatReviewTypeLabel(reviewType, customReviewPhases);
   }
 
   private formatModelName(model?: string): string {

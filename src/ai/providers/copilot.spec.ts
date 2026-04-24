@@ -500,7 +500,7 @@ Usage by model:
             category: "quality",
             message: "Missing type",
             suggestion: "Add type annotation",
-            reasoning: "Too short.", // < 50 chars triggers warn
+            reasoning: "Too short.", // Short rationale still triggers validation warning
             isPreExisting: false,
           },
         ],
@@ -512,7 +512,7 @@ Usage by model:
       expect(result.findings[0].reasoning).toBe("Too short.");
     });
 
-    it("still parses finding when reasoning lacks verification keywords", () => {
+    it("still parses finding when reasoning uses concise evidence and impact wording", () => {
       const provider = createCopilotProvider();
       const response = createAIResponse({
         findings: [
@@ -590,7 +590,7 @@ Usage by model:
                 category: "quality",
                 message: "Missing return type",
                 suggestion: "Add return type",
-                reasoning: "Short.", // < 50 chars
+                reasoning: "Short.", // Short rationale still triggers validation warning
               },
             ],
           },
@@ -602,7 +602,7 @@ Usage by model:
       expect(result[0].findings[0].reasoning).toBe("Short.");
     });
 
-    it("warns on reasoning without verification keywords in batched findings", () => {
+    it("parses batched findings with concise rationale wording", () => {
       const provider = createCopilotProvider();
       const response = createAIResponse({
         file_results: {
@@ -708,7 +708,7 @@ Usage by model:
             category: "quality",
             message: "Missing validation",
             suggestion: "Add validation",
-            reasoning: "Short.", // < 50 chars
+            reasoning: "Short.", // Short rationale still triggers validation warning
           },
         ],
       });

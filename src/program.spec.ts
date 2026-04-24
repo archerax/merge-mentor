@@ -358,6 +358,43 @@ describe("CLI", () => {
       );
     });
 
+    it("passes custom review phases through config and engine options", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          reviewType: "custom",
+          customReviewPhases: ["scan", "logic"],
+        })
+      );
+
+      const options = createReviewOptions({
+        write: false,
+        verbose: true,
+        reviewType: "custom",
+        phases: "scan,logic",
+      });
+
+      await executeReview(options);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reviewType: "custom",
+          phases: "scan,logic",
+        })
+      );
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot",
+        expect.objectContaining({
+          reviewType: "custom",
+          customReviewPhases: ["scan", "logic"],
+        })
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Review mode: Custom review [scan → logic]")
+      );
+    });
+
     it("uses config default for runs when --runs not specified", async () => {
       vi.mocked(loadConfig).mockReturnValue(createMockConfig({ reviewRuns: 2 }));
 
@@ -854,6 +891,19 @@ describe("CLI", () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Total Issues Found: 3"));
     });
+
+    it("shows custom review phases when provided", () => {
+      const result = createMockReviewResult();
+
+      displayResults(result, true, undefined, undefined, undefined, "custom", ["scan", "logic"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Review Type: Custom review")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Review Phases: scan → logic")
+      );
+    });
   });
 
   describe("hasCriticalIssues", () => {
@@ -1114,6 +1164,17 @@ describe("CLI", () => {
 
       expect(report).toContain("### 📝 Review Actions");
       expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");
+    });
+
+    it("includes custom review phases in the report header", () => {
+      const result = createMockReviewResult({});
+      const report = generateMarkdownReport(result, "copilot", true, "custom", [
+        "scan",
+        "performance",
+      ]);
+
+      expect(report).toContain("**Review Type:** Custom review");
+      expect(report).toContain("**Review Phases:** scan → performance");
     });
   });
 

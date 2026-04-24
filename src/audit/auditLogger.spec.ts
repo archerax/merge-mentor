@@ -179,6 +179,29 @@ describe("AuditLogger", () => {
     });
   });
 
+  describe("logReviewStart", () => {
+    it("logs review start with custom phases", () => {
+      const logger = new AuditLogger();
+      const logEventSpy = vi.spyOn(logger, "logEvent");
+
+      logger.logReviewStart(123, "github", 2, "custom", ["scan", "logic"]);
+
+      expect(logEventSpy).toHaveBeenCalledWith(
+        "review.start",
+        { type: "review", id: "pr-123", details: { platform: "github" } },
+        "Start review of PR #123",
+        "success",
+        {
+          prNumber: 123,
+          platform: "github",
+          runs: 2,
+          reviewType: "custom",
+          reviewPhases: ["scan", "logic"],
+        }
+      );
+    });
+  });
+
   describe("logReviewComplete", () => {
     it("logs successful review with stats", () => {
       const logger = new AuditLogger();

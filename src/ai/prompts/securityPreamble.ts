@@ -33,3 +33,26 @@ Title: ${title}
 Description: ${description || "No description provided"}
 </untrusted-pr-metadata>`;
 }
+
+/**
+ * Wraps arbitrary untrusted text content in explicit delimiters.
+ *
+ * @param tagName - Tag name used for the wrapper delimiters.
+ * @param content - Untrusted content to delimit.
+ * @returns Delimited content block.
+ */
+export function wrapUntrustedContent(tagName: string, content: string): string {
+  return `<${tagName}>
+${content}
+</${tagName}>`;
+}
+
+/**
+ * Wraps existing PR comment context in explicit untrusted delimiters.
+ *
+ * @param comments - Existing PR comment context string.
+ * @returns Delimited existing-comments block.
+ */
+export function wrapUntrustedExistingComments(comments: string): string {
+  return wrapUntrustedContent("untrusted-existing-pr-comments", comments);
+}

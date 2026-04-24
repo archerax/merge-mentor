@@ -36,6 +36,7 @@ npx merge-mentor review --pr 123
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Specialist Review Types** - Focused reviews for testing, security, or performance concerns
+- **Custom Review Phases** - Build a custom review from configurable general-review phases
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
@@ -191,6 +192,7 @@ $env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 ```
 
 **Or use command-line parameters:**
+
 ```bash
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
@@ -224,8 +226,8 @@ export MM_SKIP_EXISTING_ISSUES=true
 # Multi-run mode
 export MM_RUNS=1  # 1-5 runs
 
-# Review type (specialist reviews)
-export MM_REVIEW_TYPE=general  # general, testing, security, performance, or fast
+# Review type
+export MM_REVIEW_TYPE=general  # general, testing, security, performance, fast, or custom
 
 # Git backend for cloning repositories (default: cli uses system git binary)
 export MM_GIT_BACKEND=cli  # cli or isomorphic
@@ -255,6 +257,16 @@ merge-mentor review --pr 123 \
   --runs 3 \
   --review-type testing \
   --comment-identifier "[custom-bot]"
+
+# Custom review with selected phases (CLI only)
+merge-mentor review --pr 123 \
+  --review-type custom \
+  --phases "scan,logic,performance"
+
+# Monorepo-focused custom review
+merge-mentor review --pr 123 \
+  --review-type custom \
+  --phases "scan,monorepo,logic"
 ```
 
 ### Audit Logging
@@ -339,6 +351,7 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 **Preferred**: Configure the active provider model via `MM_AI_MODEL` or `--ai-model`.
 
 **Deprecated aliases**:
+
 - **Copilot**: `MM_COPILOT_MODEL` or `--copilot-model`
 - **Copilot SDK**: `MM_COPILOT_SDK_MODEL` or `--copilot-sdk-model`
 - **OpenCode**: `MM_OPENCODE_MODEL` or `--opencode-model`
@@ -443,7 +456,8 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|copilot-sdk\|opencode\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
-| `--review-type <type>` | Review type: general, testing, security, performance, fast | `MM_REVIEW_TYPE` | `general` |
+| `--review-type <type>` | Review type: general, testing, security, performance, fast, custom | `MM_REVIEW_TYPE` | `general` |
+| `--phases <list>` | Comma-separated general-review phases for `--review-type custom` | - | - |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
@@ -497,10 +511,10 @@ merge-mentor review --pr 123 --review-type testing --write
 
 merge-mentor supports two backends for cloning and fetching repositories used for coding standard extraction:
 
-| Backend | Description | Default |
-|---------|-------------|---------|
-| `cli` | Uses the system `git` binary via child process | ✅ Yes |
-| `isomorphic` | Uses [isomorphic-git](https://isomorphic-git.org/) — pure JS, no binary required | No |
+| Backend      | Description                                                                      | Default |
+| ------------ | -------------------------------------------------------------------------------- | ------- |
+| `cli`        | Uses the system `git` binary via child process                                   | ✅ Yes  |
+| `isomorphic` | Uses [isomorphic-git](https://isomorphic-git.org/) — pure JS, no binary required | No      |
 
 The `cli` backend is the battle-tested default. The `isomorphic` backend eliminates the dependency on a system `git` binary and avoids passing tokens through process arguments (improving security in some environments), but is newer and considered experimental.
 
@@ -554,7 +568,7 @@ merge-mentor review --pr 123 --runs 3 --write
 
 Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
 
-### Specialist Review Types
+### Review Types
 
 Focus reviews on specific concerns with the `--review-type` flag:
 
@@ -573,6 +587,12 @@ merge-mentor review --pr 123 --review-type performance --write
 
 # Fast review - single-pass for cost savings (~50% reduction)
 merge-mentor review --pr 123 --review-type fast --write
+
+# Custom review - choose only the general-review phases you want
+merge-mentor review --pr 123 --review-type custom --phases "scan,logic" --write
+
+# Custom review for monorepo changes
+merge-mentor review --pr 123 --review-type custom --phases "scan,monorepo,performance" --write
 ```
 
 **Available Review Types:**
@@ -582,16 +602,36 @@ merge-mentor review --pr 123 --review-type fast --write
 - **`security`**: Security specialist focused exclusively on vulnerabilities and threats
 - **`performance`**: Performance specialist focused exclusively on efficiency and optimization
 - **`fast`**: Combined file and architectural review in a single AI call (~50% cost reduction compared to general)
+- **`custom`**: General review prompt constrained to the selected general-review phases, in the exact order you provide
+
+**Custom Review Phase Catalog:**
+
+- `scan`
+- `security`
+- `logic`
+- `performance`
+- `monorepo`
+
+Use `--phases` with `--review-type custom`. Phase names are comma-separated, validated strictly, and must use the built-in catalog above. Example:
+
+```bash
+merge-mentor review --pr 123 \
+  --review-type custom \
+  --phases "scan,security,logic"
+```
+
+Use `monorepo` when the PR touches workspace structure, package boundaries, shared tooling, dependency ownership, or other cross-package concerns.
 
 **When to Use Specialist Reviews:**
 
-| Review Type     | Use When                                       | AI Calls | What It Checks                                                                      |
-| --------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| **general**     | Standard development or unsure what to check   | 2        | All aspects: bugs, security, performance, quality, documentation                    |
-| **fast**        | Need cost savings, routine PRs                 | 1        | Same as general but in single pass (file + architectural analysis combined)         |
-| **testing**     | Adding/modifying tests or testable code        | 2        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
-| **security**    | Handling sensitive data or auth flows          | 2        | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
-| **performance** | Performance-critical paths or scaling concerns | 2        | Algorithm efficiency, resource usage, caching opportunities, database queries       |
+| Review Type     | Use When                                           | AI Calls | What It Checks                                                                      |
+| --------------- | -------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| **general**     | Standard development or unsure what to check       | 2        | All aspects: bugs, security, performance, quality, documentation                    |
+| **fast**        | Need cost savings, routine PRs                     | 1        | Same as general but in single pass (file + architectural analysis combined)         |
+| **custom**      | Want to tailor general review passes to a codebase | 2        | Only the selected general-review phases, in the order provided                      |
+| **testing**     | Adding/modifying tests or testable code            | 2        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
+| **security**    | Handling sensitive data or auth flows              | 2        | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
+| **performance** | Performance-critical paths or scaling concerns     | 2        | Algorithm efficiency, resource usage, caching opportunities, database queries       |
 
 #### Testing Review Deep Dive
 

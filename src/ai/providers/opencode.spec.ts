@@ -608,7 +608,7 @@ describe("OpenCodeProvider", () => {
       expect(result.findings[0].reasoning).toBe("Short");
     });
 
-    it("should validate reasoning missing verification keywords", () => {
+    it("should validate reasoning that uses concise rationale wording", () => {
       const provider = createOpenCodeProvider();
       const response = createAIResponse({
         findings: [

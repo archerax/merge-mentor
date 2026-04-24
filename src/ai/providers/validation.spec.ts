@@ -8,7 +8,6 @@ describe("AI Provider Reasoning Validation", () => {
   let loggerWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    // Mock the logger's warn method
     loggerWarnSpy = vi.spyOn(logger, "createChildLogger").mockReturnValue({
       warn: vi.fn(),
       info: vi.fn(),
@@ -21,150 +20,93 @@ describe("AI Provider Reasoning Validation", () => {
     loggerWarnSpy.mockRestore();
   });
 
-  const getWarnMock = () => {
+  function getWarnMock(): ReturnType<typeof vi.fn> {
     const childLogger = loggerWarnSpy.mock.results[0]?.value;
     return childLogger?.warn as ReturnType<typeof vi.fn>;
-  };
+  }
+
+  function createFileReviewResponse(reasoning: string): AIResponse {
+    return {
+      raw: JSON.stringify({
+        findings: [
+          {
+            line: 45,
+            severity: "high",
+            confidence: "high",
+            category: "bug",
+            message: "Issue found",
+            suggestion: "Fix it",
+            reasoning,
+            isPreExisting: false,
+          },
+        ],
+      }),
+      parsed: {
+        findings: [
+          {
+            line: 45,
+            severity: "high",
+            confidence: "high",
+            category: "bug",
+            message: "Issue found",
+            suggestion: "Fix it",
+            reasoning,
+            isPreExisting: false,
+          },
+        ],
+      },
+    };
+  }
 
   describe("CopilotProvider", () => {
     it("logs warning for short reasoning in file review", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue found",
-              suggestion: "Fix it",
-              reasoning: "Too short", // Less than 50 characters
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue found",
-              suggestion: "Fix it",
-              reasoning: "Too short",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview("test.ts", createFileReviewResponse("Too short"));
 
-      // Should have logged warning about short reasoning
       const warnMock = getWarnMock();
       expect(warnMock).toHaveBeenCalled();
-      const warnCalls = warnMock.mock.calls;
-      const hasShortWarning = warnCalls.some((call) =>
+      const hasShortWarning = warnMock.mock.calls.some((call) =>
         call.some((arg: unknown) =>
-          typeof arg === "string" ? arg.includes("too short") || arg.includes("50+") : false
+          typeof arg === "string" ? arg.includes("too short") || arg.includes("20+") : false
         )
       );
       expect(hasShortWarning).toBe(true);
     });
 
-    it("logs warning for reasoning without verification keywords", () => {
+    it("logs warning when reasoning lacks concrete impact", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue found",
-              suggestion: "Fix it",
-              reasoning:
-                "This is a long enough reasoning string but it lacks verification keywords like the ones we are looking for in proper review reasoning.",
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue found",
-              suggestion: "Fix it",
-              reasoning:
-                "This is a long enough reasoning string but it lacks verification keywords like the ones we are looking for in proper review reasoning.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "The query concatenates req.body.userId directly into the SQL string in this handler."
+        )
+      );
 
-      // Should have logged warning about missing verification keywords
       const warnMock = getWarnMock();
       expect(warnMock).toHaveBeenCalled();
-      const warnCalls = warnMock.mock.calls;
-      const hasKeywordWarning = warnCalls.some((call: unknown[]) =>
+      const hasEvidenceImpactWarning = warnMock.mock.calls.some((call) =>
         call.some((arg: unknown) =>
           typeof arg === "string"
-            ? arg.includes("verification keywords") || arg.includes("verified/checked")
+            ? arg.includes("code evidence") || arg.includes("concrete impact")
             : false
         )
       );
-      expect(hasKeywordWarning).toBe(true);
+      expect(hasEvidenceImpactWarning).toBe(true);
     });
 
-    it("does not log warning for proper reasoning with verification", () => {
+    it("does not log warning for concise reasoning with evidence and impact", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Array access without bounds check",
-              suggestion: "Add bounds check",
-              reasoning:
-                "✓ Confirmed line 45: users[index] access without validation. ✓ Scanned lines 40-50: no bounds checking. ✓ Verified impact: runtime error possible.",
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Array access without bounds check",
-              suggestion: "Add bounds check",
-              reasoning:
-                "✓ Confirmed line 45: users[index] access without validation. ✓ Scanned lines 40-50: no bounds checking. ✓ Verified impact: runtime error possible.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "Line 45 uses req.body.userId in the SQL query, which can allow injection and bypass tenant scoping."
+        )
+      );
 
-      // Should NOT log any warnings for proper reasoning
-      const warnMock = getWarnMock();
-      expect(warnMock).not.toHaveBeenCalled();
+      expect(getWarnMock()).not.toHaveBeenCalled();
     });
 
     it("validates reasoning in batched file review", () => {
@@ -181,7 +123,7 @@ describe("AI Provider Reasoning Validation", () => {
                   category: "bug",
                   message: "Issue",
                   suggestion: "Fix",
-                  reasoning: "Short", // Should trigger warning
+                  reasoning: "Short",
                   isPreExisting: false,
                 },
               ],
@@ -210,8 +152,7 @@ describe("AI Provider Reasoning Validation", () => {
 
       provider.parseBatchedFileReview(response);
 
-      const warnMock = getWarnMock();
-      expect(warnMock).toHaveBeenCalled();
+      expect(getWarnMock()).toHaveBeenCalled();
     });
 
     it("validates reasoning in cross-file review", () => {
@@ -225,7 +166,8 @@ describe("AI Provider Reasoning Validation", () => {
               confidence: "high",
               category: "architecture",
               message: "Architectural issue",
-              reasoning: "Too short and unverified", // Less than 50 chars, no keywords
+              reasoning:
+                "AuthMiddleware.ts and AdminRoutes.ts diverge in how they wire the middleware.",
               affected_files: ["file1.ts", "file2.ts"],
             },
           ],
@@ -239,7 +181,8 @@ describe("AI Provider Reasoning Validation", () => {
               confidence: "high",
               category: "architecture",
               message: "Architectural issue",
-              reasoning: "Too short and unverified",
+              reasoning:
+                "AuthMiddleware.ts and AdminRoutes.ts diverge in how they wire the middleware.",
               affected_files: ["file1.ts", "file2.ts"],
             },
           ],
@@ -249,216 +192,71 @@ describe("AI Provider Reasoning Validation", () => {
 
       provider.parseCrossFileReview(response);
 
-      const warnMock = getWarnMock();
-      // Should log at least one warning (either for short reasoning or missing keywords)
-      expect(warnMock).toHaveBeenCalled();
+      expect(getWarnMock()).toHaveBeenCalled();
     });
   });
 
   describe("OpenCodeProvider", () => {
     it("validates reasoning quality in file review", () => {
       const provider = new OpenCodeProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue",
-              suggestion: "Fix",
-              reasoning: "Bad", // Too short
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Issue",
-              suggestion: "Fix",
-              reasoning: "Bad",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview("test.ts", createFileReviewResponse("Bad"));
 
       expect(getWarnMock()).toHaveBeenCalled();
     });
 
-    it("accepts proper reasoning with verification keywords", () => {
+    it("accepts concise reasoning with evidence and impact", () => {
       const provider = new OpenCodeProvider();
-      const response: AIResponse = {
-        raw: JSON.stringify({
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "security",
-              message: "SQL injection risk",
-              suggestion: "Use parameterized query",
-              reasoning:
-                "Checked line 45 and confirmed SQL concatenation. Verified no sanitization in lines 40-50. Scanned for validation utilities and found none applied.",
-              isPreExisting: false,
-            },
-          ],
-        }),
-        parsed: {
-          findings: [
-            {
-              line: 45,
-              severity: "high",
-              confidence: "high",
-              category: "security",
-              message: "SQL injection risk",
-              suggestion: "Use parameterized query",
-              reasoning:
-                "Checked line 45 and confirmed SQL concatenation. Verified no sanitization in lines 40-50. Scanned for validation utilities and found none applied.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "The request path skips the validation guard here, which can return incorrect data for unauthorized callers."
+        )
+      );
 
       expect(getWarnMock()).not.toHaveBeenCalled();
     });
   });
 
-  describe("Verification Keywords", () => {
-    it("recognizes 'verified' keyword", () => {
+  describe("Evidence and impact heuristics", () => {
+    it("accepts reasoning that cites a line and runtime failure", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: "",
-        parsed: {
-          findings: [
-            {
-              line: 1,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Test",
-              suggestion: "Fix",
-              reasoning:
-                "I have verified this is a real issue by checking the surrounding code and the impact is significant.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "Line 12 dereferences config.user without a guard, which can crash when the optional config is missing."
+        )
+      );
+
       expect(getWarnMock()).not.toHaveBeenCalled();
     });
 
-    it("recognizes 'checked' keyword", () => {
+    it("accepts reasoning that cites a query and security risk", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: "",
-        parsed: {
-          findings: [
-            {
-              line: 1,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Test",
-              suggestion: "Fix",
-              reasoning:
-                "I checked the code thoroughly and confirmed this is an issue that needs to be addressed immediately.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "The SQL query uses request input directly, which can allow injection against the user table."
+        )
+      );
+
       expect(getWarnMock()).not.toHaveBeenCalled();
     });
 
-    it("recognizes 'confirmed' keyword", () => {
+    it("warns when reasoning states impact without code evidence", () => {
       const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: "",
-        parsed: {
-          findings: [
-            {
-              line: 1,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Test",
-              suggestion: "Fix",
-              reasoning:
-                "After analysis I confirmed this bug exists and the severity is appropriately rated as high impact.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
 
-      provider.parseFileReview("test.ts", response);
-      expect(getWarnMock()).not.toHaveBeenCalled();
-    });
+      provider.parseFileReview(
+        "test.ts",
+        createFileReviewResponse(
+          "This can break production behavior for users in a very serious way."
+        )
+      );
 
-    it("recognizes 'scanned' keyword", () => {
-      const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: "",
-        parsed: {
-          findings: [
-            {
-              line: 1,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Test",
-              suggestion: "Fix",
-              reasoning:
-                "I scanned the entire function and the surrounding context to ensure this is a genuine issue.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
-
-      provider.parseFileReview("test.ts", response);
-      expect(getWarnMock()).not.toHaveBeenCalled();
-    });
-
-    it("is case-insensitive for verification keywords", () => {
-      const provider = new CopilotProvider();
-      const response: AIResponse = {
-        raw: "",
-        parsed: {
-          findings: [
-            {
-              line: 1,
-              severity: "high",
-              confidence: "high",
-              category: "bug",
-              message: "Test",
-              suggestion: "Fix",
-              reasoning:
-                "VERIFIED the issue exists. CHECKED surrounding code. CONFIRMED the impact. SCANNED for alternatives.",
-              isPreExisting: false,
-            },
-          ],
-        },
-      };
-
-      provider.parseFileReview("test.ts", response);
-      expect(getWarnMock()).not.toHaveBeenCalled();
+      expect(getWarnMock()).toHaveBeenCalled();
     });
   });
 });

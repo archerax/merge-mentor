@@ -1203,6 +1203,40 @@ describe("ReviewEngine", () => {
       expect(result.crossFileResult.overallAssessment).toBe("Fast review complete");
     });
 
+    it("uses selected phases when reviewType is custom", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false,
+        reviewType: "custom",
+        customReviewPhases: ["scan", "logic"],
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Custom review complete",
+        findings: [],
+        recommendations: [],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(result).toBeDefined();
+      expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# SELECTED REVIEW PHASES");
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. scan");
+      expect(mockExecutePrompt.mock.calls[0][0]).toContain("2. logic");
+      expect(mockExecutePrompt.mock.calls[0][0]).not.toContain("1. security");
+      expect(mockExecutePrompt.mock.calls[1][0]).toContain("# SELECTED REVIEW PHASES");
+      expect(mockExecutePrompt.mock.calls[1][0]).toContain(
+        "Restrict findings to the configured SELECTED REVIEW PHASES above"
+      );
+    });
+
     it("fast review returns empty results when no files have patches", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,

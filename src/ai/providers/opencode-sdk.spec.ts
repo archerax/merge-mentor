@@ -826,7 +826,7 @@ describe("OpenCodeSdkProvider", () => {
             category: "quality",
             message: "Missing validation",
             suggestion: "Add input validation",
-            reasoning: "Too short.", // < 50 chars triggers warn
+            reasoning: "Too short.", // Short rationale still triggers validation warning
             isPreExisting: false,
           },
         ],
@@ -838,7 +838,7 @@ describe("OpenCodeSdkProvider", () => {
       expect(result.findings[0].reasoning).toBe("Too short.");
     });
 
-    it("should still parse finding when reasoning lacks verification keywords", () => {
+    it("should still parse finding when reasoning uses concise evidence and impact wording", () => {
       const provider = createProvider();
       const response = createAIResponse({
         findings: [
@@ -875,7 +875,7 @@ describe("OpenCodeSdkProvider", () => {
                 category: "bug",
                 message: "Missing error handler",
                 suggestion: "Add error handler",
-                reasoning: "Short.", // < 50 chars, triggers validateReasoning
+                reasoning: "Short.", // Short rationale still triggers validation warning
               },
             ],
           },
