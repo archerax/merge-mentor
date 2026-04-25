@@ -47,7 +47,7 @@ import { type Clock, type FileSystem, nodeFs, systemClock } from "../ports/index
 import { convertToNumberedDiff } from "../utils/diffFormatter.js";
 
 /** Entry for a single file in the diff manifest. */
-export interface DiffFileEntry {
+interface DiffFileEntry {
   /** Original filename from the PR (e.g., "src/utils/helper.ts") */
   readonly filename: string;
   /** File status (added, modified, deleted, renamed) */

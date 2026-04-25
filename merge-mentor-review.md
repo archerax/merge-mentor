@@ -243,7 +243,9 @@ The pattern for parsing an optional integer timeout from an environment variable
  * Returns undefined if not provided or if the value is not a positive number.
  * Invalid values (NaN, zero, negative) are silently ignored.
  */
-function parseOptionalTimeout(raw: string | number | undefined): number | undefined {
+function parseOptionalTimeout(
+  raw: string | number | undefined,
+): number | undefined {
   if (raw === undefined || raw === "") {
     return undefined;
   }
@@ -259,6 +261,7 @@ function parseOptionalTimeout(raw: string | number | undefined): number | undefi
 ```
 
 The helper is called for each timeout configuration:
+
 - `copilotTimeoutMs`
 - `copilotSdkTimeoutMs`
 - `opencodeTimeoutMs`
@@ -317,7 +320,11 @@ The exponential backoff jitter was being applied **after** the `maxDelayMs` cap,
 **Solution implemented:**
 
 ```typescript
-function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
+function calculateBackoffDelay(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs: number,
+): number {
   const exponentialDelay = baseDelayMs * 2 ** attempt;
   const jitter = Math.random() * 0.3 * exponentialDelay; // 30% jitter
   const delay = Math.min(exponentialDelay + jitter, maxDelayMs); // Cap is applied after jitter
@@ -396,6 +403,7 @@ export function validateReviewType(value: string | undefined): ReviewType { ... 
 ```
 
 Each function has been exported with JSDoc explaining:
+
 - Accepted input values
 - Default behavior for invalid input
 - Return type and examples
@@ -407,6 +415,7 @@ Each function has been exported with JSDoc explaining:
 **Use cases:**
 
 These functions are now available for:
+
 - REST API wrappers that need to validate incoming parameters
 - CLI extensions or plugins
 - Diagnostic or doctor commands for configuration troubleshooting
@@ -438,7 +447,7 @@ In the review loop:
 if (run < runs) {
   const delayMs = this.options.runDelayMs ?? 2000;
   this.log(
-    `  Waiting ${delayMs / 1000} second${delayMs === 1000 ? "" : "s"} before next run...`
+    `  Waiting ${delayMs / 1000} second${delayMs === 1000 ? "" : "s"} before next run...`,
   );
   await this.delay(delayMs);
 }
@@ -458,18 +467,18 @@ if (run < runs) {
 
 ## Scorecard
 
-| Category       | Score        | Key Notes                                                              |
-| -------------- | ------------ | ---------------------------------------------------------------------- |
-| Architecture   | 9 / 10       | Excellent ports/adapters; `ReviewEngine` is the sole outlier           |
-| Code Quality   | 9.5 / 10     | DRY violations eliminated; one `as Platform` assertion remains        |
-| Testing        | 8.5 / 10       | 1,186 tests + 85% threshold; 8 untested files, no integration test     |
-| Security       | 9.5 / 10     | Audit blocks high/critical; tokens not in URLs or process env; comprehensive redaction |
-| Performance    | 9 / 10     | Async-first; jitter-after-cap bug fixed; multi-run delay now configurable  |
-| Tooling        | 8.5 / 10     | Strong pipeline; version mismatch ships to users                       |
-| Documentation  | 7.5 / 10     | Good JSDoc; no architecture diagram or ADRs                            |
-| Error Handling | 9 / 10       | Comprehensive hierarchy; one `new Error()` in program.ts               |
-| Type Safety    | 9.5 / 10     | Strict mode, no `any`; one `as Platform` assertion bypasses validation |
-| **Overall**    | **8.85 / 10** | **Production-ready with comprehensive security hardening** |
+| Category       | Score         | Key Notes                                                                              |
+| -------------- | ------------- | -------------------------------------------------------------------------------------- |
+| Architecture   | 9 / 10        | Excellent ports/adapters; `ReviewEngine` is the sole outlier                           |
+| Code Quality   | 9.5 / 10      | DRY violations eliminated; one `as Platform` assertion remains                         |
+| Testing        | 8.5 / 10      | 1,186 tests + 85% threshold; 8 untested files, no integration test                     |
+| Security       | 9.5 / 10      | Audit blocks high/critical; tokens not in URLs or process env; comprehensive redaction |
+| Performance    | 9 / 10        | Async-first; jitter-after-cap bug fixed; multi-run delay now configurable              |
+| Tooling        | 8.5 / 10      | Strong pipeline; version mismatch ships to users                                       |
+| Documentation  | 7.5 / 10      | Good JSDoc; no architecture diagram or ADRs                                            |
+| Error Handling | 9 / 10        | Comprehensive hierarchy; one `new Error()` in program.ts                               |
+| Type Safety    | 9.5 / 10      | Strict mode, no `any`; one `as Platform` assertion bypasses validation                 |
+| **Overall**    | **8.85 / 10** | **Production-ready with comprehensive security hardening**                             |
 
 ---
 

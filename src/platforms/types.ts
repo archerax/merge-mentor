@@ -36,7 +36,7 @@ export type FindingCategory =
   | "testing";
 
 /** Confidence levels for findings. */
-export type FindingConfidence = "high" | "medium" | "low";
+type FindingConfidence = "high" | "medium" | "low";
 
 /** A finding from reviewing a specific file. */
 export interface FileFinding {
@@ -92,7 +92,7 @@ export interface ExistingComment {
 }
 
 /** Action types for comment management. */
-export type CommentActionType = "create";
+type CommentActionType = "create";
 
 /** An action to perform on a comment. */
 export interface CommentAction {

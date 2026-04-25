@@ -135,7 +135,7 @@ export interface ProcessRunner {
  *
  * Contains the complete stdout and stderr output from the process.
  */
-export interface ExecResult {
+interface ExecResult {
   /** Standard output from the command */
   readonly stdout: string;
   /** Standard error output from the command */

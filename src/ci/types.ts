@@ -26,7 +26,7 @@ import type { Platform } from "../config.js";
  *
  * Indicates which CI platform is running the current build.
  */
-export type CISystem = "github-actions" | "azure-pipelines";
+type CISystem = "github-actions" | "azure-pipelines";
 
 /**
  * Resolved context from a CI environment.
