@@ -20,11 +20,8 @@ import {
 export type Platform = "github" | "azure";
 
 export type {
-  GeneralReviewPhase,
-  ResolvedReviewProfile,
   ReviewPass,
   ReviewStrategy,
-  ReviewType,
 } from "./review/reviewSelection.js";
 
 /**
@@ -43,14 +40,14 @@ const DEPRECATED_ENV_VAR_ALIASES = {
 } as const;
 
 /** GitHub-specific configuration. */
-export interface GitHubConfig {
+interface GitHubConfig {
   readonly token: string;
   readonly owner: string;
   readonly repo: string;
 }
 
 /** Azure DevOps-specific configuration. */
-export interface AzureConfig {
+interface AzureConfig {
   readonly token: string;
   readonly org: string;
   readonly project: string;

@@ -97,15 +97,20 @@ const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set(
   "mcp",
   "url",
   "custom-tool",
+  "memory",
+  "hook",
 ]);
+
+const READ_ONLY_REVIEW_TOOLS = ["grep", "glob"] as const;
 
 /**
  * Creates a permission handler for review sessions.
  *
  * Approves read-only workspace access (needed to inspect source files) and
- * denies all other tool categories — shell execution, file writes, MCP calls,
- * URL fetches, and custom tools — so that attacker-controlled content inside a
- * PR cannot trigger destructive side effects.
+ * denies all other permission categories — shell execution, file writes, MCP
+ * calls, URL fetches, custom tools, memory writes, and hooks — so that
+ * attacker-controlled content inside a PR cannot trigger destructive side
+ * effects.
  *
  * @param logger - Child logger used to emit warn-level entries for denied requests.
  */
@@ -118,9 +123,9 @@ export function createReviewPermissionHandler(
         { permissionKind: request.kind, toolCallId: request.toolCallId },
         "Blocked tool request during review (tool allowlist)"
       );
-      return { kind: "denied-by-permission-request-hook" };
+      return { kind: "reject" };
     }
-    return { kind: "approved" };
+    return { kind: "approve-once" };
   };
 }
 
@@ -235,7 +240,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     const config: Record<string, unknown> = {};
     if (this.token) {
-      config.githubToken = this.token;
+      config.gitHubToken = this.token;
     }
 
     this.client = new CopilotClient(Object.keys(config).length > 0 ? config : undefined);
@@ -299,6 +304,8 @@ export class CopilotSdkProvider implements AIProviderClient {
       model: this.model,
       workingDirectory: options?.workingDirectory,
       streaming: true,
+      includeSubAgentStreamingEvents: false,
+      availableTools: [...READ_ONLY_REVIEW_TOOLS],
       onPermissionRequest: createReviewPermissionHandler(this.logger),
       ...(provider ? { provider } : {}),
     });

@@ -1,13 +1,6 @@
 import { ValidationError } from "../errors/index.js";
 
-export const REVIEW_TYPES = [
-  "general",
-  "testing",
-  "security",
-  "performance",
-  "fast",
-  "custom",
-] as const;
+const REVIEW_TYPES = ["general", "testing", "security", "performance", "fast", "custom"] as const;
 
 export type ReviewType = (typeof REVIEW_TYPES)[number];
 
@@ -30,7 +23,7 @@ export type ReviewPass = (typeof REVIEW_PASSES)[number];
  */
 export type GeneralReviewPhase = ReviewPass;
 
-export const REVIEW_STRATEGIES = ["standard", "fast"] as const;
+const REVIEW_STRATEGIES = ["standard", "fast"] as const;
 
 export type ReviewStrategy = (typeof REVIEW_STRATEGIES)[number];
 

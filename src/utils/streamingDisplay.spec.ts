@@ -253,15 +253,24 @@ describe("StreamingDisplay", () => {
       expect(joined).toContain("line3");
     });
 
-    it("handles partial lines by buffering until newline", () => {
+    it("renders partial lines before a newline arrives", () => {
       vi.useFakeTimers();
       const { display, output } = createDisplay();
 
-      // Partial line alone won't render (lineCount is 0)
       display.push("partial");
       vi.advanceTimersByTime(100);
 
-      // Complete the line
+      const partialOutput = writes(output).join("");
+      expect(partialOutput).toContain("partial");
+    });
+
+    it("combines partial lines correctly when the newline arrives", () => {
+      vi.useFakeTimers();
+      const { display, output } = createDisplay();
+
+      display.push("partial");
+      vi.advanceTimersByTime(100);
+
       display.push(" complete\n");
       vi.advanceTimersByTime(100);
 
@@ -574,16 +583,15 @@ describe("StreamingDisplay", () => {
       }
     });
 
-    it("does not render when lineCount is zero", () => {
+    it("renders partial content even when there are no complete lines yet", () => {
       vi.useFakeTimers();
       const { display, output } = createDisplay();
 
-      // Push only a partial line (no newline)
       display.push("partial");
       vi.advanceTimersByTime(100);
 
-      // Should NOT render when there are no complete lines (lineCount is 0)
-      expect(writes(output)).toHaveLength(0);
+      const joined = writes(output).join("");
+      expect(joined).toContain("partial");
     });
 
     it("uses fallback terminal width when columns is undefined", () => {

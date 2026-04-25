@@ -285,7 +285,7 @@ export class StreamingDisplay {
    * Render the current buffer state to the terminal.
    */
   private render(): void {
-    if (!this.enabled || this.lineCount === 0) {
+    if (!this.enabled || (this.lineCount === 0 && this.partialLine.length === 0)) {
       return;
     }
 

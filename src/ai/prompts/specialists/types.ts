@@ -3,7 +3,7 @@ import type { FileReviewResult } from "../../../platforms/types.js";
 /**
  * Language types supported by specialist reviews.
  */
-export type SupportedLanguage = "csharp" | "typescript" | "unknown";
+type SupportedLanguage = "csharp" | "typescript" | "unknown";
 
 /**
  * Context for testing specialist reviews.

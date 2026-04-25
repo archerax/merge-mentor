@@ -36,7 +36,7 @@ npx merge-mentor review --pr 123
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Additive Review Passes** - Start from a baseline review and add focused passes like testing, security, database, or monorepo
-- **Fast Review Strategy** - Run the same review profile with a lower-cost single-call strategy when needed
+- **Fast Review Strategy** - Choose between higher-accuracy standard mode and lower-cost fast mode
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
@@ -609,6 +609,15 @@ merge-mentor review --pr 123 --review-type custom --passes "scan,monorepo,perfor
 - **Passes**: extra specialist attention layered on top of the baseline review
 - **Strategy**: how the review runs (`standard` or `fast`)
 
+**Choosing a strategy:**
+
+- Use `standard` when you want the best issue detection rate.
+- Use `fast` when you want to reduce GitHub Copilot premium request usage and are comfortable with lower coverage.
+
+In our benchmark repository with deliberately introduced issues, `standard` found **76%** of the issues while
+`fast` found **64%**. Under current GitHub Copilot billing, `standard` costs **2x premium requests** and `fast`
+costs **1x premium request**, so `--strategy` gives you a direct accuracy-versus-cost tradeoff.
+
 **Available passes:**
 
 - `scan`
@@ -632,26 +641,26 @@ Use `database` when the PR changes schemas, migrations, repositories, ORMs, tran
 
 **Legacy alias mapping:**
 
-| Alias | Resolved review profile |
-| ----- | ----------------------- |
-| `general` | Baseline review |
-| `testing` | Baseline review + `testing` |
-| `security` | Baseline review + `security` |
-| `performance` | Baseline review + `performance` |
-| `fast` | Baseline review + fast strategy |
-| `custom` | Baseline review + explicit `--passes` / deprecated `--phases` |
+| Alias         | Resolved review profile                                       |
+| ------------- | ------------------------------------------------------------- |
+| `general`     | Baseline review                                               |
+| `testing`     | Baseline review + `testing`                                   |
+| `security`    | Baseline review + `security`                                  |
+| `performance` | Baseline review + `performance`                               |
+| `fast`        | Baseline review + fast strategy                               |
+| `custom`      | Baseline review + explicit `--passes` / deprecated `--phases` |
 
 **Common profile choices:**
 
-| Profile | Use When | AI Calls | What It Emphasizes |
-| ------- | -------- | -------- | ------------------ |
-| **Baseline** | Standard development or unsure what to add | 2 | Broad code review coverage |
-| **Baseline + fast** | Routine PRs where cost or latency matters | 1 | Same baseline coverage with a cheaper execution strategy |
-| **Baseline + testing** | Adding/modifying tests or testable code | 2 | Test coverage, test quality, assertions, mocks |
-| **Baseline + security** | Handling sensitive data or auth flows | 2 | Vulnerabilities, auth flaws, data exposure, unsafe trust boundaries |
-| **Baseline + performance** | Performance-critical paths or scaling concerns | 2 | Efficiency, resource usage, caching, expensive queries |
-| **Baseline + database** | Changing schemas, queries, repositories, or transactions | 2 | Schema safety, query correctness, migrations, transaction boundaries |
-| **Baseline + monorepo** | Touching workspace structure or cross-package contracts | 2 | Package boundaries, dependency ownership, shared tooling impacts |
+| Profile                    | Use When                                                 | AI Calls | What It Emphasizes                                                   |
+| -------------------------- | -------------------------------------------------------- | -------- | -------------------------------------------------------------------- |
+| **Baseline**               | Standard development or unsure what to add               | 2        | Broad code review coverage                                           |
+| **Baseline + fast**        | Routine PRs where cost or latency matters                | 1        | Same baseline coverage with a cheaper execution strategy             |
+| **Baseline + testing**     | Adding/modifying tests or testable code                  | 2        | Test coverage, test quality, assertions, mocks                       |
+| **Baseline + security**    | Handling sensitive data or auth flows                    | 2        | Vulnerabilities, auth flaws, data exposure, unsafe trust boundaries  |
+| **Baseline + performance** | Performance-critical paths or scaling concerns           | 2        | Efficiency, resource usage, caching, expensive queries               |
+| **Baseline + database**    | Changing schemas, queries, repositories, or transactions | 2        | Schema safety, query correctness, migrations, transaction boundaries |
+| **Baseline + monorepo**    | Touching workspace structure or cross-package contracts  | 2        | Package boundaries, dependency ownership, shared tooling impacts     |
 
 #### Testing Pass Deep Dive
 
