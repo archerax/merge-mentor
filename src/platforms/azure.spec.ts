@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../config.js";
+import { resolveReviewProfile } from "../review/reviewSelection.js";
 import { AzureDevOpsAdapter } from "./azure.js";
 
 const mockGitApiInstance = {
@@ -39,6 +40,8 @@ function createMockResponse(ok: boolean, status: number, data: unknown) {
 }
 
 function createTestConfig(): Config {
+  const reviewProfile = resolveReviewProfile({ reviewType: "general" });
+
   return {
     defaultPlatform: "azure",
     github: {
@@ -58,6 +61,9 @@ function createTestConfig(): Config {
     skipPreExisting: true,
     reviewRuns: 1,
     reviewType: "general",
+    reviewPasses: reviewProfile.passes,
+    reviewStrategy: reviewProfile.strategy,
+    reviewProfile,
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",

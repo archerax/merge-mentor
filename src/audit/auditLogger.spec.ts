@@ -180,7 +180,7 @@ describe("AuditLogger", () => {
   });
 
   describe("logReviewStart", () => {
-    it("logs review start with custom phases", () => {
+    it("logs review start with additive passes", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
@@ -196,7 +196,7 @@ describe("AuditLogger", () => {
           platform: "github",
           runs: 2,
           reviewType: "custom",
-          reviewPhases: ["scan", "logic"],
+          reviewPasses: ["scan", "logic"],
         }
       );
     });

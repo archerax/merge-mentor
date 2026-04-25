@@ -125,8 +125,8 @@ describe("buildFastReviewPrompt", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
     expect(prompt).toContain("Expert code reviewer");
-    expect(prompt).toContain("File-level issues");
-    expect(prompt).toContain("Architectural concerns");
+    expect(prompt).toContain("Individual file analysis");
+    expect(prompt).toContain("Cross-file architectural analysis");
   });
 
   test("includes mandatory analysis structure with multiple passes", () => {

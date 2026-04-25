@@ -19,12 +19,20 @@ vi.mock("../logger.js", () => ({
   }),
 }));
 
-const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, General review, Default model`;
+const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Baseline review, Default model`;
 
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
   reviewType?: string;
-  customReviewPhases?: readonly ("scan" | "security" | "logic" | "performance" | "monorepo")[];
+  customReviewPhases?: readonly (
+    | "scan"
+    | "security"
+    | "logic"
+    | "performance"
+    | "monorepo"
+    | "testing"
+    | "database"
+  )[];
   model?: string;
 }): CommentManager {
   return new CommentManager("[AI Code Review Bot]", options);
@@ -147,7 +155,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Fast review, claude-sonnet-4.6`
+        `Merge Mentor v${packageJson.version}, Baseline review (fast strategy), claude-sonnet-4.6`
       );
     });
 
@@ -160,7 +168,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Custom review [scan → logic], Default model`
+        `Merge Mentor v${packageJson.version}, Baseline review + scan → logic, Default model`
       );
     });
   });

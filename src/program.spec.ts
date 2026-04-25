@@ -77,8 +77,18 @@ import {
   type ReviewOptions,
 } from "./program.js";
 import { ReviewEngine } from "./review/engine.js";
+import { resolveReviewProfile } from "./review/reviewSelection.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
+  const reviewType = overrides.reviewType ?? "general";
+  const reviewProfile =
+    overrides.reviewProfile ??
+    resolveReviewProfile({
+      reviewType,
+      reviewPasses: overrides.reviewPasses ?? overrides.customReviewPhases,
+      reviewStrategy: overrides.reviewStrategy,
+    });
+
   return {
     defaultPlatform: "github" as const,
     github: { token: "gh-token", owner: "test-owner", repo: "test-repo" },
@@ -89,7 +99,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     copilotModel: "claude-sonnet-4.6",
     skipPreExisting: true,
     reviewRuns: 1,
-    reviewType: "general",
+    reviewType,
+    reviewPasses: reviewProfile.passes,
+    reviewStrategy: reviewProfile.strategy,
+    reviewProfile,
+    customReviewPhases: reviewType === "custom" ? reviewProfile.passes : undefined,
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
@@ -387,11 +401,12 @@ describe("CLI", () => {
         "copilot",
         expect.objectContaining({
           reviewType: "custom",
-          customReviewPhases: ["scan", "logic"],
+          reviewPasses: ["scan", "logic"],
+          reviewStrategy: "standard",
         })
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review mode: Custom review [scan → logic]")
+        expect.stringContaining("Review mode: Baseline review + scan → logic")
       );
     });
 
@@ -786,7 +801,7 @@ describe("CLI", () => {
         expect.stringContaining("Detailed markdown report generated:")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Github-test-owner-test-repo-PR42-general-review-report.md")
+        expect.stringContaining("Github-test-owner-test-repo-PR42-review-profile-report.md")
       );
     });
 
@@ -820,7 +835,7 @@ describe("CLI", () => {
         expect.stringContaining("Detailed markdown report generated:")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Github-test-owner-test-repo-PR42-general-review-report.md")
+        expect.stringContaining("Github-test-owner-test-repo-PR42-review-profile-report.md")
       );
     });
 
@@ -898,10 +913,10 @@ describe("CLI", () => {
       displayResults(result, true, undefined, undefined, undefined, "custom", ["scan", "logic"]);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review Type: Custom review")
+        expect.stringContaining("Review Profile: Baseline review + scan → logic")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review Phases: scan → logic")
+        expect.stringContaining("Review Passes: scan → logic")
       );
     });
   });
@@ -1173,8 +1188,8 @@ describe("CLI", () => {
         "performance",
       ]);
 
-      expect(report).toContain("**Review Type:** Custom review");
-      expect(report).toContain("**Review Phases:** scan → performance");
+      expect(report).toContain("**Review Profile:** Baseline review + scan → performance");
+      expect(report).toContain("**Review Passes:** scan → performance");
     });
   });
 

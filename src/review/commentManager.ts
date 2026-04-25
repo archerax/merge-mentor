@@ -45,7 +45,7 @@ import type {
   FileReviewResult,
   FindingSeverity,
 } from "../platforms/types.js";
-import { formatReviewTypeLabel, type GeneralReviewPhase } from "./reviewSelection.js";
+import { formatReviewTypeLabel, type ReviewPass, type ReviewStrategy } from "./reviewSelection.js";
 
 /**
  * Configuration options for comment management behavior.
@@ -57,8 +57,12 @@ interface CommentManagerOptions {
   readonly skipPreExisting?: boolean;
   /** Review type label shown in comment footers. Default: general. */
   readonly reviewType?: string;
-  /** Configured phases shown in custom review footers. */
-  readonly customReviewPhases?: readonly GeneralReviewPhase[];
+  /** Ordered additive review passes shown in review footers. */
+  readonly reviewPasses?: readonly ReviewPass[];
+  /** @deprecated Use reviewPasses instead. */
+  readonly customReviewPhases?: readonly ReviewPass[];
+  /** Execution strategy shown in review footers. */
+  readonly reviewStrategy?: ReviewStrategy;
   /** Configured AI model identifier shown in comment footers. */
   readonly model?: string;
 }
@@ -97,7 +101,8 @@ export class CommentManager {
     this.skipPreExisting = options?.skipPreExisting ?? true;
     this.footer = this.buildFooter(
       options?.reviewType,
-      options?.customReviewPhases,
+      options?.reviewPasses ?? options?.customReviewPhases,
+      options?.reviewStrategy,
       options?.model
     );
   }
@@ -317,12 +322,13 @@ ${this.footer}${idMarker}`;
 
   private buildFooter(
     reviewType?: string,
-    customReviewPhases?: readonly GeneralReviewPhase[],
+    reviewPasses?: readonly ReviewPass[],
+    reviewStrategy?: ReviewStrategy,
     model?: string
   ): string {
     const footerParts = [
       `Merge Mentor v${packageJson.version}`,
-      this.formatReviewType(reviewType, customReviewPhases),
+      this.formatReviewType(reviewType, reviewPasses, reviewStrategy),
       this.formatModelName(model),
     ];
 
@@ -331,9 +337,10 @@ ${this.footer}${idMarker}`;
 
   private formatReviewType(
     reviewType?: string,
-    customReviewPhases?: readonly GeneralReviewPhase[]
+    reviewPasses?: readonly ReviewPass[],
+    reviewStrategy?: ReviewStrategy
   ): string {
-    return formatReviewTypeLabel(reviewType, customReviewPhases);
+    return formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
   }
 
   private formatModelName(model?: string): string {

@@ -35,8 +35,8 @@ npx merge-mentor review --pr 123
 - **Multi-Provider Support** - Works with GitHub Copilot and OpenCode via CLI and SDK providers
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
-- **Specialist Review Types** - Focused reviews for testing, security, or performance concerns
-- **Custom Review Phases** - Build a custom review from configurable general-review phases
+- **Additive Review Passes** - Start from a baseline review and add focused passes like testing, security, database, or monorepo
+- **Fast Review Strategy** - Run the same review profile with a lower-cost single-call strategy when needed
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
@@ -226,8 +226,10 @@ export MM_SKIP_EXISTING_ISSUES=true
 # Multi-run mode
 export MM_RUNS=1  # 1-5 runs
 
-# Review type
-export MM_REVIEW_TYPE=general  # general, testing, security, performance, fast, or custom
+# Review profile
+export MM_REVIEW_TYPE=general         # Legacy alias input
+export MM_REVIEW_PASSES=security      # Optional additive passes
+export MM_REVIEW_STRATEGY=standard    # standard or fast
 
 # Git backend for cloning repositories (default: cli uses system git binary)
 export MM_GIT_BACKEND=cli  # cli or isomorphic
@@ -255,18 +257,21 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 merge-mentor review --pr 123 \
   --skip-existing-issues true \
   --runs 3 \
-  --review-type testing \
+  --passes "testing" \
   --comment-identifier "[custom-bot]"
 
-# Custom review with selected phases (CLI only)
+# Baseline review plus ordered additive passes
 merge-mentor review --pr 123 \
-  --review-type custom \
-  --phases "scan,logic,performance"
+  --passes "scan,logic,performance"
 
-# Monorepo-focused custom review
+# Monorepo-focused review profile
 merge-mentor review --pr 123 \
-  --review-type custom \
-  --phases "scan,monorepo,logic"
+  --passes "scan,monorepo,logic"
+
+# Same review profile with fast execution strategy
+merge-mentor review --pr 123 \
+  --passes "security,database" \
+  --strategy fast
 ```
 
 ### Audit Logging
@@ -382,14 +387,14 @@ merge-mentor review --pr 456 --platform azure --write
 # Multiple review passes for thoroughness
 merge-mentor review --pr 123 --runs 3 --write
 
-# Testing-focused review
-merge-mentor review --pr 123 --review-type testing --write
+# Baseline review plus testing attention
+merge-mentor review --pr 123 --passes "testing" --write
 
-# Security-focused review
-merge-mentor review --pr 123 --review-type security --write
+# Baseline review plus security and database attention
+merge-mentor review --pr 123 --passes "security,database" --write
 
-# Performance-focused review
-merge-mentor review --pr 123 --review-type performance --write
+# Same profile with fast execution
+merge-mentor review --pr 123 --passes "performance" --strategy fast --write
 
 # Quiet mode
 merge-mentor review --pr 123 --verbose false
@@ -408,43 +413,43 @@ merge-mentor review --pr 123 --write
 
 ```bash
 # Focus on test quality when adding/modifying tests
-merge-mentor review --pr 456 --review-type testing --write
+merge-mentor review --pr 456 --passes "testing" --write
 
-# Thorough testing analysis with 3 passes
-merge-mentor review --pr 456 --review-type testing --runs 3 --write
+# Thorough testing analysis with 3 runs
+merge-mentor review --pr 456 --passes "testing" --runs 3 --write
 ```
 
 **3. Security-Sensitive Changes:**
 
 ```bash
-# Security review for authentication or data handling
-merge-mentor review --pr 789 --review-type security --write
+# Security attention for authentication or data handling
+merge-mentor review --pr 789 --passes "security" --write
 
 # Comprehensive security analysis with 5 passes
-merge-mentor review --pr 789 --review-type security --runs 5 --write
+merge-mentor review --pr 789 --passes "security" --runs 5 --write
 ```
 
 **4. Performance-Critical Code:**
 
 ```bash
-# Performance review for optimization work
-merge-mentor review --pr 321 --review-type performance --write
+# Performance attention for optimization work
+merge-mentor review --pr 321 --passes "performance" --write
 
-# Combined with multiple passes for thorough analysis
-merge-mentor review --pr 321 --review-type performance --runs 3 --write
+# Combined additive passes for broader attention
+merge-mentor review --pr 321 --passes "performance,database" --runs 3 --write
 ```
 
 **5. Preview Before Posting:**
 
 ```bash
 # Dry-run generates detailed markdown report without posting
-merge-mentor review --pr 123 --review-type testing
+merge-mentor review --pr 123 --passes "testing"
 
 # Review the report in .mergementor/reports/
-cat .mergementor/reports/Github-myrepo-PR123-testing-review-report.md
+cat .mergementor/reports/Github-myrepo-PR123-review-profile-report.md
 
 # Post if satisfied
-merge-mentor review --pr 123 --review-type testing --write
+merge-mentor review --pr 123 --passes "testing" --write
 ```
 
 ### Command Options
@@ -456,8 +461,10 @@ merge-mentor review --pr 123 --review-type testing --write
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|copilot-sdk\|opencode\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
-| `--review-type <type>` | Review type: general, testing, security, performance, fast, custom | `MM_REVIEW_TYPE` | `general` |
-| `--phases <list>` | Comma-separated general-review phases for `--review-type custom` | - | - |
+| `--review-type <type>` | Legacy alias input: general, testing, security, performance, fast, custom | `MM_REVIEW_TYPE` | `general` |
+| `--passes <list>` | Comma-separated additive review passes | `MM_REVIEW_PASSES` | - |
+| `--phases <list>` | Deprecated alias for `--passes` when used with `--review-type custom` | - | - |
+| `--strategy <strategy>` | Execution strategy: `standard` or `fast` | `MM_REVIEW_STRATEGY` | `standard` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
@@ -568,74 +575,87 @@ merge-mentor review --pr 123 --runs 3 --write
 
 Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
 
-### Review Types
+### Review Profiles, Passes, and Strategies
 
-Focus reviews on specific concerns with the `--review-type` flag:
+Every review now includes a **baseline review**. You can optionally add ordered **passes** to increase attention in specific areas without restricting findings, and you can optionally switch to the **fast** execution strategy.
 
 ```bash
-# General review (default) - comprehensive analysis
+# Baseline review only (default)
 merge-mentor review --pr 123 --write
 
-# Testing-focused review - test coverage and quality
+# Baseline review plus testing attention
+merge-mentor review --pr 123 --passes "testing" --write
+
+# Baseline review plus security attention
+merge-mentor review --pr 123 --passes "security" --write
+
+# Baseline review plus multiple ordered passes
+merge-mentor review --pr 123 --passes "security,database,performance" --write
+
+# Same profile with fast strategy
+merge-mentor review --pr 123 --passes "security,database" --strategy fast --write
+
+# Legacy aliases remain supported
 merge-mentor review --pr 123 --review-type testing --write
-
-# Security-focused review - vulnerabilities and threats
-merge-mentor review --pr 123 --review-type security --write
-
-# Performance-focused review - optimization opportunities
-merge-mentor review --pr 123 --review-type performance --write
-
-# Fast review - single-pass for cost savings (~50% reduction)
 merge-mentor review --pr 123 --review-type fast --write
 
-# Custom review - choose only the general-review phases you want
-merge-mentor review --pr 123 --review-type custom --phases "scan,logic" --write
-
-# Custom review for monorepo changes
-merge-mentor review --pr 123 --review-type custom --phases "scan,monorepo,performance" --write
+# Legacy custom alias maps to baseline review plus explicit passes
+merge-mentor review --pr 123 --review-type custom --passes "scan,monorepo,performance" --write
 ```
 
-**Available Review Types:**
+**What each piece means:**
 
-- **`general`** (default): Comprehensive review covering all aspects - bugs, security, performance, quality, and documentation (2 AI calls: file-level + cross-file analysis)
-- **`testing`**: Testing specialist focused exclusively on test quality and coverage
-- **`security`**: Security specialist focused exclusively on vulnerabilities and threats
-- **`performance`**: Performance specialist focused exclusively on efficiency and optimization
-- **`fast`**: Combined file and architectural review in a single AI call (~50% cost reduction compared to general)
-- **`custom`**: General review prompt constrained to the selected general-review phases, in the exact order you provide
+- **Baseline review**: broad code review coverage across bugs, correctness, security, performance, maintainability, and documentation
+- **Passes**: extra specialist attention layered on top of the baseline review
+- **Strategy**: how the review runs (`standard` or `fast`)
 
-**Custom Review Phase Catalog:**
+**Available passes:**
 
 - `scan`
 - `security`
 - `logic`
 - `performance`
 - `monorepo`
+- `testing`
+- `database`
 
-Use `--phases` with `--review-type custom`. Phase names are comma-separated, validated strictly, and must use the built-in catalog above. Example:
+Pass names are comma-separated, validated strictly, and run in the order provided. Example:
 
 ```bash
 merge-mentor review --pr 123 \
-  --review-type custom \
-  --phases "scan,security,logic"
+  --passes "scan,security,logic"
 ```
 
 Use `monorepo` when the PR touches workspace structure, package boundaries, shared tooling, dependency ownership, or other cross-package concerns.
 
-**When to Use Specialist Reviews:**
+Use `database` when the PR changes schemas, migrations, repositories, ORMs, transaction handling, or query-heavy code.
 
-| Review Type     | Use When                                           | AI Calls | What It Checks                                                                      |
-| --------------- | -------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| **general**     | Standard development or unsure what to check       | 2        | All aspects: bugs, security, performance, quality, documentation                    |
-| **fast**        | Need cost savings, routine PRs                     | 1        | Same as general but in single pass (file + architectural analysis combined)         |
-| **custom**      | Want to tailor general review passes to a codebase | 2        | Only the selected general-review phases, in the order provided                      |
-| **testing**     | Adding/modifying tests or testable code            | 2        | Test coverage, test quality, assertion accuracy, naming conventions, mock usage     |
-| **security**    | Handling sensitive data or auth flows              | 2        | Injection vulnerabilities, authentication flaws, data exposure, cryptography issues |
-| **performance** | Performance-critical paths or scaling concerns     | 2        | Algorithm efficiency, resource usage, caching opportunities, database queries       |
+**Legacy alias mapping:**
 
-#### Testing Review Deep Dive
+| Alias | Resolved review profile |
+| ----- | ----------------------- |
+| `general` | Baseline review |
+| `testing` | Baseline review + `testing` |
+| `security` | Baseline review + `security` |
+| `performance` | Baseline review + `performance` |
+| `fast` | Baseline review + fast strategy |
+| `custom` | Baseline review + explicit `--passes` / deprecated `--phases` |
 
-The testing specialist analyzes four key areas:
+**Common profile choices:**
+
+| Profile | Use When | AI Calls | What It Emphasizes |
+| ------- | -------- | -------- | ------------------ |
+| **Baseline** | Standard development or unsure what to add | 2 | Broad code review coverage |
+| **Baseline + fast** | Routine PRs where cost or latency matters | 1 | Same baseline coverage with a cheaper execution strategy |
+| **Baseline + testing** | Adding/modifying tests or testable code | 2 | Test coverage, test quality, assertions, mocks |
+| **Baseline + security** | Handling sensitive data or auth flows | 2 | Vulnerabilities, auth flaws, data exposure, unsafe trust boundaries |
+| **Baseline + performance** | Performance-critical paths or scaling concerns | 2 | Efficiency, resource usage, caching, expensive queries |
+| **Baseline + database** | Changing schemas, queries, repositories, or transactions | 2 | Schema safety, query correctness, migrations, transaction boundaries |
+| **Baseline + monorepo** | Touching workspace structure or cross-package contracts | 2 | Package boundaries, dependency ownership, shared tooling impacts |
+
+#### Testing Pass Deep Dive
+
+The `testing` pass adds specialist attention to four key areas while the baseline review still remains active:
 
 **1. Test Coverage Analysis**
 
@@ -726,20 +746,20 @@ expect(mockRepository.getUser).toHaveBeenCalledWith(1);
 
 ```bash
 # Environment variable
-export MM_REVIEW_TYPE=testing
+export MM_REVIEW_PASSES=testing
 
 # Or CLI parameter
-merge-mentor review --pr 123 --review-type testing --write
+merge-mentor review --pr 123 --passes "testing" --write
 ```
 
 **Example Use Cases:**
 
 ```bash
 # Review test changes in a PR
-merge-mentor review --pr 456 --review-type testing --write
+merge-mentor review --pr 456 --passes "testing" --write
 
 # Thorough testing analysis with multiple passes
-merge-mentor review --pr 456 --review-type testing --runs 3 --write
+merge-mentor review --pr 456 --passes "testing" --runs 3 --write
 ```
 
 ### Streaming Output Display

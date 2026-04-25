@@ -56,25 +56,6 @@ import {
   buildGeneralFileReviewPrompt,
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
-import {
-  buildPerformanceCrossFilePrompt,
-  buildPerformanceFileReviewPrompt,
-  type PerformanceCrossFileContext,
-} from "../ai/prompts/specialists/performance.js";
-import {
-  buildSecurityCrossFilePrompt,
-  buildSecurityFileReviewPrompt,
-  type SecurityCrossFileContext,
-} from "../ai/prompts/specialists/security.js";
-import {
-  buildTestingCrossFilePrompt,
-  buildTestingFileReviewPrompt,
-} from "../ai/prompts/specialists/testing.js";
-import type {
-  SupportedLanguage,
-  TestingCrossFileContext,
-  TestingReviewContext,
-} from "../ai/prompts/specialists/types.js";
 import { getAuditLogger } from "../audit/index.js";
 import { SKIP_EXTENSIONS } from "../constants.js";
 import { ValidationError } from "../errors/index.js";
@@ -100,7 +81,15 @@ import { FindingAggregator } from "./findingAggregator.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { RepoManager } from "./repoManager.js";
-import type { GeneralReviewPhase } from "./reviewSelection.js";
+import {
+  type GeneralReviewPhase,
+  type ResolvedReviewProfile,
+  type ReviewPass,
+  type ReviewStrategy,
+  resolveReviewProfile,
+  validateReviewStrategy,
+  validateReviewType,
+} from "./reviewSelection.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 /**
@@ -160,10 +149,16 @@ interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Number of independent review runs (1-5). Multiple runs aggregate findings (default: 1) */
   readonly reviewRuns?: number;
-  /** Review type: 'general', 'security', 'testing', 'performance', 'fast', or 'custom' (default: 'general') */
+  /** Legacy review type alias used to resolve the review profile. */
   readonly reviewType?: string;
+  /** Ordered additive review passes used to build the resolved review profile. */
+  readonly reviewPasses?: readonly ReviewPass[];
+  /** Execution strategy used to run the resolved review profile. */
+  readonly reviewStrategy?: ReviewStrategy;
   /** Selected general-review phases used when reviewType is 'custom'. */
   readonly customReviewPhases?: readonly GeneralReviewPhase[];
+  /** Fully resolved review profile. */
+  readonly reviewProfile?: ResolvedReviewProfile;
   /** Enable streaming display of AI output (default: true if TTY) */
   readonly streamingEnabled?: boolean;
   /** Maximum lines to display in streaming view (default: 5) */
@@ -230,6 +225,7 @@ export class ReviewEngine {
   private readonly output: OutputWriter;
   private readonly fileSystem: FileSystem;
   private readonly options: ReviewEngineOptions;
+  private readonly reviewProfile: ResolvedReviewProfile;
   private readonly logger = createChildLogger({ component: "ReviewEngine" });
   private readonly auditLogger = getAuditLogger();
   private platformName = "unknown";
@@ -298,6 +294,13 @@ export class ReviewEngine {
     const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
     const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
     const tempPath = resolvedOptions?.tempPath ?? path.join(process.cwd(), ".mergementor");
+    this.reviewProfile =
+      resolvedOptions?.reviewProfile ??
+      resolveReviewProfile({
+        reviewType: validateReviewType(resolvedOptions?.reviewType),
+        reviewPasses: resolvedOptions?.reviewPasses ?? resolvedOptions?.customReviewPhases,
+        reviewStrategy: validateReviewStrategy(resolvedOptions?.reviewStrategy),
+      });
 
     // Build provider options
     const providerOptions = {
@@ -317,8 +320,9 @@ export class ReviewEngine {
     this.provider = createAIProvider(resolvedProviderType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: resolvedOptions?.skipPreExisting,
-      reviewType: resolvedOptions?.reviewType,
-      customReviewPhases: resolvedOptions?.customReviewPhases,
+      reviewType: this.reviewProfile.reviewType,
+      reviewPasses: this.reviewProfile.passes,
+      reviewStrategy: this.reviewProfile.strategy,
       model,
     });
     this.stateCache = new ReviewStateCache(tempPath);
@@ -341,8 +345,9 @@ export class ReviewEngine {
         dryRun: resolvedOptions?.dryRun,
         skipPreExisting: resolvedOptions?.skipPreExisting,
         reviewRuns: resolvedOptions?.reviewRuns ?? 1,
-        reviewType: resolvedOptions?.reviewType ?? "general",
-        reviewPhases: resolvedOptions?.customReviewPhases,
+        reviewType: this.reviewProfile.reviewType,
+        reviewPasses: this.reviewProfile.passes,
+        reviewStrategy: this.reviewProfile.strategy,
       },
       "ReviewEngine initialized"
     );
@@ -400,9 +405,16 @@ export class ReviewEngine {
     const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
 
     const runs = this.options.reviewRuns ?? 1;
-    const reviewType = this.options.reviewType ?? "general";
+    const reviewType = this.reviewProfile.reviewType;
     this.logger.info(
-      { prNumber, prIdentifier, runs, reviewType, reviewPhases: this.options.customReviewPhases },
+      {
+        prNumber,
+        prIdentifier,
+        runs,
+        reviewType,
+        reviewPasses: this.reviewProfile.passes,
+        reviewStrategy: this.reviewProfile.strategy,
+      },
       "Starting PR review"
     );
     this.log(`Starting review of PR #${prNumber}...`);
@@ -411,7 +423,8 @@ export class ReviewEngine {
       this.platformName,
       runs,
       reviewType,
-      this.options.customReviewPhases
+      this.reviewProfile.passes,
+      this.reviewProfile.strategy
     );
 
     const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
@@ -449,7 +462,7 @@ export class ReviewEngine {
     }
 
     // Fast review combines file and cross-file analysis in a single pass
-    if (reviewType === "fast") {
+    if (this.reviewProfile.strategy === "fast") {
       this.log("Using fast review mode (single-pass file + architectural analysis)...");
       const fastReviewData = await this.performFastReview(
         prIdentifier,
@@ -767,6 +780,90 @@ export class ReviewEngine {
     }
   }
 
+  private hasReviewPass(pass: ReviewPass): boolean {
+    return this.reviewProfile.passes.includes(pass);
+  }
+
+  private formatContextList(label: string, values: readonly string[]): string {
+    if (values.length === 0) {
+      return `- ${label}: none`;
+    }
+
+    return `- ${label}: ${values.join(", ")}`;
+  }
+
+  private buildAdditionalPassContextSections(filenames: readonly string[]): readonly string[] {
+    const sections: string[] = [];
+
+    if (this.hasReviewPass("testing")) {
+      sections.push(this.buildTestingPassContextSection(filenames));
+    }
+
+    if (this.hasReviewPass("database")) {
+      sections.push(this.buildDatabasePassContextSection(filenames));
+    }
+
+    return sections;
+  }
+
+  private buildTestingPassContextSection(filenames: readonly string[]): string {
+    const productionFiles = filenames.filter((filename) => !isTestFile(filename));
+    const language = productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
+    const mappedTests = productionFiles
+      .map((productionFile) => ({
+        productionFile,
+        testFile: findTestFileForProduction(productionFile, filenames),
+      }))
+      .filter((entry) => entry.testFile !== undefined)
+      .map((entry) => `${entry.productionFile} -> ${entry.testFile}`);
+    const missingTests = productionFiles.filter(
+      (productionFile) => !findTestFileForProduction(productionFile, filenames)
+    );
+    const changedTestFiles = filenames.filter((filename) => isTestFile(filename));
+
+    return `# TESTING PASS CONTEXT
+- Detected language: ${language}
+${this.formatContextList("Changed production files", productionFiles)}
+${this.formatContextList("Changed test files", changedTestFiles)}
+${this.formatContextList("Mapped production-to-test pairs", mappedTests)}
+${this.formatContextList("Production files without nearby tests", missingTests)}
+
+During the testing pass, look more carefully for missing coverage, weak assertions, brittle tests, and testability problems while still reporting any material baseline findings.`;
+  }
+
+  private buildDatabasePassContextSection(filenames: readonly string[]): string {
+    const schemaFiles = filenames.filter((filename) =>
+      /(^|\/)(schema|schemas|migrations?|seed|seeds|prisma)\/|schema\.(prisma|sql)$|migration/i.test(
+        filename
+      )
+    );
+    const queryFiles = filenames.filter((filename) =>
+      /(repository|repositories|dao|model|models|query|queries|typeorm|sequelize|drizzle|knex|db)/i.test(
+        filename
+      )
+    );
+    const suspectedDatabaseFiles = filenames.filter((filename) =>
+      this.isLikelyDatabaseFile(filename)
+    );
+
+    return `# DATABASE PASS CONTEXT
+${this.formatContextList("Schema or migration files", schemaFiles)}
+${this.formatContextList("Query/model/repository files", queryFiles)}
+${this.formatContextList("Suspected database-related files", suspectedDatabaseFiles)}
+
+During the database pass, pay extra attention to query correctness, transaction boundaries, migration safety, nullability, indexing, batching, locking, caching, and data consistency while still reporting any material baseline findings.`;
+  }
+
+  private isLikelyDatabaseFile(filename: string): boolean {
+    return (
+      /(^|\/)(db|database|persistence|storage)\//i.test(filename) ||
+      /(repository|repositories|dao|model|models|query|queries|migration|schema|prisma|typeorm|sequelize|drizzle|knex)/i.test(
+        filename
+      ) ||
+      /\.(sql|prisma)$/.test(filename)
+    );
+  }
+
   private async reviewFiles(
     prIdentifier: string,
     files: PRFile[],
@@ -854,8 +951,6 @@ export class ReviewEngine {
     const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
-    const reviewType = this.options.reviewType ?? "general";
-
     try {
       // Store diffs to disk
       const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
@@ -864,8 +959,8 @@ export class ReviewEngine {
           prNumber,
           fileCount: manifest.files.length,
           diffDir,
-          reviewType,
-          reviewPhases: this.options.customReviewPhases,
+          reviewType: this.reviewProfile.reviewType,
+          reviewPasses: this.reviewProfile.passes,
         },
         "Stored diffs for batched review"
       );
@@ -874,71 +969,19 @@ export class ReviewEngine {
       this.logger.debug("Copying diffs to repo's .mergementor directory for AI access");
       await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
 
-      // Build prompt based on review type
+      // Build prompt from the resolved baseline + additive pass profile
       const commentsContext = formatExistingCommentsContext(existingComments);
-      let prompt: string;
-
-      switch (reviewType) {
-        case "testing": {
-          // Get all changed files for context
-          const allChangedFiles = filesWithPatches.map((f) => f.filename);
-
-          // For testing reviews, we need to build context with test file mappings
-          // Detect language from the first non-test file
-          const productionFiles = allChangedFiles.filter((f) => !isTestFile(f));
-          const language: SupportedLanguage =
-            productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
-
-          // Find test files for production files
-          const testFiles = productionFiles
-            .map((f) => findTestFileForProduction(f, allChangedFiles))
-            .filter((f): f is string => f !== undefined);
-
-          const context: TestingReviewContext = {
-            filename: manifest.files.map((f) => f.filename).join(", "),
-            testFiles,
-            language,
-            allChangedFiles,
-          };
-
-          prompt = buildTestingFileReviewPrompt(manifest, context, repoPath);
-          this.logger.info(
-            {
-              language,
-              testFilesFound: testFiles.length,
-              productionFiles: productionFiles.length,
-            },
-            "Built testing specialist prompt"
-          );
-          break;
-        }
-
-        case "security":
-          prompt = buildSecurityFileReviewPrompt(manifest, repoPath);
-          this.logger.info("Built security specialist prompt");
-          break;
-
-        case "performance":
-          prompt = buildPerformanceFileReviewPrompt(manifest, repoPath);
-          this.logger.info("Built performance specialist prompt");
-          break;
-        case "custom":
-          prompt = buildGeneralFileReviewPrompt(
-            manifest,
-            commentsContext || undefined,
-            repoPath,
-            this.options.customReviewPhases
-          );
-          this.logger.info(
-            { reviewPhases: this.options.customReviewPhases },
-            "Built custom review prompt"
-          );
-          break;
-        default:
-          prompt = buildGeneralFileReviewPrompt(manifest, commentsContext || undefined, repoPath);
-          this.logger.info("Built general review prompt");
-          break;
-      }
+      const prompt = buildGeneralFileReviewPrompt(
+        manifest,
+        commentsContext || undefined,
+        repoPath,
+        this.reviewProfile.passes,
+        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
+      );
+      this.logger.info(
+        { reviewPasses: this.reviewProfile.passes, reviewType: this.reviewProfile.reviewType },
+        "Built resolved file review prompt"
+      );
 
       // Single AI call for all files
       this.logger.debug(
@@ -947,7 +990,8 @@ export class ReviewEngine {
           promptPreview: prompt.substring(0, 2000),
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
           hasRepoPath: !!repoPath,
-          reviewType,
+          reviewType: this.reviewProfile.reviewType,
+          reviewPasses: this.reviewProfile.passes,
         },
         "Batched prompt being sent"
       );
@@ -1158,98 +1202,26 @@ export class ReviewEngine {
     this.log("Performing cross-file analysis...");
     this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
 
-    const reviewType = this.options.reviewType ?? "general";
-
     try {
       const filesSummary = buildFilesSummary(files);
       const commentsContext = formatExistingCommentsContext(existingComments);
-      let prompt: string;
+      const context: GeneralCrossFileContext = {
+        filesSummary,
+        fileReviewResults: fileResults,
+        existingCommentsContext: commentsContext,
+      };
 
-      switch (reviewType) {
-        case "testing": {
-          // Build production-to-test mapping for testing specialist
-          const allChangedFiles = files.map((f) => f.filename);
-          const productionToTestMap = new Map<string, string | undefined>();
-
-          for (const filename of allChangedFiles) {
-            if (!isTestFile(filename)) {
-              const testFile = findTestFileForProduction(filename, allChangedFiles);
-              productionToTestMap.set(filename, testFile);
-            }
-          }
-
-          const context: TestingCrossFileContext = {
-            fileReviewResults: fileResults,
-            productionToTestMap,
-            allChangedFiles,
-            filesSummary,
-          };
-
-          prompt = buildTestingCrossFilePrompt(prDetails, context, repoPath);
-          this.logger.info(
-            {
-              productionFiles: productionToTestMap.size,
-              mappedTests: Array.from(productionToTestMap.values()).filter((v) => v).length,
-            },
-            "Built testing specialist cross-file prompt"
-          );
-          break;
-        }
-
-        case "security": {
-          const context: SecurityCrossFileContext = {
-            filesSummary,
-            fileReviewResults: fileResults,
-            existingCommentsContext: commentsContext,
-          };
-
-          prompt = buildSecurityCrossFilePrompt(prDetails, context, repoPath);
-          this.logger.info("Built security specialist cross-file prompt");
-          break;
-        }
-
-        case "performance": {
-          const context: PerformanceCrossFileContext = {
-            filesSummary,
-            fileReviewResults: fileResults,
-            existingCommentsContext: commentsContext,
-          };
-
-          prompt = buildPerformanceCrossFilePrompt(prDetails, context, repoPath);
-          this.logger.info("Built performance specialist cross-file prompt");
-          break;
-        }
-        case "custom": {
-          const context: GeneralCrossFileContext = {
-            filesSummary,
-            fileReviewResults: fileResults,
-            existingCommentsContext: commentsContext,
-          };
-
-          prompt = buildGeneralCrossFilePrompt(
-            prDetails,
-            context,
-            repoPath,
-            this.options.customReviewPhases
-          );
-          this.logger.info(
-            { reviewPhases: this.options.customReviewPhases },
-            "Built custom review cross-file prompt"
-          );
-          break;
-        }
-        default: {
-          const context: GeneralCrossFileContext = {
-            filesSummary,
-            fileReviewResults: fileResults,
-            existingCommentsContext: commentsContext,
-          };
-
-          prompt = buildGeneralCrossFilePrompt(prDetails, context, repoPath);
-          this.logger.info("Built general cross-file prompt");
-          break;
-        }
-      }
+      const prompt = buildGeneralCrossFilePrompt(
+        prDetails,
+        context,
+        repoPath,
+        this.reviewProfile.passes,
+        this.buildAdditionalPassContextSections(files.map((file) => file.filename))
+      );
+      this.logger.info(
+        { reviewPasses: this.reviewProfile.passes, reviewType: this.reviewProfile.reviewType },
+        "Built resolved cross-file prompt"
+      );
 
       const streaming = this.createStreamingCallback("Cross-file analysis...");
       let response: AIResponse;
@@ -1331,7 +1303,9 @@ export class ReviewEngine {
         prDetails,
         manifest,
         commentsContext || undefined,
-        repoPath
+        repoPath,
+        this.reviewProfile.passes,
+        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
       );
 
       this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
