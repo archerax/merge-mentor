@@ -460,7 +460,7 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
-    it("passes token as githubToken to CopilotClient", async () => {
+    it("passes token as gitHubToken to CopilotClient", async () => {
       const provider = createProvider(1, 5000, undefined, "gh-token-123");
       mockSuccessfulPrompt();
 
@@ -469,7 +469,7 @@ describe("CopilotSdkProvider", () => {
       await resultPromise;
 
       expect(MockCopilotClient).toHaveBeenCalledWith(
-        expect.objectContaining({ githubToken: "gh-token-123" })
+        expect.objectContaining({ gitHubToken: "gh-token-123" })
       );
     });
 
@@ -482,6 +482,32 @@ describe("CopilotSdkProvider", () => {
       await resultPromise;
 
       expect(MockCopilotClient).toHaveBeenCalledWith(undefined);
+    });
+
+    it("disables sub-agent streaming deltas to preserve JSON-only output", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ includeSubAgentStreamingEvents: false })
+      );
+    });
+
+    it("limits review sessions to read-only grep and glob tools", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ availableTools: ["grep", "glob"] })
+      );
     });
 
     it("passes OpenAI-compatible BYOK provider settings to createSession", async () => {
@@ -1047,7 +1073,7 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "read" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "approved" });
+    expect(result).toEqual({ kind: "approve-once" });
   });
 
   it("denies shell permission requests", () => {
@@ -1056,7 +1082,7 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "shell" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+    expect(result).toEqual({ kind: "reject" });
   });
 
   it("denies write permission requests", () => {
@@ -1065,7 +1091,7 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "write" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+    expect(result).toEqual({ kind: "reject" });
   });
 
   it("denies mcp permission requests", () => {
@@ -1074,7 +1100,7 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "mcp" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+    expect(result).toEqual({ kind: "reject" });
   });
 
   it("denies url permission requests", () => {
@@ -1083,7 +1109,7 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "url" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+    expect(result).toEqual({ kind: "reject" });
   });
 
   it("denies custom-tool permission requests", () => {
@@ -1092,7 +1118,25 @@ describe("createReviewPermissionHandler", () => {
 
     const result = handler({ kind: "custom-tool" }, { sessionId: "s1" });
 
-    expect(result).toEqual({ kind: "denied-by-permission-request-hook" });
+    expect(result).toEqual({ kind: "reject" });
+  });
+
+  it("denies memory permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "memory" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "reject" });
+  });
+
+  it("denies hook permission requests", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger);
+
+    const result = handler({ kind: "hook" }, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "reject" });
   });
 
   it("logs a warning when a request is denied", () => {
