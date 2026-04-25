@@ -205,6 +205,16 @@ merge-mentor review --pr 123 \
 For GPT-5 series Copilot SDK BYOK models, merge-mentor automatically uses the SDK `responses`
 wire API recommended by the Copilot SDK BYOK documentation.
 
+> **BYOK cost note:** If you use a token-billed BYOK provider, review cost can vary significantly
+> based on repository size, diff size, review profile/strategy, model choice, and prompt complexity.
+> Published model prices are only a rough guide and may not predict real review cost or issue-finding
+> performance well. As one small reference point, a review in a small repository with **12 changed
+> files** cost **0.33x GitHub Copilot premium requests** using **Claude Haiku**, while the same review
+> through **OpenRouter** using **Claude Haiku** cost about **GBP 0.25**. In separate testing, **Kimi
+> 2.5** was priced at roughly half the list cost of **Claude Haiku 4.5**, but still cost about
+> **GBP 0.22** for the review and found only about **68%** as many issues as Haiku. Treat these
+> numbers as illustrative only, and set usage limits or budgets with your provider.
+
 Deprecated v1 aliases remain supported for backward compatibility and are scheduled for removal in v2:
 
 - `MM_AGENT_TIMEOUT` / `--agent-timeout`
