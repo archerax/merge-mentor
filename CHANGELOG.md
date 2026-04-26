@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-04-26
+
 ### Added
 
 - **Custom review type with configurable phases**: Added a new `custom` review type driven by a required `--phases` CLI flag
