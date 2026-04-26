@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "./config.js";
 import type { PlatformAdapter } from "./platforms/types.js";
+import type { OutputWriter } from "./ports/outputWriter.js";
 import { generateMarkdownReport } from "./program.js";
 import type { ReviewResult } from "./review/engine.js";
 
@@ -872,7 +873,7 @@ describe("CLI", () => {
         undefined,
         "standard",
         undefined,
-        mockDeps as any
+        mockDeps as { output?: OutputWriter }
       );
 
       expect(mockOutput.log).toHaveBeenCalledWith(

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { DiffManifest } from "../../../review/diffStorage.js";
 import type { PRDetails } from "../../../platforms/types.js";
+import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildFastReviewPrompt } from "./fast.js";
 
 describe("buildFastReviewPrompt", () => {
@@ -232,26 +232,14 @@ describe("buildFastReviewPrompt", () => {
   });
 
   test("omits selected passes section when empty array", () => {
-    const prompt = buildFastReviewPrompt(
-      mockPRDetails,
-      mockManifest,
-      undefined,
-      undefined,
-      []
-    );
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, undefined, []);
 
     expect(prompt).not.toContain("ADDITIVE REVIEW PASSES");
   });
 
   test("includes ordered numbered passes", () => {
     const passes = ["scan", "security", "logic"] as const;
-    const prompt = buildFastReviewPrompt(
-      mockPRDetails,
-      mockManifest,
-      undefined,
-      undefined,
-      passes
-    );
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, undefined, passes);
 
     expect(prompt).toContain("1. scan");
     expect(prompt).toContain("2. security");
@@ -260,13 +248,7 @@ describe("buildFastReviewPrompt", () => {
 
   test("includes focused pass analysis with phase details", () => {
     const passes = ["security"] as const;
-    const prompt = buildFastReviewPrompt(
-      mockPRDetails,
-      mockManifest,
-      undefined,
-      undefined,
-      passes
-    );
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, undefined, passes);
 
     expect(prompt).toContain("Additional Focused Passes");
     expect(prompt).toContain("Additive Pass 1: security");
@@ -275,12 +257,7 @@ describe("buildFastReviewPrompt", () => {
   });
 
   test("builds workspace section with proper formatting", () => {
-    const prompt = buildFastReviewPrompt(
-      mockPRDetails,
-      mockManifest,
-      undefined,
-      "/path/to/repo"
-    );
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, "/path/to/repo");
 
     expect(prompt).toContain("---");
     expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
@@ -298,7 +275,12 @@ describe("buildFastReviewPrompt", () => {
   });
 
   test("includes additional context sections with proper formatting", () => {
-    const sections = ["## Section One", "Content for section one", "## Section Two", "Content for section two"];
+    const sections = [
+      "## Section One",
+      "Content for section one",
+      "## Section Two",
+      "Content for section two",
+    ];
     const prompt = buildFastReviewPrompt(
       mockPRDetails,
       mockManifest,
@@ -350,7 +332,15 @@ describe("buildFastReviewPrompt", () => {
   });
 
   test("handles all review phases in pass analysis", () => {
-    const allPhases = ["scan", "security", "logic", "performance", "monorepo", "testing", "database"] as const;
+    const allPhases = [
+      "scan",
+      "security",
+      "logic",
+      "performance",
+      "monorepo",
+      "testing",
+      "database",
+    ] as const;
     const prompt = buildFastReviewPrompt(
       mockPRDetails,
       mockManifest,
