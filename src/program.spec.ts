@@ -839,6 +839,47 @@ describe("CLI", () => {
       );
     });
 
+    it("handles errors when generating markdown report", () => {
+      const result = createMockReviewResult();
+      const mockAdapterWithId = {
+        ...mockAdapter,
+        getProjectIdentifier: () => "test-owner-test-repo",
+      };
+
+      // Mock the output writer
+      const mockOutput = {
+        log: vi.fn(),
+        error: vi.fn(),
+        write: vi.fn(),
+      };
+
+      const mockDeps = {
+        output: mockOutput,
+      };
+
+      // Make mkdirSync throw an error to trigger the catch block
+      vi.mocked(mkdirSync).mockImplementationOnce(() => {
+        throw new Error("Permission denied");
+      });
+
+      displayResults(
+        result,
+        true,
+        mockAdapterWithId as unknown as PlatformAdapter,
+        "github",
+        "copilot",
+        "general",
+        undefined,
+        "standard",
+        undefined,
+        mockDeps as any
+      );
+
+      expect(mockOutput.log).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to generate markdown report")
+      );
+    });
+
     it("displays comment errors in write mode", () => {
       const result = createMockReviewResult({
         commentErrors: ["Failed to post comment on line 10", "Network error"],
@@ -918,6 +959,59 @@ describe("CLI", () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Review Passes: scan → logic")
       );
+    });
+
+    it("displays files skipped when present", () => {
+      const result = createMockReviewResult({
+        filesSkipped: 2,
+      });
+
+      displayResults(result, true);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Files Skipped: 2"));
+    });
+
+    it("displays ignored files with list when present", () => {
+      const result = createMockReviewResult({
+        filesIgnored: 2,
+        ignoredFiles: ["node_modules/package.json", ".git/config"],
+      });
+
+      displayResults(result, true);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Files Ignored: 2"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("node_modules/package.json")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(".git/config"));
+    });
+
+    it("displays review strategy when not standard", () => {
+      const result = createMockReviewResult();
+
+      displayResults(result, true, undefined, undefined, undefined, "general", undefined, "fast");
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Review Strategy: fast"));
+    });
+
+    it("does not display review strategy when standard", () => {
+      const result = createMockReviewResult();
+
+      displayResults(
+        result,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        "general",
+        undefined,
+        "standard"
+      );
+
+      // Check that we don't log the strategy
+      const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => String(call[0]));
+      const strategyCall = calls.find((c: string) => c.includes("Review Strategy:"));
+      expect(strategyCall).toBeUndefined();
     });
   });
 

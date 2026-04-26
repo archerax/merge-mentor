@@ -10,6 +10,7 @@ import {
   validateReviewType,
 } from "./config.js";
 import { ConfigurationError, ValidationError } from "./errors/index.js";
+import type { Environment } from "./ports/environment.js";
 import { createStubEnvironment } from "./ports/environment.test-helper.js";
 
 describe("Config", () => {
@@ -611,6 +612,117 @@ describe("Config", () => {
           phases: "scan",
         })
       ).toThrow("Use either --passes or --phases, not both.");
+    });
+
+    it("should default MM_STREAMING_LINES to 9 when not set", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
+
+      expect(config.streamingLines).toBe(9);
+    });
+
+    it("should load MM_STREAMING_LINES from environment", () => {
+      const env = createStubEnvironment({
+        MM_STREAMING_LINES: "15",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.streamingLines).toBe(15);
+    });
+
+    it("should accept CLI streamingLines override", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(
+        {
+          streamingLines: 20,
+        },
+        env
+      );
+
+      expect(config.streamingLines).toBe(20);
+    });
+
+    it("should handle zero streamingLines from CLI", () => {
+      const env = createStubEnvironment({
+        MM_STREAMING_LINES: "10",
+      });
+      const config = loadConfig(
+        {
+          streamingLines: 0,
+        },
+        env
+      );
+
+      // Zero from CLI should still override (nullish coalescing doesn't consider 0 as falsy for this purpose)
+      expect(config.streamingLines).toBe(0);
+    });
+
+    it("should handle edge case where env.get returns undefined in parseInt fallback", () => {
+      // Create a mock environment that returns truthy for the first call but undefined for the second
+      let callCount = 0;
+      const mockEnv: Environment = {
+        get: (key) => {
+          if (key === "MM_STREAMING_LINES") {
+            callCount++;
+            // First call (in condition) returns "123", second call (in parseInt) returns undefined
+            // This tests the ?? "" fallback path
+            return callCount === 1 ? "123" : undefined;
+          }
+          return undefined;
+        },
+      };
+
+      const config = loadConfig(undefined, mockEnv);
+
+      // When second call returns undefined, the ?? "" fallback kicks in, resulting in NaN
+      // which is still a number (albeit invalid), so it gets used
+      expect(Number.isNaN(config.streamingLines)).toBe(true);
+    });
+
+    it("should prefer CLI streamingLines over environment variable", () => {
+      const env = createStubEnvironment({
+        MM_STREAMING_LINES: "10",
+      });
+
+      const config = loadConfig(
+        {
+          streamingLines: 25,
+        },
+        env
+      );
+
+      expect(config.streamingLines).toBe(25);
+    });
+
+    it("should load MM_STREAMING_ENABLED from environment", () => {
+      const env = createStubEnvironment({
+        MM_STREAMING_ENABLED: "false",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.streamingEnabled).toBe(false);
+    });
+
+    it("should default MM_STREAMING_ENABLED to true when not set", () => {
+      const env = createStubEnvironment();
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.streamingEnabled).toBe(true);
+    });
+
+    it("should accept CLI streamingEnabled override", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(
+        {
+          streamingEnabled: false,
+        },
+        env
+      );
+
+      expect(config.streamingEnabled).toBe(false);
     });
   });
 

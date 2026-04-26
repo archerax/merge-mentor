@@ -163,6 +163,22 @@ describe("IsomorphicGitClient", () => {
         )
       ).rejects.toThrow(/timed out/);
     });
+
+    it("passes http adapter to git.clone", async () => {
+      await client.clone(
+        "https://github.com/org/repo.git",
+        "/tmp/repo",
+        { type: "ci" },
+        { branch: "main" }
+      );
+
+      const callArgs = (mockedGit.clone as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        http: unknown;
+        fs: unknown;
+      };
+      expect(callArgs.http).toBeDefined();
+      expect(callArgs.fs).toBeDefined();
+    });
   });
 
   // ── fetch ──────────────────────────────────────────────────────────────────
@@ -196,6 +212,34 @@ describe("IsomorphicGitClient", () => {
       expect(onAuth).toBeDefined();
       expect(onAuth?.().password).toBe("tok");
     });
+
+    it("throws when git.fetch rejects", async () => {
+      mockedGit.fetch.mockRejectedValueOnce(new Error("fetch failed"));
+
+      await expect(client.fetch("/tmp/repo", "main", { type: "ci" })).rejects.toThrow(
+        "fetch failed"
+      );
+    });
+
+    it("supplies remoteRef equal to branch", async () => {
+      await client.fetch("/tmp/repo", "feature", { type: "ci" });
+
+      expect(mockedGit.fetch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ref: "feature",
+          remoteRef: "feature",
+        })
+      );
+    });
+
+    it("does not pass onAuth in CI mode", async () => {
+      await client.fetch("/tmp/repo", "main", { type: "ci" });
+
+      const callArgs = (mockedGit.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        onAuth?: unknown;
+      };
+      expect(callArgs.onAuth).toBeUndefined();
+    });
   });
 
   // ── checkout ───────────────────────────────────────────────────────────────
@@ -221,6 +265,27 @@ describe("IsomorphicGitClient", () => {
           force: true,
         })
       );
+    });
+
+    it("throws when git.writeRef fails", async () => {
+      mockedGit.writeRef.mockRejectedValueOnce(new Error("writeRef failed"));
+
+      await expect(client.checkout("/tmp/repo", "branch")).rejects.toThrow("writeRef failed");
+    });
+
+    it("throws when git.checkout fails", async () => {
+      mockedGit.checkout.mockRejectedValueOnce(new Error("checkout failed"));
+
+      await expect(client.checkout("/tmp/repo", "branch")).rejects.toThrow("checkout failed");
+    });
+
+    it("uses correct remote ref format for branch", async () => {
+      await client.checkout("/tmp/repo", "main");
+
+      const writeRefCall = (mockedGit.writeRef as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        value: string;
+      };
+      expect(writeRefCall.value).toBe("refs/remotes/origin/main");
     });
   });
 
@@ -253,6 +318,33 @@ describe("IsomorphicGitClient", () => {
           value: "https://github.com/org/new-repo.git",
         })
       );
+    });
+
+    it("throws when git.setConfig fails", async () => {
+      mockedGit.setConfig.mockRejectedValueOnce(new Error("setConfig failed"));
+
+      await expect(
+        client.setRemoteUrl("/tmp/repo", "https://example.com/repo.git")
+      ).rejects.toThrow("setConfig failed");
+    });
+
+    it("uses correct config path for remote origin URL", async () => {
+      await client.setRemoteUrl("/tmp/repo", "https://github.com/new-owner/new-repo.git");
+
+      const setConfigCall = (mockedGit.setConfig as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        path: string;
+      };
+      expect(setConfigCall.path).toBe("remote.origin.url");
+    });
+
+    it("passes correct remote URL to git.setConfig", async () => {
+      const url = "https://example.com/org/repo.git";
+      await client.setRemoteUrl("/tmp/repo", url);
+
+      const setConfigCall = (mockedGit.setConfig as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        value: string;
+      };
+      expect(setConfigCall.value).toBe(url);
     });
   });
 });

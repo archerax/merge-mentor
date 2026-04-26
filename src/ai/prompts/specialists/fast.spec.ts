@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
+import type { PRDetails } from "../../../platforms/types.js";
 import { buildFastReviewPrompt } from "./fast.js";
 
 describe("buildFastReviewPrompt", () => {
@@ -211,5 +211,175 @@ describe("buildFastReviewPrompt", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
     expect(prompt).toContain('"isPreExisting"');
+  });
+
+  test("includes selectedPasses and additional context sections when provided", () => {
+    const passes = ["security", "performance"] as const;
+    const additionalSections = ["## Custom Analysis Section", "Custom context here"];
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      passes,
+      additionalSections
+    );
+
+    expect(prompt).toContain("security");
+    expect(prompt).toContain("performance");
+    expect(prompt).toContain("Custom Analysis Section");
+    expect(prompt).toContain("Custom context here");
+  });
+
+  test("omits selected passes section when empty array", () => {
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      []
+    );
+
+    expect(prompt).not.toContain("ADDITIVE REVIEW PASSES");
+  });
+
+  test("includes ordered numbered passes", () => {
+    const passes = ["scan", "security", "logic"] as const;
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      passes
+    );
+
+    expect(prompt).toContain("1. scan");
+    expect(prompt).toContain("2. security");
+    expect(prompt).toContain("3. logic");
+  });
+
+  test("includes focused pass analysis with phase details", () => {
+    const passes = ["security"] as const;
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      passes
+    );
+
+    expect(prompt).toContain("Additional Focused Passes");
+    expect(prompt).toContain("Additive Pass 1: security");
+    expect(prompt).toContain("trust boundaries");
+    expect(prompt).toContain("secrets, data exposure");
+  });
+
+  test("builds workspace section with proper formatting", () => {
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      "/path/to/repo"
+    );
+
+    expect(prompt).toContain("---");
+    expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
+    expect(prompt).toContain("@workspace /search");
+    expect(prompt).toContain("@file:");
+    expect(prompt).toContain("MANDATORY");
+  });
+
+  test("omits workspace section when repoPath is undefined or empty", () => {
+    const prompt1 = buildFastReviewPrompt(mockPRDetails, mockManifest);
+    const prompt2 = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, "");
+
+    expect(prompt1).not.toContain("WORKSPACE ACCESS ENABLED");
+    expect(prompt2).not.toContain("WORKSPACE ACCESS ENABLED");
+  });
+
+  test("includes additional context sections with proper formatting", () => {
+    const sections = ["## Section One", "Content for section one", "## Section Two", "Content for section two"];
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      undefined,
+      sections
+    );
+
+    expect(prompt).toContain("Section One");
+    expect(prompt).toContain("Section Two");
+    expect(prompt).toContain("Content for section one");
+    expect(prompt).toContain("Content for section two");
+  });
+
+  test("omits additional context when array is empty", () => {
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      undefined,
+      []
+    );
+
+    // Verify the section is just omitted entirely
+    expect(prompt).toContain("# YOUR ROLE");
+  });
+
+  test("combines all optional sections correctly", () => {
+    const passes = ["logic", "performance"] as const;
+    const sections = ["## Custom Guidance"];
+    const comments = "Previous review: check error handling";
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      comments,
+      "/repo",
+      passes,
+      sections
+    );
+
+    expect(prompt).toContain("EXISTING PR COMMENTS");
+    expect(prompt).toContain("WORKSPACE ACCESS ENABLED");
+    expect(prompt).toContain("ADDITIVE REVIEW PASSES");
+    expect(prompt).toContain("Custom Guidance");
+    expect(prompt).toContain("logic");
+    expect(prompt).toContain("performance");
+  });
+
+  test("handles all review phases in pass analysis", () => {
+    const allPhases = ["scan", "security", "logic", "performance", "monorepo", "testing", "database"] as const;
+    const prompt = buildFastReviewPrompt(
+      mockPRDetails,
+      mockManifest,
+      undefined,
+      undefined,
+      allPhases
+    );
+
+    expect(prompt).toContain("scan");
+    expect(prompt).toContain("security");
+    expect(prompt).toContain("logic");
+    expect(prompt).toContain("performance");
+    expect(prompt).toContain("monorepo");
+    expect(prompt).toContain("testing");
+    expect(prompt).toContain("database");
+  });
+
+  test("formats file listings with correct symbol for workspace path", () => {
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, "/workspace");
+
+    // When repoPath is provided, uses @.mergementor/diffs/ prefix
+    expect(prompt).toContain("@.mergementor/diffs/");
+  });
+
+  test("formats file listings without workspace prefix when no repoPath", () => {
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
+
+    // Without repoPath, uses simple @ prefix
+    expect(prompt).toContain("@auth.diff");
+    expect(prompt).not.toContain("@.mergementor/diffs/");
   });
 });
