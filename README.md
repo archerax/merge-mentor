@@ -1,6 +1,16 @@
 # merge-mentor
 
-Automated code review bot powered by AI providers. Supports GitHub Copilot and OpenCode via both CLI and SDK integrations. Analyzes pull requests and provides intelligent feedback on code quality, security, performance, and best practices.
+MergeMentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them. Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot and OpenCode.
+
+## Why MergeMentor?
+
+- **⚡ Faster feedback cycle** — Developers get actionable feedback the moment they open a PR, without waiting for a reviewer to become available. Particularly valuable for distributed teams working across time zones.
+- **💰 Free up your senior engineers** — AI handles the routine first pass so your experienced reviewers can focus on architectural decisions and the changes that genuinely need human judgment.
+- **🎯 Goes beyond linting** — Surfaces logic errors, insecure trust boundaries, missing edge-case handling, and cross-file issues that linters and static analysers typically don't catch.
+- **🔒 Control where your code goes** — Use your own OpenAI-compatible endpoint (such as Amazon Bedrock, Azure OpenAI, or a locally-hosted model) when you need tighter control over where review traffic is sent.
+- **📏 Consistent standards** — Every PR gets the same quality first-pass review regardless of team workload, reviewer availability, or fatigue.
+- **🔁 Safe to try** — Dry-run is the default: preview every review before posting a single comment. Built-in audit logging keeps a compliance trail of all bot activity.
+- **🌐 Works where your PRs already live** — Native support for GitHub and Azure DevOps, with CI integration for GitHub Actions and Azure Pipelines.
 
 ## Quick Start
 
@@ -208,12 +218,16 @@ wire API recommended by the Copilot SDK BYOK documentation.
 > **BYOK cost note:** If you use a token-billed BYOK provider, review cost can vary significantly
 > based on repository size, diff size, review profile/strategy, model choice, and prompt complexity.
 > Published model prices are only a rough guide and may not predict real review cost or issue-finding
-> performance well. As one small reference point, a review in a small repository with **12 changed
-> files** cost **0.33x GitHub Copilot premium requests** using **Claude Haiku**, while the same review
-> through **OpenRouter** using **Claude Haiku** cost about **GBP 0.25**. In separate testing, **Kimi
-> 2.5** was priced at roughly half the list cost of **Claude Haiku 4.5**, but still cost about
-> **GBP 0.22** for the review and found only about **68%** as many issues as Haiku. Treat these
-> numbers as illustrative only, and set usage limits or budgets with your provider.
+> performance well. The table below shows illustrative results from a small repository with **12 changed
+> files** via **OpenRouter** — treat these as indicative only, and set usage limits or budgets with
+> your provider. The same Haiku review cost **0.33× GitHub Copilot premium requests** via the
+> Copilot SDK provider.
+
+| Model | Cost (12-file review) | Issues found |
+|-------|-----------------------|--------------|
+| Claude Haiku 4.5 | £0.25 | 100% (baseline) |
+| Kimi 2.5 | £0.22 | ~68% |
+| Minimax M2.5 | £0.05 | ~126% |
 
 Deprecated v1 aliases remain supported for backward compatibility and are scheduled for removal in v2:
 
