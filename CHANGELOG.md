@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-04-27
+
+### Changed
+
+- **README**: Improved introduction with a clearer positioning statement and a new "Why MergeMentor?" section covering key value propositions
+- **README**: Reformatted BYOK cost data into a comparison table for clarity
+- **Docs**: Added token-efficiency investigation document
+
 ## [1.32.0] - 2026-04-26
 
 ### Added
