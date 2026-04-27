@@ -10,12 +10,14 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
   FastReviewResult,
+  TokenUsage,
 } from "../types.js";
 
 /** Raw finding structure from Copilot SDK JSON response. */
@@ -191,12 +193,15 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     const promptType: PromptType = options?.promptType ?? this.inferPromptType(prompt);
     let lastError: Error | null = null;
+    let accumulatedUsage: TokenUsage | undefined;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const { raw, parsed } = await this.runSdk(prompt, options);
+        const { raw, parsed } = await this.runSdk(prompt, options, (usage) => {
+          accumulatedUsage = mergeTokenUsage(accumulatedUsage, usage);
+        });
         this.auditLogger.logAIProviderExecution("copilot-sdk", promptType, this.model, "success");
-        return { raw, parsed };
+        return { raw, parsed, tokenUsage: accumulatedUsage };
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(
@@ -288,7 +293,8 @@ export class CopilotSdkProvider implements AIProviderClient {
 
   private async runSdk(
     prompt: string,
-    options?: ExecutePromptOptions
+    options?: ExecutePromptOptions,
+    onUsageCollected?: (usage: TokenUsage | undefined) => void
   ): Promise<{ raw: string; parsed: unknown }> {
     let client: CopilotClient;
     try {
@@ -310,14 +316,31 @@ export class CopilotSdkProvider implements AIProviderClient {
       ...(provider ? { provider } : {}),
     });
 
+    let collectedUsage: TokenUsage | undefined;
+
     try {
       const chunks: string[] = [];
-      const unsubscribe = session.on("assistant.message_delta", (event) => {
+      const unsubscribeDelta = session.on("assistant.message_delta", (event) => {
         const delta = event.data.deltaContent;
         if (delta) {
           chunks.push(delta);
           options?.onStreamData?.(delta);
         }
+      });
+
+      const unsubscribeUsage = session.on("assistant.usage", (event) => {
+        const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, model, duration } =
+          event.data;
+        const usageEvent: TokenUsage = {
+          inputTokens: inputTokens ?? 0,
+          outputTokens: outputTokens ?? 0,
+          ...(cacheReadTokens !== undefined || cacheWriteTokens !== undefined
+            ? { cachedTokens: (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0) }
+            : {}),
+          ...(model ? { model } : {}),
+          ...(duration !== undefined ? { durationApiSeconds: duration / 1000 } : {}),
+        };
+        collectedUsage = mergeTokenUsage(collectedUsage, usageEvent);
       });
 
       const attachments: Array<{ type: "file"; path: string }> = [];
@@ -357,7 +380,9 @@ export class CopilotSdkProvider implements AIProviderClient {
         }
         throw error;
       } finally {
-        unsubscribe();
+        unsubscribeDelta();
+        unsubscribeUsage();
+        onUsageCollected?.(collectedUsage);
       }
     } finally {
       try {

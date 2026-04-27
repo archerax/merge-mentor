@@ -325,6 +325,56 @@ describe("ReviewEngine", () => {
       expect(result.filesSkipped).toBe(0);
     });
 
+    it("returns zero linesAdded and linesDeleted when PR has no files", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const prDetails = createPRDetails();
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.linesAdded).toBe(0);
+      expect(result.linesDeleted).toBe(0);
+    });
+
+    it("sums linesAdded and linesDeleted from non-ignored files", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const prDetails = createPRDetails();
+      const files: PRFile[] = [
+        createPRFile({ filename: "a.ts", additions: 20, deletions: 5 }),
+        createPRFile({ filename: "b.ts", additions: 10, deletions: 3 }),
+      ];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.linesAdded).toBe(30);
+      expect(result.linesDeleted).toBe(8);
+    });
+
+    it("returns zero linesAdded and linesDeleted when all files are ignored", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+        verbose: false,
+        ignorePatterns: ["*.ts"],
+      });
+      const prDetails = createPRDetails();
+      const files: PRFile[] = [createPRFile({ filename: "a.ts", additions: 20, deletions: 5 })];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.linesAdded).toBe(0);
+      expect(result.linesDeleted).toBe(0);
+    });
+
     it("handles dry run mode", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", {
         verbose: false,

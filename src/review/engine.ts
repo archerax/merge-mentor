@@ -48,6 +48,7 @@ import {
   type AIProviderType,
   type AIResponse,
   createAIProvider,
+  type TokenUsage,
 } from "../ai/index.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
 import { buildFilesSummary } from "../ai/prompts/prompts.js";
@@ -75,6 +76,7 @@ import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
+import { mergeTokenUsage } from "../utils/tokenUsage.js";
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
@@ -118,6 +120,12 @@ export interface ReviewResult {
   readonly commentsCreated: number;
   /** Error messages from failed comment postings (doesn't stop review) */
   readonly commentErrors: readonly string[];
+  /** Total lines added across all non-ignored files in this PR. */
+  readonly linesAdded: number;
+  /** Total lines deleted across all non-ignored files in this PR. */
+  readonly linesDeleted: number;
+  /** Aggregated token usage across all AI calls in this review */
+  readonly tokenUsage?: TokenUsage;
 }
 
 /**
@@ -434,9 +442,17 @@ export class ReviewEngine {
     // Use pre-existing workspace (CI checkout) or clone the repo for CLI agent access
     const repoPath = await this.resolveWorkspace(prDetails.baseBranch);
 
+    const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
+    const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
+
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
+    let tokenUsage: TokenUsage | undefined;
+
+    const onTokenUsage = (usage: TokenUsage | undefined): void => {
+      tokenUsage = mergeTokenUsage(tokenUsage, usage);
+    };
 
     // Check if all files are ignored (but there were files originally)
     if (files.length === 0 && ignoredFiles.length > 0) {
@@ -451,6 +467,8 @@ export class ReviewEngine {
         filesIgnored: ignoredFiles.length,
         ignoredFiles,
         fileResults: [],
+        linesAdded: 0,
+        linesDeleted: 0,
         crossFileResult: {
           overallAssessment: "No files to review",
           findings: [],
@@ -469,7 +487,8 @@ export class ReviewEngine {
         prDetails,
         files,
         existingComments,
-        repoPath
+        repoPath,
+        onTokenUsage
       );
       fileResults = fastReviewData.fileResults;
       crossFileResult = fastReviewData.crossFileResult;
@@ -484,7 +503,8 @@ export class ReviewEngine {
         files,
         existingComments,
         cachedState,
-        repoPath
+        repoPath,
+        onTokenUsage
       );
       fileResults = reviewData.fileResults;
       filesSkipped = reviewData.filesSkipped;
@@ -503,7 +523,8 @@ export class ReviewEngine {
           files,
           fileResults,
           existingComments,
-          repoPath
+          repoPath,
+          onTokenUsage
         );
       }
     } else {
@@ -515,7 +536,8 @@ export class ReviewEngine {
         files,
         runs,
         existingComments,
-        repoPath
+        repoPath,
+        onTokenUsage
       );
       fileResults = aggregated.fileResults;
       crossFileResult = aggregated.crossFileResult;
@@ -553,6 +575,7 @@ export class ReviewEngine {
         totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
         commentsCreated: commentStats.commentsCreated,
         commentErrors: commentStats.commentErrors.length,
+        tokenUsage,
       },
       "PR review completed"
     );
@@ -573,8 +596,11 @@ export class ReviewEngine {
       filesIgnored: ignoredFiles.length,
       ignoredFiles,
       fileResults,
+      linesAdded,
+      linesDeleted,
       crossFileResult,
       ...commentStats,
+      tokenUsage,
     };
   }
 
@@ -588,7 +614,8 @@ export class ReviewEngine {
     files: PRFile[],
     runs: number,
     existingComments: readonly ExistingComment[],
-    repoPath?: string
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<{
     fileResults: FileReviewResult[];
     crossFileResult: CrossFileReviewResult;
@@ -618,7 +645,8 @@ export class ReviewEngine {
           files,
           runComments,
           undefined,
-          repoPath
+          repoPath,
+          onTokenUsage
         );
         const validatedResults = this.validateLineNumbers(fileResults, files);
         allFileResults.push(validatedResults);
@@ -632,7 +660,8 @@ export class ReviewEngine {
           files,
           validatedResults,
           runComments,
-          repoPath
+          repoPath,
+          onTokenUsage
         );
         allCrossFileResults.push(crossFileResult);
 
@@ -869,7 +898,8 @@ During the database pass, pay extra attention to query correctness, transaction 
     files: PRFile[],
     existingComments: readonly ExistingComment[],
     cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
-    repoPath?: string
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<{ fileResults: FileReviewResult[]; filesSkipped: number }> {
     // Filter out files that should be skipped
     const filesToReview: PRFile[] = [];
@@ -914,7 +944,8 @@ During the database pass, pay extra attention to query correctness, transaction 
       prIdentifier,
       filesToReview,
       existingComments,
-      repoPath
+      repoPath,
+      onTokenUsage
     );
 
     // Combine cached and new results
@@ -936,7 +967,8 @@ During the database pass, pay extra attention to query correctness, transaction 
     prIdentifier: string,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    repoPath?: string
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<FileReviewResult[]> {
     const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
     const diffStorage = new DiffStorage(tempPath, this.fileSystem);
@@ -1006,6 +1038,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       } finally {
         streaming.finish();
       }
+      onTokenUsage?.(response.tokenUsage);
       const results = this.provider.parseBatchedFileReview(response);
 
       // Log individual file results
@@ -1197,7 +1230,8 @@ During the database pass, pay extra attention to query correctness, transaction 
     files: PRFile[],
     fileResults: readonly FileReviewResult[],
     existingComments: readonly ExistingComment[],
-    repoPath?: string
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<CrossFileReviewResult> {
     this.log("Performing cross-file analysis...");
     this.auditLogger.logCrossFileReviewStart(prDetails.number, files.length);
@@ -1233,6 +1267,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       } finally {
         streaming.finish();
       }
+      onTokenUsage?.(response.tokenUsage);
       const result = this.provider.parseCrossFileReview(response);
       this.log(`  Overall: ${result.overallAssessment.slice(0, 100)}...`);
 
@@ -1258,7 +1293,8 @@ During the database pass, pay extra attention to query correctness, transaction 
     prDetails: PRDetails,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
-    repoPath?: string
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<{
     fileResults: FileReviewResult[];
     crossFileResult: CrossFileReviewResult;
@@ -1321,6 +1357,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       } finally {
         streaming.finish();
       }
+      onTokenUsage?.(response.tokenUsage);
 
       // Parse combined response
       const result = this.provider.parseFastReview(response);

@@ -357,6 +357,114 @@ describe("CopilotSdkProvider", () => {
       expect(error).toBeInstanceOf(CopilotSdkError);
       expect(error.message).toContain("Failed after 1 attempts");
     });
+
+    it("captures token usage from assistant.usage event", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.usage") {
+          handler({
+            type: "assistant.usage",
+            data: {
+              inputTokens: 100,
+              outputTokens: 50,
+              cacheReadTokens: 20,
+              cacheWriteTokens: 5,
+              model: "gpt-4.1",
+              duration: 1200,
+            },
+          });
+        }
+        return () => {};
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toMatchObject({
+        inputTokens: 100,
+        outputTokens: 50,
+        cachedTokens: 25,
+        model: "gpt-4.1",
+        durationApiSeconds: 1.2,
+      });
+    });
+
+    it("accumulates token usage across multiple assistant.usage events in one call", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.usage") {
+          handler({
+            type: "assistant.usage",
+            data: { inputTokens: 100, outputTokens: 50, model: "gpt-4.1", duration: 800 },
+          });
+          handler({
+            type: "assistant.usage",
+            data: { inputTokens: 40, outputTokens: 20, model: "gpt-4.1", duration: 400 },
+          });
+        }
+        return () => {};
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toMatchObject({
+        inputTokens: 140,
+        outputTokens: 70,
+      });
+      expect(result.tokenUsage?.durationApiSeconds).toBeCloseTo(1.2);
+    });
+
+    it("accumulates token usage across retry attempts", async () => {
+      const provider = new CopilotSdkProvider({ maxRetries: 2, timeoutMs: 5000 });
+      let attempt = 0;
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.usage") {
+          handler({
+            type: "assistant.usage",
+            data: { inputTokens: 50, outputTokens: 30, duration: 500 },
+          });
+        }
+        return () => {};
+      });
+
+      mockSession.sendAndWait.mockImplementation(() => {
+        attempt++;
+        if (attempt === 1) throw new Error("transient error");
+        return Promise.resolve({
+          type: "assistant.message",
+          data: { content: '{"findings": []}' },
+        });
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toMatchObject({
+        inputTokens: 100,
+        outputTokens: 60,
+        durationApiSeconds: 1.0,
+      });
+    });
+
+    it("returns undefined tokenUsage when no assistant.usage events fire", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toBeUndefined();
+    });
   });
 
   describe("session cleanup", () => {

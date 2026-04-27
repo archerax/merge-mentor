@@ -30,6 +30,7 @@ import {
   REVIEW_PASSES,
 } from "./review/reviewSelection.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
+import { formatTokenUsage } from "./utils/tokenUsage.js";
 
 export interface ReviewOptions {
   pr?: number;
@@ -310,18 +311,25 @@ export async function executeReview(
     gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
   });
 
-  const modeLabel = dryRun ? "(dry-run)" : "";
-  const providerLabel = `[${aiProvider}]`;
+  const modeLabel = dryRun ? " (dry-run)" : "";
+  output.log(`\n🔍 Starting code review for PR #${pr} on ${platform}${modeLabel}...\n`);
+  output.log(`  Platform: ${platform}`);
+  output.log(`  Provider: ${aiProvider}`);
+  if (aiModel) {
+    output.log(`  Model:    ${aiModel}`);
+  }
+  if (config.aiBaseUrl) {
+    output.log(`  BYOK URL: ${config.aiBaseUrl}`);
+  }
   output.log(
-    `\n🔍 Starting code review for PR #${pr} on ${platform} ${providerLabel} ${modeLabel}...\n`
-  );
-  output.log(
-    `Review mode: ${formatReviewTypeLabel(
+    `  Review:   ${formatReviewTypeLabel(
       resolvedOptions.reviewType ?? config.reviewType,
       config.reviewPasses,
       config.reviewStrategy
-    )}\n`
+    )}`
   );
+  output.log(`  Runs:     ${reviewRuns}`);
+  output.log("");
 
   const result = await engine.reviewPR(pr);
   return { result, adapter, platform };
@@ -367,6 +375,15 @@ export function generateMarkdownReport(
   report += `- **Total Issues Found:** ${totalIssues + crossFileIssues}\n`;
   report += `  - File-specific issues: ${totalIssues}\n`;
   report += `  - Cross-file issues: ${crossFileIssues}\n\n`;
+
+  if (result.tokenUsage) {
+    const lines = formatTokenUsage(result.tokenUsage);
+    report += `### 💰 Token Usage\n\n`;
+    for (const line of lines) {
+      report += `- ${line}\n`;
+    }
+    report += `\n`;
+  }
 
   // Review actions summary
   const actionHeader = dryRun ? "### 📝 Planned Actions (Dry-Run)" : "### 📝 Review Actions";
@@ -547,6 +564,7 @@ export function displayResults(
   }
   output.log("");
   output.log(`Files Reviewed: ${result.filesReviewed}`);
+  output.log(`Lines Changed: +${result.linesAdded} / -${result.linesDeleted}`);
   if (result.filesSkipped > 0) {
     output.log(`Files Skipped: ${result.filesSkipped}`);
   }
@@ -556,10 +574,23 @@ export function displayResults(
       output.log(`  - ${file}`);
     });
   }
-  output.log(
-    `Total Issues Found: ${result.fileResults.reduce((sum, r) => sum + r.findings.length, 0)}`
-  );
+  const fileIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
+  const crossFileIssues = result.crossFileResult.findings.length;
+  output.log(`Total Issues Found: ${fileIssues + crossFileIssues}`);
+  if (crossFileIssues > 0) {
+    output.log(`  File-specific: ${fileIssues}`);
+    output.log(`  Cross-file: ${crossFileIssues}`);
+  }
   output.log("");
+
+  if (result.tokenUsage) {
+    output.log("💰 Token Usage");
+    const lines = formatTokenUsage(result.tokenUsage);
+    for (const line of lines) {
+      output.log(`  ${line}`);
+    }
+    output.log("");
+  }
 
   if (dryRun) {
     output.log("📝 Dry-run mode - showing what would be posted:");

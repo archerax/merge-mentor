@@ -163,6 +163,8 @@ function createMockReviewResult(overrides: Partial<ReviewResult> = {}): ReviewRe
     },
     commentsCreated: 2,
     commentErrors: [],
+    linesAdded: 10,
+    linesDeleted: 5,
     ...overrides,
   };
 }
@@ -407,8 +409,46 @@ describe("CLI", () => {
         })
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review mode: Baseline review + scan → logic")
+        expect.stringContaining("Review:   Baseline review + scan → logic")
       );
+    });
+
+    it("shows model in start banner when aiModel is set in config", async () => {
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ aiModel: "gpt-4o" }));
+
+      await executeReview(createReviewOptions({ write: false, verbose: true }));
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Model:    gpt-4o"));
+    });
+
+    it("omits model from start banner when aiModel is not set", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({ aiModel: undefined, copilotModel: undefined })
+      );
+
+      await executeReview(createReviewOptions({ write: false, verbose: true }));
+
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("Model:"));
+    });
+
+    it("shows BYOK URL in start banner when aiBaseUrl is set", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({ aiBaseUrl: "https://my-byok.example.com/v1" })
+      );
+
+      await executeReview(createReviewOptions({ write: false, verbose: true }));
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("BYOK URL: https://my-byok.example.com/v1")
+      );
+    });
+
+    it("omits BYOK URL from start banner when aiBaseUrl is not set", async () => {
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ aiBaseUrl: undefined }));
+
+      await executeReview(createReviewOptions({ write: false, verbose: true }));
+
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("BYOK URL:"));
     });
 
     it("uses config default for runs when --runs not specified", async () => {
@@ -947,6 +987,66 @@ describe("CLI", () => {
       displayResults(result, true);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Total Issues Found: 3"));
+    });
+
+    it("includes cross-file issues in total issues count", () => {
+      const result = createMockReviewResult({
+        fileResults: [
+          {
+            filename: "file1.ts",
+            findings: [
+              {
+                severity: "medium",
+                confidence: "high",
+                category: "quality",
+                message: "File issue",
+                line: 1,
+                suggestion: "Fix",
+                reasoning: "A file-level issue.",
+              },
+            ],
+          },
+        ],
+        crossFileResult: {
+          overallAssessment: "Issues found",
+          findings: [
+            {
+              severity: "high",
+              confidence: "high",
+              category: "security",
+              message: "Cross-file issue",
+              reasoning: "A cross-file issue.",
+              affectedFiles: ["file1.ts", "file2.ts"],
+            },
+          ],
+          recommendations: [],
+        },
+      });
+
+      displayResults(result, true);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Total Issues Found: 2"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("File-specific: 1"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Cross-file: 1"));
+    });
+
+    it("does not display cross-file breakdown when there are no cross-file issues", () => {
+      const result = createMockReviewResult();
+
+      displayResults(result, true);
+
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("File-specific:"));
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("Cross-file:"));
+    });
+
+    it("displays lines changed in summary", () => {
+      const result = createMockReviewResult({ linesAdded: 42, linesDeleted: 7 });
+
+      displayResults(result, true);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Lines Changed: +42 / -7")
+      );
     });
 
     it("shows custom review phases when provided", () => {
