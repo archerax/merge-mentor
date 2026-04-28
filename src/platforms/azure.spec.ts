@@ -67,6 +67,7 @@ function createTestConfig(): Config {
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
+    tokenSaver: false,
   };
 }
 
@@ -194,12 +195,16 @@ describe("AzureDevOpsAdapter", () => {
       expect(result[0].patch).toContain("diff --git");
       expect(result[0].patch).toContain("@@");
       expect(result[0].patch).toContain("+const updated = 4;");
+      expect(result[0].additions).toBe(2);
+      expect(result[0].deletions).toBe(0);
 
       expect(result[1].filename).toBe("README.md");
       expect(result[1].status).toBe("added");
       expect(result[1].patch).toContain("diff --git");
       expect(result[1].patch).toContain("@@");
       expect(result[1].patch).toContain("+# README");
+      expect(result[1].additions).toBeGreaterThan(0);
+      expect(result[1].deletions).toBe(0);
     });
 
     it("handles empty iterations", async () => {

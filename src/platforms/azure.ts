@@ -235,7 +235,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
 
       // Fetch file content at both commits and generate diff
-      const patch = await this.generateDiffFromBlobs(
+      const { patch, additions, deletions } = await this.generateDiffFromBlobs(
         repositoryId,
         path,
         baseCommitId,
@@ -246,8 +246,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       files.push({
         filename: path,
         status,
-        additions: 0,
-        deletions: 0,
+        additions,
+        deletions,
         patch,
         sha: item.objectId,
       });
@@ -362,7 +362,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     baseCommitId: string,
     targetCommitId: string,
     status: FileStatus
-  ): Promise<string> {
+  ): Promise<{ patch: string; additions: number; deletions: number }> {
     try {
       let baseContent = "";
       let targetContent = "";
@@ -415,15 +415,20 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         { context: DIFF_CONTEXT_LINES }
       );
 
-      // Format as git-style unified diff
+      // Format as git-style unified diff and count changed lines
       let patch = `diff --git a/${filePath} b/${filePath}\n`;
       patch += `--- a/${filePath}\n`;
       patch += `+++ b/${filePath}\n`;
+
+      let additions = 0;
+      let deletions = 0;
 
       for (const hunk of structuredDiff.hunks) {
         patch += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
         for (const line of hunk.lines) {
           patch += `${line}\n`;
+          if (line.startsWith("+")) additions++;
+          else if (line.startsWith("-")) deletions++;
         }
       }
 
@@ -439,13 +444,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         );
       }
 
-      return patch;
+      return { patch, additions, deletions };
     } catch (error) {
       this.logger.warn(
         { filePath, error: (error as Error).message },
         "Failed to generate diff from blobs"
       );
-      return this.createEmptyDiffHeader(filePath);
+      return { patch: this.createEmptyDiffHeader(filePath), additions: 0, deletions: 0 };
     }
   }
 
