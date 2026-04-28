@@ -94,6 +94,8 @@ export interface ReviewOptions {
   localWorkspacePath?: string;
   /** Git backend for repository cloning and fetching ('cli' or 'isomorphic'). Default: 'cli' */
   gitBackend?: string;
+  /** Suppress verbose multi-pass analysis instructions to save output tokens. */
+  tokenSaver?: boolean;
 }
 
 interface ReviewExecutionResult {
@@ -233,6 +235,7 @@ export async function executeReview(
     streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
     streamingLines: resolvedOptions.streamLines,
     gitBackend: resolvedOptions.gitBackend,
+    tokenSaver: resolvedOptions.tokenSaver,
   });
 
   // Initialize logger with configured temp path
@@ -309,6 +312,7 @@ export async function executeReview(
     localWorkspacePath: resolvedOptions.localWorkspacePath,
     ignorePatterns: resolvedOptions.ignore,
     gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
+    tokenSaver: config.tokenSaver,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";
@@ -774,6 +778,11 @@ program
     "--skip-existing-issues <bool>",
     "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
   )
+  // Token optimization
+  .option(
+    "--token-saver",
+    "Suppress mandatory analysis structure to save output tokens. Env: MM_TOKEN_SAVER"
+  )
   // File filtering
   .option(
     "--ignore <pattern>",
@@ -841,6 +850,7 @@ program
         passes: options.passes,
         phases: options.phases,
         reviewStrategy: options.strategy,
+        tokenSaver: options.tokenSaver,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";

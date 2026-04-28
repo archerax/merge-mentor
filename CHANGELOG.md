@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--token-saver` flag**: New CLI flag (and `MM_TOKEN_SAVER` env var) that suppresses the "MANDATORY ANALYSIS STRUCTURE" multi-pass analysis preamble from AI prompts. Reduces output token usage by 500–2,000+ tokens per review call. Verbose analysis remains the default; opt in with `--token-saver` or `MM_TOKEN_SAVER=true`.
+
 ## [1.32.1] - 2026-04-27
 
 ### Changed

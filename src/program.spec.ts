@@ -108,6 +108,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
+    tokenSaver: false,
     ...overrides,
   };
 }

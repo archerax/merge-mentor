@@ -80,6 +80,38 @@ describe("Config", () => {
       expect(config.skipPreExisting).toBe(true);
     });
 
+    it("should default tokenSaver to false when not set", () => {
+      const env = createStubEnvironment();
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.tokenSaver).toBe(false);
+    });
+
+    it("should enable tokenSaver from MM_TOKEN_SAVER environment variable", () => {
+      const env = createStubEnvironment({ MM_TOKEN_SAVER: "true" });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.tokenSaver).toBe(true);
+    });
+
+    it("should not enable tokenSaver when MM_TOKEN_SAVER is not 'true'", () => {
+      const env = createStubEnvironment({ MM_TOKEN_SAVER: "false" });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.tokenSaver).toBe(false);
+    });
+
+    it("should enable tokenSaver from CLI override", () => {
+      const env = createStubEnvironment();
+
+      const config = loadConfig({ tokenSaver: true }, env);
+
+      expect(config.tokenSaver).toBe(true);
+    });
+
     it("should load MM_REVIEW_RUNS from environment", () => {
       const env = createStubEnvironment({
         MM_REVIEW_RUNS: "3",

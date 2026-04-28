@@ -111,6 +111,8 @@ export interface Config {
   readonly streamingLines: number;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). Default: ./.mergementor */
   readonly tempPath: string;
+  /** Suppress verbose multi-pass analysis instructions to save output tokens. Default: false */
+  readonly tokenSaver: boolean;
 }
 
 /**
@@ -252,6 +254,7 @@ export function loadConfig(
         ? Number.parseInt(env.get("MM_STREAMING_LINES") ?? "", 10)
         : 9),
     tempPath: path.resolve(cliOverrides?.tempPath ?? env.get("MM_TEMP_PATH") ?? "./.mergementor"),
+    tokenSaver: cliOverrides?.tokenSaver === true || env.get("MM_TOKEN_SAVER") === "true",
   };
 }
 
@@ -300,6 +303,7 @@ interface CliOverrides {
   readonly streamingLines?: number;
   readonly tempPath?: string;
   readonly gitBackend?: string;
+  readonly tokenSaver?: boolean;
 }
 
 /**

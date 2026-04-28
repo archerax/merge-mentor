@@ -273,6 +273,9 @@ export AUDIT_LOGGING_ENABLED=true
 # Streaming output display
 export MM_STREAMING_ENABLED=true  # Enable/disable streaming output (default: true)
 export MM_STREAMING_LINES=5       # Number of lines in streaming display (default: 5)
+
+# Token optimization
+export MM_TOKEN_SAVER=false  # Suppress mandatory analysis structure to save output tokens (default: false)
 ```
 
 **Or use command-line parameters:**
@@ -533,6 +536,11 @@ merge-mentor review --pr 123 --passes "testing" --write
 |--------|-------------|--------------|---------|
 | `--skip-existing-issues <bool>` | Skip pre-existing issues (true/false) | `MM_SKIP_EXISTING_ISSUES` | `true` |
 | `--comment-identifier <id>` | Bot comment identifier | `MM_COMMENT_IDENTIFIER` | `[merge-mentor]` |
+
+**Token Optimization:**
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--token-saver` | Suppress mandatory analysis structure to save output tokens | `MM_TOKEN_SAVER` | `false` |
 
 **Note:** Command-line parameters always override environment variables.
 

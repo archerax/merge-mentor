@@ -272,5 +272,39 @@ describe("AI Prompts", () => {
 
       expect(prompt).toContain("@file:.mergementor/diffs/test.diff");
     });
+
+    describe("tokenSaver option", () => {
+      it("includes mandatory analysis structure by default", () => {
+        const prompt = buildBatchedFileReviewPrompt(mockManifest);
+
+        expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
+      });
+
+      it("suppresses mandatory analysis structure when tokenSaver is true", () => {
+        const prompt = buildBatchedFileReviewPrompt(mockManifest, undefined, undefined, undefined, {
+          tokenSaver: true,
+        });
+
+        expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+      });
+
+      it("suppresses verbose output format example when tokenSaver is true", () => {
+        const prompt = buildBatchedFileReviewPrompt(mockManifest, undefined, undefined, undefined, {
+          tokenSaver: true,
+        });
+
+        expect(prompt).not.toContain("1. ANALYSIS: Think step-by-step");
+        expect(prompt).toContain("Return ONLY the JSON code block");
+      });
+
+      it("still includes core review content when tokenSaver is true", () => {
+        const prompt = buildBatchedFileReviewPrompt(mockManifest, undefined, undefined, undefined, {
+          tokenSaver: true,
+        });
+
+        expect(prompt).toContain("Expert code reviewer");
+        expect(prompt).toContain("VERIFICATION CHECKLIST");
+      });
+    });
   });
 });

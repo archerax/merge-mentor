@@ -1,5 +1,5 @@
 interface BatchedFileResultsOutputFormatOptions {
-  readonly analysisInstruction: string;
+  readonly analysisInstruction?: string;
   readonly severityExample: string;
   readonly categoryExample: string;
   readonly messageExample: string;
@@ -44,9 +44,12 @@ export function buildBatchedFileResultsOutputFormat(
     footer,
   } = options;
 
+  const intro = analysisInstruction
+    ? `1. REVIEW: ${analysisInstruction}\n2. RESPONSE: Return ONLY the JSON object below in a markdown code block`
+    : `1. RESPONSE: Return ONLY the JSON object below in a markdown code block`;
+
   return buildOutputFormatSection(
-    `1. REVIEW: ${analysisInstruction}
-2. RESPONSE: Return ONLY the JSON object below in a markdown code block`,
+    intro,
     `{
   "file_results": {
     "path/to/file.ts": {
@@ -103,10 +106,13 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
-export function buildFastReviewOutputFormat(): string {
+export function buildFastReviewOutputFormat(options?: { tokenSaver?: boolean }): string {
+  const intro = options?.tokenSaver
+    ? `1. RESPONSE: Return ONLY the JSON object below in a markdown code block`
+    : `1. REVIEW: Document your analysis step-by-step (all 5 passes)\n2. RESPONSE: Return ONLY the JSON object below in a markdown code block`;
+
   return buildOutputFormatSection(
-    `1. REVIEW: Document your analysis step-by-step (all 5 passes)
-2. RESPONSE: Return ONLY the JSON object below in a markdown code block`,
+    intro,
     `{
   "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
   "findings": [

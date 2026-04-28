@@ -363,13 +363,16 @@ export function buildFilesSummary(files: readonly PRFile[]): string {
  * @param existingCommentsContext - Optional context of existing comments to avoid duplication
  * @param repoContext - Optional repository-specific coding standards and guidelines
  * @param repoPath - Optional path to cloned repository for workspace access
+ * @param options - Optional prompt options
+ * @param options.tokenSaver - When true, suppresses verbose multi-pass analysis instructions
  * @returns Formatted prompt for batched review
  */
 export function buildBatchedFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
   repoContext?: string,
-  repoPath?: string
+  repoPath?: string,
+  options?: { tokenSaver?: boolean }
 ): string {
   // When repoPath is provided, diffs are stored in .mergementor/diffs/ inside the repo
   // Use @file: prefix for file paths when working in a repository workspace
@@ -385,6 +388,35 @@ export function buildBatchedFileReviewPrompt(
   const commentsSection = existingCommentsContext
     ? `\n${existingCommentsContext}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
     : "";
+
+  const mandatoryAnalysisSection = options?.tokenSaver
+    ? ""
+    : `# MANDATORY ANALYSIS STRUCTURE
+
+Before providing JSON, document your analysis:
+
+## Pass 1: Surface Scan
+Line-by-line observations of suspicious patterns
+
+## Pass 2: Security Deep Dive
+- Authentication/authorization analysis
+- Input validation completeness
+- Data exposure risks
+
+## Pass 3: Logic Analysis
+- Edge case handling
+- Error path completeness
+- State management correctness
+
+## Pass 4: Performance Review
+- Algorithmic complexity
+- Resource leak risks
+- Scalability concerns
+
+## Findings Summary
+Only after completing all passes above, list findings.
+
+`;
 
   const repoContextSection = repoContext
     ? `
@@ -447,32 +479,7 @@ Review ALL files listed below. Each file's diff is stored separately - read usin
 Files to Review:
 ${filesListing}
 ${commentsSection}
-# MANDATORY ANALYSIS STRUCTURE
-
-Before providing JSON, document your analysis:
-
-## Pass 1: Surface Scan
-Line-by-line observations of suspicious patterns
-
-## Pass 2: Security Deep Dive
-- Authentication/authorization analysis
-- Input validation completeness
-- Data exposure risks
-
-## Pass 3: Logic Analysis
-- Edge case handling
-- Error path completeness
-- State management correctness
-
-## Pass 4: Performance Review
-- Algorithmic complexity
-- Resource leak risks
-- Scalability concerns
-
-## Findings Summary
-Only after completing all passes above, list findings.
-
-# VERIFICATION CHECKLIST
+${mandatoryAnalysisSection}# VERIFICATION CHECKLIST
 
 Before reporting any finding, complete this mandatory verification:
 
@@ -783,7 +790,38 @@ Reason to reject: Didn't check context - functions are in different scopes (one 
 - If issue exists in removed lines (-), set isPreExisting: true
 - Only set isPreExisting: false for newly introduced issues
 
-# OUTPUT FORMAT
+${
+  options?.tokenSaver
+    ? `# OUTPUT FORMAT
+
+Return ONLY the JSON code block:
+
+\`\`\`json
+{
+  "file_results": {
+    "path/to/file1.ts": {
+      "findings": [
+        {
+          "line": 45,
+          "severity": "high",
+          "confidence": "high",
+          "category": "bug",
+          "message": "Array access without bounds check on user input",
+          "suggestion": "Add validation: if (index >= 0 && index < array.length)",
+          "reasoning": "Runtime error if index out of bounds, user input not validated",
+          "isPreExisting": false
+        }
+      ]
+    },
+    "path/to/file2.ts": {
+      "findings": []
+    }
+  }
+}
+\`\`\`
+
+REMEMBER: Include entry for EVERY file listed above, even with empty findings array.`
+    : `# OUTPUT FORMAT
 
 1. ANALYSIS: Think step-by-step through logic, security, performance, quality
 2. JSON: Strict format in markdown code block
@@ -825,6 +863,7 @@ Key concern: Line 45 accesses array without bounds validation...
 }
 \`\`\`
 
-REMEMBER: Include entry for EVERY file listed above, even with empty findings array.
+REMEMBER: Include entry for EVERY file listed above, even with empty findings array.`
+}
 `;
 }

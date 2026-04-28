@@ -10,21 +10,23 @@ This document identifies the key drivers of token waste and ranks them by impact
 
 ## Summary: Top Issues by Impact
 
-| # | Issue | Token Type | Est. Cost Impact | Effort |
-|---|-------|-----------|-----------------|--------|
-| 1 | MANDATORY ANALYSIS STRUCTURE | Output | Very High | Low |
-| 2 | Verbose `reasoning` field requirements | Output | High | Low |
-| 3 | `severityContext` section (~5,000 tokens per prompt) | Input | High | Medium |
-| 4 | Excessive examples in each prompt (17–27 examples) | Input | Medium | Medium |
-| 5 | Self-challenge & counter-argument documentation | Output | Medium | Low |
-| 6 | Token usage not tracked in SDK providers | Observability | — | Low |
-| 7 | Multi-run cost multiplication with no warnings | Architecture | Medium | Low |
+| # | Issue | Token Type | Est. Cost Impact | Status |
+|---|-------|-----------|-----------------|---------|
+| 1 | MANDATORY ANALYSIS STRUCTURE | Output | Very High | ✅ DONE |
+| 2 | Verbose `reasoning` field requirements | Output | High | Pending |
+| 3 | `severityContext` section (~5,000 tokens per prompt) | Input | High | Pending |
+| 4 | Excessive examples in each prompt (17–27 examples) | Input | Medium | Pending |
+| 5 | Self-challenge & counter-argument documentation | Output | Medium | Pending |
+| 6 | Token usage not tracked in SDK providers | Observability | — | Pending |
+| 7 | Multi-run cost multiplication with no warnings | Architecture | Medium | ✅ DONE |
 
 ---
 
 ## Output Token Issues (5× cost multiplier — highest priority)
 
-### 1. MANDATORY ANALYSIS STRUCTURE
+### 1. MANDATORY ANALYSIS STRUCTURE ✅ DONE
+
+**Implementation:** `--token-saver` flag (`MM_TOKEN_SAVER` env var)
 
 **Where:** `prompts.ts` (`buildBatchedFileReviewPrompt`), `general.ts` (`buildGeneralFileReviewPrompt`), `fast.ts` (`buildFastReviewPrompt`)
 
@@ -48,6 +50,8 @@ Only after completing all passes above, list findings.
 **Why it's expensive:** This "think aloud" text is generated as output tokens (5× cost) but is never shown to users or stored anywhere useful. For a medium PR with 10 files, this alone can generate 500–2,000+ output tokens per review call — pure cost with no user-facing value at runtime.
 
 **Recommendation:** Make this an opt-in `verbose`/`thorough` mode. The default should allow the model to reason internally (models still perform multi-pass analysis, they just don't write it out). This is the single biggest quick win.
+
+**Status:** ✅ **Implemented.** Added `--token-saver` CLI flag (and `MM_TOKEN_SAVER` env var) that suppresses the MANDATORY ANALYSIS STRUCTURE preamble and verbose output format examples. Default behavior unchanged (verbose). Users opt in to token savings with `--token-saver` or `MM_TOKEN_SAVER=true`.
 
 ---
 
@@ -156,15 +160,19 @@ Example of the scale: Examples 1–20 each have 2–3 multi-paragraph code snipp
 
 ---
 
-### 8. Multi-Run Cost Multiplication
+### 7. Multi-Run Cost Multiplication ✅ DONE
+
+**Implementation:** Cost warning logged during review execution
 
 **Where:** `reviewRuns` config option (default: 1, max: 5)
 
-**What happens:** Each additional review run multiplies ALL token costs linearly. Running `reviewRuns=3` triples both input and output token costs. There's no warning or cost estimate when users configure multi-run mode with BYOK.
+**What happens:** Each additional review run multiplies ALL token costs linearly. Running `reviewRuns=3` triples both input and output token costs.
 
 **Recommendation:**
 - Log a cost warning when `reviewRuns > 1` and BYOK is configured (`aiApiKey` is set)
 - Consider showing estimated token multiplier in the review summary
+
+**Status:** ✅ **Implemented.** Cost warnings are logged to stdout during review execution when `reviewRuns > 1` and a BYOK provider is active (detected via `aiApiKey`). Warnings inform users of the token cost multiplier before each subsequent run begins.
 
 ---
 
@@ -202,15 +210,13 @@ At typical BYOK pricing ($15/M output, $3/M input), reducing 4,000 output tokens
 
 ---
 
-## Files to Modify
+## Next Steps
 
-1. `src/ai/prompts/prompts.ts` — Remove/conditionalize MANDATORY ANALYSIS STRUCTURE; trim examples (27→5)
-2. `src/ai/prompts/specialists/general.ts` — Remove MANDATORY ANALYSIS STRUCTURE; compact self-challenge
-3. `src/ai/prompts/specialists/fast.ts` — Remove MANDATORY ANALYSIS STRUCTURE; compact self-challenge
-4. `src/ai/prompts/severityContext.ts` — Trim examples from 20 to 8
-5. `src/ai/prompts/specialists/security.ts` — Trim examples (21→5)
-6. `src/ai/prompts/specialists/testing.ts` — Trim examples (18→5)
-7. `src/ai/prompts/specialists/performance.ts` — Trim examples (21→5)
-8. `src/ai/providers/copilot-sdk.ts` — Add token usage extraction
-9. `src/ai/providers/opencode-sdk.ts` — Add token usage extraction
-10. Extract `buildWorkspaceSection` to shared module
+The following items remain to be addressed:
+
+1. **Item 2:** Compact reasoning fields (verbose `reasoning` field)
+2. **Item 3:** Reduce `severityContext` examples from 20 to 8
+3. **Item 4:** Trim examples in prompt bodies (17–27 → 4–6 per file)
+4. **Item 5:** Remove counter-argument documentation from output (keep mental discipline)
+5. **Item 6:** Add token usage extraction in SDK providers (`copilot-sdk.ts`, `opencode-sdk.ts`)
+6. **Item 8:** Extract shared `buildWorkspaceSection` to module

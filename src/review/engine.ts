@@ -190,6 +190,8 @@ interface ReviewEngineOptions {
   readonly output?: OutputWriter;
   /** File system abstraction for I/O (dependency injection, defaults to nodeFs) */
   readonly fileSystem?: FileSystem;
+  /** Suppress verbose multi-pass analysis instructions to save output tokens (default: false) */
+  readonly tokenSaver?: boolean;
 }
 
 /**
@@ -1008,7 +1010,8 @@ During the database pass, pay extra attention to query correctness, transaction 
         commentsContext || undefined,
         repoPath,
         this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
+        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename)),
+        { tokenSaver: this.options.tokenSaver }
       );
       this.logger.info(
         { reviewPasses: this.reviewProfile.passes, reviewType: this.reviewProfile.reviewType },
@@ -1341,7 +1344,8 @@ During the database pass, pay extra attention to query correctness, transaction 
         commentsContext || undefined,
         repoPath,
         this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
+        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename)),
+        { tokenSaver: this.options.tokenSaver }
       );
 
       this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
