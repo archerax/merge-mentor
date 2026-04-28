@@ -372,4 +372,88 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain("@auth.diff");
     expect(prompt).not.toContain("@.mergementor/diffs/");
   });
+
+  describe("tokenSaver option", () => {
+    test("includes mandatory analysis structure by default", () => {
+      const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
+
+      expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
+    });
+
+    test("suppresses mandatory analysis structure when tokenSaver is true", () => {
+      const prompt = buildFastReviewPrompt(
+        mockPRDetails,
+        mockManifest,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { tokenSaver: true }
+      );
+
+      expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+    });
+
+    test("includes compact analysis instruction when tokenSaver is true with no passes", () => {
+      const prompt = buildFastReviewPrompt(
+        mockPRDetails,
+        mockManifest,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { tokenSaver: true }
+      );
+
+      expect(prompt).toContain("# ANALYSIS");
+      expect(prompt).toContain("Scan thoroughly");
+    });
+
+    test("suppresses verbose output format instruction when tokenSaver is true", () => {
+      const prompt = buildFastReviewPrompt(
+        mockPRDetails,
+        mockManifest,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { tokenSaver: true }
+      );
+
+      expect(prompt).not.toContain("Document your analysis");
+      expect(prompt).toContain("Return ONLY");
+    });
+
+    test("still includes core review content when tokenSaver is true", () => {
+      const prompt = buildFastReviewPrompt(
+        mockPRDetails,
+        mockManifest,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { tokenSaver: true }
+      );
+
+      expect(prompt).toContain("Expert code reviewer");
+      expect(prompt).toContain("VERIFICATION CHECKLIST");
+      expect(prompt).toContain("SELF-CHALLENGE REQUIREMENT");
+    });
+
+    test("still includes pass analysis for custom phases when tokenSaver is true", () => {
+      const passes = ["security"] as const;
+      const prompt = buildFastReviewPrompt(
+        mockPRDetails,
+        mockManifest,
+        undefined,
+        undefined,
+        passes,
+        undefined,
+        { tokenSaver: true }
+      );
+
+      expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+      expect(prompt).toContain("Additive Pass 1: security");
+    });
+  });
 });

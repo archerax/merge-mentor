@@ -855,6 +855,84 @@ describe("General Review Prompts", () => {
       expect(prompt).toContain("**monorepo**: Monorepo-team lens");
       expect(prompt).toContain("**Monorepo hygiene**: Boundary violations");
     });
+
+    describe("tokenSaver option", () => {
+      it("includes mandatory analysis structure by default", () => {
+        const prompt = buildGeneralFileReviewPrompt(mockManifest);
+
+        expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
+      });
+
+      it("suppresses mandatory analysis structure when tokenSaver is true", () => {
+        const prompt = buildGeneralFileReviewPrompt(
+          mockManifest,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { tokenSaver: true }
+        );
+
+        expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+      });
+
+      it("includes compact analysis instruction when tokenSaver is true with no passes", () => {
+        const prompt = buildGeneralFileReviewPrompt(
+          mockManifest,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { tokenSaver: true }
+        );
+
+        expect(prompt).toContain("# ANALYSIS");
+        expect(prompt).toContain("Scan thoroughly");
+      });
+
+      it("suppresses verbose output format instruction when tokenSaver is true", () => {
+        const prompt = buildGeneralFileReviewPrompt(
+          mockManifest,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { tokenSaver: true }
+        );
+
+        expect(prompt).not.toContain("Document your analysis step-by-step");
+        expect(prompt).toContain("Return ONLY");
+      });
+
+      it("still includes core review content when tokenSaver is true", () => {
+        const prompt = buildGeneralFileReviewPrompt(
+          mockManifest,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { tokenSaver: true }
+        );
+
+        expect(prompt).toContain("Expert code reviewer");
+        expect(prompt).toContain("VERIFICATION CHECKLIST");
+      });
+
+      it("still includes pass analysis for custom phases when tokenSaver is true", () => {
+        const prompt = buildGeneralFileReviewPrompt(
+          mockManifest,
+          undefined,
+          undefined,
+          ["security"],
+          undefined,
+          { tokenSaver: true }
+        );
+
+        expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+        expect(prompt).toContain("Additive Pass");
+        expect(prompt).toContain("security");
+      });
+    });
   });
 
   describe("buildGeneralCrossFilePrompt", () => {

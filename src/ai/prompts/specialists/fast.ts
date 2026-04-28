@@ -105,7 +105,8 @@ export function buildFastReviewPrompt(
   existingCommentsContext?: string,
   repoPath?: string,
   selectedPasses?: readonly GeneralReviewPhase[],
-  additionalContextSections?: readonly string[]
+  additionalContextSections?: readonly string[],
+  options?: { tokenSaver?: boolean }
 ): string {
   const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
@@ -124,22 +125,11 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 `
     : "";
 
-  return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer performing comprehensive analysis in a single pass. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
-${buildWorkspaceSection(repoPath)}
-# PR CONTEXT
-${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
-
-# TASK
-Perform a COMPLETE review of this PR covering:
-- Individual file analysis (bugs, security, performance, quality)
-- Cross-file architectural analysis (integration, consistency, design)
-
-Files to Review:
-${filesListing}
-${commentsSection}
-${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}
-# MANDATORY ANALYSIS STRUCTURE
+  const additionalPassAnalysis = buildAdditionalPassAnalysis(selectedPasses);
+  const analysisStructureSection = options?.tokenSaver
+    ? `# ANALYSIS
+Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns across all files and their interactions. Report all genuine findings with line references.${additionalPassAnalysis}`
+    : `# MANDATORY ANALYSIS STRUCTURE
 
 Before providing JSON, document your analysis:
 
@@ -166,10 +156,25 @@ Line-by-line observations of suspicious patterns in individual files
 - Cross-file consistency (error handling, patterns)
 - System-level design concerns
 - Dependency relationships
-${buildAdditionalPassAnalysis(selectedPasses)}
-
+${additionalPassAnalysis}
 ## Findings Summary
-Only after completing all passes above, list findings with appropriate attribution.
+Only after completing all passes above, list findings with appropriate attribution.`;
+
+  return `${buildSecurityPreamble()}# YOUR ROLE
+Expert code reviewer performing comprehensive analysis in a single pass. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
+${buildWorkspaceSection(repoPath)}
+# PR CONTEXT
+${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
+
+# TASK
+Perform a COMPLETE review of this PR covering:
+- Individual file analysis (bugs, security, performance, quality)
+- Cross-file architectural analysis (integration, consistency, design)
+
+Files to Review:
+${filesListing}
+${commentsSection}
+${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}${analysisStructureSection}
 
 # VERIFICATION CHECKLIST
 
@@ -299,6 +304,6 @@ Rebuttal:
 Decision:
 Report only if the issue remains material after the challenge above.
 
-${buildFastReviewOutputFormat()}
+${buildFastReviewOutputFormat(options)}
 `;
 }
