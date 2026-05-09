@@ -222,6 +222,23 @@ describe("ReviewEngine", () => {
       expect(mockEnsureRepo).not.toHaveBeenCalled();
     });
 
+    it("clones the PR head branch (not base branch) when no localWorkspacePath is set", async () => {
+      const prDetails = createPRDetails();
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+
+      await engine.reviewPR(123);
+
+      expect(mockEnsureRepo).toHaveBeenCalledWith(
+        expect.anything(),
+        prDetails.headBranch,
+        expect.anything()
+      );
+    });
+
     it("throws a clear error when localWorkspacePath does not exist", async () => {
       const prDetails = createPRDetails();
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);

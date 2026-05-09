@@ -439,8 +439,8 @@ export class ReviewEngine {
     const existingComments = await this.fetchExistingComments(prNumber);
     const cachedState = await this.stateCache.getState(prIdentifier);
 
-    // Use pre-existing workspace (CI checkout) or clone the repo for CLI agent access
-    const repoPath = await this.resolveWorkspace(prDetails.baseBranch);
+    // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
+    const repoPath = await this.resolveWorkspace(prDetails.headBranch);
 
     const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
     const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
