@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.32.1] - 2026-04-27
+## [1.33.0] - 2026-05-14
+
+### Added
+
+- **Vercel AI Provider Plan**: New documentation outlining the planned architecture for Vercel AI SDK integration
+- **Pragmatic TypeScript Instructions**: Updated and streamlined AI instructions for better code generation
+- **Testing TypeScript Instructions**: Updated and streamlined AI instructions for improved test generation
+
+### Changed
+
+- **Package Upgrades**: Updated various dependencies to latest versions
 
 ### Changed
 
