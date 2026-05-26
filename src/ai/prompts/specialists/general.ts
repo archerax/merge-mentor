@@ -1,6 +1,6 @@
 import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
-import type { GeneralReviewPhase } from "../../../review/reviewSelection.js";
+import type { ReviewPass } from "../../../review/reviewSelection.js";
 import {
   buildSecurityPreamble,
   wrapUntrustedExistingComments,
@@ -57,7 +57,7 @@ const CROSS_FILE_ALLOWED_CATEGORIES = [
 ] as const;
 
 const FILE_REVIEW_PASS_DETAILS: Record<
-  GeneralReviewPhase,
+  ReviewPass,
   {
     readonly analysisLines: readonly string[];
     readonly approach: string;
@@ -150,7 +150,7 @@ const FILE_REVIEW_PASS_DETAILS: Record<
   },
 };
 
-const CROSS_FILE_PASS_DETAILS: Record<GeneralReviewPhase, string> = {
+const CROSS_FILE_PASS_DETAILS: Record<ReviewPass, string> = {
   scan: "Suspicious cross-file patterns, incomplete refactors, and inconsistent changes introduced by the PR",
   security:
     "Trust-boundary consistency, auth/authz coverage, validation gaps, data exposure, and exploit paths across files",
@@ -166,7 +166,7 @@ const CROSS_FILE_PASS_DETAILS: Record<GeneralReviewPhase, string> = {
     "Schema/query consistency, transaction coverage, migration impact, and data-integrity risks across files",
 };
 
-function buildSelectedPassesSection(selectedPasses?: readonly GeneralReviewPhase[]): string {
+function buildSelectedPassesSection(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
   }
@@ -180,7 +180,7 @@ These passes add focus and context. They do **not** restrict what issues you may
 `;
 }
 
-function buildAdditionalFilePassAnalysis(selectedPasses?: readonly GeneralReviewPhase[]): string {
+function buildAdditionalFilePassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
   }
@@ -197,7 +197,7 @@ ${selectedPasses
 After running the additional passes above, merge the strongest findings into one final result set.`;
 }
 
-function buildAdditionalReviewApproach(selectedPasses?: readonly GeneralReviewPhase[]): string {
+function buildAdditionalReviewApproach(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
   }
@@ -210,7 +210,7 @@ ${selectedPasses
 `;
 }
 
-function buildAdditionalReportFocus(selectedPasses?: readonly GeneralReviewPhase[]): string {
+function buildAdditionalReportFocus(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
   }
@@ -231,7 +231,7 @@ ${Array.from(items)
 `;
 }
 
-function buildAdditionalCrossFileChecklist(selectedPasses?: readonly GeneralReviewPhase[]): string {
+function buildAdditionalCrossFileChecklist(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
   }
@@ -277,7 +277,7 @@ export function buildGeneralFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
   repoPath?: string,
-  selectedPasses?: readonly GeneralReviewPhase[],
+  selectedPasses?: readonly ReviewPass[],
   additionalContextSections?: readonly string[],
   options?: { tokenSaver?: boolean }
 ): string {
@@ -296,33 +296,8 @@ export function buildGeneralFileReviewPrompt(
   );
 
   const additionalFilePassAnalysis = buildAdditionalFilePassAnalysis(selectedPasses);
-  const analysisStructureSection = options?.tokenSaver
-    ? `# ANALYSIS
-Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns. Report all genuine findings with line references.${additionalFilePassAnalysis}`
-    : `# MANDATORY ANALYSIS STRUCTURE
-
-Before providing JSON, document your analysis:
-
-## Pass 1: Surface Scan
-Line-by-line observations of suspicious patterns
-
-## Pass 2: Security Deep Dive
-- Authentication/authorization analysis
-- Input validation completeness
-- Data exposure risks
-
-## Pass 3: Logic Analysis
-- Edge case handling
-- Error path completeness
-- State management correctness
-
-## Pass 4: Performance Review
-- Algorithmic complexity
-- Resource leak risks
-- Scalability concerns
-${additionalFilePassAnalysis}
-## Findings Summary
-Only after completing all passes above, list findings.`;
+  const analysisStructureSection = `# ANALYSIS
+Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns. Report all genuine findings with line references.${additionalFilePassAnalysis}`;
 
   return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer analyzing changes. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another close read.
@@ -337,33 +312,13 @@ ${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(ad
 
 # VERIFICATION CHECKLIST
 
-Before reporting any finding, complete this mandatory verification:
+Before reporting any finding:
+- Issue exists in ADDED lines (+), not removed lines (-)
+- Line number is correct and points to actual problem code
+- Issue isn't already handled elsewhere in the diff
+- Severity matches actual impact
 
-□ Issue exists in ADDED lines (+), not removed lines (-)
-□ Line number is correct and points to actual problem code
-□ Issue isn't handled elsewhere in the diff (checked context lines)
-□ Suggestion actually fixes the root cause (not just masking symptoms)
-□ Issue isn't a false positive from missing context
-□ Severity matches the actual impact (not over/under-rated)
-
-## Verification Documentation Requirements
-
-For EACH finding, your reasoning field must include verification notes.
-
-**Required verification elements:**
-- ✓ Confirmation: What you verified ("Confirmed line X has Y")
-- ✓ Context check: What surrounding code you examined
-- ✓ Pattern check: Whether you searched for existing solutions
-- ✓ Impact assessment: Concrete consequences of the issue
-- ✓ Severity justification: Why this specific severity level
-
-**Example of proper verification in reasoning:**
-
-    ✓ Confirmed line 45: users[index] access without bounds check
-    ✓ Scanned lines 40-50: no validation present for index parameter
-    ✓ Checked context: index comes from req.query.id (user-controlled input)
-    ✓ Impact: Runtime TypeError crashes server if index >= users.length
-    ✓ Severity justification: high (production crash risk from user input)
+For each finding, \`reasoning\` must confirm the issue is real, state its concrete impact, and justify the severity (1–2 sentences).
 
 # CRITICAL RULES
 1. Only flag NEW issues in added lines (marked with +)
@@ -422,54 +377,14 @@ Diff format: [+/-/SPACE][NUMBER] | CODE
 
 # SELF-CHALLENGE REQUIREMENT
 
-Before reporting ANY finding, you must challenge yourself with these questions:
+Before reporting ANY finding, ask yourself:
+1. Could this be intentional? (e.g., deliberate error swallowing in retry logic)
+2. Is this handled elsewhere? (e.g., validation at API gateway)
+3. Is this test/mock code? (different standards apply)
+4. Is there framework context I'm missing?
+5. Would a senior engineer flag this? (Is it substantive, not nitpicking?)
 
-1. **"Could this be intentional?"**
-   → Example: Error swallowing in retry logic, intentional for resilience
-
-2. **"Is this validated elsewhere?"**
-   → Example: Input validation at API gateway layer, not application code
-
-3. **"Is this test/mock/development code?"**
-   → Different standards apply (shortcuts acceptable in tests)
-
-4. **"Is there missing context?"**
-   → Example: Framework magic (Next.js auto-imports, React conventions)
-
-5. **"Would a senior engineer flag this?"**
-   → Gut check: Is this substantive or nitpicking?
-
-## Counter-Argument Documentation
-
-For findings that could be questioned, document your self-challenge in the reasoning:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "Missing try-catch around database call"
-
-Counter-Argument Considered:
-"This could be handled by a transaction wrapper or middleware"
-
-Rebuttal:
-"✓ Checked codebase: No transaction wrapper exists (@workspace /search transaction wrapper)
-✓ Verified pattern: Other DB calls in src/data/ all use explicit try-catch (checked 8 files)
-✓ This is inconsistent with established pattern"
-
-Decision: ✅ **Report** (pattern violation confirmed)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Magic number 3600 should be constant"
-
-Counter-Argument Considered:
-"This is clearly seconds-per-hour, universally understood"
-
-Rebuttal:
-"✓ Verified: 3600 is universally known constant (seconds per hour)
-✓ Context: Used once, meaning obvious from variable name
-✓ Pattern check: No SECONDS_PER_HOUR constant elsewhere in codebase"
-
-Decision: ❌ **Don't report** (universally understood constant)
+Only report findings that survive this check.
 
 ${buildBatchedFileResultsOutputFormat({
   analysisInstruction: options?.tokenSaver ? undefined : "Document your analysis step-by-step",
@@ -477,7 +392,7 @@ ${buildBatchedFileResultsOutputFormat({
   categoryExample: "bug",
   messageExample: "Clear description of the problem",
   suggestionExample: "Specific fix with code example",
-  reasoningExample: "Complete verification including data flow, impact, and severity justification",
+  reasoningExample: "Why this is a real issue and its concrete impact",
   footer: `Return ONLY the JSON code block. Use only these categories: ${FILE_REVIEW_ALLOWED_CATEGORIES.join(", ")}. Include entry for EVERY file listed, even with empty findings.`,
 })}
 `;
@@ -487,7 +402,7 @@ export function buildGeneralCrossFilePrompt(
   prDetails: PRDetails,
   context: GeneralCrossFileContext,
   repoPath?: string,
-  selectedPasses?: readonly GeneralReviewPhase[],
+  selectedPasses?: readonly ReviewPass[],
   additionalContextSections?: readonly string[]
 ): string {
   const { filesSummary, fileReviewResults, existingCommentsContext } = context;
@@ -572,24 +487,7 @@ Before reporting any cross-file finding, complete this mandatory verification:
 □ Impact is architectural/system-level (not isolated)
 □ Severity matches cross-file impact (consider system-wide consequences)
 
-## Verification Documentation Requirements
-
-For EACH finding, your reasoning field must include verification notes.
-
-**Required verification elements:**
-- ✓ Cross-file confirmation: Which files you verified and how they're connected
-- ✓ System impact: How the issue affects overall architecture
-- ✓ Pattern check: Whether similar patterns exist elsewhere
-- ✓ Integration verification: How components interact incorrectly
-- ✓ Severity justification: Why this matters at the system level
-
-**Example of proper verification in reasoning:**
-
-    ✓ Confirmed: AuthMiddleware.ts adds check, but AdminRoutes.ts bypasses it
-    ✓ Verified integration: AdminRoutes imports but doesn't use the middleware
-    ✓ Pattern check: All other route files (UserRoutes, OrderRoutes) use middleware correctly
-    ✓ System impact: Admin endpoints lack authentication, allowing unauthorized access
-    ✓ Severity justification: high (security boundary violated across modules)
+For each finding, \`reasoning\` must confirm which files are involved, state the system-level impact, and justify the severity (1–2 sentences).
 
 # SEVERITY THRESHOLDS
 Use these exact criteria:
@@ -614,62 +512,21 @@ ${buildAdditionalCrossFileChecklist(selectedPasses)}
 
 # SELF-CHALLENGE REQUIREMENT
 
-Before reporting ANY finding, you must challenge yourself with these questions:
+Before reporting ANY finding, ask yourself:
+1. Could this be intentional design? (e.g., deliberate loose coupling)
+2. Is this validated/handled elsewhere in the system?
+3. Is there architectural context I'm missing? (e.g., framework conventions)
+4. Is this actually a system-level concern, not just file-level?
+5. Would an experienced architect flag this as a real problem?
 
-1. **"Could this be intentional design?"**
-   → Example: Loose coupling might look like "missing integration" but could be deliberate
-
-2. **"Is this validated/handled elsewhere in the system?"**
-   → Example: Input validation might exist in API gateway, not application layer
-
-3. **"Is there architectural context I'm missing?"**
-   → Example: Framework conventions (dependency injection, middleware patterns)
-
-4. **"Is this actually a system-level concern?"**
-   → Example: Issue might be file-level, not architectural
-
-5. **"Would an experienced architect agree this is a problem?"**
-   → Gut check: Is this substantive architectural concern or minor coupling?
-
-## Counter-Argument Documentation
-
-For findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "Missing error handling coordination across service boundaries"
-
-Counter-Argument Considered:
-"Could be handled by API gateway or middleware layer"
-
-Rebuttal:
-"✓ Checked: No API gateway in this project (monolithic architecture)
-✓ Verified: Middleware in src/middleware/ handles only authentication, not errors
-✓ Pattern analysis: Other service integrations (PaymentService, NotificationService) have explicit error handling
-✓ This service integration is inconsistent with established pattern"
-
-Decision: ✅ **Report** (architectural inconsistency confirmed)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Tight coupling between UserController and UserService"
-
-Counter-Argument Considered:
-"This might be standard Controller-Service pattern"
-
-Rebuttal:
-"✓ Reviewed: This IS the standard Controller-Service pattern used throughout
-✓ Pattern check: All controllers follow this pattern (checked 12 files)
-✓ No architectural violation - this is the intended design"
-
-Decision: ❌ **Don't report** (standard pattern confirmed)
+Only report findings that survive this check.
 
 ${buildCrossFileOutputFormat({
   intro: "Provide a complete cross-file analysis in JSON format:",
   severityExample: "high",
   categoryExample: "architecture",
   messageExample: "Clear description of cross-file issue",
-  reasoningExample: "Detailed verification of cross-file impact with evidence",
+  reasoningExample: "Why this cross-file concern is real and its system-level impact",
   overallAssessmentExample: "Brief summary of PR quality and architecture",
   recommendationExample: "Actionable improvement suggestions",
   footer: `Return ONLY the JSON code block. Use only these categories: ${CROSS_FILE_ALLOWED_CATEGORIES.join(", ")}. Focus on system-level concerns across the changed files.`,

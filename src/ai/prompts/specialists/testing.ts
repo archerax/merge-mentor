@@ -375,37 +375,7 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "calculateDiscount() method lacks test coverage"
-
-Counter-Argument Considered:
-"Could be simple calculation not worth testing"
-
-Rebuttal:
-"✓ Reviewed: Complex logic with multiple conditions (lines 67-89)
-✓ Verified: Handles percentage vs fixed discounts, minimum purchase thresholds
-✓ Risk assessment: Financial calculations, direct revenue impact if broken
-✓ Pattern check: Similar methods (calculateTax, calculateShipping) have tests"
-
-Decision: ✅ **Report** (complex financial logic needs coverage)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Missing tests for getName() method"
-
-Counter-Argument Considered:
-"Trivial getter may not need tests"
-
-Rebuttal:
-"✓ Reviewed: Simple property getter, returns this.name
-✓ No logic, no transformations, no side effects
-✓ Pattern check: Similar getters throughout codebase are untested
-✓ Risk assessment: Zero risk - impossible to break"
-
-Decision: ❌ **Don't report** (trivial property access, no value in testing)
+For findings that could be questioned, apply the self-challenge above before reporting. Only include findings for genuinely risky coverage gaps.
 
 # WHAT TO REPORT
 
@@ -552,7 +522,7 @@ ${buildBatchedFileResultsOutputFormat({
   categoryExample: "testing",
   messageExample: "Concise issue description",
   suggestionExample: "Specific actionable fix",
-  reasoningExample: "Complete verification with coverage analysis and ✓ checks",
+  reasoningExample: "Why this coverage gap or test quality issue matters for regression risk",
   footer: `**Rules:**
 - Include entry for EVERY file listed, even with empty findings
 - Every finding MUST have complete reasoning with verification steps
@@ -693,38 +663,7 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "No integration tests for service layer interactions"
-
-Counter-Argument Considered:
-"Could be tested via E2E tests or in separate test suite"
-
-Rebuttal:
-"✓ Checked: No E2E test directory in repository
-✓ Verified: Unit tests only mock dependencies, never test real integration
-✓ Pattern analysis: All service tests use complete mocking
-✓ Risk assessment: No verification that services actually work together
-✓ Integration points: 5 new inter-service calls added in this PR"
-
-Decision: ✅ **Report** (confirmed gap in integration testing)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Inconsistent test file naming (some .test.ts, some .spec.ts)"
-
-Counter-Argument Considered:
-"Naming inconsistency doesn't affect test quality or coverage"
-
-Rebuttal:
-"✓ Verified: Both patterns work with test runner configuration
-✓ Coverage check: All production files have corresponding test files
-✓ Impact assessment: Cosmetic only, tests run successfully
-✓ Pattern check: Mix of patterns exists throughout entire codebase"
-
-Decision: ❌ **Don't report** (cosmetic issue, no testing impact)
+For findings that could be questioned, apply the self-challenge above before reporting. Only include findings with a real system-level testing gap.
 
 # WHAT TO REPORT
 
@@ -821,7 +760,7 @@ ${buildCrossFileOutputFormat({
   severityExample: "medium",
   categoryExample: "testing",
   messageExample: "Concise issue description",
-  reasoningExample: "Complete verification with system-level testing analysis and ✓ checks",
+  reasoningExample: "Why this system-level testing concern is real and its regression risk",
   overallAssessmentExample: "Brief summary of testing approach",
   recommendationExample: "Actionable system-level testing improvements",
   footer: `**Rules:**

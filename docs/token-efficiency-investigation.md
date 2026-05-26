@@ -10,15 +10,15 @@ This document identifies the key drivers of token waste and ranks them by impact
 
 ## Summary: Top Issues by Impact
 
-| # | Issue | Token Type | Est. Cost Impact | Effort |
-|---|-------|-----------|-----------------|--------|
-| 1 | MANDATORY ANALYSIS STRUCTURE | Output | Very High | Low |
-| 2 | Verbose `reasoning` field requirements | Output | High | Low |
-| 3 | `severityContext` section (~5,000 tokens per prompt) | Input | High | Medium |
-| 4 | Excessive examples in each prompt (17–27 examples) | Input | Medium | Medium |
-| 5 | Self-challenge & counter-argument documentation | Output | Medium | Low |
-| 6 | Token usage not tracked in SDK providers | Observability | — | Low |
-| 7 | Multi-run cost multiplication with no warnings | Architecture | Medium | Low |
+| #   | Issue                                                | Token Type    | Est. Cost Impact | Effort |
+| --- | ---------------------------------------------------- | ------------- | ---------------- | ------ |
+| 1   | MANDATORY ANALYSIS STRUCTURE                         | Output        | Very High        | Low    |
+| 2   | Verbose `reasoning` field requirements               | Output        | High             | Low    |
+| 3   | `severityContext` section (~5,000 tokens per prompt) | Input         | High             | Medium |
+| 4   | Excessive examples in each prompt (17–27 examples)   | Input         | Medium           | Medium |
+| 5   | Self-challenge & counter-argument documentation      | Output        | Medium           | Low    |
+| 6   | Token usage not tracked in SDK providers             | Observability | —                | Low    |
+| 7   | Multi-run cost multiplication with no warnings       | Architecture  | Medium           | Low    |
 
 ---
 
@@ -28,7 +28,7 @@ This document identifies the key drivers of token waste and ranks them by impact
 
 **Where:** `prompts.ts` (`buildBatchedFileReviewPrompt`), `general.ts` (`buildGeneralFileReviewPrompt`), `fast.ts` (`buildFastReviewPrompt`)
 
-**What it does:** Every prompt instructs the model to write out multi-pass analysis as free-form text *before* generating the JSON:
+**What it does:** Every prompt instructs the model to write out multi-pass analysis as free-form text _before_ generating the JSON:
 
 ```
 ## Pass 1: Surface Scan
@@ -66,6 +66,7 @@ Only after completing all passes above, list findings.
 ```
 
 And the example provided shows:
+
 ```
 ✓ Confirmed line 45: users[index] access without bounds check
 ✓ Scanned lines 40-50: no validation present for index parameter
@@ -85,6 +86,7 @@ And the example provided shows:
 **Where:** 11 occurrences across all prompt files
 
 **What it does:** Instructs the model to document a full counter-argument workflow for each potential finding:
+
 ```
 Counter-Argument Considered: "..."
 Rebuttal: "..."
@@ -93,9 +95,9 @@ Decision: ✅ Report / ❌ Don't report
 
 With 2–3 full workflow examples shown in each prompt.
 
-**Why it's expensive:** The self-challenge questions are valuable for reducing false positives, but requiring *documented* counter-arguments generates output tokens that users never see. The model can still perform this check mentally.
+**Why it's expensive:** The self-challenge questions are valuable for reducing false positives, but requiring _documented_ counter-arguments generates output tokens that users never see. The model can still perform this check mentally.
 
-**Recommendation:** Keep the mental discipline (the "SELF-CHALLENGE REQUIREMENT" questions) but remove the requirement to write out the counter-argument in output. Only require it to influence whether the finding is *included*, not to be documented in the response.
+**Recommendation:** Keep the mental discipline (the "SELF-CHALLENGE REQUIREMENT" questions) but remove the requirement to write out the counter-argument in output. Only require it to influence whether the finding is _included_, not to be documented in the response.
 
 ---
 
@@ -112,6 +114,7 @@ Example of the scale: Examples 1–20 each have 2–3 multi-paragraph code snipp
 **Why it matters:** This section is appended to every major file review prompt. For a PR with 3 separate AI calls (file review, cross-file, potentially fast review), this section contributes ~15,000 input tokens.
 
 **Recommendation:**
+
 - Reduce from 20 examples to 8–10 representative ones (covering the key patterns)
 - Consider only including it for high-sensitivity review types (security, financial)
 - Or conditionally include it based on the file contexts being reviewed
@@ -121,9 +124,10 @@ Example of the scale: Examples 1–20 each have 2–3 multi-paragraph code snipp
 ### 5. Excessive Examples in Prompt Bodies
 
 **File-level counts:**
+
 - `prompts.ts` (batched review): **27 examples** (EXCELLENT/WEAK verification examples)
 - `security.ts`: **21 examples**
-- `testing.ts`: **18 examples**  
+- `testing.ts`: **18 examples**
 - `performance.ts`: **21 examples**
 
 **Why it matters:** These examples — while helpful for guiding the model — represent thousands of input tokens. Research shows 3–5 good examples typically provide most of the benefit; beyond that, marginal gains don't justify the cost.
@@ -163,6 +167,7 @@ Example of the scale: Examples 1–20 each have 2–3 multi-paragraph code snipp
 **What happens:** Each additional review run multiplies ALL token costs linearly. Running `reviewRuns=3` triples both input and output token costs. There's no warning or cost estimate when users configure multi-run mode with BYOK.
 
 **Recommendation:**
+
 - Log a cost warning when `reviewRuns > 1` and BYOK is configured (`aiApiKey` is set)
 - Consider showing estimated token multiplier in the review summary
 
@@ -172,13 +177,13 @@ Example of the scale: Examples 1–20 each have 2–3 multi-paragraph code snipp
 
 All of the output token issues could be addressed holistically with a `MM_COMPACT_MODE=true` (or `--compact`) flag that switches to a cost-optimised prompt profile:
 
-| Feature | Default (thorough) | Compact |
-|---------|-------------------|---------|
-| MANDATORY ANALYSIS STRUCTURE | Yes | No |
-| Reasoning field | 5 checkpoints | 1–2 sentences |
-| Counter-argument documentation | Required | Omitted |
-| Severity context examples | 20 | 5 |
-| Per-prompt examples | 17–27 | 4–6 |
+| Feature                        | Default (thorough) | Compact       |
+| ------------------------------ | ------------------ | ------------- |
+| MANDATORY ANALYSIS STRUCTURE   | Yes                | No            |
+| Reasoning field                | 5 checkpoints      | 1–2 sentences |
+| Counter-argument documentation | Required           | Omitted       |
+| Severity context examples      | 20                 | 5             |
+| Per-prompt examples            | 17–27              | 4–6           |
 
 This would be a reasonable default for BYOK users.
 
@@ -188,15 +193,15 @@ This would be a reasonable default for BYOK users.
 
 These are rough estimates based on typical review sizes (10 files, 15 findings, 1 run):
 
-| Optimisation | Saved Output Tokens | Saved Input Tokens |
-|-------------|--------------------|--------------------|
-| Remove MANDATORY ANALYSIS STRUCTURE | 800–2,000 | 400 |
-| Compact reasoning fields | 600–1,500 | 300 |
-| Remove counter-argument docs from output | 200–500 | 100 |
-| Trim severityContext examples (20→8) | — | 2,400 |
-| Trim per-prompt examples (25→5) | — | 2,000–3,000 |
-| Remove self-challenge output requirement | 300–600 | 200 |
-| **Total per single review** | **~2,000–5,000** | **~5,000–6,000** |
+| Optimisation                             | Saved Output Tokens | Saved Input Tokens |
+| ---------------------------------------- | ------------------- | ------------------ |
+| Remove MANDATORY ANALYSIS STRUCTURE      | 800–2,000           | 400                |
+| Compact reasoning fields                 | 600–1,500           | 300                |
+| Remove counter-argument docs from output | 200–500             | 100                |
+| Trim severityContext examples (20→8)     | —                   | 2,400              |
+| Trim per-prompt examples (25→5)          | —                   | 2,000–3,000        |
+| Remove self-challenge output requirement | 300–600             | 200                |
+| **Total per single review**              | **~2,000–5,000**    | **~5,000–6,000**   |
 
 At typical BYOK pricing ($15/M output, $3/M input), reducing 4,000 output tokens and 5,500 input tokens saves roughly **$0.077 per review**. For teams running hundreds of reviews per month, this adds up to meaningful savings.
 

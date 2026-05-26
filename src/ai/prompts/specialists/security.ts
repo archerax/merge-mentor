@@ -343,36 +343,7 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For security findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "User input passed directly to SQL query"
-
-Counter-Argument Considered:
-"Could be sanitized by ORM or prepared statement layer"
-
-Rebuttal:
-"✓ Verified: Raw SQL string concatenation, no ORM in use
-✓ Traced input: req.body.userId flows directly to query string
-✓ No parameterization: db.query(\`SELECT * FROM users WHERE id = \${userId}\`)
-✓ Impact: Full database read/write via SQL injection"
-
-Decision: ✅ **Report** (confirmed exploitable SQL injection)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Missing HTTPS enforcement"
-
-Counter-Argument Considered:
-"Could be handled at infrastructure level (load balancer, reverse proxy)"
-
-Rebuttal:
-"✓ Checked deployment: Runs behind AWS ALB with forced HTTPS redirect
-✓ Verified: ALB config in terraform/ shows ssl_policy enforcement
-✓ Application-level HTTPS is redundant with infra-level enforcement"
-
-Decision: ❌ **Don't report** (mitigated at infrastructure layer)
+For security findings that could be questioned, apply the self-challenge above before reporting. Only include findings where the attack vector is realistic and not already mitigated.
 
 ${buildBatchedFileResultsOutputFormat({
   analysisInstruction: "Document your security analysis step-by-step",
@@ -380,7 +351,7 @@ ${buildBatchedFileResultsOutputFormat({
   categoryExample: "security",
   messageExample: "Clear description of the security vulnerability",
   suggestionExample: "Specific remediation with code example",
-  reasoningExample: "Attack vector, impact analysis, verification notes",
+  reasoningExample: "Attack vector and concrete security impact",
   footer:
     "REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report SECURITY issues.",
 })}
@@ -581,46 +552,14 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "Inconsistent CSRF protection across API endpoints"
-
-Counter-Argument Considered:
-"Maybe CSRF protection is at framework/middleware level"
-
-Rebuttal:
-"✓ Checked: No framework-level CSRF protection (@workspace /search csrf)
-✓ Verified: UserController has CSRF tokens, AdminController does not
-✓ Pattern analysis: 8 controllers have CSRF, 2 new ones don't
-✓ Attack scenario: Admin endpoints exploitable via CSRF, user endpoints protected
-✓ System impact: Architectural inconsistency creates exploitable gap"
-
-Decision: ✅ **Report** (architectural security inconsistency confirmed)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Different auth libraries used in different modules"
-
-Counter-Argument Considered:
-"This might be intentional multi-auth strategy"
-
-Rebuttal:
-"✓ Reviewed: Intentional OAuth2 for external API, JWT for internal API
-✓ Pattern verified: Clear separation documented in src/auth/README.md
-✓ Security rationale: Different trust levels require different mechanisms
-✓ No security gap: Each mechanism appropriate for its use case"
-
-Decision: ❌ **Don't report** (intentional security architecture)
+For findings that could be questioned, apply the self-challenge above before reporting. Only include findings with a realistic cross-file attack scenario.
 
 ${buildCrossFileOutputFormat({
   intro: "Provide a complete cross-file security analysis in JSON format:",
   severityExample: "high",
   categoryExample: "security",
   messageExample: "Clear description of cross-file security issue",
-  reasoningExample:
-    "Detailed verification of cross-file security impact with attack scenario and evidence",
+  reasoningExample: "Why this cross-file security concern is real and its attack impact",
   overallAssessmentExample:
     "Brief summary of PR's security posture and architectural security concerns",
   recommendationExample: "Actionable security improvement suggestions",

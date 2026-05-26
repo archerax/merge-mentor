@@ -48,7 +48,6 @@ function createTestConfig(): Config {
     aiProvider: "copilot",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewRuns: 1,
     reviewType: "general",
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,

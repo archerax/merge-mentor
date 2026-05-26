@@ -102,12 +102,9 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
-export function buildFastReviewOutputFormat(options?: { tokenSaver?: boolean }): string {
-  const analysisInstruction = options?.tokenSaver
-    ? undefined
-    : "Document your analysis step-by-step (all 5 passes)";
+export function buildFastReviewOutputFormat(_options?: { tokenSaver?: boolean }): string {
   return buildOutputFormatSection(
-    `${analysisInstruction ? `1. REVIEW: ${analysisInstruction}\n` : ""}${analysisInstruction ? "2" : "1"}. RESPONSE: Return ONLY the JSON object below in a markdown code block`,
+    "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",
     `{
   "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
   "findings": [

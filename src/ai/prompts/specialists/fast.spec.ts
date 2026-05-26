@@ -129,15 +129,12 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain("Cross-file architectural analysis");
   });
 
-  test("includes mandatory analysis structure with multiple passes", () => {
+  test("includes compact analysis structure", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
-    expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
-    expect(prompt).toContain("Pass 1: File-Level Surface Scan");
-    expect(prompt).toContain("Pass 2: Security Deep Dive");
-    expect(prompt).toContain("Pass 3: Logic Analysis");
-    expect(prompt).toContain("Pass 4: Performance Review");
-    expect(prompt).toContain("Pass 5: Architectural Analysis");
+    expect(prompt).toContain("# ANALYSIS");
+    expect(prompt).toContain("Scan thoroughly");
+    expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
   });
 
   test("includes self-challenge requirement", () => {
@@ -148,12 +145,11 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain("Is this validated elsewhere?");
   });
 
-  test("includes counter-argument documentation", () => {
+  test("omits counter-argument documentation examples", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
-    expect(prompt).toContain("Counter-Argument Considered:");
-    expect(prompt).toContain("Rebuttal:");
-    expect(prompt).toContain("Decision:");
+    expect(prompt).not.toContain("Counter-Argument Considered:");
+    expect(prompt).not.toContain("Decision:");
   });
 
   test("includes attribution rules for different finding scopes", () => {
@@ -374,24 +370,12 @@ describe("buildFastReviewPrompt", () => {
   });
 
   describe("tokenSaver option", () => {
-    test("includes mandatory analysis structure by default", () => {
+    test("uses compact analysis structure by default (no MANDATORY ANALYSIS STRUCTURE)", () => {
       const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
-      expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
-    });
-
-    test("suppresses mandatory analysis structure when tokenSaver is true", () => {
-      const prompt = buildFastReviewPrompt(
-        mockPRDetails,
-        mockManifest,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { tokenSaver: true }
-      );
-
       expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+      expect(prompt).toContain("# ANALYSIS");
+      expect(prompt).toContain("Scan thoroughly");
     });
 
     test("includes compact analysis instruction when tokenSaver is true with no passes", () => {

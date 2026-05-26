@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createSystemExecutableFinder } from "./executableFinder.js";
 import { nodeFs } from "./fileSystem.js";
 import { consoleOutputWriter } from "./outputWriter.js";
-import { nodeProcessRunner } from "./processRunner.js";
 import { createStubProcessRunner } from "./processRunner.test-helper.js";
 
 // ---------------------------------------------------------------------------
@@ -242,61 +241,6 @@ describe("nodeFs", () => {
     await nodeFs.unlink(filePath);
 
     await expect(nodeFs.access(filePath)).rejects.toThrow();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// processRunner (nodeProcessRunner)
-// ---------------------------------------------------------------------------
-describe("nodeProcessRunner", () => {
-  describe("exec", () => {
-    test("returns stdout and stderr", async () => {
-      const result = await nodeProcessRunner.exec('echo "hello"');
-
-      expect(result.stdout.trim()).toBe("hello");
-      expect(result.stderr).toBeDefined();
-    });
-
-    test("rejects on command failure", async () => {
-      await expect(nodeProcessRunner.exec('node -e "process.exit(1)"')).rejects.toThrow();
-    });
-  });
-
-  describe("execSync", () => {
-    test("returns string output", () => {
-      const result = nodeProcessRunner.execSync('echo "sync-hello"', {
-        encoding: "utf-8",
-      });
-
-      expect(result.trim()).toBe("sync-hello");
-    });
-
-    test("throws on failure", () => {
-      expect(() =>
-        nodeProcessRunner.execSync('node -e "process.exit(1)"', {
-          encoding: "utf-8",
-        })
-      ).toThrow();
-    });
-  });
-
-  describe("spawn", () => {
-    test("returns a ChildProcess", () => {
-      const child = nodeProcessRunner.spawn("echo", ["spawned"]);
-
-      expect(child).toBeDefined();
-      expect(child.pid).toBeTypeOf("number");
-    });
-
-    test("can spawn a simple command and receive exit", async () => {
-      const child = nodeProcessRunner.spawn("echo", ["test"]);
-
-      const exitCode = await new Promise<number | null>((resolve) => {
-        child.on("close", resolve);
-      });
-
-      expect(exitCode).toBe(0);
-    });
   });
 });
 

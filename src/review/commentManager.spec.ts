@@ -24,7 +24,7 @@ const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Baseline review, D
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
   reviewType?: string;
-  customReviewPhases?: readonly (
+  reviewPasses?: readonly (
     | "scan"
     | "security"
     | "logic"
@@ -162,7 +162,7 @@ describe("CommentManager", () => {
     it("includes custom review phases in the footer", () => {
       const manager = createCommentManager({
         reviewType: "custom",
-        customReviewPhases: ["scan", "logic"],
+        reviewPasses: ["scan", "logic"],
       });
 
       const result = manager.formatInlineComment(createFileFinding());

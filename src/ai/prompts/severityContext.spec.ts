@@ -339,33 +339,24 @@ describe("severityContext", () => {
       expect(section).toContain("`/admin/`");
     });
 
-    it("includes at least 20 examples", () => {
-      // Count example headers (### Example N:)
-      const exampleMatches = section.match(/### Example \d+:/g);
-      expect(exampleMatches).not.toBeNull();
-      expect(exampleMatches?.length).toBeGreaterThanOrEqual(20);
-    });
-
-    it("includes examples showing same bug in different contexts", () => {
-      // Example 1: Array Access Without Bounds Check
-      expect(section).toContain("Array Access Without Bounds Check");
-      expect(section).toContain("src/auth/validateToken.ts");
-      expect(section).toContain("src/utils/formatDate.ts");
-      expect(section).toContain("tests/helpers/mockData.ts");
+    it("includes compact examples showing same bug in different contexts", () => {
+      // 6 compact examples replacing the old verbose 20+
+      expect(section).toContain("Missing Input Validation");
+      expect(section).toContain("Hardcoded Secret");
+      expect(section).toContain("Missing Error Handling");
+      expect(section).toContain("SQL Injection");
     });
 
     it("includes examples for security-critical context", () => {
-      expect(section).toContain("Security-critical context elevates severity");
-      expect(section).toContain("authentication code");
+      expect(section).toContain("src/auth/");
+      expect(section).toContain("CRITICAL");
     });
 
     it("includes examples for financial context", () => {
-      expect(section).toContain("Financial context");
-      expect(section).toContain("payment code");
+      expect(section).toContain("src/payment/");
     });
 
     it("includes examples for test context", () => {
-      expect(section).toContain("Test context = lenient severity");
       expect(section).toContain("no production impact");
     });
 
@@ -425,7 +416,7 @@ describe("severityContext", () => {
 
     it("includes admin severity rules", () => {
       expect(section).toContain("high privilege");
-      expect(section).toContain("Admin context");
+      expect(section).toContain("admin");
     });
 
     it("includes utility severity rules", () => {

@@ -4,8 +4,6 @@ import { ConfigurationError } from "./errors/index.js";
 import { type Environment, processEnvironment } from "./ports/environment.js";
 import type { GitBackendType } from "./review/gitClient.js";
 import {
-  type GeneralReviewPhase,
-  parseCustomReviewPhases,
   parseReviewPasses,
   type ResolvedReviewProfile,
   type ReviewPass,
@@ -23,21 +21,6 @@ export type {
   ReviewPass,
   ReviewStrategy,
 } from "./review/reviewSelection.js";
-
-/**
- * Deprecated environment variable aliases retained for v1 compatibility.
- *
- * @deprecated Remove these aliases in v2 after deleting fallback support.
- */
-const DEPRECATED_ENV_VAR_ALIASES = {
-  agentTimeout: "MM_AGENT_TIMEOUT",
-  copilotModel: "MM_COPILOT_MODEL",
-  copilotSdkModel: "MM_COPILOT_SDK_MODEL",
-  opencodeModel: "MM_OPENCODE_MODEL",
-  opencodeSdkModel: "MM_OPENCODE_SDK_MODEL",
-  copilotSdkBaseUrl: "MM_COPILOT_SDK_BASE_URL",
-  copilotSdkApiKey: "MM_COPILOT_SDK_API_KEY",
-} as const;
 
 /** GitHub-specific configuration. */
 interface GitHubConfig {
@@ -67,34 +50,14 @@ export interface Config {
   readonly copilotToken?: string;
   /** Shared timeout for all AI providers. Preferred over provider-specific timeout aliases. */
   readonly aiTimeoutMs?: number;
-  /** @deprecated Use aiTimeoutMs instead. */
-  readonly agentTimeoutMs?: number;
   /** Generic model identifier for the active AI provider. */
   readonly aiModel?: string;
-  /** @deprecated Use aiModel instead. */
-  readonly copilotModel?: string;
-  /** @deprecated Use aiTimeoutMs instead. */
-  readonly copilotTimeoutMs?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly copilotSdkModel?: string;
   /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
   readonly aiBaseUrl?: string;
   /** Generic BYOK API key for AI providers that support it. */
   readonly aiApiKey?: string;
-  /** @deprecated Use aiTimeoutMs instead. */
-  readonly copilotSdkTimeoutMs?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly opencodeModel?: string;
-  /** @deprecated Use aiTimeoutMs instead. */
-  readonly opencodeTimeoutMs?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly opencodeSdkModel?: string;
-  /** @deprecated Use aiTimeoutMs instead. */
-  readonly opencodeSdkTimeoutMs?: number;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
-  /** Number of review runs to perform (1-5). Higher values increase thoroughness but also time/cost. */
-  readonly reviewRuns: number;
   /** Legacy review type alias used to resolve the review profile. Default: general */
   readonly reviewType: ReviewType;
   /** Ordered additive review passes resolved for this run. */
@@ -103,8 +66,6 @@ export interface Config {
   readonly reviewStrategy: ReviewStrategy;
   /** Fully resolved baseline + passes + strategy profile for this run. */
   readonly reviewProfile: ResolvedReviewProfile;
-  /** Selected review passes retained for legacy custom-review compatibility. */
-  readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Whether to show streaming output from AI providers. Default: true (if TTY) */
   readonly streamingEnabled: boolean;
   /** Number of lines to show in the streaming display. Default: 5 */
@@ -155,28 +116,8 @@ export function loadConfig(
   cliOverrides?: Partial<CliOverrides>,
   env: Environment = processEnvironment
 ): Config {
-  const aiTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.aiTimeout ??
-      cliOverrides?.agentTimeout ??
-      env.get("MM_AI_TIMEOUT") ??
-      env.get(DEPRECATED_ENV_VAR_ALIASES.agentTimeout)
-  );
-  const copilotTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.copilotTimeout ?? env.get("MM_COPILOT_TIMEOUT")
-  );
-  const copilotSdkTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.copilotSdkTimeout ?? env.get("MM_COPILOT_SDK_TIMEOUT")
-  );
-  const opencodeTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.opencodeTimeout ?? env.get("MM_OPENCODE_TIMEOUT")
-  );
-  const opencodeSdkTimeoutMs = parseOptionalTimeout(
-    cliOverrides?.opencodeSdkTimeout ?? env.get("MM_OPENCODE_SDK_TIMEOUT")
-  );
+  const aiTimeoutMs = parseOptionalTimeout(cliOverrides?.aiTimeout ?? env.get("MM_AI_TIMEOUT"));
 
-  const reviewRuns = validateReviewRuns(
-    cliOverrides?.reviewRuns?.toString() ?? env.get("MM_REVIEW_RUNS")
-  );
   const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"));
   const reviewType = validateReviewType(cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"));
   const reviewStrategy = validateReviewStrategy(
@@ -186,14 +127,9 @@ export function loadConfig(
     cliOverrides?.passes ?? env.get("MM_REVIEW_PASSES")
   );
 
-  if (cliOverrides?.passes && cliOverrides?.phases) {
-    throw new ConfigurationError("passes", "Use either --passes or --phases, not both.");
-  }
-
-  const legacyCustomReviewPhases = parseCustomReviewPhases(reviewType, cliOverrides?.phases);
   const resolvedReviewProfile = resolveReviewProfile({
     reviewType,
-    reviewPasses: explicitReviewPasses ?? legacyCustomReviewPhases,
+    reviewPasses: explicitReviewPasses,
     reviewStrategy,
   });
   const gitBackend = validateGitBackend(cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"));
@@ -217,36 +153,15 @@ export function loadConfig(
     gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
     aiTimeoutMs,
-    agentTimeoutMs: aiTimeoutMs,
     aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
-    copilotModel: cliOverrides?.copilotModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.copilotModel),
-    copilotTimeoutMs,
-    copilotSdkModel:
-      cliOverrides?.copilotSdkModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkModel),
-    aiBaseUrl:
-      cliOverrides?.aiBaseUrl ??
-      cliOverrides?.copilotSdkBaseUrl ??
-      env.get("MM_AI_BASE_URL") ??
-      env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkBaseUrl),
-    aiApiKey:
-      cliOverrides?.aiApiKey ??
-      cliOverrides?.copilotSdkApiKey ??
-      env.get("MM_AI_API_KEY") ??
-      env.get(DEPRECATED_ENV_VAR_ALIASES.copilotSdkApiKey),
-    copilotSdkTimeoutMs,
-    opencodeModel: cliOverrides?.opencodeModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.opencodeModel),
-    opencodeTimeoutMs,
-    opencodeSdkModel:
-      cliOverrides?.opencodeSdkModel ?? env.get(DEPRECATED_ENV_VAR_ALIASES.opencodeSdkModel),
-    opencodeSdkTimeoutMs,
+    aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
+    aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
     skipPreExisting:
       (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
-    reviewRuns,
     reviewType,
     reviewPasses: resolvedReviewProfile.passes,
     reviewStrategy: resolvedReviewProfile.strategy,
     reviewProfile: resolvedReviewProfile,
-    customReviewPhases: reviewType === "custom" ? resolvedReviewProfile.passes : undefined,
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED") !== "false",
     streamingLines:
       cliOverrides?.streamingLines ??
@@ -271,62 +186,17 @@ interface CliOverrides {
   readonly aiProvider?: string;
   readonly copilotToken?: string;
   readonly aiTimeout?: number;
-  /** @deprecated Use aiTimeout instead. */
-  readonly agentTimeout?: number;
   readonly aiModel?: string;
-  /** @deprecated Use aiModel instead. */
-  readonly copilotModel?: string;
-  readonly copilotTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly copilotSdkModel?: string;
   readonly aiBaseUrl?: string;
   readonly aiApiKey?: string;
-  /** @deprecated Use aiBaseUrl instead. */
-  readonly copilotSdkBaseUrl?: string;
-  /** @deprecated Use aiApiKey instead. */
-  readonly copilotSdkApiKey?: string;
-  readonly copilotSdkTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly opencodeModel?: string;
-  readonly opencodeTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  readonly opencodeSdkModel?: string;
-  readonly opencodeSdkTimeout?: number;
   readonly skipExistingIssues?: string;
-  readonly reviewRuns?: number;
   readonly reviewType?: string;
   readonly passes?: string;
-  readonly phases?: string;
   readonly reviewStrategy?: string;
   readonly streamingEnabled?: boolean;
   readonly streamingLines?: number;
   readonly tempPath?: string;
   readonly gitBackend?: string;
-}
-
-/**
- * Validates the number of review runs.
- * Accepted values are 1-5. Values outside this range default to 1.
- *
- * @param value - Review run count as string or undefined
- * @returns Validated run count (1-5), or 1 if invalid
- *
- * @example
- * ```typescript
- * validateReviewRuns("3"); // 3
- * validateReviewRuns("10"); // 1 (default, out of range)
- * validateReviewRuns(undefined); // 1 (default)
- * ```
- */
-export function validateReviewRuns(value: string | undefined): number {
-  if (!value) {
-    return 1; // Default to 1 run
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
-    return 1; // Default to 1 for invalid values
-  }
-  return parsed;
 }
 
 /**

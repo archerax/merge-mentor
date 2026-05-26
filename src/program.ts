@@ -39,10 +39,8 @@ export interface ReviewOptions {
   provider?: string;
   write?: boolean;
   verbose: boolean;
-  runs?: number;
   reviewType?: string;
   passes?: string;
-  phases?: string;
   strategy?: string;
   stream?: boolean;
   streamLines?: number;
@@ -61,27 +59,9 @@ export interface ReviewOptions {
   // AI provider config
   copilotToken?: string;
   aiTimeout?: number;
-  /** @deprecated Use aiTimeout instead. */
-  agentTimeout?: number;
   aiModel?: string;
-  /** @deprecated Use aiModel instead. */
-  copilotModel?: string;
-  copilotTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  copilotSdkModel?: string;
   aiBaseUrl?: string;
   aiApiKey?: string;
-  /** @deprecated Use aiBaseUrl instead. */
-  copilotSdkBaseUrl?: string;
-  /** @deprecated Use aiApiKey instead. */
-  copilotSdkApiKey?: string;
-  copilotSdkTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  opencodeModel?: string;
-  opencodeTimeout?: number;
-  /** @deprecated Use aiModel instead. */
-  opencodeSdkModel?: string;
-  opencodeSdkTimeout?: number;
   // Comment filtering
   skipExistingIssues?: string;
   // File filtering
@@ -106,21 +86,6 @@ interface ProgramDeps {
   output?: OutputWriter;
   env?: Environment;
 }
-
-/**
- * Deprecated CLI option aliases retained for v1 compatibility.
- *
- * @deprecated Remove these aliases in v2 after deleting Commander option support.
- */
-const DEPRECATED_CLI_OPTION_ALIASES = {
-  agentTimeout: "--agent-timeout <ms>",
-  copilotModel: "--copilot-model <model>",
-  copilotSdkModel: "--copilot-sdk-model <model>",
-  opencodeModel: "--opencode-model <model>",
-  opencodeSdkModel: "--opencode-sdk-model <model>",
-  copilotSdkBaseUrl: "--copilot-sdk-base-url <url>",
-  copilotSdkApiKey: "--copilot-sdk-api-key <key>",
-} as const;
 
 /**
  * Merges a resolved CI context into review options.
@@ -210,25 +175,12 @@ export async function executeReview(
     tempPath: resolvedOptions.tempPath,
     aiProvider: resolvedOptions.provider,
     aiModel: resolvedOptions.aiModel,
-    copilotModel: resolvedOptions.copilotModel,
-    aiTimeout: resolvedOptions.aiTimeout ?? resolvedOptions.agentTimeout,
-    agentTimeout: resolvedOptions.agentTimeout,
-    copilotTimeout: resolvedOptions.copilotTimeout,
-    copilotSdkModel: resolvedOptions.copilotSdkModel,
-    aiBaseUrl: resolvedOptions.aiBaseUrl ?? resolvedOptions.copilotSdkBaseUrl,
-    aiApiKey: resolvedOptions.aiApiKey ?? resolvedOptions.copilotSdkApiKey,
-    copilotSdkBaseUrl: resolvedOptions.copilotSdkBaseUrl,
-    copilotSdkApiKey: resolvedOptions.copilotSdkApiKey,
-    copilotSdkTimeout: resolvedOptions.copilotSdkTimeout,
-    opencodeModel: resolvedOptions.opencodeModel,
-    opencodeTimeout: resolvedOptions.opencodeTimeout,
-    opencodeSdkModel: resolvedOptions.opencodeSdkModel,
-    opencodeSdkTimeout: resolvedOptions.opencodeSdkTimeout,
+    aiTimeout: resolvedOptions.aiTimeout,
+    aiBaseUrl: resolvedOptions.aiBaseUrl,
+    aiApiKey: resolvedOptions.aiApiKey,
     skipExistingIssues: resolvedOptions.skipExistingIssues,
-    reviewRuns: resolvedOptions.runs,
     reviewType: resolvedOptions.reviewType,
     passes: resolvedOptions.passes,
-    phases: resolvedOptions.phases,
     reviewStrategy: resolvedOptions.strategy,
     streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
     streamingLines: resolvedOptions.streamLines,
@@ -264,29 +216,8 @@ export async function executeReview(
   }
 
   const dryRun = !resolvedOptions.write;
-  const reviewRuns = resolvedOptions.runs ?? config.reviewRuns;
-
-  // Select provider-specific model and resolve the shared timeout.
-  let aiModel: string | undefined;
-  let aiTimeoutMs = config.aiTimeoutMs;
-
-  switch (aiProvider) {
-    case "copilot-sdk":
-      aiModel = config.aiModel ?? config.copilotSdkModel ?? config.copilotModel;
-      aiTimeoutMs ??= config.copilotSdkTimeoutMs ?? config.copilotTimeoutMs;
-      break;
-    case "opencode":
-      aiModel = config.aiModel ?? config.opencodeModel;
-      aiTimeoutMs ??= config.opencodeTimeoutMs;
-      break;
-    case "opencode-sdk":
-      aiModel = config.aiModel ?? config.opencodeSdkModel ?? config.opencodeModel;
-      aiTimeoutMs ??= config.opencodeSdkTimeoutMs ?? config.opencodeTimeoutMs;
-      break;
-    default:
-      aiModel = config.aiModel ?? config.copilotModel;
-      aiTimeoutMs ??= config.copilotTimeoutMs;
-  }
+  const aiModel = config.aiModel;
+  const aiTimeoutMs = config.aiTimeoutMs;
 
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun,
@@ -297,11 +228,9 @@ export async function executeReview(
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     skipPreExisting: config.skipPreExisting,
-    reviewRuns,
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
     reviewPasses: config.reviewPasses,
     reviewStrategy: config.reviewStrategy,
-    customReviewPhases: config.customReviewPhases,
     streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
     ciMode: resolvedOptions.ci,
@@ -328,7 +257,6 @@ export async function executeReview(
       config.reviewStrategy
     )}`
   );
-  output.log(`  Runs:     ${reviewRuns}`);
   output.log("");
 
   const result = await engine.reviewPR(pr);
@@ -671,13 +599,6 @@ program
   )
   .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
   .option("--verbose", "Enable verbose output", true)
-  .option("--runs <number>", "Number of review runs (1-5). Env: MM_REVIEW_RUNS", (value) => {
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
-      throw new Error("--runs must be a number between 1 and 5");
-    }
-    return parsed;
-  })
   .option(
     "--review-type <type>",
     "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
@@ -686,10 +607,6 @@ program
   .option(
     "--passes <passNames>",
     `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
-  )
-  .option(
-    "--phases <phaseNames>",
-    `Deprecated alias for --passes when used with --review-type custom. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
   )
   .option("--strategy <strategy>", "Execution strategy (standard or fast). Env: MM_REVIEW_STRATEGY")
   .option(
@@ -714,61 +631,12 @@ program
   // AI provider config
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.agentTimeout,
-    "Deprecated alias for --ai-timeout. Env: MM_AGENT_TIMEOUT",
-    parseInt
-  )
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.copilotModel,
-    "Deprecated alias for --ai-model. Env: MM_COPILOT_MODEL"
-  )
-  .option(
-    "--copilot-timeout <ms>",
-    "Copilot timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
-    parseInt
-  )
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkModel,
-    "Deprecated alias for --ai-model. Env: MM_COPILOT_SDK_MODEL"
-  )
   .option(
     "--ai-base-url <url>",
     "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
   )
   .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkBaseUrl,
-    "Deprecated alias for --ai-base-url. Env: MM_COPILOT_SDK_BASE_URL"
-  )
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.copilotSdkApiKey,
-    "Deprecated alias for --ai-api-key. Env: MM_COPILOT_SDK_API_KEY"
-  )
-  .option(
-    "--copilot-sdk-timeout <ms>",
-    "Copilot SDK timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
-    parseInt
-  )
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.opencodeModel,
-    "Deprecated alias for --ai-model. Env: MM_OPENCODE_MODEL"
-  )
-  .option(
-    "--opencode-timeout <ms>",
-    "OpenCode timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
-    parseInt
-  )
-  .option(
-    DEPRECATED_CLI_OPTION_ALIASES.opencodeSdkModel,
-    "Deprecated alias for --ai-model. Env: MM_OPENCODE_SDK_MODEL"
-  )
-  .option(
-    "--opencode-sdk-timeout <ms>",
-    "OpenCode SDK timeout in ms. Deprecated alias for --ai-timeout / MM_AI_TIMEOUT.",
-    parseInt
-  )
   // Comment filtering
   .option(
     "--skip-existing-issues <bool>",
@@ -820,26 +688,13 @@ program
         commentIdentifier: options.commentIdentifier,
         aiProvider: options.provider,
         copilotToken: options.copilotToken,
-        aiTimeout: options.aiTimeout ?? options.agentTimeout,
+        aiTimeout: options.aiTimeout,
         aiModel: options.aiModel,
-        agentTimeout: options.agentTimeout,
-        copilotModel: options.copilotModel,
-        copilotTimeout: options.copilotTimeout,
-        copilotSdkModel: options.copilotSdkModel,
         aiBaseUrl: options.aiBaseUrl,
         aiApiKey: options.aiApiKey,
-        copilotSdkBaseUrl: options.copilotSdkBaseUrl,
-        copilotSdkApiKey: options.copilotSdkApiKey,
-        copilotSdkTimeout: options.copilotSdkTimeout,
-        opencodeModel: options.opencodeModel,
-        opencodeTimeout: options.opencodeTimeout,
-        opencodeSdkModel: options.opencodeSdkModel,
-        opencodeSdkTimeout: options.opencodeSdkTimeout,
         skipExistingIssues: options.skipExistingIssues,
-        reviewRuns: options.runs,
         reviewType: options.reviewType,
         passes: options.passes,
-        phases: options.phases,
         reviewStrategy: options.strategy,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;

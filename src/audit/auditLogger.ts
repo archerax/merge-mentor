@@ -345,20 +345,6 @@ export class AuditLogger {
   }
 
   /**
-   * Logs Copilot CLI execution.
-   *
-   * @deprecated Use logAIProviderExecution instead
-   */
-  logCopilotExecution(
-    promptType: string,
-    model?: string,
-    result: "success" | "failure" = "success",
-    error?: string
-  ): void {
-    this.logAIProviderExecution("copilot", promptType, model, result, error);
-  }
-
-  /**
    * Logs AI provider execution.
    *
    * Called when executing a prompt with the configured AI provider (Copilot SDK, OpenCode, etc.).
@@ -409,7 +395,6 @@ export class AuditLogger {
   logReviewStart(
     prNumber: number,
     platform: string,
-    runs: number,
     reviewType?: string,
     reviewPasses?: readonly string[],
     reviewStrategy?: string
@@ -422,7 +407,6 @@ export class AuditLogger {
       {
         prNumber,
         platform,
-        runs,
         reviewType: reviewType ?? "general",
         ...(reviewPasses && reviewPasses.length > 0 ? { reviewPasses } : {}),
         ...(reviewStrategy ? { reviewStrategy } : {}),

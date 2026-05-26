@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, test, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import packageJson from "../../package.json" with { type: "json" };
 import { createAIProvider } from "../ai/index.js";
 import { ValidationError } from "../errors/index.js";
@@ -170,12 +170,12 @@ describe("ReviewEngine", () => {
 
   describe("constructor", () => {
     it("creates engine with default options", () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
       expect(engine).toBeDefined();
     });
 
     it("creates engine with custom options", () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         dryRun: true,
       });
@@ -211,7 +211,7 @@ describe("ReviewEngine", () => {
       const { nodeFs } = await import("../ports/index.js");
       vi.mocked(nodeFs.access).mockResolvedValue(undefined);
 
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         localWorkspacePath: "/preexisting/checkout",
       });
@@ -228,7 +228,7 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
 
-      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
 
       await engine.reviewPR(123);
 
@@ -248,7 +248,7 @@ describe("ReviewEngine", () => {
       const { nodeFs } = await import("../ports/index.js");
       vi.mocked(nodeFs.access).mockRejectedValue(new Error("ENOENT"));
 
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         localWorkspacePath: "/nonexistent/path",
       });
@@ -261,26 +261,26 @@ describe("ReviewEngine", () => {
 
   describe("reviewPR", () => {
     it("throws ValidationError for negative PR number", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
 
       await expect(engine.reviewPR(-1)).rejects.toThrow(ValidationError);
       await expect(engine.reviewPR(-1)).rejects.toThrow("Must be a positive integer");
     });
 
     it("throws ValidationError for zero PR number", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
 
       await expect(engine.reviewPR(0)).rejects.toThrow(ValidationError);
     });
 
     it("throws ValidationError for non-integer PR number", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]");
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
 
       await expect(engine.reviewPR(1.5)).rejects.toThrow(ValidationError);
     });
 
     it("skips deleted files", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files: PRFile[] = [createPRFile({ filename: "deleted.ts", status: "deleted" })];
 
@@ -294,7 +294,7 @@ describe("ReviewEngine", () => {
     });
 
     it("skips files without patch", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files: PRFile[] = [createPRFile({ patch: undefined })];
 
@@ -309,7 +309,7 @@ describe("ReviewEngine", () => {
     });
 
     it("skips binary and generated files", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files: PRFile[] = [
         createPRFile({ filename: "image.png", status: "modified", patch: "@@ test @@" }),
@@ -328,7 +328,7 @@ describe("ReviewEngine", () => {
     });
 
     it("returns result with PR details", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -343,7 +343,7 @@ describe("ReviewEngine", () => {
     });
 
     it("returns zero linesAdded and linesDeleted when PR has no files", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -357,7 +357,7 @@ describe("ReviewEngine", () => {
     });
 
     it("sums linesAdded and linesDeleted from non-ignored files", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files: PRFile[] = [
         createPRFile({ filename: "a.ts", additions: 20, deletions: 5 }),
@@ -375,7 +375,7 @@ describe("ReviewEngine", () => {
     });
 
     it("returns zero linesAdded and linesDeleted when all files are ignored", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         ignorePatterns: ["*.ts"],
       });
@@ -393,7 +393,7 @@ describe("ReviewEngine", () => {
     });
 
     it("handles dry run mode", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         dryRun: true,
       });
@@ -411,7 +411,7 @@ describe("ReviewEngine", () => {
 
     it("logs actions in verbose mode", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: true });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: true });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -426,7 +426,7 @@ describe("ReviewEngine", () => {
 
     it("suppresses logs in non-verbose mode", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -441,7 +441,7 @@ describe("ReviewEngine", () => {
 
     it("continues review when comment action fails", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: true });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: true });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -457,7 +457,7 @@ describe("ReviewEngine", () => {
     });
 
     it("handles file without patch", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files = [createPRFile({ patch: undefined })];
 
@@ -478,7 +478,7 @@ describe("ReviewEngine", () => {
 
     it("shows dry run actions for inline comment", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: true,
         dryRun: true,
       });
@@ -519,7 +519,7 @@ describe("ReviewEngine", () => {
     });
 
     it("skips creating duplicate comments when matching comment exists", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
       const existingComments: ExistingComment[] = [
@@ -571,7 +571,7 @@ describe("ReviewEngine", () => {
     });
 
     it("executes create action for general comment", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -593,7 +593,7 @@ describe("ReviewEngine", () => {
     });
 
     it("executes create action for inline comment", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
 
@@ -635,7 +635,7 @@ describe("ReviewEngine", () => {
     });
 
     it("includes version, review type, and model in posted comment footers", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "security",
         aiModel: "claude-sonnet-4.6",
@@ -682,7 +682,7 @@ describe("ReviewEngine", () => {
     });
 
     it("warns when all findings filtered out due to invalid line numbers", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files = [
         createPRFile({
@@ -727,7 +727,7 @@ describe("ReviewEngine", () => {
 
     it("reuses cached cross-file analysis when all files unchanged", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: true });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: true });
       const prDetails = createPRDetails();
       const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
 
@@ -778,7 +778,7 @@ describe("ReviewEngine", () => {
     });
 
     it("performs new cross-file analysis when some files changed", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
       const files = [
         createPRFile({
@@ -848,7 +848,7 @@ describe("ReviewEngine", () => {
     });
 
     it("handles action with no body for create", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
 
       // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
@@ -861,7 +861,7 @@ describe("ReviewEngine", () => {
     });
 
     it("creates general comment when path or line is missing", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
 
       // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
@@ -876,7 +876,7 @@ describe("ReviewEngine", () => {
     });
 
     it("creates general comment when only path is provided", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
 
       // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
@@ -892,7 +892,7 @@ describe("ReviewEngine", () => {
     });
 
     it("creates general comment when only line is provided", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
 
       // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
@@ -908,226 +908,9 @@ describe("ReviewEngine", () => {
     });
   });
 
-  describe("multi-run mode", () => {
-    it("uses single run when reviewRuns is 1", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        reviewRuns: 1,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      await engine.reviewPR(123);
-
-      // Should NOT show multi-run messages
-      const multiRunCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] && String(call[0]).includes("Multi-run mode")
-      );
-      expect(multiRunCalls.length).toBe(0);
-      consoleSpy.mockRestore();
-    });
-
-    it("defaults to single run when reviewRuns not specified", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        // reviewRuns not specified - should default to 1
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      await engine.reviewPR(123);
-
-      // Should NOT show multi-run messages
-      const multiRunCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] && String(call[0]).includes("Multi-run mode")
-      );
-      expect(multiRunCalls.length).toBe(0);
-      consoleSpy.mockRestore();
-    });
-
-    it("logs reviewRuns in constructor", () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        reviewRuns: 3,
-      });
-      expect(engine).toBeDefined();
-    });
-
-    test("executes multiple runs and aggregates findings", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: true,
-        reviewRuns: 2,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-
-      mockParseBatchedFileReview.mockReturnValue([
-        {
-          filename: "test.ts",
-          findings: [],
-        },
-      ]);
-
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      // Should show multi-run log output
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("📝 Review run"));
-      expect(result).toBeDefined();
-
-      consoleSpy.mockRestore();
-    });
-
-    it("continues with remaining runs when one run fails", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: false, // Reduce logging
-        reviewRuns: 2,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-
-      // First run fails, second succeeds
-      let callCount = 0;
-      mockExecutePrompt.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          throw new Error("Run 1 failed");
-        }
-        return Promise.resolve({ raw: "{}", parsed: {} });
-      });
-
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [],
-      });
-
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      // Should continue and complete
-      expect(result).toBeDefined();
-
-      consoleSpy.mockRestore();
-    });
-
-    test("does not wait after last run", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: false,
-        reviewRuns: 2,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([
-        {
-          filename: "test.ts",
-          findings: [],
-        },
-      ]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      await engine.reviewPR(123);
-
-      // Test verifies the code completes without hanging
-      // (no delay after last run)
-    });
-
-    it("creates synthetic comments from previous run findings", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
-        verbose: false,
-        reviewRuns: 2,
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-
-      mockParseBatchedFileReview.mockReturnValue([
-        {
-          filename: "test.ts",
-          findings: [],
-        },
-      ]);
-
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Good",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      // Second run should receive context from first run
-      expect(mockExecutePrompt).toHaveBeenCalled();
-      expect(result).toBeDefined();
-    }, 10000);
-  });
-
   describe("executeCommentAction error handling", () => {
     it("throws error for create action without body", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", { verbose: false });
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
       const prDetails = createPRDetails();
 
       vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
@@ -1147,7 +930,7 @@ describe("ReviewEngine", () => {
 
   describe("resolved review profiles", () => {
     it("resolves security reviewType to a baseline review with a security pass", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "security",
       });
@@ -1175,7 +958,7 @@ describe("ReviewEngine", () => {
     });
 
     it("resolves performance reviewType to a baseline review with a performance pass", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "performance",
       });
@@ -1202,7 +985,7 @@ describe("ReviewEngine", () => {
     });
 
     it("resolves testing reviewType to a baseline review with a testing pass", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "testing",
       });
@@ -1230,7 +1013,7 @@ describe("ReviewEngine", () => {
     });
 
     it("uses fast strategy when reviewType is fast", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "fast",
       });
@@ -1274,10 +1057,10 @@ describe("ReviewEngine", () => {
     });
 
     it("uses ordered additive passes when reviewType is custom", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "custom",
-        customReviewPhases: ["scan", "logic"],
+        reviewPasses: ["scan", "logic"],
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1307,7 +1090,7 @@ describe("ReviewEngine", () => {
     });
 
     it("fast review returns empty results when no files have patches", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         reviewType: "fast",
       });
@@ -1331,7 +1114,7 @@ describe("ReviewEngine", () => {
 
   describe("dry run and comment error handling", () => {
     it("dry run logs planned actions without posting comments", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         dryRun: true,
       });
@@ -1374,7 +1157,7 @@ describe("ReviewEngine", () => {
     });
 
     it("comment action error populates commentErrors", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
         dryRun: false,
       });

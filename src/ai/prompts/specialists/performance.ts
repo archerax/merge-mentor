@@ -363,37 +363,7 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For performance findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "N+1 query pattern in user listing"
-
-Counter-Argument Considered:
-"Data might be cached or dataset is small enough"
-
-Rebuttal:
-"✓ Verified: No caching layer present (checked Redis/cache imports)
-✓ Scale analysis: users table has 50k+ records (from migration comments)
-✓ Hot path confirmed: Called on every page load (dashboard component)
-✓ Impact: 50k DB queries vs 1 with batch loading"
-
-Decision: ✅ **Report** (confirmed significant performance impact)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Array.includes() in loop could use Set"
-
-Counter-Argument Considered:
-"Array size might be small enough that Set overhead isn't worth it"
-
-Rebuttal:
-"✓ Checked data: Array has max 5 items (from validation schema)
-✓ Scale analysis: O(5) lookup is negligible
-✓ Set overhead: Creating Set costs more than 5 array lookups
-✓ Hot path check: Called once per form submit (not performance critical)"
-
-Decision: ❌ **Don't report** (micro-optimization with no measurable impact)
+For performance findings that could be questioned, apply the self-challenge above before reporting. Only include findings with measurable, hot-path performance impact.
 
 ${buildBatchedFileResultsOutputFormat({
   analysisInstruction: "Document your performance analysis step-by-step",
@@ -401,7 +371,7 @@ ${buildBatchedFileResultsOutputFormat({
   categoryExample: "performance",
   messageExample: "Clear description of the performance issue",
   suggestionExample: "Specific optimization with code example",
-  reasoningExample: "Complexity analysis, scale impact, verification notes",
+  reasoningExample: "Complexity or resource impact and concrete performance consequence",
   footer:
     "REMEMBER: Include entry for EVERY file listed, even with empty findings. Only report PERFORMANCE issues.",
 })}
@@ -607,46 +577,14 @@ Before reporting ANY finding, challenge yourself:
 
 ## Counter-Argument Documentation
 
-For findings that could be questioned, document your self-challenge:
-
-**Example 1 - Report After Challenge:**
-
-Finding: "Sequential data fetching across service layers"
-
-Counter-Argument Considered:
-"Maybe sequential is intentional for data consistency"
-
-Rebuttal:
-"✓ Checked: No transaction requirements across these services
-✓ Verified: Services are independent (UserService, ProfileService, SettingsService)
-✓ Pattern analysis: Other service calls use Promise.all for parallel fetching
-✓ Performance impact: 3 × 200ms = 600ms sequential vs 200ms parallel
-✓ System impact: User-facing page load, significant latency at scale"
-
-Decision: ✅ **Report** (architectural performance inefficiency confirmed)
-
-**Example 2 - Skip After Challenge:**
-
-Finding: "Different caching strategies in different modules"
-
-Counter-Argument Considered:
-"This might be intentional for different data characteristics"
-
-Rebuttal:
-"✓ Reviewed: Intentional strategy per module (user data: Redis, static: CDN, session: in-memory)
-✓ Pattern verified: Each strategy appropriate for data access patterns
-✓ Performance rationale: Different TTLs and invalidation needs documented
-✓ No performance gap: Each module optimized for its use case"
-
-Decision: ❌ **Don't report** (intentional performance architecture)
+For findings that could be questioned, apply the self-challenge above before reporting. Only include findings with realistic, measurable cross-file performance impact.
 
 ${buildCrossFileOutputFormat({
   intro: "Provide a complete cross-file performance analysis in JSON format:",
   severityExample: "high",
   categoryExample: "performance",
   messageExample: "Clear description of cross-file performance issue",
-  reasoningExample:
-    "Detailed verification of cross-file performance impact with scale analysis and evidence",
+  reasoningExample: "Why this cross-file performance concern is real and its impact at scale",
   overallAssessmentExample:
     "Brief summary of PR's performance characteristics and architectural performance concerns",
   recommendationExample: "Actionable performance improvement suggestions",

@@ -200,11 +200,7 @@ describe("Specialized Review Prompts", () => {
       const prompt = buildSecurityFileReviewPrompt(mockManifest);
 
       expect(prompt).toContain("## Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
-      expect(prompt).toContain("Decision:");
-      expect(prompt).toContain("✅ **Report**");
-      expect(prompt).toContain("❌ **Don't report**");
+      expect(prompt).toContain("self-challenge");
     });
   });
 
@@ -357,11 +353,7 @@ describe("Specialized Review Prompts", () => {
       const prompt = buildPerformanceFileReviewPrompt(mockManifest);
 
       expect(prompt).toContain("## Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
-      expect(prompt).toContain("Decision:");
-      expect(prompt).toContain("✅ **Report**");
-      expect(prompt).toContain("❌ **Don't report**");
+      expect(prompt).toContain("self-challenge");
     });
   });
 
@@ -523,8 +515,7 @@ describe("Specialized Review Prompts", () => {
       const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
 
       expect(prompt).toContain("Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
+      expect(prompt).toContain("self-challenge");
     });
 
     it("should include verification checklist", () => {
@@ -685,8 +676,7 @@ describe("Specialized Review Prompts", () => {
       const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
 
       expect(prompt).toContain("Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
+      expect(prompt).toContain("self-challenge");
     });
 
     it("should include verification checklist", () => {
@@ -711,6 +701,7 @@ describe("Specialized Review Prompts", () => {
         expect(prompt).toContain("# VERIFICATION CHECKLIST");
         expect(prompt).toContain("# SELF-CHALLENGE REQUIREMENT");
         expect(prompt).toContain("## Counter-Argument Documentation");
+        expect(prompt).toContain("self-challenge");
         expect(prompt).toContain("# OUTPUT FORMAT");
       }
     });
@@ -857,10 +848,12 @@ describe("General Review Prompts", () => {
     });
 
     describe("tokenSaver option", () => {
-      it("includes mandatory analysis structure by default", () => {
+      it("uses compact analysis structure by default (no MANDATORY ANALYSIS STRUCTURE)", () => {
         const prompt = buildGeneralFileReviewPrompt(mockManifest);
 
-        expect(prompt).toContain("MANDATORY ANALYSIS STRUCTURE");
+        expect(prompt).not.toContain("MANDATORY ANALYSIS STRUCTURE");
+        expect(prompt).toContain("# ANALYSIS");
+        expect(prompt).toContain("Scan thoroughly");
       });
 
       it("suppresses mandatory analysis structure when tokenSaver is true", () => {

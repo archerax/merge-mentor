@@ -59,8 +59,6 @@ interface CommentManagerOptions {
   readonly reviewType?: string;
   /** Ordered additive review passes shown in review footers. */
   readonly reviewPasses?: readonly ReviewPass[];
-  /** @deprecated Use reviewPasses instead. */
-  readonly customReviewPhases?: readonly ReviewPass[];
   /** Execution strategy shown in review footers. */
   readonly reviewStrategy?: ReviewStrategy;
   /** Configured AI model identifier shown in comment footers. */
@@ -101,7 +99,7 @@ export class CommentManager {
     this.skipPreExisting = options?.skipPreExisting ?? true;
     this.footer = this.buildFooter(
       options?.reviewType,
-      options?.reviewPasses ?? options?.customReviewPhases,
+      options?.reviewPasses,
       options?.reviewStrategy,
       options?.model
     );

@@ -86,7 +86,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     overrides.reviewProfile ??
     resolveReviewProfile({
       reviewType,
-      reviewPasses: overrides.reviewPasses ?? overrides.customReviewPhases,
+      reviewPasses: overrides.reviewPasses,
       reviewStrategy: overrides.reviewStrategy,
     });
 
@@ -96,15 +96,13 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
     botCommentIdentifier: "[merge-mentor]",
     aiProvider: "copilot",
+    aiModel: "claude-sonnet-4.6",
     gitBackend: "cli",
-    copilotModel: "claude-sonnet-4.6",
     skipPreExisting: true,
-    reviewRuns: 1,
     reviewType,
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,
-    customReviewPhases: reviewType === "custom" ? reviewProfile.passes : undefined,
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
@@ -214,7 +212,6 @@ describe("CLI", () => {
           dryRun: true,
           verbose: true,
           aiModel: "claude-sonnet-4.6",
-          reviewRuns: 1,
         })
       );
       expect(mockReviewPR).toHaveBeenCalledWith(42);
@@ -255,7 +252,6 @@ describe("CLI", () => {
           dryRun: false,
           verbose: false,
           aiModel: "claude-sonnet-4.6",
-          reviewRuns: 1,
         })
       );
     });
@@ -356,30 +352,11 @@ describe("CLI", () => {
       expect(dryRunCalls.length).toBe(0);
     });
 
-    it("passes --runs option to ReviewEngine", async () => {
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-        runs: 3,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "copilot",
-        expect.objectContaining({
-          reviewRuns: 3,
-        })
-      );
-    });
-
     it("passes custom review phases through config and engine options", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           reviewType: "custom",
-          customReviewPhases: ["scan", "logic"],
+          reviewPasses: ["scan", "logic"],
         })
       );
 
@@ -387,7 +364,7 @@ describe("CLI", () => {
         write: false,
         verbose: true,
         reviewType: "custom",
-        phases: "scan,logic",
+        passes: "scan,logic",
       });
 
       await executeReview(options);
@@ -395,7 +372,7 @@ describe("CLI", () => {
       expect(loadConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           reviewType: "custom",
-          phases: "scan,logic",
+          passes: "scan,logic",
         })
       );
       expect(ReviewEngine).toHaveBeenCalledWith(
@@ -422,9 +399,7 @@ describe("CLI", () => {
     });
 
     it("omits model from start banner when aiModel is not set", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({ aiModel: undefined, copilotModel: undefined })
-      );
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ aiModel: undefined }));
 
       await executeReview(createReviewOptions({ write: false, verbose: true }));
 
@@ -449,26 +424,6 @@ describe("CLI", () => {
       await executeReview(createReviewOptions({ write: false, verbose: true }));
 
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("BYOK URL:"));
-    });
-
-    it("uses config default for runs when --runs not specified", async () => {
-      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ reviewRuns: 2 }));
-
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "copilot",
-        expect.objectContaining({
-          reviewRuns: 2,
-        })
-      );
     });
 
     it("passes skipPreExisting config to ReviewEngine", async () => {
@@ -497,8 +452,8 @@ describe("CLI", () => {
     it("uses opencode provider when specified via --provider", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
-          opencodeModel: "claude-4.5-sonnet",
-          opencodeTimeoutMs: 120000,
+          aiModel: "claude-4.5-sonnet",
+          aiTimeoutMs: 120000,
         })
       );
 
@@ -521,94 +476,11 @@ describe("CLI", () => {
       );
     });
 
-    it("prefers shared agent timeout over deprecated provider-specific timeouts", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({
-          aiProvider: "copilot-sdk",
-          aiTimeoutMs: 600000,
-          copilotTimeoutMs: 120000,
-          copilotSdkTimeoutMs: 180000,
-        })
-      );
-
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "copilot-sdk",
-        expect.objectContaining({
-          aiTimeoutMs: 600000,
-        })
-      );
-    });
-
-    it("uses shared Copilot model and timeout for copilot-sdk when sdk-specific values are unset", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({
-          aiProvider: "copilot-sdk",
-          copilotModel: "claude-haiku-4.5",
-          copilotTimeoutMs: 420000,
-          copilotSdkModel: undefined,
-          copilotSdkTimeoutMs: undefined,
-        })
-      );
-
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "copilot-sdk",
-        expect.objectContaining({
-          aiModel: "claude-haiku-4.5",
-          aiTimeoutMs: 420000,
-        })
-      );
-    });
-
-    it("prefers generic aiModel over provider-specific model aliases", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({
-          aiProvider: "copilot-sdk",
-          aiModel: "gpt-5.2-codex",
-          copilotModel: "claude-haiku-4.5",
-          copilotSdkModel: "claude-sonnet-4.6",
-        })
-      );
-
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "copilot-sdk",
-        expect.objectContaining({
-          aiModel: "gpt-5.2-codex",
-        })
-      );
-    });
-
     it("passes Copilot SDK BYOK settings to ReviewEngine", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           aiProvider: "copilot-sdk",
-          copilotSdkModel: "gpt-5.2-codex",
+          aiModel: "gpt-5.2-codex",
           aiBaseUrl: "https://bedrock.example.com/openai/v1",
           aiApiKey: "bedrock-key",
         })
@@ -629,35 +501,6 @@ describe("CLI", () => {
           aiModel: "gpt-5.2-codex",
           aiBaseUrl: "https://bedrock.example.com/openai/v1",
           aiApiKey: "bedrock-key",
-        })
-      );
-    });
-
-    it("uses shared OpenCode model and timeout for opencode-sdk when sdk-specific values are unset", async () => {
-      vi.mocked(loadConfig).mockReturnValue(
-        createMockConfig({
-          aiProvider: "opencode-sdk",
-          opencodeModel: "claude-sonnet-4.5",
-          opencodeTimeoutMs: 240000,
-          opencodeSdkModel: undefined,
-          opencodeSdkTimeoutMs: undefined,
-        })
-      );
-
-      const options = createReviewOptions({
-        write: false,
-        verbose: true,
-      });
-
-      await executeReview(options);
-
-      expect(ReviewEngine).toHaveBeenCalledWith(
-        expect.any(Object),
-        "[merge-mentor]",
-        "opencode-sdk",
-        expect.objectContaining({
-          aiModel: "claude-sonnet-4.5",
-          aiTimeoutMs: 240000,
         })
       );
     });

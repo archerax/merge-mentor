@@ -166,15 +166,9 @@ export MM_AI_TIMEOUT=3600000
 # Generic AI model setting
 export MM_AI_MODEL=gpt-5.2-codex
 
-# Deprecated Copilot-specific model alias (scheduled for removal in v2)
-export MM_COPILOT_MODEL=claude-sonnet-4.6
-
 # Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
 export MM_AI_BASE_URL=https://your-resource.openai.azure.com/openai/v1/
 export MM_AI_API_KEY=your_provider_api_key
-
-# Deprecated OpenCode-specific model alias (scheduled for removal in v2)
-export MM_OPENCODE_MODEL=claude-sonnet-4.6
 
 ```
 
@@ -190,15 +184,9 @@ $env:MM_AI_TIMEOUT="3600000"
 # Generic AI model setting
 $env:MM_AI_MODEL="gpt-5.2-codex"
 
-# Deprecated Copilot-specific model alias (scheduled for removal in v2)
-$env:MM_COPILOT_MODEL="claude-sonnet-4.6"
-
 # Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
 $env:MM_AI_BASE_URL="https://your-resource.openai.azure.com/openai/v1/"
 $env:MM_AI_API_KEY="your_provider_api_key"
-
-# Deprecated OpenCode-specific model alias (scheduled for removal in v2)
-$env:MM_OPENCODE_MODEL="claude-sonnet-4.6"
 ```
 
 **Or use command-line parameters:**
@@ -223,21 +211,13 @@ wire API recommended by the Copilot SDK BYOK documentation.
 > your provider. The same Haiku review cost **0.33× GitHub Copilot premium requests** via the
 > Copilot SDK provider.
 
-| Model | Cost (12-file review) | Issues found |
-|-------|-----------------------|--------------|
-| Claude Haiku 4.5 | £0.25 | 100% (baseline) |
-| Kimi 2.5 | £0.22 | ~68% |
-| Minimax M2.5 | £0.05 | ~126% |
+| Model            | Cost (12-file review) | Issues found    |
+| ---------------- | --------------------- | --------------- |
+| Claude Haiku 4.5 | £0.25                 | 100% (baseline) |
+| Kimi 2.5         | £0.22                 | ~68%            |
+| Minimax M2.5     | £0.05                 | ~126%           |
 
-Deprecated v1 aliases remain supported for backward compatibility and are scheduled for removal in v2:
-
-- `MM_AGENT_TIMEOUT` / `--agent-timeout`
-- `MM_COPILOT_MODEL` / `--copilot-model`
-- `MM_COPILOT_SDK_MODEL` / `--copilot-sdk-model`
-- `MM_OPENCODE_MODEL` / `--opencode-model`
-- `MM_OPENCODE_SDK_MODEL` / `--opencode-sdk-model`
-- `MM_COPILOT_SDK_BASE_URL` / `--copilot-sdk-base-url`
-- `MM_COPILOT_SDK_API_KEY` / `--copilot-sdk-api-key`
+Deprecated v1 aliases have been removed in v2. Use `MM_AI_MODEL` / `--ai-model` for all providers.
 
 ### Optional Settings
 
@@ -251,8 +231,6 @@ export MM_SKIP_EXISTING_ISSUES=true
 export MM_RUNS=1  # 1-5 runs
 
 # Review profile
-export MM_REVIEW_TYPE=general         # Legacy alias input
-export MM_REVIEW_PASSES=security      # Optional additive passes
 export MM_REVIEW_STRATEGY=standard    # standard or fast
 
 # Git backend for cloning repositories (default: cli uses system git binary)
@@ -280,21 +258,10 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 ```bash
 merge-mentor review --pr 123 \
   --skip-existing-issues true \
-  --runs 3 \
-  --passes "testing" \
   --comment-identifier "[custom-bot]"
 
-# Baseline review plus ordered additive passes
+# Fast execution strategy
 merge-mentor review --pr 123 \
-  --passes "scan,logic,performance"
-
-# Monorepo-focused review profile
-merge-mentor review --pr 123 \
-  --passes "scan,monorepo,logic"
-
-# Same review profile with fast execution strategy
-merge-mentor review --pr 123 \
-  --passes "security,database" \
   --strategy fast
 ```
 
@@ -379,13 +346,6 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 
 **Preferred**: Configure the active provider model via `MM_AI_MODEL` or `--ai-model`.
 
-**Deprecated aliases**:
-
-- **Copilot**: `MM_COPILOT_MODEL` or `--copilot-model`
-- **Copilot SDK**: `MM_COPILOT_SDK_MODEL` or `--copilot-sdk-model`
-- **OpenCode**: `MM_OPENCODE_MODEL` or `--opencode-model`
-- **OpenCode SDK**: `MM_OPENCODE_SDK_MODEL` or `--opencode-sdk-model`
-
 - `claude-sonnet-4.6` (default)
 - `claude-sonnet-4.5`
 - `claude-haiku-4.5`
@@ -409,7 +369,7 @@ merge-mentor review --pr 123 --provider opencode --write
 merge-mentor review --pr 456 --platform azure --write
 
 # Multiple review passes for thoroughness
-merge-mentor review --pr 123 --runs 3 --write
+merge-mentor review --pr 123 --passes "security,database" --write
 
 # Baseline review plus testing attention
 merge-mentor review --pr 123 --passes "testing" --write
@@ -438,9 +398,6 @@ merge-mentor review --pr 123 --write
 ```bash
 # Focus on test quality when adding/modifying tests
 merge-mentor review --pr 456 --passes "testing" --write
-
-# Thorough testing analysis with 3 runs
-merge-mentor review --pr 456 --passes "testing" --runs 3 --write
 ```
 
 **3. Security-Sensitive Changes:**
@@ -449,8 +406,8 @@ merge-mentor review --pr 456 --passes "testing" --runs 3 --write
 # Security attention for authentication or data handling
 merge-mentor review --pr 789 --passes "security" --write
 
-# Comprehensive security analysis with 5 passes
-merge-mentor review --pr 789 --passes "security" --runs 5 --write
+# Comprehensive security analysis with multiple focused passes
+merge-mentor review --pr 789 --passes "security,database" --write
 ```
 
 **4. Performance-Critical Code:**
@@ -460,7 +417,7 @@ merge-mentor review --pr 789 --passes "security" --runs 5 --write
 merge-mentor review --pr 321 --passes "performance" --write
 
 # Combined additive passes for broader attention
-merge-mentor review --pr 321 --passes "performance,database" --runs 3 --write
+merge-mentor review --pr 321 --passes "performance,database" --write
 ```
 
 **5. Preview Before Posting:**
@@ -485,13 +442,9 @@ merge-mentor review --pr 123 --passes "testing" --write
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot\|copilot-sdk\|opencode\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
-| `--review-type <type>` | Legacy alias input: general, testing, security, performance, fast, custom | `MM_REVIEW_TYPE` | `general` |
-| `--passes <list>` | Comma-separated additive review passes | `MM_REVIEW_PASSES` | - |
-| `--phases <list>` | Deprecated alias for `--passes` when used with `--review-type custom` | - | - |
 | `--strategy <strategy>` | Execution strategy: `standard` or `fast` | `MM_REVIEW_STRATEGY` | `standard` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
-| `--runs <1-5>` | Number of review passes | `MM_REVIEW_RUNS` | `1` |
 | `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
 | `--stream-lines <n>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES` | `5` |
 
@@ -516,12 +469,8 @@ merge-mentor review --pr 123 --passes "testing" --write
 | `--copilot-token <token>` | GitHub token for Copilot CLI/SDK auth (CI use) | `MM_COPILOT_TOKEN` |
 | `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` |
 | `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` |
-| `--copilot-model <model>` | Deprecated alias for `--ai-model` | `MM_COPILOT_MODEL` |
-| `--copilot-sdk-model <model>` | Deprecated alias for `--ai-model` | `MM_COPILOT_SDK_MODEL` |
 | `--ai-base-url <url>` | Generic OpenAI-compatible BYOK base URL | `MM_AI_BASE_URL` |
 | `--ai-api-key <key>` | Generic BYOK API key | `MM_AI_API_KEY` |
-| `--opencode-model <model>` | Deprecated alias for `--ai-model` | `MM_OPENCODE_MODEL` |
-| `--opencode-sdk-model <model>` | Deprecated alias for `--ai-model` | `MM_OPENCODE_SDK_MODEL` |
 
 **File Filtering:**
 | Option | Description | Default |
@@ -587,17 +536,6 @@ merge-mentor review --pr 123 --ignore '**/*.test.ts' --ignore '**/*.spec.ts' --i
 ```
 
 Ignored files are logged for transparency in the review output.
-
-### Multi-Run Mode
-
-AI reviews are non-deterministic. Running multiple passes catches more issues:
-
-```bash
-# Run 3 times and aggregate findings
-merge-mentor review --pr 123 --runs 3 --write
-```
-
-Use 3-5 runs for critical/security-sensitive code, 1 run for regular development.
 
 ### Review Profiles, Passes, and Strategies
 
@@ -665,14 +603,14 @@ Use `database` when the PR changes schemas, migrations, repositories, ORMs, tran
 
 **Legacy alias mapping:**
 
-| Alias         | Resolved review profile                                       |
-| ------------- | ------------------------------------------------------------- |
-| `general`     | Baseline review                                               |
-| `testing`     | Baseline review + `testing`                                   |
-| `security`    | Baseline review + `security`                                  |
-| `performance` | Baseline review + `performance`                               |
-| `fast`        | Baseline review + fast strategy                               |
-| `custom`      | Baseline review + explicit `--passes` / deprecated `--phases` |
+| Alias         | Resolved review profile               |
+| ------------- | ------------------------------------- |
+| `general`     | Baseline review                       |
+| `testing`     | Baseline review + `testing`           |
+| `security`    | Baseline review + `security`          |
+| `performance` | Baseline review + `performance`       |
+| `fast`        | Baseline review + fast strategy       |
+| `custom`      | Baseline review + explicit `--passes` |
 
 **Common profile choices:**
 
@@ -791,8 +729,8 @@ merge-mentor review --pr 123 --passes "testing" --write
 # Review test changes in a PR
 merge-mentor review --pr 456 --passes "testing" --write
 
-# Thorough testing analysis with multiple passes
-merge-mentor review --pr 456 --passes "testing" --runs 3 --write
+# Combined passes for broader testing and security attention
+merge-mentor review --pr 456 --passes "testing,security" --write
 ```
 
 ### Streaming Output Display

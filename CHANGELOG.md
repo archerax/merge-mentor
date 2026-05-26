@@ -7,20 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes (v2.0)
+
+- **Removed `--runs` / `MM_REVIEW_RUNS`**: Multi-run mode has been removed. To run multiple reviews, simply invoke the app multiple times.
+- **Removed deprecated CLI options**: `--agent-timeout`, `--copilot-model`, `--copilot-sdk-model`, `--copilot-sdk-base-url`, `--copilot-sdk-api-key`, `--opencode-model`, `--opencode-sdk-model`, `--copilot-timeout`, `--copilot-sdk-timeout`, `--opencode-timeout`, `--opencode-sdk-timeout`, `--phases`. Use `--ai-model`, `--ai-timeout`, `--ai-base-url`, `--ai-api-key`, and `--passes` instead.
+- **Removed deprecated environment variables**: `MM_AGENT_TIMEOUT`, `MM_COPILOT_MODEL`, `MM_COPILOT_SDK_MODEL`, `MM_OPENCODE_MODEL`, `MM_OPENCODE_SDK_MODEL`, `MM_COPILOT_SDK_BASE_URL`, `MM_COPILOT_SDK_API_KEY`, `MM_COPILOT_TIMEOUT`, `MM_COPILOT_SDK_TIMEOUT`, `MM_OPENCODE_TIMEOUT`, `MM_OPENCODE_SDK_TIMEOUT`, `MM_REVIEW_RUNS`. Use `MM_AI_MODEL`, `MM_AI_TIMEOUT`, `MM_AI_BASE_URL`, and `MM_AI_API_KEY` instead.
+- **Removed deprecated `Config` interface fields**: `copilotModel`, `copilotTimeoutMs`, `copilotSdkModel`, `copilotSdkTimeoutMs`, `opencodeModel`, `opencodeTimeoutMs`, `opencodeSdkModel`, `opencodeSdkTimeoutMs`, `reviewRuns`, `customReviewPhases`. Use `aiModel`, `aiTimeoutMs`, `aiBaseUrl`, `aiApiKey`, and `reviewPasses` instead.
+- **`ReviewEngine` constructor**: The legacy overloaded constructor form (passing options as the third argument) has been removed. The `providerType: AIProviderType` argument is now required as the third positional argument.
+- **Removed `GeneralReviewPhase` type alias** and `parseCustomReviewPhases` function from `reviewSelection.ts`. Use `ReviewPass` instead.
+- **Removed `customReviewPhases` from `ReviewCommentManagerOptions`**. Use `reviewPasses` instead.
+
+### Changed
+
+- Reduced token usage for large reviews
+
 ## [1.33.0] - 2026-05-14
-
-### Added
-
-- **Vercel AI Provider Plan**: New documentation outlining the planned architecture for Vercel AI SDK integration
-- **Pragmatic TypeScript Instructions**: Updated and streamlined AI instructions for better code generation
-- **Testing TypeScript Instructions**: Updated and streamlined AI instructions for improved test generation
 
 ### Changed
 
 - **Package Upgrades**: Updated various dependencies to latest versions
-
-### Changed
-
 - **README**: Improved introduction with a clearer positioning statement and a new "Why MergeMentor?" section covering key value propositions
 - **README**: Reformatted BYOK cost data into a comparison table for clarity
 - **Docs**: Added token-efficiency investigation document
@@ -109,30 +114,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Copilot Token Handling**: Fixed bug in Copilot token validation and usage
-
-## [1.25.0] - 2026-04-15
-
-### Changed
-
-- Internal release pipeline improvements
-
-## [1.24.0] - 2026-04-15
-
-### Changed
-
-- Internal release pipeline improvements
-
-## [1.23.0] - 2026-04-15
-
-### Changed
-
-- Internal release pipeline improvements
-
-## [1.22.0] - 2026-04-15
-
-### Changed
-
-- CI/CD pipeline authentication token handling
 
 ## [1.21.0] - 2026-04-15
 

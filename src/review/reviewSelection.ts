@@ -16,13 +16,6 @@ export const REVIEW_PASSES = [
 
 export type ReviewPass = (typeof REVIEW_PASSES)[number];
 
-/**
- * Legacy alias retained for compatibility with the old custom-review implementation.
- *
- * @deprecated Use ReviewPass instead.
- */
-export type GeneralReviewPhase = ReviewPass;
-
 const REVIEW_STRATEGIES = ["standard", "fast"] as const;
 
 export type ReviewStrategy = (typeof REVIEW_STRATEGIES)[number];
@@ -105,23 +98,6 @@ function parsePassList(
 
 export function parseReviewPasses(value: string | undefined): readonly ReviewPass[] | undefined {
   return parsePassList(value, "passes");
-}
-
-export function parseCustomReviewPhases(
-  reviewType: ReviewType,
-  value: string | undefined
-): readonly GeneralReviewPhase[] | undefined {
-  const rawValue = value?.trim();
-
-  if (reviewType !== "custom") {
-    if (rawValue) {
-      throw new ValidationError("phases", "--phases can only be used with --review-type custom");
-    }
-
-    return undefined;
-  }
-
-  return parsePassList(rawValue, "phases");
 }
 
 function getImplicitPasses(reviewType: ReviewType): readonly ReviewPass[] {

@@ -5,11 +5,10 @@ import {
   validateAIProvider,
   validateConfig,
   validateGitBackend,
-  validateReviewRuns,
   validateReviewStrategy,
   validateReviewType,
 } from "./config.js";
-import { ConfigurationError, ValidationError } from "./errors/index.js";
+import { ConfigurationError } from "./errors/index.js";
 import type { Environment } from "./ports/environment.js";
 import { createStubEnvironment } from "./ports/environment.test-helper.js";
 
@@ -31,7 +30,6 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("copilot-sdk");
       expect(config.gitBackend).toBe("cli");
       expect(config.skipPreExisting).toBe(true);
-      expect(config.reviewRuns).toBe(1);
       expect(config.reviewPasses).toEqual([]);
       expect(config.reviewStrategy).toBe("standard");
     });
@@ -80,79 +78,9 @@ describe("Config", () => {
       expect(config.skipPreExisting).toBe(true);
     });
 
-    it("should load MM_REVIEW_RUNS from environment", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_RUNS: "3",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewRuns).toBe(3);
-    });
-
-    it("should default MM_REVIEW_RUNS to 1 for invalid values", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_RUNS: "invalid",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewRuns).toBe(1);
-    });
-
-    it("should default MM_REVIEW_RUNS to 1 for values below range", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_RUNS: "0",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewRuns).toBe(1);
-    });
-
-    it("should default MM_REVIEW_RUNS to 1 for values above range", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_RUNS: "10",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewRuns).toBe(1);
-    });
-
-    it("should accept MM_REVIEW_RUNS at boundary values", () => {
-      expect(loadConfig(undefined, createStubEnvironment({ MM_REVIEW_RUNS: "1" })).reviewRuns).toBe(
-        1
-      );
-
-      expect(loadConfig(undefined, createStubEnvironment({ MM_REVIEW_RUNS: "5" })).reviewRuns).toBe(
-        5
-      );
-    });
-
-    it("should load MM_COPILOT_TIMEOUT from environment", () => {
-      const env = createStubEnvironment({
-        MM_COPILOT_TIMEOUT: "60000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.copilotTimeoutMs).toBe(60000);
-    });
-
     it("should load MM_AI_TIMEOUT from environment", () => {
       const env = createStubEnvironment({
         MM_AI_TIMEOUT: "60000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.aiTimeoutMs).toBe(60000);
-    });
-
-    it("should support deprecated MM_AGENT_TIMEOUT alias", () => {
-      const env = createStubEnvironment({
-        MM_AGENT_TIMEOUT: "60000",
       });
 
       const config = loadConfig(undefined, env);
@@ -175,57 +103,6 @@ describe("Config", () => {
       const config = loadConfig(undefined, env);
 
       expect(config.aiTimeoutMs).toBeUndefined();
-    });
-
-    it("should prefer MM_AI_TIMEOUT over deprecated provider-specific timeouts", () => {
-      const env = createStubEnvironment({
-        MM_AI_TIMEOUT: "60000",
-        MM_COPILOT_TIMEOUT: "120000",
-        MM_OPENCODE_TIMEOUT: "180000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.aiTimeoutMs).toBe(60000);
-      expect(config.copilotTimeoutMs).toBe(120000);
-      expect(config.opencodeTimeoutMs).toBe(180000);
-    });
-
-    it("should ignore MM_COPILOT_TIMEOUT when zero or negative", () => {
-      const env = createStubEnvironment({
-        MM_COPILOT_TIMEOUT: "0",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.copilotTimeoutMs).toBeUndefined();
-    });
-
-    it("should ignore MM_COPILOT_TIMEOUT when negative", () => {
-      const env = createStubEnvironment({
-        MM_COPILOT_TIMEOUT: "-1000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.copilotTimeoutMs).toBeUndefined();
-    });
-
-    it("should default MM_COPILOT_TIMEOUT to undefined when not set", () => {
-      const env = createStubEnvironment();
-      const config = loadConfig(undefined, env);
-
-      expect(config.copilotTimeoutMs).toBeUndefined();
-    });
-
-    it("should load MM_COPILOT_MODEL from environment", () => {
-      const env = createStubEnvironment({
-        MM_COPILOT_MODEL: "claude-haiku-4.5",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.copilotModel).toBe("claude-haiku-4.5");
     });
 
     it("should load MM_AI_MODEL from environment", () => {
@@ -252,18 +129,6 @@ describe("Config", () => {
       const env = createStubEnvironment({
         MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
         MM_AI_API_KEY: "bedrock-key",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
-      expect(config.aiApiKey).toBe("bedrock-key");
-    });
-
-    it("should support deprecated Copilot SDK BYOK environment variable aliases", () => {
-      const env = createStubEnvironment({
-        MM_COPILOT_SDK_BASE_URL: "https://bedrock.example.com/openai/v1",
-        MM_COPILOT_SDK_API_KEY: "bedrock-key",
       });
 
       const config = loadConfig(undefined, env);
@@ -316,66 +181,6 @@ describe("Config", () => {
       expect(config.gitBackend).toBe("cli");
     });
 
-    it("should load MM_OPENCODE_MODEL from environment", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_MODEL: "claude-4.5-sonnet",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeModel).toBe("claude-4.5-sonnet");
-    });
-
-    it("should load MM_OPENCODE_TIMEOUT from environment", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_TIMEOUT: "120000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeTimeoutMs).toBe(120000);
-    });
-
-    it("should ignore MM_OPENCODE_TIMEOUT when zero or negative", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_TIMEOUT: "0",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeTimeoutMs).toBeUndefined();
-    });
-
-    it("should load MM_OPENCODE_SDK_MODEL from environment", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_SDK_MODEL: "claude-4.5-sonnet",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeSdkModel).toBe("claude-4.5-sonnet");
-    });
-
-    it("should load MM_OPENCODE_SDK_TIMEOUT from environment", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_SDK_TIMEOUT: "90000",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeSdkTimeoutMs).toBe(90000);
-    });
-
-    it("should ignore MM_OPENCODE_SDK_TIMEOUT when zero or negative", () => {
-      const env = createStubEnvironment({
-        MM_OPENCODE_SDK_TIMEOUT: "0",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.opencodeSdkTimeoutMs).toBeUndefined();
-    });
-
     it("should support all MM_ prefixed environment variables", () => {
       const env = createStubEnvironment({
         MM_PLATFORM: "azure",
@@ -390,13 +195,10 @@ describe("Config", () => {
         MM_AI_PROVIDER: "opencode",
         MM_AI_TIMEOUT: "180000",
         MM_AI_MODEL: "gpt-5.2-codex",
-        MM_COPILOT_MODEL: "claude-haiku-4.5",
-        MM_COPILOT_TIMEOUT: "60000",
         MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
         MM_AI_API_KEY: "bedrock-key",
         MM_MIN_COMMENT_CONFIDENCE: "low",
         MM_SKIP_EXISTING_ISSUES: "false",
-        MM_REVIEW_RUNS: "3",
       });
 
       const config = loadConfig(undefined, env);
@@ -413,33 +215,27 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("opencode");
       expect(config.aiTimeoutMs).toBe(180000);
       expect(config.aiModel).toBe("gpt-5.2-codex");
-      expect(config.copilotModel).toBe("claude-haiku-4.5");
-      expect(config.copilotTimeoutMs).toBe(60000);
       expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
       expect(config.aiApiKey).toBe("bedrock-key");
       expect(config.skipPreExisting).toBe(false);
-      expect(config.reviewRuns).toBe(3);
     });
 
     it("should accept CLI overrides that take precedence over environment variables", () => {
       const env = createStubEnvironment({
         MM_GITHUB_TOKEN: "env-token",
         MM_PLATFORM: "github",
-        MM_REVIEW_RUNS: "1",
       });
 
       const config = loadConfig(
         {
           githubToken: "cli-token",
           platform: "azure",
-          reviewRuns: 3,
         },
         env
       );
 
       expect(config.github.token).toBe("cli-token");
       expect(config.defaultPlatform).toBe("azure");
-      expect(config.reviewRuns).toBe(3);
     });
 
     it("should accept all CLI overrides", () => {
@@ -458,12 +254,9 @@ describe("Config", () => {
           aiProvider: "copilot-sdk",
           aiTimeout: 180000,
           aiModel: "gpt-5.2-codex",
-          copilotModel: "claude-haiku-4.5",
-          copilotTimeout: 90000,
           aiBaseUrl: "https://bedrock.example.com/openai/v1",
           aiApiKey: "bedrock-key",
           skipExistingIssues: "false",
-          reviewRuns: 5,
         },
         env
       );
@@ -480,12 +273,9 @@ describe("Config", () => {
       expect(config.aiProvider).toBe("copilot-sdk");
       expect(config.aiTimeoutMs).toBe(180000);
       expect(config.aiModel).toBe("gpt-5.2-codex");
-      expect(config.copilotModel).toBe("claude-haiku-4.5");
-      expect(config.copilotTimeoutMs).toBe(90000);
       expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
       expect(config.aiApiKey).toBe("bedrock-key");
       expect(config.skipPreExisting).toBe(false);
-      expect(config.reviewRuns).toBe(5);
     });
 
     it("should load MM_REVIEW_TYPE from environment", () => {
@@ -531,61 +321,6 @@ describe("Config", () => {
       ).toBe("fast");
     });
 
-    it("loads custom review phases from CLI overrides", () => {
-      const config = loadConfig({
-        reviewType: "custom",
-        phases: "scan, monorepo",
-      });
-
-      expect(config.reviewType).toBe("custom");
-      expect(config.reviewPasses).toEqual(["scan", "monorepo"]);
-      expect(config.customReviewPhases).toEqual(["scan", "monorepo"]);
-    });
-
-    it("normalizes custom review phase names case-insensitively", () => {
-      const config = loadConfig({
-        reviewType: "custom",
-        phases: "SCAN,performance",
-      });
-
-      expect(config.reviewPasses).toEqual(["scan", "performance"]);
-      expect(config.customReviewPhases).toEqual(["scan", "performance"]);
-    });
-
-    it("throws when custom review type is missing phases", () => {
-      expect(() => loadConfig({ reviewType: "custom" })).toThrow(ValidationError);
-      expect(() => loadConfig({ reviewType: "custom" })).toThrow(
-        "--passes or --phases is required"
-      );
-    });
-
-    it("throws when custom phases contain unknown values", () => {
-      expect(() =>
-        loadConfig({
-          reviewType: "custom",
-          phases: "scan,quality",
-        })
-      ).toThrow(ValidationError);
-    });
-
-    it("throws when custom phases contain duplicates", () => {
-      expect(() =>
-        loadConfig({
-          reviewType: "custom",
-          phases: "scan,SCAN",
-        })
-      ).toThrow('Duplicate phase "scan" is not allowed');
-    });
-
-    it("throws when phases are provided without the custom review type", () => {
-      expect(() =>
-        loadConfig({
-          reviewType: "general",
-          phases: "scan",
-        })
-      ).toThrow("--phases can only be used with --review-type custom");
-    });
-
     it("loads additive review passes without using legacy review types", () => {
       const config = loadConfig({
         passes: "security,database",
@@ -602,16 +337,6 @@ describe("Config", () => {
       });
 
       expect(config.reviewPasses).toEqual(["database", "security"]);
-    });
-
-    it("throws when both passes and phases are provided", () => {
-      expect(() =>
-        loadConfig({
-          reviewType: "custom",
-          passes: "security",
-          phases: "scan",
-        })
-      ).toThrow("Use either --passes or --phases, not both.");
     });
 
     it("should default MM_STREAMING_LINES to 9 when not set", () => {
@@ -827,26 +552,6 @@ describe("Config", () => {
 });
 
 describe("Validator functions", () => {
-  describe("validateReviewRuns", () => {
-    it("should accept valid run counts 1-5", () => {
-      expect(validateReviewRuns("1")).toBe(1);
-      expect(validateReviewRuns("3")).toBe(3);
-      expect(validateReviewRuns("5")).toBe(5);
-    });
-
-    it("should default to 1 for out-of-range values", () => {
-      expect(validateReviewRuns("0")).toBe(1);
-      expect(validateReviewRuns("6")).toBe(1);
-      expect(validateReviewRuns("100")).toBe(1);
-    });
-
-    it("should default to 1 for invalid values", () => {
-      expect(validateReviewRuns("invalid")).toBe(1);
-      expect(validateReviewRuns("")).toBe(1);
-      expect(validateReviewRuns(undefined)).toBe(1);
-    });
-  });
-
   describe("validateAIProvider", () => {
     it("should accept valid provider types", () => {
       expect(validateAIProvider("copilot")).toBe("copilot");

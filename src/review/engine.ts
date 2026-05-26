@@ -50,8 +50,8 @@ import {
   createAIProvider,
   type TokenUsage,
 } from "../ai/index.js";
+import { buildFilesSummary } from "../ai/prompts/buildFilesSummary.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
-import { buildFilesSummary } from "../ai/prompts/prompts.js";
 import {
   buildGeneralCrossFilePrompt,
   buildGeneralFileReviewPrompt,
@@ -79,12 +79,10 @@ import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.j
 import { mergeTokenUsage } from "../utils/tokenUsage.js";
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
-import { FindingAggregator } from "./findingAggregator.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { RepoManager } from "./repoManager.js";
 import {
-  type GeneralReviewPhase,
   type ResolvedReviewProfile,
   type ReviewPass,
   type ReviewStrategy,
@@ -139,10 +137,6 @@ interface ReviewEngineOptions {
   readonly verbose?: boolean;
   /** Dry run mode: review PR but don't post comments. Useful for testing */
   readonly dryRun?: boolean;
-  /** @deprecated Use aiModel instead */
-  readonly copilotModel?: string;
-  /** @deprecated Use aiTimeoutMs instead */
-  readonly copilotTimeoutMs?: number;
   /** Copilot GitHub token for CLI authentication (copilot/copilot-sdk only) */
   readonly copilotToken?: string;
   /** Model identifier for the AI provider (e.g., "gpt-5.2-codex", "claude-opus") */
@@ -155,16 +149,12 @@ interface ReviewEngineOptions {
   readonly aiTimeoutMs?: number;
   /** Skip pre-existing issues introduced before this PR (default: true) */
   readonly skipPreExisting?: boolean;
-  /** Number of independent review runs (1-5). Multiple runs aggregate findings (default: 1) */
-  readonly reviewRuns?: number;
   /** Legacy review type alias used to resolve the review profile. */
   readonly reviewType?: string;
   /** Ordered additive review passes used to build the resolved review profile. */
   readonly reviewPasses?: readonly ReviewPass[];
   /** Execution strategy used to run the resolved review profile. */
   readonly reviewStrategy?: ReviewStrategy;
-  /** Selected general-review phases used when reviewType is 'custom'. */
-  readonly customReviewPhases?: readonly GeneralReviewPhase[];
   /** Fully resolved review profile. */
   readonly reviewProfile?: ResolvedReviewProfile;
   /** Enable streaming display of AI output (default: true if TTY) */
@@ -184,8 +174,6 @@ interface ReviewEngineOptions {
   readonly localWorkspacePath?: string;
   /** Glob patterns for files to skip during review (e.g., ['*.test.ts', 'dist/**']) */
   readonly ignorePatterns?: string[];
-  /** Delay in milliseconds between review runs (default: 2000) */
-  readonly runDelayMs?: number;
   /** Output writer for console output (dependency injection, defaults to consoleOutputWriter) */
   readonly output?: OutputWriter;
   /** File system abstraction for I/O (dependency injection, defaults to nodeFs) */
@@ -243,71 +231,36 @@ export class ReviewEngine {
   /**
    * Creates a new ReviewEngine.
    *
-   * Supports two constructor signatures for backward compatibility:
-   * - New: `ReviewEngine(platform, botId, providerType, options)`
-   * - Legacy: `ReviewEngine(platform, botId, options)` - assumes copilot provider
-   *
-   * The constructor initializes all internal components:
-   * - AI provider client (Copilot, OpenCode, Cursor)
-   * - Comment manager for bot comment tracking
-   * - Review state cache for unchanged file optimization
-   * - Repository manager for cloning and standard extraction
-   * - All injected dependencies (file system, process runner, clock)
-   *
    * @param platform - GitHub or Azure DevOps platform adapter
    * @param botIdentifier - Identifier for bot comments (e.g., '[Merge Mentor]')
    * @param providerType - AI provider type ('copilot', 'opencode', 'cursor', etc.)
-   *                       or full options object for legacy signature support
-   * @param options - Configuration options (omitted in legacy signature)
-   * @throws Error if options contain invalid values (e.g., reviewRuns > 5)
+   * @param options - Configuration options
    *
    * @example
    * ```typescript
-   * // Modern signature
    * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
    *   aiModel: 'gpt-5.2-codex',
    *   reviewType: 'security',
-   *   reviewRuns: 2,
-   * });
-   *
-   * // Legacy signature (assumes copilot provider)
-   * const legacyEngine = new ReviewEngine(githubAdapter, '[Bot]', {
-   *   copilotModel: 'gpt-5.2',
-   *   reviewType: 'general',
    * });
    * ```
    */
   constructor(
     platform: PlatformAdapter,
     botIdentifier: string,
-    providerType?: AIProviderType | ReviewEngineOptions,
+    providerType: AIProviderType,
     options?: ReviewEngineOptions
   ) {
     this.platform = platform;
 
-    // Handle overloaded constructor for backward compatibility
-    let resolvedOptions: ReviewEngineOptions | undefined;
-    let resolvedProviderType: AIProviderType;
-
-    if (typeof providerType === "string") {
-      resolvedProviderType = providerType;
-      resolvedOptions = options;
-    } else {
-      // Legacy signature: (platform, botIdentifier, options)
-      resolvedProviderType = "copilot";
-      resolvedOptions = providerType;
-    }
-
-    // Resolve model and timeout (support both legacy and new options)
-    const model = resolvedOptions?.aiModel ?? resolvedOptions?.copilotModel;
-    const timeoutMs = resolvedOptions?.aiTimeoutMs ?? resolvedOptions?.copilotTimeoutMs;
-    const tempPath = resolvedOptions?.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const model = options?.aiModel;
+    const timeoutMs = options?.aiTimeoutMs;
+    const tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.reviewProfile =
-      resolvedOptions?.reviewProfile ??
+      options?.reviewProfile ??
       resolveReviewProfile({
-        reviewType: validateReviewType(resolvedOptions?.reviewType),
-        reviewPasses: resolvedOptions?.reviewPasses ?? resolvedOptions?.customReviewPhases,
-        reviewStrategy: validateReviewStrategy(resolvedOptions?.reviewStrategy),
+        reviewType: validateReviewType(options?.reviewType),
+        reviewPasses: options?.reviewPasses,
+        reviewStrategy: validateReviewStrategy(options?.reviewStrategy),
       });
 
     // Build provider options
@@ -315,19 +268,19 @@ export class ReviewEngine {
       model,
       timeoutMs,
       token:
-        resolvedProviderType === "copilot" || resolvedProviderType === "copilot-sdk"
-          ? resolvedOptions?.copilotToken
+        providerType === "copilot" || providerType === "copilot-sdk"
+          ? options?.copilotToken
           : undefined,
-      aiBaseUrl: resolvedOptions?.aiBaseUrl,
-      aiApiKey: resolvedOptions?.aiApiKey,
+      aiBaseUrl: options?.aiBaseUrl,
+      aiApiKey: options?.aiApiKey,
       tempPath,
     };
 
-    this.output = resolvedOptions?.output ?? consoleOutputWriter;
-    this.fileSystem = resolvedOptions?.fileSystem ?? nodeFs;
-    this.provider = createAIProvider(resolvedProviderType, providerOptions);
+    this.output = options?.output ?? consoleOutputWriter;
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+    this.provider = createAIProvider(providerType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
-      skipPreExisting: resolvedOptions?.skipPreExisting,
+      skipPreExisting: options?.skipPreExisting,
       reviewType: this.reviewProfile.reviewType,
       reviewPasses: this.reviewProfile.passes,
       reviewStrategy: this.reviewProfile.strategy,
@@ -336,23 +289,22 @@ export class ReviewEngine {
     this.stateCache = new ReviewStateCache(tempPath);
     this.repoManager = new RepoManager(
       tempPath,
-      { ciMode: resolvedOptions?.ciMode },
-      createGitClient((resolvedOptions?.gitBackend ?? "cli") as GitBackendType)
+      { ciMode: options?.ciMode },
+      createGitClient((options?.gitBackend ?? "cli") as GitBackendType)
     );
-    this.options = resolvedOptions ?? {};
-    this.streamingEnabled = resolvedOptions?.streamingEnabled ?? true;
-    this.streamingLines = resolvedOptions?.streamingLines ?? 5;
+    this.options = options ?? {};
+    this.streamingEnabled = options?.streamingEnabled ?? true;
+    this.streamingLines = options?.streamingLines ?? 5;
     this.platformName = platform.constructor.name.toLowerCase().includes("github")
       ? "github"
       : "azure";
     this.logger.info(
       {
-        aiProvider: resolvedProviderType,
+        aiProvider: providerType,
         aiModel: model,
         aiTimeoutMs: timeoutMs,
-        dryRun: resolvedOptions?.dryRun,
-        skipPreExisting: resolvedOptions?.skipPreExisting,
-        reviewRuns: resolvedOptions?.reviewRuns ?? 1,
+        dryRun: options?.dryRun,
+        skipPreExisting: options?.skipPreExisting,
         reviewType: this.reviewProfile.reviewType,
         reviewPasses: this.reviewProfile.passes,
         reviewStrategy: this.reviewProfile.strategy,
@@ -412,13 +364,11 @@ export class ReviewEngine {
     const projectId = this.platform.getProjectIdentifier();
     const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
 
-    const runs = this.options.reviewRuns ?? 1;
     const reviewType = this.reviewProfile.reviewType;
     this.logger.info(
       {
         prNumber,
         prIdentifier,
-        runs,
         reviewType,
         reviewPasses: this.reviewProfile.passes,
         reviewStrategy: this.reviewProfile.strategy,
@@ -429,7 +379,6 @@ export class ReviewEngine {
     this.auditLogger.logReviewStart(
       prNumber,
       this.platformName,
-      runs,
       reviewType,
       this.reviewProfile.passes,
       this.reviewProfile.strategy
@@ -448,6 +397,7 @@ export class ReviewEngine {
     let fileResults: FileReviewResult[];
     let crossFileResult: CrossFileReviewResult;
     let filesSkipped: number;
+    let filesAnalyzed: number | undefined; // overridden in fast mode to reflect files sent to AI
     let tokenUsage: TokenUsage | undefined;
 
     const onTokenUsage = (usage: TokenUsage | undefined): void => {
@@ -493,11 +443,11 @@ export class ReviewEngine {
       fileResults = fastReviewData.fileResults;
       crossFileResult = fastReviewData.crossFileResult;
       filesSkipped = 0; // Fast review doesn't use caching yet
+      filesAnalyzed = fastReviewData.filesAnalyzed;
 
       // Validate line numbers against actual diff content
       fileResults = this.validateLineNumbers(fileResults, files);
-    } else if (runs === 1) {
-      // Single run - use existing logic
+    } else {
       const reviewData = await this.reviewFiles(
         prIdentifier,
         files,
@@ -527,21 +477,6 @@ export class ReviewEngine {
           onTokenUsage
         );
       }
-    } else {
-      // Multi-run mode - aggregate findings from multiple runs
-      const aggregated = await this.reviewPRMultiRun(
-        prNumber,
-        prIdentifier,
-        prDetails,
-        files,
-        runs,
-        existingComments,
-        repoPath,
-        onTokenUsage
-      );
-      fileResults = aggregated.fileResults;
-      crossFileResult = aggregated.crossFileResult;
-      filesSkipped = 0; // Multi-run doesn't skip files
     }
 
     const actions = this.commentManager.determineActions(
@@ -570,7 +505,7 @@ export class ReviewEngine {
     this.logger.info(
       {
         prNumber,
-        filesReviewed: fileResults.length,
+        filesReviewed: (filesAnalyzed ?? fileResults.length) - filesSkipped,
         filesSkipped,
         totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
         commentsCreated: commentStats.commentsCreated,
@@ -583,7 +518,7 @@ export class ReviewEngine {
     this.auditLogger.logReviewComplete(
       prNumber,
       this.platformName,
-      fileResults.length - filesSkipped,
+      (filesAnalyzed ?? fileResults.length) - filesSkipped,
       filesSkipped,
       commentStats.commentsCreated,
       commentStats.commentErrors.length
@@ -591,7 +526,7 @@ export class ReviewEngine {
 
     return {
       prDetails,
-      filesReviewed: fileResults.length - filesSkipped,
+      filesReviewed: (filesAnalyzed ?? fileResults.length) - filesSkipped,
       filesSkipped,
       filesIgnored: ignoredFiles.length,
       ignoredFiles,
@@ -602,106 +537,6 @@ export class ReviewEngine {
       ...commentStats,
       tokenUsage,
     };
-  }
-
-  /**
-   * Performs multiple review runs and aggregates findings.
-   */
-  private async reviewPRMultiRun(
-    prNumber: number,
-    prIdentifier: string,
-    prDetails: PRDetails,
-    files: PRFile[],
-    runs: number,
-    existingComments: readonly ExistingComment[],
-    repoPath?: string,
-    onTokenUsage?: (usage: TokenUsage | undefined) => void
-  ): Promise<{
-    fileResults: FileReviewResult[];
-    crossFileResult: CrossFileReviewResult;
-  }> {
-    const allFileResults: FileReviewResult[][] = [];
-    const allCrossFileResults: CrossFileReviewResult[] = [];
-
-    this.log(`\n🔄 Multi-run mode: performing ${runs} review runs...`);
-
-    // Accumulate findings from each run to provide context to subsequent runs
-    const accumulatedFindings: FileReviewResult[] = [];
-
-    for (let run = 1; run <= runs; run++) {
-      this.log(`\n📝 Review run ${run} of ${runs}...`);
-      this.logger.info({ prNumber, run, totalRuns: runs }, "Starting review run");
-
-      try {
-        // For runs after the first, create synthetic "existing comments" from previous findings
-        const runComments =
-          run === 1
-            ? existingComments
-            : this.createSyntheticComments(existingComments, accumulatedFindings);
-
-        // Perform file reviews for this run (no caching in multi-run mode)
-        const { fileResults } = await this.reviewFiles(
-          prIdentifier,
-          files,
-          runComments,
-          undefined,
-          repoPath,
-          onTokenUsage
-        );
-        const validatedResults = this.validateLineNumbers(fileResults, files);
-        allFileResults.push(validatedResults);
-
-        // Accumulate findings for next run's context
-        accumulatedFindings.push(...validatedResults);
-
-        // Perform cross-file analysis for this run
-        const crossFileResult = await this.performCrossFileAnalysis(
-          prDetails,
-          files,
-          validatedResults,
-          runComments,
-          repoPath,
-          onTokenUsage
-        );
-        allCrossFileResults.push(crossFileResult);
-
-        this.log(
-          `  Run ${run}: Found ${validatedResults.reduce((sum, r) => sum + r.findings.length, 0)} file issues, ${crossFileResult.findings.length} cross-file issues`
-        );
-
-        // Delay between runs to avoid rate limits (except after last run)
-        if (run < runs) {
-          const delayMs = this.options.runDelayMs ?? 2000;
-          this.log(
-            `  Waiting ${delayMs / 1000} second${delayMs === 1000 ? "" : "s"} before next run...`
-          );
-          await this.delay(delayMs);
-        }
-      } catch (error) {
-        this.logger.error({ prNumber, run, error: (error as Error).message }, "Review run failed");
-        this.log(`  ⚠️  Run ${run} failed: ${(error as Error).message}`);
-        // Continue with remaining runs
-      }
-    }
-
-    // Aggregate findings from all successful runs
-    const aggregator = new FindingAggregator();
-    const aggregatedFileResults = aggregator.aggregateFileFindings(allFileResults);
-    const aggregatedCrossFile = aggregator.aggregateCrossFileFindings(allCrossFileResults);
-
-    const totalFindings = aggregatedFileResults.reduce((sum, r) => sum + r.findings.length, 0);
-    this.log(
-      `\n✅ Aggregated ${totalFindings} unique file findings and ${aggregatedCrossFile.findings.length} cross-file findings from ${allFileResults.length} successful run(s)`
-    );
-
-    return {
-      fileResults: aggregatedFileResults,
-      crossFileResult: aggregatedCrossFile,
-    };
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async fetchPRData(prNumber: number): Promise<{
@@ -1298,6 +1133,7 @@ During the database pass, pay extra attention to query correctness, transaction 
   ): Promise<{
     fileResults: FileReviewResult[];
     crossFileResult: CrossFileReviewResult;
+    filesAnalyzed: number;
   }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
 
@@ -1315,6 +1151,7 @@ During the database pass, pay extra attention to query correctness, transaction 
           findings: [],
           recommendations: [],
         },
+        filesAnalyzed: 0,
       };
     }
 
@@ -1378,7 +1215,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       this.auditLogger.logFileReviewComplete("fast-review", prNumber, totalFileFindings);
       this.auditLogger.logCrossFileReviewComplete(prNumber, crossFileFindings);
 
-      return result;
+      return { ...result, filesAnalyzed: filesWithPatches.length };
     } catch (error) {
       this.auditLogger.logFileReviewComplete(
         "fast-review",
@@ -1468,35 +1305,6 @@ During the database pass, pay extra attention to query correctness, transaction 
     if (file.status === "deleted") return true;
     if (!file.patch) return true;
     return SKIP_EXTENSIONS.some((ext) => file.filename.endsWith(ext));
-  }
-
-  /**
-   * Creates synthetic "existing comment" objects from findings to provide context
-   * to subsequent review runs in multi-run mode.
-   */
-  private createSyntheticComments(
-    realComments: readonly ExistingComment[],
-    findings: readonly FileReviewResult[]
-  ): ExistingComment[] {
-    const synthetic: ExistingComment[] = [...realComments];
-    let syntheticId = -1; // Use negative IDs for synthetic comments
-
-    for (const fileResult of findings) {
-      for (const finding of fileResult.findings) {
-        // Create a synthetic comment matching our format
-        const syntheticBody = this.commentManager.formatInlineComment(finding, fileResult.filename);
-
-        synthetic.push({
-          id: syntheticId--,
-          body: syntheticBody,
-          path: fileResult.filename,
-          line: finding.line,
-          isResolved: false,
-        });
-      }
-    }
-
-    return synthetic;
   }
 
   private buildFileShaMap(files: PRFile[]): Map<string, string> {

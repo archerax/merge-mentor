@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { FileReviewResult, PRDetails, PRFile } from "../../platforms/types.js";
+import type { FileReviewResult, PRDetails } from "../../platforms/types.js";
 import type { DiffManifest } from "../../review/diffStorage.js";
-import {
-  buildBatchedFileReviewPrompt,
-  buildCrossFilePrompt,
-  buildFilesSummary,
-} from "./prompts.js";
+import { buildBatchedFileReviewPrompt, buildCrossFilePrompt } from "./prompts.js";
 
 describe("AI Prompts", () => {
   describe("buildCrossFilePrompt", () => {
@@ -83,20 +79,19 @@ describe("AI Prompts", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
       expect(prompt).toContain("# SELF-CHALLENGE REQUIREMENT");
-      expect(prompt).toContain('"Could this be intentional design?"');
-      expect(prompt).toContain('"Is this validated/handled elsewhere in the system?"');
-      expect(prompt).toContain('"Is there architectural context I\'m missing?"');
-      expect(prompt).toContain('"Is this actually a system-level concern?"');
-      expect(prompt).toContain('"Would an experienced architect agree this is a problem?"');
+      expect(prompt).toContain("Could this be intentional design?");
+      expect(prompt).toContain("Is this validated/handled elsewhere in the system?");
+      expect(prompt).toContain("Is there architectural context I'm missing?");
+      expect(prompt).toContain("Is this actually a system-level concern");
+      expect(prompt).toContain("Would an experienced architect");
     });
 
-    it("should include counter-argument documentation examples", () => {
+    it("should omit counter-argument documentation examples", () => {
       const prompt = buildCrossFilePrompt(prDetails, filesSummary, []);
 
-      expect(prompt).toContain("## Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
-      expect(prompt).toContain("Decision:");
+      expect(prompt).toContain("# SELF-CHALLENGE REQUIREMENT");
+      expect(prompt).not.toContain("## Counter-Argument Documentation");
+      expect(prompt).not.toContain("Counter-Argument Considered:");
     });
 
     it("should include verification checklist", () => {
@@ -139,27 +134,6 @@ describe("AI Prompts", () => {
     });
   });
 
-  describe("buildFilesSummary", () => {
-    it("should format files correctly", () => {
-      const files: PRFile[] = [
-        { filename: "src/test.ts", status: "modified", additions: 10, deletions: 5 },
-        { filename: "src/new.ts", status: "added", additions: 20, deletions: 0 },
-        { filename: "src/old.ts", status: "deleted", additions: 0, deletions: 15 },
-      ];
-
-      const summary = buildFilesSummary(files);
-
-      expect(summary).toContain("- src/test.ts (modified, +10/-5)");
-      expect(summary).toContain("- src/new.ts (added, +20/-0)");
-      expect(summary).toContain("- src/old.ts (deleted, +0/-15)");
-    });
-
-    it("should return empty string for no files", () => {
-      const summary = buildFilesSummary([]);
-      expect(summary).toBe("");
-    });
-  });
-
   describe("buildBatchedFileReviewPrompt", () => {
     const mockManifest: DiffManifest = {
       prIdentifier: "test-pr-123",
@@ -179,22 +153,19 @@ describe("AI Prompts", () => {
       const prompt = buildBatchedFileReviewPrompt(mockManifest);
 
       expect(prompt).toContain("# SELF-CHALLENGE REQUIREMENT");
-      expect(prompt).toContain('"Could this be intentional?"');
-      expect(prompt).toContain('"Is this validated elsewhere?"');
-      expect(prompt).toContain('"Is this test/mock/development code?"');
-      expect(prompt).toContain('"Is there missing context?"');
-      expect(prompt).toContain('"Would a senior engineer flag this?"');
+      expect(prompt).toContain("Could this be intentional?");
+      expect(prompt).toContain("Is this validated elsewhere?");
+      expect(prompt).toContain("Is this test/mock code?");
+      expect(prompt).toContain("Is there framework context I'm missing?");
+      expect(prompt).toContain("Would a senior engineer flag this?");
     });
 
-    it("should include counter-argument documentation examples", () => {
+    it("should include self-challenge requirement instead of counter-argument examples", () => {
       const prompt = buildBatchedFileReviewPrompt(mockManifest);
 
-      expect(prompt).toContain("## Counter-Argument Documentation");
-      expect(prompt).toContain("Counter-Argument Considered:");
-      expect(prompt).toContain("Rebuttal:");
-      expect(prompt).toContain("Decision:");
-      expect(prompt).toContain("✅ **Report**");
-      expect(prompt).toContain("❌ **Don't report**");
+      expect(prompt).toContain("# SELF-CHALLENGE REQUIREMENT");
+      expect(prompt).not.toContain("## Counter-Argument Documentation");
+      expect(prompt).not.toContain("Counter-Argument Considered:");
     });
 
     it("should include verification checklist", () => {
@@ -203,27 +174,21 @@ describe("AI Prompts", () => {
       expect(prompt).toContain("# VERIFICATION CHECKLIST");
       expect(prompt).toContain("Issue exists in ADDED lines (+)");
       expect(prompt).toContain("Line number is correct");
-      expect(prompt).toContain("Suggestion actually fixes the root cause");
     });
 
-    it("should include verification documentation requirements", () => {
+    it("should include compact reasoning requirement", () => {
       const prompt = buildBatchedFileReviewPrompt(mockManifest);
 
-      expect(prompt).toContain("## Verification Documentation Requirements");
-      expect(prompt).toContain("✓ Confirmation:");
-      expect(prompt).toContain("✓ Context check:");
-      expect(prompt).toContain("✓ Pattern check:");
-      expect(prompt).toContain("✓ Impact assessment:");
-      expect(prompt).toContain("✓ Severity justification:");
+      expect(prompt).toContain("reasoning");
+      expect(prompt).toContain("concrete impact");
+      expect(prompt).toContain("justify the severity");
     });
 
-    it("should include examples with counter-argument reasoning", () => {
+    it("should omit verbose counter-argument examples", () => {
       const prompt = buildBatchedFileReviewPrompt(mockManifest);
 
-      // Check that examples include counter-arguments
-      expect(prompt).toContain("✅ EXAMPLE 2:");
-      expect(prompt).toContain("✓ Counter-argument:");
-      expect(prompt).toContain("✓ Rebuttal:");
+      expect(prompt).not.toContain("✅ EXAMPLE 2:");
+      expect(prompt).not.toContain("✓ Counter-argument:");
     });
 
     it("should include repository context when provided", () => {

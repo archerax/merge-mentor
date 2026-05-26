@@ -89,28 +89,6 @@ describe("AuditLogger", () => {
     });
   });
 
-  describe("logCopilotExecution", () => {
-    it("logs successful Copilot execution with model", () => {
-      const logger = new AuditLogger();
-      const logEventSpy = vi.spyOn(logger, "logEvent");
-
-      logger.logCopilotExecution("file-review", "claude-haiku-4.5", "success");
-
-      expect(logEventSpy).toHaveBeenCalledWith(
-        "ai.provider.execute",
-        {
-          type: "copilot",
-          id: "copilot:file-review",
-          details: { provider: "copilot", model: "claude-haiku-4.5" },
-        },
-        "Execute copilot prompt: file-review",
-        "success",
-        { provider: "copilot", promptType: "file-review", model: "claude-haiku-4.5" },
-        undefined
-      );
-    });
-  });
-
   describe("logAIProviderExecution", () => {
     it("logs AI provider execution with token usage", () => {
       const logger = new AuditLogger();
@@ -184,7 +162,7 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logReviewStart(123, "github", 2, "custom", ["scan", "logic"]);
+      logger.logReviewStart(123, "github", "custom", ["scan", "logic"]);
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "review.start",
@@ -194,7 +172,6 @@ describe("AuditLogger", () => {
         {
           prNumber: 123,
           platform: "github",
-          runs: 2,
           reviewType: "custom",
           reviewPasses: ["scan", "logic"],
         }
