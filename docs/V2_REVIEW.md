@@ -99,12 +99,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 
 ### 1.7 `tokenSaver` -- Dead Field in Config
 
-- **Files:** `src/config.ts` (line 74)
-- **What it is:** The `Config` interface declares `tokenSaver?: boolean` but `loadConfig()` never populates it. There is no CLI flag, no env var, and no `CliOverrides` mapping. It is consumed by prompt builders as an optional parameter that is always `undefined`.
-- **What happens if we don't fix it:** Nothing functionally breaks, but it's dead weight that implies a feature exists when it doesn't.
-- **Proposed fix:** Remove from the `Config` interface.
-- **Effort:** Small
-- **Recommendation:** **Do in v2.0.** Removing a field from a public interface is a breaking change.
+- **Status:** ✅ **Resolved** -- Removed from `Config` interface, `buildGeneralFileReviewPrompt`, `buildFastReviewPrompt`, and `buildFastReviewOutputFormat`. The field was never populated and always evaluated to `undefined`.
 
 ---
 
@@ -154,10 +149,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 
 ### 1.12 `outputFormats.ts` Dead Parameter
 
-- **Files:** `src/ai/prompts/specialists/outputFormats.ts` (line 105), `general.ts` (line 390), `fast.ts` (line 240)
-- **What it is:** `buildFastReviewOutputFormat` accepts an `_options` parameter (prefix underscore = conventionally unused) but `tokenSaver` is never read from it. The callers pass it, but it has no effect. Parameter should be removed.
-- **Effort:** Trivial
-- **Recommendation:** **Do in v2.0.** Removing a function parameter is a breaking change.
+- **Status:** ✅ **Resolved** -- Removed the `_options` parameter from `buildFastReviewOutputFormat` alongside the `tokenSaver` cleanup (see 1.7).
 
 ---
 
@@ -424,7 +416,7 @@ These are documented in the CHANGELOG and are already in progress or planned:
 - [ ] 1.4: Extract `buildWorkspaceSection` (touches AI prompts)
 - [ ] 1.5: Standardize "passes" vs "phases" naming
 - [ ] 1.6: Route `verbose` through config
-- [ ] 1.7: Remove `tokenSaver` dead field
+- [x] 1.7: Remove `tokenSaver` dead field
 - [ ] 1.8: Fix `streamingLines` defaults
 - [ ] 1.9: Fix Azure error swallowing
 - [ ] 1.10: Narrow adapter constructors

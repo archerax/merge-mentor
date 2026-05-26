@@ -67,8 +67,6 @@ export interface Config {
   readonly streamingEnabled: boolean;
   /** Number of lines to show in the streaming display. Default: 5 */
   readonly streamingLines: number;
-  /** Whether to reduce token usage by omitting verbose analysis instructions. Default: false */
-  readonly tokenSaver?: boolean;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). Default: ./.mergementor */
   readonly tempPath: string;
 }

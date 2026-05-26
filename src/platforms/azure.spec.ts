@@ -66,7 +66,6 @@ function createTestConfig(): Config {
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
-    tokenSaver: false,
   };
 }
 
@@ -151,11 +150,19 @@ describe("AzureDevOpsAdapter", () => {
         createMockResponse(true, 200, {
           changeEntries: [
             {
-              item: { path: "/src/test.ts", objectId: "obj123", gitObjectType: "blob" },
+              item: {
+                path: "/src/test.ts",
+                objectId: "obj123",
+                gitObjectType: "blob",
+              },
               changeType: 2, // Edit
             },
             {
-              item: { path: "/README.md", objectId: "obj456", gitObjectType: "blob" },
+              item: {
+                path: "/README.md",
+                objectId: "obj456",
+                gitObjectType: "blob",
+              },
               changeType: 1, // Add
             },
           ],
@@ -234,7 +241,10 @@ describe("AzureDevOpsAdapter", () => {
 
       // Missing id field returns empty result
       mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
-        { sourceRefCommit: { commitId: "source123" }, commonRefCommit: { commitId: "base123" } },
+        {
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
       ]);
 
       const result = await adapter.getPRFiles(123);
@@ -266,7 +276,11 @@ describe("AzureDevOpsAdapter", () => {
             { item: null },
             { item: { path: null } },
             {
-              item: { path: "/valid.ts", objectId: "obj789", gitObjectType: "blob" },
+              item: {
+                path: "/valid.ts",
+                objectId: "obj789",
+                gitObjectType: "blob",
+              },
               changeType: 2, // Edit
             },
           ],
@@ -365,23 +379,43 @@ describe("AzureDevOpsAdapter", () => {
         createMockResponse(true, 200, {
           changeEntries: [
             {
-              item: { path: "/added.ts", objectId: "a1", gitObjectType: "blob" },
+              item: {
+                path: "/added.ts",
+                objectId: "a1",
+                gitObjectType: "blob",
+              },
               changeType: 1, // Add
             },
             {
-              item: { path: "/modified.ts", objectId: "m1", gitObjectType: "blob" },
+              item: {
+                path: "/modified.ts",
+                objectId: "m1",
+                gitObjectType: "blob",
+              },
               changeType: 2, // Edit
             },
             {
-              item: { path: "/renamed.ts", objectId: "r1", gitObjectType: "blob" },
+              item: {
+                path: "/renamed.ts",
+                objectId: "r1",
+                gitObjectType: "blob",
+              },
               changeType: 8, // Rename
             },
             {
-              item: { path: "/deleted.ts", objectId: "d1", gitObjectType: "blob" },
+              item: {
+                path: "/deleted.ts",
+                objectId: "d1",
+                gitObjectType: "blob",
+              },
               changeType: 16, // Delete
             },
             {
-              item: { path: "/unknown.ts", objectId: "u1", gitObjectType: "blob" },
+              item: {
+                path: "/unknown.ts",
+                objectId: "u1",
+                gitObjectType: "blob",
+              },
               changeType: 999, // Unknown - should default to modified
             },
           ],
@@ -446,12 +480,20 @@ describe("AzureDevOpsAdapter", () => {
 
       // Generate 150 files to test pagination (page size is 100)
       const firstPageChanges = Array.from({ length: 100 }, (_, i) => ({
-        item: { path: `/src/file${i}.ts`, objectId: `obj${i}`, gitObjectType: "blob" },
+        item: {
+          path: `/src/file${i}.ts`,
+          objectId: `obj${i}`,
+          gitObjectType: "blob",
+        },
         changeType: 2, // Edit (numeric)
       }));
 
       const secondPageChanges = Array.from({ length: 50 }, (_, i) => ({
-        item: { path: `/src/file${100 + i}.ts`, objectId: `obj${100 + i}`, gitObjectType: "blob" },
+        item: {
+          path: `/src/file${100 + i}.ts`,
+          objectId: `obj${100 + i}`,
+          gitObjectType: "blob",
+        },
         changeType: 2, // Edit (numeric)
       }));
 
@@ -474,11 +516,15 @@ describe("AzureDevOpsAdapter", () => {
       for (let i = 0; i < 150; i++) {
         // Base version
         mockFetch.mockImplementationOnce(() =>
-          createMockResponse(true, 200, { content: `// Base content for file${i}` })
+          createMockResponse(true, 200, {
+            content: `// Base content for file${i}`,
+          })
         );
         // Target version
         mockFetch.mockImplementationOnce(() =>
-          createMockResponse(true, 200, { content: `// Modified content for file${i}` })
+          createMockResponse(true, 200, {
+            content: `// Modified content for file${i}`,
+          })
         );
       }
 
@@ -519,7 +565,11 @@ describe("AzureDevOpsAdapter", () => {
 
       // Return exactly 100 files on first page
       const firstPageChanges = Array.from({ length: 100 }, (_, i) => ({
-        item: { path: `/src/file${i}.ts`, objectId: `obj${i}`, gitObjectType: "blob" },
+        item: {
+          path: `/src/file${i}.ts`,
+          objectId: `obj${i}`,
+          gitObjectType: "blob",
+        },
         changeType: 1, // Add (numeric)
       }));
 

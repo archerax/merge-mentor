@@ -102,7 +102,7 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
-export function buildFastReviewOutputFormat(_options?: { tokenSaver?: boolean }): string {
+export function buildFastReviewOutputFormat(): string {
   return buildOutputFormatSection(
     "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",
     `{

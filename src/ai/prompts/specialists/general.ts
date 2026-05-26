@@ -278,8 +278,7 @@ export function buildGeneralFileReviewPrompt(
   existingCommentsContext?: string,
   repoPath?: string,
   selectedPasses?: readonly ReviewPass[],
-  additionalContextSections?: readonly string[],
-  options?: { tokenSaver?: boolean }
+  additionalContextSections?: readonly string[]
 ): string {
   const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
@@ -387,7 +386,7 @@ Before reporting ANY finding, ask yourself:
 Only report findings that survive this check.
 
 ${buildBatchedFileResultsOutputFormat({
-  analysisInstruction: options?.tokenSaver ? undefined : "Document your analysis step-by-step",
+  analysisInstruction: "Document your analysis step-by-step",
   severityExample: "high",
   categoryExample: "bug",
   messageExample: "Clear description of the problem",

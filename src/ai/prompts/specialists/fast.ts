@@ -105,8 +105,7 @@ export function buildFastReviewPrompt(
   existingCommentsContext?: string,
   repoPath?: string,
   selectedPasses?: readonly ReviewPass[],
-  additionalContextSections?: readonly string[],
-  options?: { tokenSaver?: boolean }
+  additionalContextSections?: readonly string[]
 ): string {
   const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
   const filesListing = manifest.files
@@ -237,6 +236,6 @@ Only report findings that survive this check.
 - **File-level**: Include file and omit line number
 - **General/PR-level**: Omit both file and line
 
-${buildFastReviewOutputFormat(options)}
+${buildFastReviewOutputFormat()}
 `;
 }
