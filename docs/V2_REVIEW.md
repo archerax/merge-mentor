@@ -271,21 +271,17 @@ These are correctness or quality risks. They do not require interface changes bu
 
 ### 2.11 Dynamic Import of `fast.ts` in Engine
 
+- **Status:** ✅ **Resolved** -- Changed to static import alongside other prompt builders.
 - **Files:** `src/review/engine.ts` (line 1174)
-- **What it is:** The fast-review prompt builder is the only prompt builder imported dynamically. All others are imported statically. If the dynamic import fails (typo, bundler issue), the error surfaces only when a user triggers a fast review, not at startup.
-- **Proposed fix:** Static-import it alongside the other prompt builders.
 - **Effort:** Small
-- **Recommendation:** **Fix before release.** Simple safety improvement.
 
 ---
 
 ### 2.12 Copy-pasted `buildSelectedPassesSection` in Two Files
 
+- **Status:** ✅ **Resolved** -- Extracted to `src/ai/prompts/shared/passHelpers.ts` with tests.
 - **Files:** `src/ai/prompts/specialists/general.ts` (lines 169-181), `fast.ts` (lines 64-76)
-- **What it is:** These identically-named functions exist in both files. Any change to pass descriptions must be made in two places.
-- **Proposed fix:** Extract to `src/ai/prompts/shared/passHelpers.ts`.
 - **Effort:** Small
-- **Recommendation:** **Fix before release.** Duplication risk.
 
 ---
 
@@ -363,7 +359,7 @@ Low effort, low risk. Good for sprint filler or a new contributor.
 
 | #   | Issue                                                                                  | File                        | Effort  |
 | --- | -------------------------------------------------------------------------------------- | --------------------------- | ------- |
-| 4.1 | `_AzureChangeType` constant defined but never used                                     | `azure.ts:22-27`            | Trivial |
+| 4.1 | ~~`_AzureChangeType` constant defined but never used~~ ✅                              | `azure.ts:22-27`            | Trivial |
 | 4.2 | magic number `50` for truncation in `prIdentifier.ts:81`                               | `utils/prIdentifier.ts`     | Trivial |
 | 4.3 | Comment body may exceed API length limits (65K chars)                                  | `commentManager.ts:273-291` | Small   |
 | 4.4 | `verbose` semantic is inverted (controls all output, not just debug)                   | `engine.ts:1321`            | Small   |
@@ -426,8 +422,8 @@ These are documented in the CHANGELOG and are already in progress or planned:
 - [ ] 2.6: Make `executeAction` switch exhaustive
 - [ ] 2.7: Rename `stream` to `streamingEnabled`
 - [ ] 2.10: Increase specialist prompt test coverage
-- [ ] 2.11: Static-import `fast.ts`
-- [ ] 2.12: Extract `buildSelectedPassesSection`
+- [x] 2.11: Static-import `fast.ts`
+- [x] 2.12: Extract `buildSelectedPassesSection`
 
 **Can ship after v2.0:**
 

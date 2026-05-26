@@ -18,14 +18,6 @@ import type {
   RepoInfo,
 } from "./types.js";
 
-/** Azure DevOps change type values. */
-const _AzureChangeType = {
-  ADD: 1,
-  EDIT: 2,
-  RENAME: 8,
-  DELETE: 16,
-} as const;
-
 /** Azure DevOps thread status values. */
 const AzureThreadStatus = {
   ACTIVE: 1,
@@ -46,7 +38,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly repoName: string;
   private readonly botIdentifier: string;
   private readonly auditLogger = getAuditLogger();
-  private readonly logger = createChildLogger({ component: "AzureDevOpsAdapter" });
+  private readonly logger = createChildLogger({
+    component: "AzureDevOpsAdapter",
+  });
   private readonly token: string;
   private readonly orgUrl: string;
   private readonly org: string;
@@ -299,7 +293,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(
-          { status: response.status, statusText: response.statusText, errorText },
+          {
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
+          },
           "Failed to fetch PR iteration changes via REST API"
         );
         throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
@@ -389,7 +387,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           );
         } catch (error) {
           this.logger.debug(
-            { filePath, commit: targetCommitId, error: (error as Error).message },
+            {
+              filePath,
+              commit: targetCommitId,
+              error: (error as Error).message,
+            },
             "Could not fetch target content (file may be deleted)"
           );
         }
@@ -434,7 +436,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
       if (structuredDiff.hunks.length === 0) {
         this.logger.warn(
-          { filePath, baseLength: baseContent.length, targetLength: targetContent.length },
+          {
+            filePath,
+            baseLength: baseContent.length,
+            targetLength: targetContent.length,
+          },
           "No diff hunks generated - files may be identical"
         );
       } else {
@@ -450,7 +456,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         { filePath, error: (error as Error).message },
         "Failed to generate diff from blobs"
       );
-      return { patch: this.createEmptyDiffHeader(filePath), additions: 0, deletions: 0 };
+      return {
+        patch: this.createEmptyDiffHeader(filePath),
+        additions: 0,
+        deletions: 0,
+      };
     }
   }
 

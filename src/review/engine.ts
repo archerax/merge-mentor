@@ -52,6 +52,7 @@ import {
 } from "../ai/index.js";
 import { buildFilesSummary } from "../ai/prompts/buildFilesSummary.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
+import { buildFastReviewPrompt } from "../ai/prompts/specialists/fast.js";
 import {
   buildGeneralCrossFilePrompt,
   buildGeneralFileReviewPrompt,
@@ -1174,7 +1175,6 @@ During the database pass, pay extra attention to query correctness, transaction 
 
       // Build combined prompt for fast review
       const commentsContext = formatExistingCommentsContext(existingComments);
-      const { buildFastReviewPrompt } = await import("../ai/prompts/specialists/fast.js");
       const prompt = buildFastReviewPrompt(
         prDetails,
         manifest,

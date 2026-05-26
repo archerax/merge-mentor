@@ -3,6 +3,7 @@ import type { DiffManifest } from "../../../review/diffStorage.js";
 import type { ReviewPass } from "../../../review/reviewSelection.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import { buildSelectedPassesSection } from "../shared/passHelpers.js";
 import { buildFastReviewOutputFormat } from "./outputFormats.js";
 
 function buildWorkspaceSection(repoPath?: string): string {
@@ -60,20 +61,6 @@ const FAST_PASS_DETAILS: Record<ReviewPass, readonly string[]> = {
     "- Revisit indexing, batching, locking, and data consistency concerns",
   ],
 };
-
-function buildSelectedPassesSection(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  return `
-# ADDITIVE REVIEW PASSES
-Baseline review is always active. After the baseline review, run these extra passes in this exact order:
-${selectedPasses.map((phase, index) => `${index + 1}. ${phase}`).join("\n")}
-
-These passes add focus and context. They do **not** restrict what issues you may report.
-`;
-}
 
 function buildAdditionalPassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
