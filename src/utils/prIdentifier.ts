@@ -1,5 +1,7 @@
 import type { Platform } from "../config.js";
 
+const MAX_PROJECT_NAME_LENGTH = 50;
+
 /**
  * PR identification and naming utilities.
  *
@@ -59,7 +61,7 @@ export function generatePRIdentifier(
  * - Replaces filesystem-invalid chars: `/ \ : * ? " < > |` → `_`
  * - Replaces whitespace: ` \t \n` → `-`
  * - Removes trailing dots (reserved in Windows)
- * - Limits output to 50 characters to prevent overly long paths
+ * - Limits output to {@link MAX_PROJECT_NAME_LENGTH} characters to prevent overly long paths
  *
  * @param project - Raw project name that may contain special characters
  * @returns Sanitized project name safe for file system use
@@ -78,5 +80,5 @@ export function sanitizeProjectName(project: string): string {
     .replace(/[/\\:*?"<>|]/g, "_") // Replace invalid filename characters
     .replace(/\s+/g, "-") // Replace spaces with hyphens
     .replace(/[.]+$/g, "") // Remove trailing dots
-    .substring(0, 50); // Limit length to prevent overly long file names
+    .substring(0, MAX_PROJECT_NAME_LENGTH);
 }
