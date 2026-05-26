@@ -267,10 +267,7 @@ export class ReviewEngine {
     const providerOptions = {
       model,
       timeoutMs,
-      token:
-        providerType === "copilot" || providerType === "copilot-sdk"
-          ? options?.copilotToken
-          : undefined,
+      token: providerType === "copilot-sdk" ? options?.copilotToken : undefined,
       aiBaseUrl: options?.aiBaseUrl,
       aiApiKey: options?.aiApiKey,
       tempPath,
@@ -846,7 +843,10 @@ During the database pass, pay extra attention to query correctness, transaction 
         this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
       );
       this.logger.info(
-        { reviewPasses: this.reviewProfile.passes, reviewType: this.reviewProfile.reviewType },
+        {
+          reviewPasses: this.reviewProfile.passes,
+          reviewType: this.reviewProfile.reviewType,
+        },
         "Built resolved file review prompt"
       );
 
@@ -1088,7 +1088,10 @@ During the database pass, pay extra attention to query correctness, transaction 
         this.buildAdditionalPassContextSections(files.map((file) => file.filename))
       );
       this.logger.info(
-        { reviewPasses: this.reviewProfile.passes, reviewType: this.reviewProfile.reviewType },
+        {
+          reviewPasses: this.reviewProfile.passes,
+          reviewType: this.reviewProfile.reviewType,
+        },
         "Built resolved cross-file prompt"
       );
 

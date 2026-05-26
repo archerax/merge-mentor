@@ -98,7 +98,7 @@ interface AuditEvent {
  * with optional details about the resource.
  */
 interface AuditResource {
-  readonly type: "pr" | "file" | "comment" | "copilot" | "review";
+  readonly type: "pr" | "file" | "comment" | "ai" | "review";
   readonly id: string;
   readonly details?: Record<string, unknown>;
 }
@@ -336,7 +336,11 @@ export class AuditLogger {
   ): void {
     this.logEvent(
       "comment.post.general",
-      { type: "comment", id: `pr-${prNumber}-general`, details: { prNumber, platform } },
+      {
+        type: "comment",
+        id: `pr-${prNumber}-general`,
+        details: { prNumber, platform },
+      },
       `Post general comment on PR #${prNumber}`,
       result,
       { prNumber, platform },
@@ -381,7 +385,11 @@ export class AuditLogger {
 
     this.logEvent(
       "ai.provider.execute",
-      { type: "copilot", id: `${provider}:${promptType}`, details: { provider, model } },
+      {
+        type: "ai",
+        id: `${provider}:${promptType}`,
+        details: { provider, model },
+      },
       `Execute ${provider} prompt: ${promptType}`,
       result,
       metadata,

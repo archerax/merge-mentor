@@ -56,7 +56,7 @@ function createTestConfig(): Config {
       repo: "test-repo",
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
-    aiProvider: "copilot",
+    aiProvider: "copilot-sdk",
     gitBackend: "cli",
     skipPreExisting: true,
     reviewType: "general",

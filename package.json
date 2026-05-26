@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "npx prettier **/*.{md,yml} && biome check && knip",
+    "lint": "npx prettier --check **/*.{md,yml} && biome check && knip",
     "lint:fix": "npx prettier --write **/*.{md,yml} && biome check --write && knip --fix",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",

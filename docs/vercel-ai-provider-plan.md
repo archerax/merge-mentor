@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a new AI provider `vercel-ai` that uses Vercel AI SDK v6's `ToolLoopAgent` with custom read-only tools (readFile, grep, glob) for code exploration. This is an additional provider alongside Copilot/OpenCode, not a replacement.
+Add a new AI provider `vercel-ai` that uses Vercel AI SDK v6's `ToolLoopAgent` with secure read-only tools (readFile, grep, glob, listDir) for code exploration. This is an additional provider alongside Copilot/OpenCode, not a replacement.
 
 ## Architecture
 
@@ -37,11 +37,50 @@ Existing deduplication → post comments
 5. **Timeout** - Uses existing timeout mechanism (passed to ToolLoopAgent)
 6. **Deduplication** - Uses existing deduplication in review engine
 
+### Security Model
+
+**Path Sandboxing:** All file paths are resolved and verified to be within the working directory before access. Path traversal attacks (`../`) are blocked.
+
+**Tool Allowlist:** Only explicitly defined read-only tools are available. No shell, write, network, or external directory access.
+
+**Resource Limits:** Tools enforce file size limits (1MB default) and binary file detection to prevent abuse.
+
+**Permission Handler:** Mirrors the pattern from `copilot-sdk.ts` for consistency.
+
+```typescript
+const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set(
+  [
+    "shell",
+    "write",
+    "mcp",
+    "url",
+    "custom-tool",
+    "memory",
+    "hook",
+    "external_directory",
+  ],
+);
+
+const READ_ONLY_REVIEW_TOOLS = [
+  "readFile",
+  "grep",
+  "glob",
+  "listDir",
+  "postComment",
+] as const;
+```
+
 ### Tool Set
 
 ```typescript
+interface ToolLimits {
+  maxFileSizeBytes: number; // Default: 1MB
+  maxStepCount: number; // Default: 20
+  maxToolsPerCategory: Record<string, number>; // per-tool call limits
+  maxTotalFilesRead: number; // Default: 100
+}
+
 const tools = {
-  // Custom read-only tools against real filesystem
   readFile: tool({
     description: "Read the contents of a file from the repository",
     parameters: z.object({
@@ -53,18 +92,32 @@ const tools = {
       endLine: z.number().optional().describe("End line number (inclusive)"),
     }),
     execute: async ({ path, startLine, endLine }) => {
-      const fullPath = path.join(this.workingDirectory, path);
+      const fullPath = this.resolvePath(path); // Sandboxed
+      const stat = await this.fileSystem.stat(fullPath);
+
+      if (stat.size > this.toolLimits.maxFileSizeBytes) {
+        throw new ToolError(
+          `File too large: ${stat.size} bytes (max ${this.toolLimits.maxFileSizeBytes})`,
+        );
+      }
+
+      if (await this.isBinaryFile(fullPath)) {
+        throw new ToolError("Cannot read binary files");
+      }
+
       let content = await this.fileSystem.readFile(fullPath, "utf-8");
       if (startLine !== undefined && endLine !== undefined) {
         const lines = content.split("\n");
         content = lines.slice(startLine - 1, endLine).join("\n");
       }
+
+      this.auditLogger.logToolAccess("readFile", fullPath);
       return { content };
     },
   }),
 
   grep: tool({
-    description: "Search for patterns in files",
+    description: "Search for patterns in files using ripgrep",
     parameters: z.object({
       pattern: z.string().describe("Regular expression to search for"),
       path: z
@@ -77,7 +130,12 @@ const tools = {
         .describe("Number of context lines around matches"),
     }),
     execute: async ({ pattern, path, contextLines }) => {
-      const results = await this.grepFiles(pattern, path, contextLines);
+      if (pattern.length > 500) {
+        throw new ToolError("Pattern too long (max 500 chars)");
+      }
+      const searchPath = this.resolvePath(path ?? ".");
+      const results = await this.grepFiles(pattern, searchPath, contextLines);
+      this.auditLogger.logToolAccess("grep", searchPath, { pattern });
       return { matches: results };
     },
   }),
@@ -89,12 +147,32 @@ const tools = {
       path: z.string().optional().describe("Base directory to search in"),
     }),
     execute: async ({ pattern, path }) => {
-      const files = await this.globFiles(pattern, path);
+      if (pattern.length > 200) {
+        throw new ToolError("Pattern too long (max 200 chars)");
+      }
+      const searchPath = path ? this.resolvePath(path) : this.workingDirectory;
+      const files = await this.globFiles(pattern, searchPath);
+      this.auditLogger.logToolAccess("glob", searchPath, {
+        pattern,
+        count: files.length,
+      });
       return { files };
     },
   }),
 
-  // Custom - adds to queue, returns data (no execute stops the loop)
+  listDir: tool({
+    description: "List directory contents",
+    parameters: z.object({
+      path: z.string().optional().describe("Directory path (defaults to root)"),
+    }),
+    execute: async ({ path }) => {
+      const dirPath = this.resolvePath(path ?? ".");
+      const entries = await this.fileSystem.readdir(dirPath);
+      this.auditLogger.logToolAccess("listDir", dirPath);
+      return { entries };
+    },
+  }),
+
   postComment: tool({
     description: "Record a review comment to post on the PR",
     parameters: z.object({
@@ -112,9 +190,40 @@ const tools = {
       confidence: z.enum(["high", "medium", "low"]).default("high"),
       suggestion: z.string().optional().describe("Suggested fix"),
     }),
-    // No execute function - when agent calls this, it returns to us with the data
   }),
 };
+```
+
+### Path Sandboxing Implementation
+
+```typescript
+class PathSanitizer {
+  constructor(private readonly workingDirectory: string) {}
+
+  resolvePath(inputPath: string): string {
+    // Handle both absolute and relative paths
+    const basePath = this.workingDirectory;
+
+    // Use path.normalize to resolve . and .. components
+    const fullPath = path.resolve(basePath, inputPath);
+
+    // CRITICAL: Verify the resolved path starts with working directory
+    // This prevents path traversal attacks (e.g., "../../../etc/passwd")
+    const normalizedPath = path.normalize(fullPath);
+
+    if (
+      !normalizedPath.startsWith(basePath + path.sep) &&
+      normalizedPath !== basePath
+    ) {
+      throw new ToolError(
+        `Access denied: path '${inputPath}' resolves to '${normalizedPath}' ` +
+          `which is outside working directory '${basePath}'`,
+      );
+    }
+
+    return normalizedPath;
+  }
+}
 ```
 
 **Security:** Tools use node's `fs` module only for read operations. No shell execution. Mirrors Copilot SDK's `grep` and `glob` tools.
@@ -220,12 +329,13 @@ Add to `package.json`:
   "dependencies": {
     "ai": "^6.0.0",
     "@ai-sdk/openai": "^1.0.0",
+    "@vscode/ripgrep": "^1.15.0",
     "glob": "^11.0.0"
   }
 }
 ```
 
-Note: Use `@ai-sdk/openai` for OpenAI-compatible models. For other providers (Anthropic, etc.), use the appropriate package or OpenRouter as a gateway.
+**Note:** Use `@ai-sdk/openai` for OpenAI-compatible models. For other providers (Anthropic, etc.), use the appropriate package or OpenRouter as a gateway.
 
 ## Configuration Options
 
@@ -245,6 +355,7 @@ const agent = new ToolLoopAgent({
     readFile: readFileTool,
     grep: grepTool,
     glob: globTool,
+    listDir: listDirTool,
     postComment: postCommentTool,
   },
   instructions: reviewPrompt, // Use existing prompts
@@ -263,53 +374,148 @@ const agent = new ToolLoopAgent({
 - **Timeout:** Use `timeoutMs` option to limit agent execution
 - **No comments:** If agent finishes without calling postComment, return empty findings
 - **Malformed tool calls:** Validate and skip invalid inputs
-- **Tool errors:** Catch filesystem errors, return error message to agent (agent can retry)
+- **Tool errors:** Catch filesystem errors, return `ToolError` message to agent (agent can retry)
+- **Path sandbox violations:** Return `ToolError` with clear denial message
+- **Resource limit exceeded:** Return `ToolError` with limit info
+
+### ToolError class
+
+```typescript
+class ToolError extends Error {
+  constructor(
+    message: string,
+    public readonly toolName: string,
+    public readonly isRetryable: boolean = true,
+  ) {
+    super(message);
+    this.name = "ToolError";
+  }
+}
+```
+
+### Token Usage Tracking
+
+Token usage is extracted from the model response metadata:
+
+```typescript
+interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+function extractTokenUsage(result: AgentResult): TokenUsage {
+  // From response metadata (provider-specific format)
+  const usage = result.usage ?? result.metadata?.usage;
+
+  return {
+    promptTokens: usage?.promptTokens ?? 0,
+    completionTokens: usage?.completionTokens ?? 0,
+    totalTokens: usage?.totalTokens ?? 0,
+  };
+}
+```
+
+Audit logging for token usage happens in `logAIProviderExecution()` (existing pattern from copilot.ts).
 
 ## Tool Implementation Details
 
-### grep implementation
+### grep implementation (using @vscode/ripgrep)
 
 ```typescript
-async grepFiles(pattern: string, searchPath?: string, contextLines = 3): Promise<GrepResult[]> {
-  const results: GrepResult[] = [];
-  const regex = new RegExp(pattern, 'gi');
+import { ripgrep } from "@vscode/ripgrep";
+
+interface GrepMatch {
+  file: string;
+  line: number;
+  match: string;
+  context: string;
+}
+
+async grepFiles(
+  pattern: string,
+  searchPath: string,
+  contextLines: number = 3
+): Promise<GrepMatch[]> {
+  const results: GrepMatch[] = [];
   const basePath = this.workingDirectory;
 
-  const filesToSearch = searchPath
-    ? [path.join(basePath, searchPath)]
-    : await this.globAllFiles(basePath);
-
-  for (const filePath of filesToSearch) {
-    const content = await this.fileSystem.readFile(filePath, "utf-8");
-    const lines = content.split('\n');
-
-    for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
-        const start = Math.max(0, i - contextLines);
-        const end = Math.min(lines.length, i + contextLines + 1);
-        results.push({
-          file: path.relative(basePath, filePath),
-          line: i + 1,
-          match: lines[i].trim(),
-          context: lines.slice(start, end).join('\n'),
-        });
-      }
-      regex.lastIndex = 0;
-    }
+  for await (const match of ripgrep(pattern, {
+    cwd: searchPath,
+    contextLines,
+    glob: ["**/*"],  // Could be configurable
+  })) {
+    results.push({
+      file: path.relative(basePath, match.path),
+      line: match.lineNumber,
+      match: match.lines.substring(
+        match.lineStart,
+        match.lineEnd
+      ),
+      context: match.lines,
+    });
   }
+
   return results;
 }
 ```
 
+**Why @vscode/ripgrep:**
+
+- Native Node addon - faster than pure JS regex
+- Proper PCRE-compatible regex support
+- Respects `.gitignore` patterns automatically
+- Battle-tested in VSCode (handles huge repos)
+
 ### glob implementation
 
 ```typescript
-async globFiles(pattern: string, searchPath?: string): Promise<string[]> {
-  const basePath = searchPath
-    ? path.join(this.workingDirectory, searchPath)
-    : this.workingDirectory;
+async globFiles(pattern: string, searchPath: string): Promise<string[]> {
+  return glob(pattern, { cwd: searchPath, absolute: false });
+}
+```
 
-  return glob(pattern, { cwd: basePath, absolute: false });
+### listDir implementation
+
+```typescript
+async listDir(dirPath: string): Promise<DirEntry[]> {
+  const entries = await this.fileSystem.readdir(dirPath);
+  const result = await Promise.all(
+    entries.map(async (name) => {
+      const fullPath = path.join(dirPath, name);
+      const stat = await this.fileSystem.stat(fullPath);
+      return {
+        name,
+        isDirectory: stat.isDirectory(),
+        isFile: stat.isFile(),
+        size: stat.size,
+      };
+    })
+  );
+  return result;
+}
+```
+
+### Binary file detection
+
+```typescript
+async isBinaryFile(filePath: string): Promise<boolean> {
+  const buffer = Buffer.alloc(8192);
+  const { bytesRead } = await this.fileSystem.read(
+    filePath,
+    buffer,
+    0,
+    buffer.length,
+    0
+  );
+
+  // Check for null bytes (common in binary files)
+  for (let i = 0; i < bytesRead; i++) {
+    if (buffer[i] === 0) {
+      return true;
+    }
+  }
+  return false;
 }
 ```
 
@@ -317,19 +523,33 @@ async globFiles(pattern: string, searchPath?: string): Promise<string[]> {
 
 1. [ ] Create `src/ai/providers/vercel-ai.ts`
    - [ ] Implement ToolLoopAgent setup
-   - [ ] Implement readFile, grep, glob, postComment tools
+   - [ ] Implement PathSanitizer class (resolve + prefix check)
+   - [ ] Implement readFile, grep, glob, listDir, postComment tools
+   - [ ] Add resource limits (file size, binary detection, path length)
    - [ ] Handle result.staticToolCalls extraction
    - [ ] Add token usage tracking
-2. [ ] Update `src/ai/types.ts` - add `"vercel-ai"` to AIProviderType
-3. [ ] Update `src/ai/providerFactory.ts` - add case for `"vercel-ai"`
-4. [ ] Add tests for provider
-5. [ ] Verify with real PR review
+   - [ ] Add audit logging for tool access
+2. [ ] Create `src/ai/tools/` directory
+   - [ ] `pathSanitizer.ts` - path sandboxing utilities
+   - [ ] `toolLimits.ts` - configurable limits
+   - [ ] `binaryDetector.ts` - binary file detection
+3. [ ] Update `src/ai/types.ts` - add `"vercel-ai"` to AIProviderType
+4. [ ] Update `src/ai/providerFactory.ts` - add case for `"vercel-ai"`
+5. [ ] Add tests for provider
+   - [ ] Unit tests for PathSanitizer (path traversal attempts)
+   - [ ] Unit tests for binary detection
+   - [ ] Unit tests for tool limits
+   - [ ] Integration tests with mock model
+   - [ ] End-to-end test with real PR
 
 ## Testing
 
-1. Unit tests for provider class
-2. Integration tests with mock model
-3. End-to-end test with real PR
+1. **Path traversal tests:** Verify `../` attacks are blocked
+2. **Binary file tests:** Verify binary files are rejected
+3. **File size tests:** Verify oversized files are rejected
+4. **Unit tests for provider class**
+5. **Integration tests with mock model**
+6. **End-to-end test with real PR**
 
 ## Benefits
 
@@ -337,7 +557,30 @@ async globFiles(pattern: string, searchPath?: string): Promise<string[]> {
 2. **Dynamic exploration** - Agent can use tools to find issues
 3. **Direct comment collection** - Agent returns structured findings
 4. **Compatible** - Existing infrastructure (deduplication, dry-run, audit) unchanged
-5. **Secure** - Read-only tools (no shell), operates on cloned repo only
+5. **Secure** - Read-only tools with strong path sandboxing
+6. **Auditable** - Tool access logging for security reviews
+7. **Efficient** - Uses @vscode/ripgrep for fast, regex-compliant search
+
+## Security Considerations
+
+### Threat Model
+
+1. **Malicious PR content** - Attacker-controlled file names or contents
+2. **Path traversal** - `../../../etc/passwd` style attacks
+3. **Symbolic link attacks** - Following symlinks outside working directory
+4. **Large file DoS** - Reading huge files to exhaust memory
+5. **Binary file exposure** - Leaking binary content in tool responses
+
+### Mitigations
+
+| Threat             | Mitigation                                         |
+| ------------------ | -------------------------------------------------- |
+| Path traversal     | `resolvePath()` + prefix verification              |
+| Symlink attacks    | `access()` check before read (or disable symlinks) |
+| Large files        | 1MB default limit with detection                   |
+| Binary files       | Null-byte detection rejects binary                 |
+| ReDoS in grep      | Pattern length limit (500 chars)                   |
+| DoS via file count | Max 100 files read per session                     |
 
 ## Risks
 

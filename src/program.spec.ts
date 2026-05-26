@@ -93,9 +93,14 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   return {
     defaultPlatform: "github" as const,
     github: { token: "gh-token", owner: "test-owner", repo: "test-repo" },
-    azure: { token: "az-token", org: "test-org", project: "test-project", repo: "test-repo" },
+    azure: {
+      token: "az-token",
+      org: "test-org",
+      project: "test-project",
+      repo: "test-repo",
+    },
     botCommentIdentifier: "[merge-mentor]",
-    aiProvider: "copilot",
+    aiProvider: "copilot-sdk",
     aiModel: "claude-sonnet-4.6",
     gitBackend: "cli",
     skipPreExisting: true,
@@ -207,7 +212,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
-        "copilot",
+        "copilot-sdk",
         expect.objectContaining({
           dryRun: true,
           verbose: true,
@@ -247,7 +252,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
-        "copilot",
+        "copilot-sdk",
         expect.objectContaining({
           dryRun: false,
           verbose: false,
@@ -378,7 +383,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
-        "copilot",
+        "copilot-sdk",
         expect.objectContaining({
           reviewType: "custom",
           reviewPasses: ["scan", "logic"],
@@ -442,14 +447,14 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
-        "copilot",
+        "copilot-sdk",
         expect.objectContaining({
           skipPreExisting: false,
         })
       );
     });
 
-    it("uses opencode provider when specified via --provider", async () => {
+    it("uses opencode-sdk provider when specified via --provider", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           aiModel: "claude-4.5-sonnet",
@@ -458,7 +463,7 @@ describe("CLI", () => {
       );
 
       const options = createReviewOptions({
-        provider: "opencode",
+        provider: "opencode-sdk",
         write: false,
         verbose: true,
       });
@@ -468,7 +473,7 @@ describe("CLI", () => {
       expect(ReviewEngine).toHaveBeenCalledWith(
         expect.any(Object),
         "[merge-mentor]",
-        "opencode",
+        "opencode-sdk",
         expect.objectContaining({
           aiModel: "claude-4.5-sonnet",
           aiTimeoutMs: 120000,
@@ -513,7 +518,7 @@ describe("CLI", () => {
       });
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot", "copilot-sdk", "opencode", or "opencode-sdk".'
+        'Invalid AI provider "invalid". Must be "copilot-sdk" or "opencode-sdk".'
       );
     });
 
@@ -551,7 +556,11 @@ describe("CLI", () => {
       });
 
       it("defaults write to true in CI mode", async () => {
-        const options = createReviewOptions({ ci: true, pr: undefined, write: undefined });
+        const options = createReviewOptions({
+          ci: true,
+          pr: undefined,
+          write: undefined,
+        });
 
         await executeReview(options, { env: createStubEnv(githubEnv) });
 
@@ -564,7 +573,11 @@ describe("CLI", () => {
       });
 
       it("respects explicit --no-write in CI mode", async () => {
-        const options = createReviewOptions({ ci: true, pr: undefined, write: false });
+        const options = createReviewOptions({
+          ci: true,
+          pr: undefined,
+          write: false,
+        });
 
         await executeReview(options, { env: createStubEnv(githubEnv) });
 
@@ -585,7 +598,11 @@ describe("CLI", () => {
       });
 
       it("MM_AZURE_TOKEN takes priority over SYSTEM_ACCESSTOKEN", async () => {
-        const options = createReviewOptions({ ci: true, pr: undefined, platform: "azure" });
+        const options = createReviewOptions({
+          ci: true,
+          pr: undefined,
+          platform: "azure",
+        });
         const env = createStubEnv({ ...azureEnv, MM_AZURE_TOKEN: "my-pat" });
 
         await executeReview(options, { env });
@@ -594,7 +611,11 @@ describe("CLI", () => {
       });
 
       it("falls back to SYSTEM_ACCESSTOKEN when MM_AZURE_TOKEN is not set", async () => {
-        const options = createReviewOptions({ ci: true, pr: undefined, platform: "azure" });
+        const options = createReviewOptions({
+          ci: true,
+          pr: undefined,
+          platform: "azure",
+        });
 
         await executeReview(options, { env: createStubEnv(azureEnv) });
 
@@ -620,7 +641,9 @@ describe("CLI", () => {
           expect.any(Object),
           expect.any(String),
           expect.any(String),
-          expect.objectContaining({ localWorkspacePath: "/home/runner/work/myrepo/myrepo" })
+          expect.objectContaining({
+            localWorkspacePath: "/home/runner/work/myrepo/myrepo",
+          })
         );
       });
 
@@ -678,7 +701,7 @@ describe("CLI", () => {
         true,
         mockAdapterWithId as unknown as PlatformAdapter,
         "github",
-        "copilot"
+        "copilot-sdk"
       );
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -712,7 +735,7 @@ describe("CLI", () => {
         false,
         mockAdapterWithId as unknown as PlatformAdapter,
         "github",
-        "copilot"
+        "copilot-sdk"
       );
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -751,7 +774,7 @@ describe("CLI", () => {
         true,
         mockAdapterWithId as unknown as PlatformAdapter,
         "github",
-        "copilot",
+        "copilot-sdk",
         "general",
         undefined,
         "standard",
@@ -883,7 +906,10 @@ describe("CLI", () => {
     });
 
     it("displays lines changed in summary", () => {
-      const result = createMockReviewResult({ linesAdded: 42, linesDeleted: 7 });
+      const result = createMockReviewResult({
+        linesAdded: 42,
+        linesDeleted: 7,
+      });
 
       displayResults(result, true);
 
@@ -1156,12 +1182,12 @@ describe("CLI", () => {
         },
       });
 
-      const report = generateMarkdownReport(result, "copilot", true);
+      const report = generateMarkdownReport(result, "copilot-sdk", true);
 
       expect(report).toContain("# Code Review Report - PR #123");
       expect(report).toContain("**PR Title:** Test PR");
       expect(report).toContain("**Author:** test-author");
-      expect(report).toContain("**AI Provider:** copilot");
+      expect(report).toContain("**AI Provider:** copilot-sdk");
       expect(report).toContain("- **Files Reviewed:** 2");
       expect(report).toContain("- **Files Skipped:** 1");
       expect(report).toContain("- **Total Issues Found:** 2");
@@ -1200,10 +1226,10 @@ describe("CLI", () => {
         },
       });
 
-      const report = generateMarkdownReport(result, "opencode", true);
+      const report = generateMarkdownReport(result, "opencode-sdk", true);
 
       expect(report).toContain("# Code Review Report - PR #42"); // Use the actual PR number from mock
-      expect(report).toContain("**AI Provider:** opencode");
+      expect(report).toContain("**AI Provider:** opencode-sdk");
       expect(report).toContain("- **Total Issues Found:** 0");
       expect(report).not.toContain("## 📁 File-Specific Issues");
       expect(report).not.toContain("## 🔗 Cross-File Issues");
@@ -1221,7 +1247,7 @@ describe("CLI", () => {
 
     it("includes custom review phases in the report header", () => {
       const result = createMockReviewResult({});
-      const report = generateMarkdownReport(result, "copilot", true, "custom", [
+      const report = generateMarkdownReport(result, "copilot-sdk", true, "custom", [
         "scan",
         "performance",
       ]);
@@ -1379,9 +1405,10 @@ describe("CLI", () => {
       vi.mocked(statSync).mockImplementation(() => {
         callCount++;
         if (callCount <= 1) {
-          return { isDirectory: () => true, mtime: new Date() } as unknown as ReturnType<
-            typeof statSync
-          >;
+          return {
+            isDirectory: () => true,
+            mtime: new Date(),
+          } as unknown as ReturnType<typeof statSync>;
         }
         return { isDirectory: () => false } as unknown as ReturnType<typeof statSync>;
       });
@@ -1418,15 +1445,14 @@ describe("CLI", () => {
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
 
-    it("checks all three providers by default", async () => {
+    it("checks no providers by default (CLI providers removed)", async () => {
       vi.mocked(execSync).mockImplementation(() => {
         throw new Error("not found");
       });
 
       await program.parseAsync(["node", "test", "doctor"]);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking opencode CLI"));
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("Checking"));
     });
 
     it("checks only specified provider with --provider", async () => {
@@ -1435,8 +1461,78 @@ describe("CLI", () => {
       await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Checking opencode CLI")
+    });
+
+    it("shows installed version when provider is found", async () => {
+      vi.mocked(execSync).mockReturnValue("copilot 2.5.0");
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Installed: copilot 2.5.0")
+      );
+    });
+
+    it("shows location when which/where succeeds", async () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("copilot 2.5.0")
+        .mockReturnValueOnce("/usr/local/bin/copilot");
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Location: /usr/local/bin/copilot")
+      );
+    });
+
+    it("shows warning when which/where fails", async () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("copilot 2.5.0")
+        .mockImplementationOnce(() => {
+          throw new Error("which failed");
+        });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Could not determine installation location")
+      );
+    });
+
+    it("shows not found when provider version check fails", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("command not found: opencode");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "opencode"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Not found or not working")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("command not found: opencode")
+      );
+    });
+
+    it("displays configuration details", async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not found");
+      });
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          defaultPlatform: "github",
+          aiProvider: "copilot-sdk",
+        })
+      );
+
+      await program.parseAsync(["node", "test", "doctor"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Configuration:"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Default platform: github")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("AI provider: copilot-sdk")
       );
     });
 
@@ -1498,7 +1594,7 @@ describe("CLI", () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           defaultPlatform: "github",
-          aiProvider: "copilot",
+          aiProvider: "copilot-sdk",
         })
       );
 

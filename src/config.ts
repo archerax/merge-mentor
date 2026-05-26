@@ -17,10 +17,7 @@ import {
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
 
-export type {
-  ReviewPass,
-  ReviewStrategy,
-} from "./review/reviewSelection.js";
+export type { ReviewPass, ReviewStrategy } from "./review/reviewSelection.js";
 
 /** GitHub-specific configuration. */
 interface GitHubConfig {
@@ -201,7 +198,7 @@ interface CliOverrides {
 
 /**
  * Validates the AI provider type.
- * Supported providers are: copilot, copilot-sdk, opencode, opencode-sdk.
+ * Supported providers are: copilot-sdk, opencode-sdk.
  * Unknown values default to copilot-sdk.
  *
  * @param value - AI provider name as string or undefined
@@ -209,14 +206,14 @@ interface CliOverrides {
  *
  * @example
  * ```typescript
- * validateAIProvider("copilot"); // "copilot"
+ * validateAIProvider("copilot-sdk"); // "copilot-sdk"
  * validateAIProvider("opencode-sdk"); // "opencode-sdk"
  * validateAIProvider("unknown"); // "copilot-sdk" (default)
  * validateAIProvider(undefined); // "copilot-sdk" (default)
  * ```
  */
 export function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot", "copilot-sdk", "opencode", "opencode-sdk"];
+  const validProviders: AIProviderType[] = ["copilot-sdk", "opencode-sdk"];
   if (value && validProviders.includes(value as AIProviderType)) {
     return value as AIProviderType;
   }

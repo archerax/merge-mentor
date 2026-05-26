@@ -1,6 +1,6 @@
 # merge-mentor
 
-MergeMentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them. Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot and OpenCode.
+MergeMentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them. Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK.
 
 ## Why MergeMentor?
 
@@ -33,8 +33,8 @@ merge-mentor review --pr 123 \
 # Post comments to PR
 merge-mentor review --pr 123 --write
 
-# Use OpenCode CLI instead of Copilot
-merge-mentor review --pr 123 --provider opencode --write
+# Use OpenCode SDK instead of Copilot SDK
+merge-mentor review --pr 123 --provider opencode-sdk --write
 
 # Or use npx (no installation required)
 npx merge-mentor review --pr 123
@@ -42,7 +42,7 @@ npx merge-mentor review --pr 123
 
 ## Features
 
-- **Multi-Provider Support** - Works with GitHub Copilot and OpenCode via CLI and SDK providers
+- **Multi-Provider Support** - Works with GitHub Copilot SDK and OpenCode SDK
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Additive Review Passes** - Start from a baseline review and add focused passes like testing, security, database, or monorepo
@@ -57,16 +57,12 @@ npx merge-mentor review --pr 123
 ## Prerequisites
 
 - **Node.js 22+**
-- **AI providers** require these CLIs to be installed manually:
-  - **Copilot CLI** (required for `copilot-sdk` and `copilot`):
+- **AI provider prerequisites**:
+  - **Copilot SDK** (`copilot-sdk`): Requires the Copilot CLI to be installed for authentication:
     ```bash
     npm install -g @github/copilot
     ```
-  - **OpenCode CLI** (required for `opencode-sdk` and `opencode`):
-    ```bash
-    # Install OpenCode CLI (follow official instructions)
-    # https://opencode.dev
-    ```
+  - **OpenCode SDK** (`opencode-sdk`): Follow the official OpenCode installation instructions at https://opencode.dev
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 **Supported Platforms**: Windows, macOS, and Linux
@@ -157,7 +153,7 @@ set MM_PLATFORM=azure
 **Linux/macOS:**
 
 ```bash
-# Select AI provider (copilot-sdk, copilot, opencode, opencode-sdk)
+# Select AI provider (copilot-sdk, opencode-sdk)
 export MM_AI_PROVIDER=copilot-sdk
 
 # Shared AI timeout (preferred)
@@ -362,8 +358,8 @@ merge-mentor review --pr 123
 # Post comments to PR
 merge-mentor review --pr 123 --write
 
-# Use OpenCode CLI instead of Copilot
-merge-mentor review --pr 123 --provider opencode --write
+# Use OpenCode SDK instead of Copilot SDK
+merge-mentor review --pr 123 --provider opencode-sdk --write
 
 # Azure DevOps
 merge-mentor review --pr 456 --platform azure --write
@@ -440,7 +436,7 @@ merge-mentor review --pr 123 --passes "testing" --write
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required) | - | - |
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot\|copilot-sdk\|opencode\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
+| `--provider <copilot-sdk\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
 | `--strategy <strategy>` | Execution strategy: `standard` or `fast` | `MM_REVIEW_STRATEGY` | `standard` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
@@ -466,7 +462,7 @@ merge-mentor review --pr 123 --passes "testing" --write
 **AI Provider Configuration:**
 | Option | Description | Env Variable |
 |--------|-------------|--------------|
-| `--copilot-token <token>` | GitHub token for Copilot CLI/SDK auth (CI use) | `MM_COPILOT_TOKEN` |
+| `--copilot-token <token>` | GitHub token for Copilot SDK auth (CI use) | `MM_COPILOT_TOKEN` |
 | `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` |
 | `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` |
 | `--ai-base-url <url>` | Generic OpenAI-compatible BYOK base URL | `MM_AI_BASE_URL` |

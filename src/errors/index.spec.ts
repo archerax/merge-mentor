@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   ConfigurationError,
-  CopilotCliError,
   JsonParseError,
   MergeMentorError,
   PlatformApiError,
@@ -16,24 +15,6 @@ describe("Error Classes", () => {
       expect(error.message).toBe("Test error");
       expect(error.name).toBe("MergeMentorError");
       expect(error).toBeInstanceOf(Error);
-    });
-  });
-
-  describe("CopilotCliError", () => {
-    it("creates error without cause", () => {
-      const error = new CopilotCliError("CLI failed");
-
-      expect(error.message).toBe("CLI failed");
-      expect(error.name).toBe("CopilotCliError");
-      expect(error.cause).toBeUndefined();
-    });
-
-    it("creates error with cause", () => {
-      const cause = new Error("Original error");
-      const error = new CopilotCliError("CLI failed", cause);
-
-      expect(error.message).toBe("CLI failed");
-      expect(error.cause).toBe(cause);
     });
   });
 

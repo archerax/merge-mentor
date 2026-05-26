@@ -45,7 +45,7 @@ function createTestConfig(): Config {
       repo: "",
     },
     botCommentIdentifier: "<!-- merge-mentor -->",
-    aiProvider: "copilot",
+    aiProvider: "copilot-sdk",
     gitBackend: "cli",
     skipPreExisting: true,
     reviewType: "general",
@@ -325,12 +325,22 @@ describe("GitHubAdapter", () => {
       expect(mockOctokitInstance.paginate).toHaveBeenNthCalledWith(
         1,
         mockOctokitInstance.pulls.listReviewComments,
-        { owner: "test-owner", repo: "test-repo", pull_number: 123, per_page: 100 }
+        {
+          owner: "test-owner",
+          repo: "test-repo",
+          pull_number: 123,
+          per_page: 100,
+        }
       );
       expect(mockOctokitInstance.paginate).toHaveBeenNthCalledWith(
         2,
         mockOctokitInstance.issues.listComments,
-        { owner: "test-owner", repo: "test-repo", issue_number: 123, per_page: 100 }
+        {
+          owner: "test-owner",
+          repo: "test-repo",
+          issue_number: 123,
+          per_page: 100,
+        }
       );
     });
   });

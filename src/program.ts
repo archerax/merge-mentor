@@ -199,10 +199,10 @@ export async function executeReview(
 
   // Validate and resolve AI provider
   const aiProvider = (resolvedOptions.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot", "copilot-sdk", "opencode", "opencode-sdk"].includes(aiProvider)) {
+  if (!["copilot-sdk", "opencode-sdk"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot", "copilot-sdk", "opencode", or "opencode-sdk".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot-sdk" or "opencode-sdk".`
     );
   }
 
@@ -580,7 +580,7 @@ const program = new Command();
 
 program
   .name("merge-mentor")
-  .description("Automated code review bot using AI providers (Copilot CLI, OpenCode CLI)")
+  .description("Automated code review bot using AI providers (Copilot SDK, OpenCode SDK)")
   .version(packageJson.version);
 
 program
@@ -593,10 +593,7 @@ program
     false
   )
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot, copilot-sdk, opencode, opencode-sdk). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
   .option("--verbose", "Enable verbose output", true)
   .option(
@@ -841,37 +838,37 @@ program
     output.log(`CWD: ${process.cwd()}`);
     output.log(`PATH length: ${(env.get("PATH") || env.get("Path") || "").length} chars\n`);
 
-    const providersToCheck = options.provider ? [options.provider] : ["copilot", "opencode"];
+    const providersToCheck = options.provider ? [options.provider] : [];
 
-    for (const provider of providersToCheck) {
-      output.log(`\n📦 Checking ${provider} CLI:`);
+    if (providersToCheck.length > 0) {
+      for (const provider of providersToCheck) {
+        output.log(`\n📦 Checking ${provider} CLI:`);
 
-      try {
-        // Try to get version
-        const versionOutput = execSync(`${provider} --version`, {
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-          timeout: 5000,
-        }).trim();
-        output.log(`  ✅ Installed: ${versionOutput}`);
-
-        // Try to get path
-        const whichCommand = process.platform === "win32" ? "where" : "which";
         try {
-          const pathOutput = execSync(`${whichCommand} ${provider}`, {
+          const versionOutput = execSync(`${provider} --version`, {
             encoding: "utf-8",
             stdio: ["pipe", "pipe", "pipe"],
             timeout: 5000,
           }).trim();
-          output.log(`  📍 Location: ${pathOutput}`);
-        } catch {
-          output.log(`  ⚠️  Could not determine installation location`);
-        }
-      } catch (error) {
-        const err = error as Error & { status?: number };
-        output.log(`  ❌ Not found or not working`);
-        if (err.message) {
-          output.log(`     Error: ${err.message.split("\n")[0]}`);
+          output.log(`  ✅ Installed: ${versionOutput}`);
+
+          const whichCommand = process.platform === "win32" ? "where" : "which";
+          try {
+            const pathOutput = execSync(`${whichCommand} ${provider}`, {
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"],
+              timeout: 5000,
+            }).trim();
+            output.log(`  📍 Location: ${pathOutput}`);
+          } catch {
+            output.log(`  ⚠️  Could not determine installation location`);
+          }
+        } catch (error) {
+          const err = error as Error & { status?: number };
+          output.log(`  ❌ Not found or not working`);
+          if (err.message) {
+            output.log(`     Error: ${err.message.split("\n")[0]}`);
+          }
         }
       }
     }

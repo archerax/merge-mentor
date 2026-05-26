@@ -23,7 +23,7 @@ interface StubChildProcessOptions {
 }
 
 /** Creates a stub ChildProcess for testing. */
-export function createStubChildProcess(
+function createStubChildProcess(
   optionsOrExitCode?: StubChildProcessOptions | number
 ): ChildProcess {
   const opts: StubChildProcessOptions =

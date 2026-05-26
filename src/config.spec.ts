@@ -117,12 +117,12 @@ describe("Config", () => {
 
     it("should load MM_AI_PROVIDER from environment", () => {
       const env = createStubEnvironment({
-        MM_AI_PROVIDER: "opencode",
+        MM_AI_PROVIDER: "opencode-sdk",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.aiProvider).toBe("opencode");
+      expect(config.aiProvider).toBe("opencode-sdk");
     });
 
     it("should load generic AI BYOK settings from environment", () => {
@@ -149,16 +149,8 @@ describe("Config", () => {
 
     it("should accept all valid MM_AI_PROVIDER values", () => {
       expect(
-        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "copilot" })).aiProvider
-      ).toBe("copilot");
-
-      expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "copilot-sdk" })).aiProvider
       ).toBe("copilot-sdk");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode" })).aiProvider
-      ).toBe("opencode");
 
       expect(
         loadConfig(undefined, createStubEnvironment({ MM_AI_PROVIDER: "opencode-sdk" })).aiProvider
@@ -192,7 +184,7 @@ describe("Config", () => {
         MM_AZURE_PROJECT: "project",
         MM_AZURE_REPO: "az-repo",
         MM_COMMENT_IDENTIFIER: "[MM Bot]",
-        MM_AI_PROVIDER: "opencode",
+        MM_AI_PROVIDER: "opencode-sdk",
         MM_AI_TIMEOUT: "180000",
         MM_AI_MODEL: "gpt-5.2-codex",
         MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
@@ -212,7 +204,7 @@ describe("Config", () => {
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
       expect(config.botCommentIdentifier).toBe("[MM Bot]");
-      expect(config.aiProvider).toBe("opencode");
+      expect(config.aiProvider).toBe("opencode-sdk");
       expect(config.aiTimeoutMs).toBe(180000);
       expect(config.aiModel).toBe("gpt-5.2-codex");
       expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
@@ -554,9 +546,7 @@ describe("Config", () => {
 describe("Validator functions", () => {
   describe("validateAIProvider", () => {
     it("should accept valid provider types", () => {
-      expect(validateAIProvider("copilot")).toBe("copilot");
       expect(validateAIProvider("copilot-sdk")).toBe("copilot-sdk");
-      expect(validateAIProvider("opencode")).toBe("opencode");
       expect(validateAIProvider("opencode-sdk")).toBe("opencode-sdk");
     });
 

@@ -79,7 +79,12 @@ describe("AuditLogger", () => {
         {
           type: "comment",
           id: "pr-789-src/app.ts-42",
-          details: { prNumber: 789, path: "src/app.ts", line: 42, platform: "github" },
+          details: {
+            prNumber: 789,
+            path: "src/app.ts",
+            line: 42,
+            platform: "github",
+          },
         },
         "Post inline comment on PR #789 at src/app.ts:42",
         "success",
@@ -105,7 +110,7 @@ describe("AuditLogger", () => {
       };
 
       logger.logAIProviderExecution(
-        "copilot",
+        "copilot-sdk",
         "file-review",
         "claude-haiku-4.5",
         "success",
@@ -116,14 +121,14 @@ describe("AuditLogger", () => {
       expect(logEventSpy).toHaveBeenCalledWith(
         "ai.provider.execute",
         {
-          type: "copilot",
-          id: "copilot:file-review",
-          details: { provider: "copilot", model: "claude-haiku-4.5" },
+          type: "ai",
+          id: "copilot-sdk:file-review",
+          details: { provider: "copilot-sdk", model: "claude-haiku-4.5" },
         },
-        "Execute copilot prompt: file-review",
+        "Execute copilot-sdk prompt: file-review",
         "success",
         {
-          provider: "copilot",
+          provider: "copilot-sdk",
           promptType: "file-review",
           model: "claude-haiku-4.5",
           tokenUsage,
@@ -136,19 +141,19 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logAIProviderExecution("opencode", "cross-file-review", "model-x", "success");
+      logger.logAIProviderExecution("opencode-sdk", "cross-file-review", "model-x", "success");
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "ai.provider.execute",
         {
-          type: "copilot",
-          id: "opencode:cross-file-review",
-          details: { provider: "opencode", model: "model-x" },
+          type: "ai",
+          id: "opencode-sdk:cross-file-review",
+          details: { provider: "opencode-sdk", model: "model-x" },
         },
-        "Execute opencode prompt: cross-file-review",
+        "Execute opencode-sdk prompt: cross-file-review",
         "success",
         {
-          provider: "opencode",
+          provider: "opencode-sdk",
           promptType: "cross-file-review",
           model: "model-x",
         },

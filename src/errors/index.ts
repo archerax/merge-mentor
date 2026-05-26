@@ -45,38 +45,6 @@ export class MergeMentorError extends Error {
 }
 
 /**
- * Error thrown when the Copilot CLI fails or is unavailable.
- *
- * Raised when the `copilot` command cannot be executed, is not installed,
- * or returns an error. Use this to distinguish CLI tool failures from
- * other API or configuration errors.
- *
- * @example
- * ```typescript
- * try {
- *   await executeAiPrompt();
- * } catch (error) {
- *   if (error instanceof CopilotCliError) {
- *     logger.error("Copilot CLI not available", { cause: error.cause });
- *   }
- * }
- * ```
- */
-export class CopilotCliError extends MergeMentorError {
-  constructor(
-    message: string,
-    /**
-     * The underlying error that caused this CLI error (e.g., command execution failure).
-     * Useful for debugging tool execution issues.
-     */
-    public readonly cause?: Error
-  ) {
-    super(message);
-    this.name = "CopilotCliError";
-  }
-}
-
-/**
  * Error thrown when the Copilot SDK fails or is unavailable.
  *
  * Raised when the @github/copilot-sdk package fails, is not installed,
