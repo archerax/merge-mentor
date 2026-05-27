@@ -980,7 +980,9 @@ describe("AzureDevOpsAdapter", () => {
       ]);
 
       // First call to fetchAllIterationChanges fails with 429, then succeeds with 200 on retry
-      mockFetch.mockImplementationOnce(() => createMockResponse(false, 429, { message: "Rate limit exceeded" }));
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(false, 429, { message: "Rate limit exceeded" })
+      );
       mockFetch.mockImplementationOnce(() =>
         createMockResponse(true, 200, {
           changeEntries: [

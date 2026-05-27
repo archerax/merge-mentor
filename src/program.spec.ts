@@ -1014,16 +1014,7 @@ describe("CLI", () => {
     it("does not display review strategy when fast", () => {
       const result = createMockReviewResult();
 
-      displayResults(
-        result,
-        true,
-        undefined,
-        undefined,
-        undefined,
-        "general",
-        undefined,
-        "fast"
-      );
+      displayResults(result, true, undefined, undefined, undefined, "general", undefined, "fast");
 
       // Check that we don't log the strategy
       const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => String(call[0]));

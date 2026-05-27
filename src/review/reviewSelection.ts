@@ -190,8 +190,7 @@ export function formatReviewTypeLabel(
     reviewPasses,
     getImplicitPasses(normalizedReviewType as ReviewType)
   );
-  const resolvedStrategy =
-    normalizedReviewType === "fast" ? "fast" : (reviewStrategy ?? "fast");
+  const resolvedStrategy = normalizedReviewType === "fast" ? "fast" : (reviewStrategy ?? "fast");
 
   return formatReviewProfileLabel(mergedPasses, resolvedStrategy);
 }

@@ -7,6 +7,7 @@ import * as Diff from "diff";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
+import { PlatformApiError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
@@ -304,9 +305,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             },
             "Failed to fetch PR iteration changes via REST API"
           );
-          const error = new Error(`Azure DevOps API error: ${res.status} ${res.statusText}`);
-          (error as any).status = res.status;
-          throw error;
+          throw new PlatformApiError(
+            "azure",
+            "fetch-iteration-changes",
+            `Azure DevOps API error: ${res.status} ${res.statusText}`,
+            undefined,
+            res.status
+          );
         }
         return res;
       });
@@ -379,7 +384,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           if ((error as Error).message.includes("Binary file")) {
             throw error;
           }
-          if ((error as any).status === 404) {
+          if (error instanceof PlatformApiError && error.status === 404) {
             this.logger.debug(
               { filePath, commit: baseCommitId, error: (error as Error).message },
               "Could not fetch base content (file may be new)"
@@ -402,7 +407,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           if ((error as Error).message.includes("Binary file")) {
             throw error;
           }
-          if ((error as any).status === 404) {
+          if (error instanceof PlatformApiError && error.status === 404) {
             this.logger.debug(
               {
                 filePath,
@@ -473,17 +478,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       return { patch, additions, deletions };
     } catch (error) {
       if ((error as Error).message.includes("Binary file")) {
-        this.logger.info(
-          { filePath },
-          "Skipping binary file in diff generation"
-        );
+        this.logger.info({ filePath }, "Skipping binary file in diff generation");
         return {
           patch: "",
           additions: 0,
           deletions: 0,
         };
       }
-      if ((error as any).status === 404) {
+      if (error instanceof PlatformApiError && error.status === 404) {
         this.logger.warn(
           { filePath, error: (error as Error).message },
           "Expected file content not found (404) during diff generation"
@@ -522,9 +524,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         },
       });
       if (!res.ok) {
-        const error = new Error(`Failed to fetch file content: ${res.status} ${res.statusText}`);
-        (error as any).status = res.status;
-        throw error;
+        throw new PlatformApiError(
+          "azure",
+          "fetch-file-content",
+          `Failed to fetch file content: ${res.status} ${res.statusText}`,
+          undefined,
+          res.status
+        );
       }
       return res;
     });

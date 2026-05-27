@@ -170,7 +170,11 @@ export class PlatformApiError extends MergeMentorError {
      * The underlying error from the platform API (HTTP error, network timeout, etc.).
      * Use for debugging platform-specific issues.
      */
-    public readonly cause?: Error
+    public readonly cause?: Error,
+    /**
+     * The HTTP status code from the platform API response, if available.
+     */
+    public readonly status?: number
   ) {
     super(`${platform} API error during ${operation}: ${message}`);
     this.name = "PlatformApiError";

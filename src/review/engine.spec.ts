@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import packageJson from "../../package.json" with { type: "json" };
 import { createAIProvider } from "../ai/index.js";
+import type { AIProviderType } from "../ai/types.js";
 import { ValidationError } from "../errors/index.js";
 import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { createFixedClock } from "../ports/clock.test-helper.js";
 import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
 import { DiffStorage } from "./diffStorage.js";
 import { ReviewEngine as OriginalReviewEngine } from "./engine.js";
-import type { AIProviderType } from "../ai/types.js";
 
 class ReviewEngine extends OriginalReviewEngine {
   constructor(
