@@ -19,7 +19,7 @@ vi.mock("../logger.js", () => ({
   }),
 }));
 
-const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Baseline review, Default model`;
+const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Baseline review, AI model`;
 
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
@@ -103,7 +103,9 @@ describe("CommentManager", () => {
 
     it("should use default emoji for unknown severity", () => {
       const manager = createCommentManager();
-      const finding = createFileFinding({ severity: "unknown" as unknown as FindingSeverity });
+      const finding = createFileFinding({
+        severity: "unknown" as unknown as FindingSeverity,
+      });
 
       const result = manager.formatInlineComment(finding);
 
@@ -168,7 +170,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Baseline review + scan → logic, Default model`
+        `Merge Mentor v${packageJson.version}, Baseline review + scan → logic, AI model`
       );
     });
   });
@@ -194,16 +196,32 @@ describe("CommentManager", () => {
         {
           filename: "file1.ts",
           findings: [
-            createFileFinding({ line: 1, severity: "critical", category: "bug" }),
-            createFileFinding({ line: 2, severity: "high", category: "security" }),
+            createFileFinding({
+              line: 1,
+              severity: "critical",
+              category: "bug",
+            }),
+            createFileFinding({
+              line: 2,
+              severity: "high",
+              category: "security",
+            }),
           ],
         },
         {
           filename: "file2.ts",
-          findings: [createFileFinding({ line: 5, severity: "medium", category: "performance" })],
+          findings: [
+            createFileFinding({
+              line: 5,
+              severity: "medium",
+              category: "performance",
+            }),
+          ],
         },
       ];
-      const crossFileResult = createCrossFileResult({ overallAssessment: "Needs work" });
+      const crossFileResult = createCrossFileResult({
+        overallAssessment: "Needs work",
+      });
 
       const result = manager.formatSummaryComment(fileResults, crossFileResult);
 
@@ -314,10 +332,18 @@ describe("CommentManager", () => {
       const fileResults: FileReviewResult[] = [
         {
           filename: "test.ts",
-          findings: [createFileFinding({ line: 10, message: "Bug found", suggestion: "Fix it" })],
+          findings: [
+            createFileFinding({
+              line: 10,
+              message: "Bug found",
+              suggestion: "Fix it",
+            }),
+          ],
         },
       ];
-      const crossFileResult = createCrossFileResult({ overallAssessment: "Needs work" });
+      const crossFileResult = createCrossFileResult({
+        overallAssessment: "Needs work",
+      });
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
@@ -346,7 +372,9 @@ describe("CommentManager", () => {
         },
       ];
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult = createCrossFileResult({ overallAssessment: "New assessment" });
+      const crossFileResult = createCrossFileResult({
+        overallAssessment: "New assessment",
+      });
 
       const actions = manager.determineActions(existingComments, fileResults, crossFileResult);
 
@@ -358,7 +386,9 @@ describe("CommentManager", () => {
     it("should skip creating duplicate summary when content is unchanged", () => {
       const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [];
-      const crossFileResult = createCrossFileResult({ overallAssessment: "Test assessment" });
+      const crossFileResult = createCrossFileResult({
+        overallAssessment: "Test assessment",
+      });
       const summaryBody = manager.formatSummaryComment(fileResults, crossFileResult);
 
       const existingComments: ExistingComment[] = [
@@ -557,8 +587,16 @@ describe("CommentManager", () => {
         {
           filename: "test.ts",
           findings: [
-            createFileFinding({ line: 10, category: "bug", message: "Test message" }),
-            createFileFinding({ line: 10, category: "bug", message: "Test message" }),
+            createFileFinding({
+              line: 10,
+              category: "bug",
+              message: "Test message",
+            }),
+            createFileFinding({
+              line: 10,
+              category: "bug",
+              message: "Test message",
+            }),
           ],
         },
       ];

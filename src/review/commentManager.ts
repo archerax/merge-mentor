@@ -343,7 +343,7 @@ ${this.footer}${idMarker}`;
 
   private formatModelName(model?: string): string {
     if (!model || model.trim().length === 0) {
-      return "Default model";
+      return "AI model";
     }
 
     return model.trim();

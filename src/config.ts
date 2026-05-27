@@ -65,7 +65,7 @@ export interface Config {
   readonly reviewProfile: ResolvedReviewProfile;
   /** Whether to show streaming output from AI providers. Default: true (if TTY) */
   readonly streamingEnabled: boolean;
-  /** Number of lines to show in the streaming display. Default: 5 */
+  /** Number of lines to show in the streaming display. Default: 9 */
   readonly streamingLines: number;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). Default: ./.mergementor */
   readonly tempPath: string;

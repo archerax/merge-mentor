@@ -72,7 +72,7 @@ export function generatePRIdentifier(
  * sanitizeProjectName("project/name");         // "project_name"
  * sanitizeProjectName("repo<special>name");    // "repo_special_name"
  * sanitizeProjectName("Very Long Project Name With Many Words And Characters");
- * // First 50 chars only
+ * // Truncated to MAX_PROJECT_NAME_LENGTH chars
  * ```
  */
 export function sanitizeProjectName(project: string): string {

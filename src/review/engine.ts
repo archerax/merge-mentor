@@ -292,7 +292,7 @@ export class ReviewEngine {
     );
     this.options = options ?? {};
     this.streamingEnabled = options?.streamingEnabled ?? true;
-    this.streamingLines = options?.streamingLines ?? 5;
+    this.streamingLines = options?.streamingLines ?? 9;
     this.platformName = platform.constructor.name.toLowerCase().includes("github")
       ? "github"
       : "azure";
@@ -1301,6 +1301,8 @@ During the database pass, pay extra attention to query correctness, transaction 
           this.logger.info({ prNumber }, "General comment created");
         }
         break;
+      default:
+        throw new Error(`Unknown comment action type: ${(action as CommentAction).type}`);
     }
   }
 
