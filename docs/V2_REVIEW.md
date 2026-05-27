@@ -337,6 +337,7 @@ Beyond `buildWorkspaceSection`, five helper functions are copy-pasted:
 
 ### 3.5 Token Usage Utility Has Repeated Pattern
 
+- **Status:** ✅ **Resolved** -- Extracted `sumOptional(a, b)` helper. All four optional token fields now use the same consistent pattern.
 - **Files:** `src/utils/tokenUsage.ts` (lines 30-46)
 - **What it is:** The pattern `(sum > 0 || a.field !== undefined || b.field !== undefined) ? sum : undefined` is repeated four times for each token field.
 - **Proposed fix:** Extract a `sumOptional(a, b)` helper.
@@ -357,17 +358,17 @@ Beyond `buildWorkspaceSection`, five helper functions are copy-pasted:
 
 Low effort, low risk. Good for sprint filler or a new contributor.
 
-| #   | Issue                                                                                  | File                        | Effort  |
-| --- | -------------------------------------------------------------------------------------- | --------------------------- | ------- |
-| 4.1 | ~~`_AzureChangeType` constant defined but never used~~ ✅                              | `azure.ts:22-27`            | Trivial |
-| 4.2 | magic number `50` for truncation in `prIdentifier.ts:81`                               | `utils/prIdentifier.ts`     | Trivial |
-| 4.3 | Comment body may exceed API length limits (65K chars)                                  | `commentManager.ts:273-291` | Small   |
-| 4.4 | `verbose` semantic is inverted (controls all output, not just debug)                   | `engine.ts:1321`            | Small   |
-| 4.5 | GitHub comment posting has TOCTOU race on commit SHA                                   | `github.ts:181-199`         | Trivial |
-| 4.6 | `formatModelName` returns "Default model" when no model configured                     | `commentManager.ts:344-350` | Trivial |
-| 4.7 | `premiumRequests` field in `mergeTokenUsage` has inconsistent handling vs other fields | `tokenUsage.ts:43-46`       | Trivial |
-| 4.8 | `redact.ts` should accept a configurable redaction marker                              | `utils/redact.ts:48`        | Trivial |
-| 4.9 | `prIdentifier.ts` hardcodes `"PR"` prefix; won't work with GitLab "MR"                 | `utils/prIdentifier.ts:50`  | Trivial |
+| #   | Issue                                                                                         | File                        | Effort  |
+| --- | --------------------------------------------------------------------------------------------- | --------------------------- | ------- |
+| 4.1 | ~~`_AzureChangeType` constant defined but never used~~ ✅                                     | `azure.ts:22-27`            | Trivial |
+| 4.2 | ~~magic number `50` for truncation in `prIdentifier.ts:81`~~ ✅                               | `utils/prIdentifier.ts`     | Trivial |
+| 4.3 | Comment body may exceed API length limits (65K chars)                                         | `commentManager.ts:273-291` | Small   |
+| 4.4 | `verbose` semantic is inverted (controls all output, not just debug)                          | `engine.ts:1321`            | Small   |
+| 4.5 | GitHub comment posting has TOCTOU race on commit SHA                                          | `github.ts:181-199`         | Trivial |
+| 4.6 | `formatModelName` returns "Default model" when no model configured                            | `commentManager.ts:344-350` | Trivial |
+| 4.7 | ~~`premiumRequests` field in `mergeTokenUsage` has inconsistent handling vs other fields~~ ✅ | `tokenUsage.ts:43-46`       | Trivial |
+| 4.8 | `redact.ts` should accept a configurable redaction marker                                     | `utils/redact.ts:48`        | Trivial |
+| 4.9 | `prIdentifier.ts` hardcodes `"PR"` prefix; won't work with GitLab "MR"                        | `utils/prIdentifier.ts:50`  | Trivial |
 
 ---
 

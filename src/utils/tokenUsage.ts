@@ -1,12 +1,20 @@
 import type { TokenUsage } from "../ai/types.js";
 
 /**
+ * Sums two optional numeric values. When at least one is defined, returns the
+ * sum (treating the other as 0). When both are undefined, returns undefined.
+ */
+export function sumOptional(a: number | undefined, b: number | undefined): number | undefined {
+  return a !== undefined || b !== undefined ? (a ?? 0) + (b ?? 0) : undefined;
+}
+
+/**
  * Merges two TokenUsage objects by summing all numeric fields.
  *
  * - `inputTokens` and `outputTokens` are always summed.
- * - `cachedTokens` and `durationApiSeconds` are summed when at least one side is defined.
- * - `durationWallSeconds` is summed when at least one side is defined.
- * - `model` prefers the first non-undefined value; falls back to the second.
+ * - `cachedTokens`, `durationApiSeconds`, `durationWallSeconds`, and
+ *   `premiumRequests` are summed when at least one side is defined.
+ * - `model` prefers the first non-undefined value, falling back to the second.
  *
  * @param a - First token usage (may be undefined)
  * @param b - Second token usage (may be undefined)
@@ -20,30 +28,14 @@ export function mergeTokenUsage(
   if (!a) return b;
   if (!b) return a;
 
-  const cachedSum = (a.cachedTokens ?? 0) + (b.cachedTokens ?? 0);
-  const apiDurSum = (a.durationApiSeconds ?? 0) + (b.durationApiSeconds ?? 0);
-  const wallDurSum = (a.durationWallSeconds ?? 0) + (b.durationWallSeconds ?? 0);
-
   return {
     inputTokens: a.inputTokens + b.inputTokens,
     outputTokens: a.outputTokens + b.outputTokens,
-    cachedTokens:
-      cachedSum > 0 || a.cachedTokens !== undefined || b.cachedTokens !== undefined
-        ? cachedSum
-        : undefined,
-    durationApiSeconds:
-      apiDurSum > 0 || a.durationApiSeconds !== undefined || b.durationApiSeconds !== undefined
-        ? apiDurSum
-        : undefined,
-    durationWallSeconds:
-      wallDurSum > 0 || a.durationWallSeconds !== undefined || b.durationWallSeconds !== undefined
-        ? wallDurSum
-        : undefined,
+    cachedTokens: sumOptional(a.cachedTokens, b.cachedTokens),
+    durationApiSeconds: sumOptional(a.durationApiSeconds, b.durationApiSeconds),
+    durationWallSeconds: sumOptional(a.durationWallSeconds, b.durationWallSeconds),
     model: a.model ?? b.model,
-    premiumRequests:
-      a.premiumRequests !== undefined || b.premiumRequests !== undefined
-        ? (a.premiumRequests ?? 0) + (b.premiumRequests ?? 0)
-        : undefined,
+    premiumRequests: sumOptional(a.premiumRequests, b.premiumRequests),
   };
 }
 
