@@ -287,25 +287,29 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
       this.logger.debug({ skip, top: this.CHANGES_PAGE_SIZE }, "Fetching iteration changes page");
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error(
-          {
-            status: response.status,
-            statusText: response.statusText,
-            errorText,
+      const response = await withRateLimitHandling(async () => {
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+            "Content-Type": "application/json",
           },
-          "Failed to fetch PR iteration changes via REST API"
-        );
-        throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
-      }
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          this.logger.error(
+            {
+              status: res.status,
+              statusText: res.statusText,
+              errorText,
+            },
+            "Failed to fetch PR iteration changes via REST API"
+          );
+          const error = new Error(`Azure DevOps API error: ${res.status} ${res.statusText}`);
+          (error as any).status = res.status;
+          throw error;
+        }
+        return res;
+      });
 
       const data = (await response.json()) as {
         changeEntries?: Array<{
@@ -334,25 +338,23 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     return allChanges;
   }
 
-  /**
-   * Maps PR iteration change type (numeric) to FileStatus.
-   * Azure DevOps iteration changes use numeric change types.
-   */
   private mapIterationChangeTypeToStatus(changeType?: number): FileStatus {
-    // Azure DevOps VersionControlChangeType enum values
-    // See: https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-request-iteration-changes
-    switch (changeType) {
-      case 1: // Add
-        return "added";
-      case 2: // Edit
-        return "modified";
-      case 8: // Rename
-        return "renamed";
-      case 16: // Delete
-        return "deleted";
-      default:
-        return "modified";
+    if (changeType === undefined) {
+      return "modified";
     }
+    // Delete
+    if ((changeType & 16) !== 0) {
+      return "deleted";
+    }
+    // Rename, SourceRename, or TargetRename
+    if ((changeType & 8) !== 0 || (changeType & 1024) !== 0 || (changeType & 2048) !== 0) {
+      return "renamed";
+    }
+    // Add
+    if (changeType === 1 || changeType === 3) {
+      return "added";
+    }
+    return "modified";
   }
 
   /**
@@ -374,10 +376,17 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         try {
           baseContent = await this.fetchFileContentAtCommit(repositoryId, filePath, baseCommitId);
         } catch (error) {
-          this.logger.debug(
-            { filePath, commit: baseCommitId, error: (error as Error).message },
-            "Could not fetch base content (file may be new)"
-          );
+          if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as any).status === 404) {
+            this.logger.debug(
+              { filePath, commit: baseCommitId, error: (error as Error).message },
+              "Could not fetch base content (file may be new)"
+            );
+          } else {
+            throw error;
+          }
         }
       }
 
@@ -390,14 +399,21 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             targetCommitId
           );
         } catch (error) {
-          this.logger.debug(
-            {
-              filePath,
-              commit: targetCommitId,
-              error: (error as Error).message,
-            },
-            "Could not fetch target content (file may be deleted)"
-          );
+          if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as any).status === 404) {
+            this.logger.debug(
+              {
+                filePath,
+                commit: targetCommitId,
+                error: (error as Error).message,
+              },
+              "Could not fetch target content (file may be deleted)"
+            );
+          } else {
+            throw error;
+          }
         }
       }
 
@@ -456,15 +472,33 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
       return { patch, additions, deletions };
     } catch (error) {
-      this.logger.warn(
+      if ((error as Error).message.includes("Binary file")) {
+        this.logger.info(
+          { filePath },
+          "Skipping binary file in diff generation"
+        );
+        return {
+          patch: "",
+          additions: 0,
+          deletions: 0,
+        };
+      }
+      if ((error as any).status === 404) {
+        this.logger.warn(
+          { filePath, error: (error as Error).message },
+          "Expected file content not found (404) during diff generation"
+        );
+        return {
+          patch: this.createEmptyDiffHeader(filePath),
+          additions: 0,
+          deletions: 0,
+        };
+      }
+      this.logger.error(
         { filePath, error: (error as Error).message },
-        "Failed to generate diff from blobs"
+        "Unexpected error generating diff from blobs"
       );
-      return {
-        patch: this.createEmptyDiffHeader(filePath),
-        additions: 0,
-        deletions: 0,
-      };
+      throw error;
     }
   }
 
@@ -480,18 +514,31 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
     this.logger.debug({ filePath, commitId }, "Fetching file content at commit");
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
-        Accept: "application/json",
-      },
+    const response = await withRateLimitHandling(async () => {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        const error = new Error(`Failed to fetch file content: ${res.status} ${res.statusText}`);
+        (error as any).status = res.status;
+        throw error;
+      }
+      return res;
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file content: ${response.status} ${response.statusText}`);
-    }
+    const data = (await response.json()) as {
+      content?: string;
+      contentType?: string;
+      versionControlContentType?: string;
+    };
 
-    const data = (await response.json()) as { content?: string };
+    const type = (data.contentType || data.versionControlContentType)?.toLowerCase();
+    if (type === "base64encoded") {
+      throw new Error(`Binary file: base64Encoded content type detected for ${filePath}`);
+    }
 
     if (!data.content) {
       this.logger.warn({ filePath, commitId }, "No content returned from Items API");

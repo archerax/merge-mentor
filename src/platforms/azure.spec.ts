@@ -880,6 +880,163 @@ describe("AzureDevOpsAdapter", () => {
       expect(files[0].patch).toContain("@@"); // Has hunk header
       expect(files[0].patch).toContain("+"); // Has addition
     });
+
+    it("handles combined changeType bitmasks correctly (Rename + Edit = 10) (2.1)", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // Mock PR Iteration Changes API with combined changeType (8 | 2 = 10)
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: [
+            {
+              item: { path: "/combined.ts", gitObjectType: "blob" },
+              changeType: 10, // Rename (8) + Edit (2)
+            },
+          ],
+        })
+      );
+
+      // Mock base and target versions
+      mockFetch.mockImplementationOnce(() => createMockResponse(true, 200, { content: "// Old" }));
+      mockFetch.mockImplementationOnce(() => createMockResponse(true, 200, { content: "// New" }));
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(files[0].status).toBe("renamed");
+    });
+
+    it("detects and excludes binary files by checking contentType (2.2)", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // Mock PR Iteration Changes API
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: [
+            {
+              item: { path: "/image.png", gitObjectType: "blob" },
+              changeType: 2, // Edit
+            },
+          ],
+        })
+      );
+
+      // Mock Items API for base version with base64Encoded contentType
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          content: "base64EncodedContent...",
+          contentType: "base64Encoded",
+        })
+      );
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(files[0].patch).toBe(""); // Skipped binary file
+      expect(files[0].additions).toBe(0);
+      expect(files[0].deletions).toBe(0);
+    });
+
+    it("retries on HTTP 429 using withRateLimitHandling for direct fetches (2.3)", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // First call to fetchAllIterationChanges fails with 429, then succeeds with 200 on retry
+      mockFetch.mockImplementationOnce(() => createMockResponse(false, 429, { message: "Rate limit exceeded" }));
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: [
+            {
+              item: { path: "/file.ts", gitObjectType: "blob" },
+              changeType: 2, // Edit
+            },
+          ],
+        })
+      );
+
+      // Mock base and target versions
+      mockFetch.mockImplementationOnce(() => createMockResponse(true, 200, { content: "// Old" }));
+      mockFetch.mockImplementationOnce(() => createMockResponse(true, 200, { content: "// New" }));
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalledTimes(4); // 2 iteration page calls + 2 content calls
+    });
+
+    it("propagates unexpected HTTP errors instead of silencing them (1.9)", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-uuid-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          sourceRefCommit: { commitId: "source123" },
+          commonRefCommit: { commitId: "base123" },
+        },
+      ]);
+
+      // Mock PR Iteration Changes API
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(true, 200, {
+          changeEntries: [
+            {
+              item: { path: "/file.ts", gitObjectType: "blob" },
+              changeType: 2, // Edit
+            },
+          ],
+        })
+      );
+
+      // Mock Items API for base version with 401 Unauthorized
+      mockFetch.mockImplementationOnce(() =>
+        createMockResponse(false, 401, { message: "Unauthorized" })
+      );
+
+      await expect(adapter.getPRFiles(123)).rejects.toThrow("Failed to fetch file content: 401");
+    });
   });
 
   describe("getRepoInfo", () => {
