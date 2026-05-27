@@ -327,6 +327,52 @@ describe("CLI", () => {
       expect(AzureDevOpsAdapter).toHaveBeenCalledWith(createMockConfig());
     });
 
+    it("passes Azure-specific fields to loadConfig when using --pr-url parsed options", async () => {
+      const options = createReviewOptions({
+        platform: "azure",
+        azureOrg: "parsed-org",
+        azureProject: "parsed-project",
+        azureRepo: "parsed-repo",
+        azureToken: "parsed-token",
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "azure",
+          azureOrg: "parsed-org",
+          azureProject: "parsed-project",
+          azureRepo: "parsed-repo",
+          azureToken: "parsed-token",
+        })
+      );
+    });
+
+    it("passes GitHub-specific fields to loadConfig when using --pr-url parsed options", async () => {
+      const options = createReviewOptions({
+        platform: "github",
+        githubRepoOwner: "parsed-owner",
+        githubRepoName: "parsed-repo",
+        githubToken: "parsed-token",
+        write: false,
+        verbose: true,
+      });
+
+      await executeReview(options);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "github",
+          githubRepoOwner: "parsed-owner",
+          githubRepoName: "parsed-repo",
+          githubToken: "parsed-token",
+        })
+      );
+    });
+
     it("logs starting message with dry-run label", async () => {
       const options = createReviewOptions({
         write: false,
@@ -1672,6 +1718,175 @@ describe("CLI", () => {
         expect.stringContaining("Could not load configuration")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Config file not found"));
+    });
+  });
+
+  describe("--pr-url", () => {
+    let exitSpy: ReturnType<typeof vi.spyOn>;
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("resolves GitHub PR URL and populates correct options", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://github.com/test-owner/test-repo/pull/42",
+        "--github-token",
+        "gh-token",
+        "--verbose",
+      ]);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "github",
+          githubRepoOwner: "test-owner",
+          githubRepoName: "test-repo",
+        })
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it("resolves Azure DevOps PR URL and populates correct options", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/123",
+        "--azure-token",
+        "az-token",
+        "--verbose",
+      ]);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "azure",
+          azureOrg: "myorg",
+          azureProject: "myproject",
+          azureRepo: "myrepo",
+        })
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it("resolves Azure DevOps legacy visualstudio.com PR URL", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://oldorg.visualstudio.com/MyProject/_git/MyRepo/pullrequest/99",
+        "--azure-token",
+        "az-token",
+        "--verbose",
+      ]);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "azure",
+          azureOrg: "oldorg",
+          azureProject: "MyProject",
+          azureRepo: "MyRepo",
+        })
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it("errors when --pr-url is combined with --ci", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://github.com/org/repo/pull/1",
+        "--ci",
+      ]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("--pr-url cannot be combined with --ci")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --pr-url is combined with --pr", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://github.com/org/repo/pull/1",
+        "--pr",
+        "99",
+      ]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("--pr-url cannot be combined with --pr")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --pr-url is combined with --platform", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://github.com/org/repo/pull/1",
+        "--platform",
+        "azure",
+      ]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("--pr-url cannot be combined with --platform")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --pr-url is combined with Azure-specific flags", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://github.com/org/repo/pull/1",
+        "--azure-org",
+        "someorg",
+      ]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("--pr-url cannot be combined with --azure-org")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --pr-url is combined with GitHub-specific flags", async () => {
+      await program.parseAsync([
+        "node",
+        "test",
+        "review",
+        "--pr-url",
+        "https://dev.azure.com/org/proj/_git/repo/pullrequest/1",
+        "--github-repo-owner",
+        "someone",
+      ]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("--pr-url cannot be combined with --github-repo-owner")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("errors when --pr-url is given an invalid URL", async () => {
+      await program.parseAsync(["node", "test", "review", "--pr-url", "not-a-valid-url"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("is not a valid URL"));
+      expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
 });

@@ -30,10 +30,12 @@ import {
   REVIEW_PASSES,
 } from "./review/reviewSelection.js";
 import { generatePRIdentifier, sanitizeProjectName } from "./utils/prIdentifier.js";
+import { parsePRUrl } from "./utils/prUrl.js";
 import { formatTokenUsage } from "./utils/tokenUsage.js";
 
 export interface ReviewOptions {
   pr?: number;
+  prUrl?: string;
   ci: boolean;
   platform?: string;
   provider?: string;
@@ -588,6 +590,10 @@ program
   .description("Review a pull request")
   .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
   .option(
+    "--pr-url <url>",
+    "PR URL (e.g. https://github.com/owner/repo/pull/123 or https://dev.azure.com/org/project/_git/repo/pullrequest/456). Sets platform, org/project, repo, and PR number automatically."
+  )
+  .option(
     "--ci",
     "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
     false
@@ -664,9 +670,40 @@ program
   )
   .action(async (options: ReviewOptions) => {
     try {
+      if (options.prUrl) {
+        const conflicting: string[] = [];
+        if (options.pr !== undefined) conflicting.push("--pr");
+        if (options.ci) conflicting.push("--ci");
+        if (options.platform !== undefined) conflicting.push("--platform");
+        if (options.githubRepoOwner !== undefined) conflicting.push("--github-repo-owner");
+        if (options.githubRepoName !== undefined) conflicting.push("--github-repo-name");
+        if (options.azureOrg !== undefined) conflicting.push("--azure-org");
+        if (options.azureProject !== undefined) conflicting.push("--azure-project");
+        if (options.azureRepo !== undefined) conflicting.push("--azure-repo");
+
+        if (conflicting.length > 0) {
+          consoleOutputWriter.error(
+            `\n❌ Error: --pr-url cannot be combined with ${conflicting.join(", ")}.\n`
+          );
+          process.exit(1);
+        }
+
+        const parsed = parsePRUrl(options.prUrl);
+        options.pr = parsed.prNumber;
+        options.platform = parsed.platform;
+        if (parsed.platform === "github") {
+          options.githubRepoOwner = parsed.owner;
+          options.githubRepoName = parsed.repo;
+        } else {
+          options.azureOrg = parsed.org;
+          options.azureProject = parsed.project;
+          options.azureRepo = parsed.azureRepo;
+        }
+      }
+
       if (!options.ci && options.pr === undefined) {
         consoleOutputWriter.error(
-          "\n❌ Error: --pr <number> is required, or use --ci to auto-detect in a CI environment.\n"
+          "\n❌ Error: --pr <number> or --pr-url <url> is required, or use --ci to auto-detect in a CI environment.\n"
         );
         process.exit(1);
       }
