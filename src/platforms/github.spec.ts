@@ -63,6 +63,13 @@ describe("GitHubAdapter", () => {
     vi.clearAllMocks();
   });
 
+  describe("getPlatformName", () => {
+    it("returns github", () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      expect(adapter.getPlatformName()).toBe("github");
+    });
+  });
+
   describe("getPRDetails", () => {
     it("retrieves PR details successfully", async () => {
       const adapter = new GitHubAdapter(createTestConfig());

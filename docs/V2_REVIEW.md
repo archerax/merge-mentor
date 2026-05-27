@@ -55,12 +55,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 
 ### 1.3 Platform Name Detection via Constructor Inspection
 
-- **Files:** `src/review/engine.ts` (lines 298-300)
-- **What it is:** The engine determines whether it's running on GitHub or Azure by inspecting `platform.constructor.name.toLowerCase().includes("github")`.
-- **What happens if we don't fix it:** This breaks silently if the class is renamed (`GitHubAdapter` to `DefaultAdapter`), if the code is minified (production builds with esbuild could mangle class names), or if a third platform adapter (GitLab, Bitbucket) is added.
-- **Proposed fix:** Add a `getPlatformName(): "github" | "azure"` method to the `PlatformAdapter` interface.
-- **Effort:** Small
-- **Recommendation:** **Block v2.0.** Adding to an interface is a breaking change.
+- **Status:** ✅ **Resolved** -- Added `getPlatformName(): "github" | "azure"` to `PlatformAdapter` interface. Implemented in `GitHubAdapter` and `AzureDevOpsAdapter`. Updated `ReviewEngine` to use `platform.getPlatformName()` instead of constructor name inspection.
 
 ---
 
@@ -105,12 +100,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 
 ### 1.8 `streamingLines` Default Mismatch
 
-- **Files:** `src/config.ts` (lines 72, 170), `src/review/engine.ts` (line 297)
-- **What it is:** Three different defaults exist for the same value. The JSDoc comment on the `Config` interface says 5. The `loadConfig()` function hardcodes 9. The `ReviewEngine` constructor fallback says 5 (but is unreachable because config always supplies a value). Effective default at runtime is 9.
-- **What happens if we don't fix it:** The comment is wrong, which confuses contributors. The engine fallback is dead code.
-- **Proposed fix:** Standardize on 9 everywhere. Remove the dead engine fallback. Update the JSDoc comment.
-- **Effort:** Small
-- **Recommendation:** **Do in v2.0.** Trivial, and the comment is literally wrong today.
+- **Status:** ✅ **Resolved** -- All three defaults (JSDoc, `loadConfig()`, `ReviewEngine` fallback) are now consistently `9`.
 
 ---
 
@@ -138,12 +128,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 
 ### 1.11 Specialist Cross-File Context Interfaces Are Nearly Identical
 
-- **Files:** `src/ai/prompts/specialists/types.ts`
-- **What it is:** `GeneralCrossFileContext`, `SecurityCrossFileContext`, and `PerformanceCrossFileContext` all share the same base fields (`filesSummary`, `fileReviewResults`, `existingCommentsContext`). The testing context has its own shape but shares `allChangedFiles`.
-- **What happens if we don't fix it:** Adding a shared field to all cross-file contexts requires editing four interfaces.
-- **Proposed fix:** Extract a `BaseCrossFileContext` interface and extend it.
-- **Effort:** Small
-- **Recommendation:** **Do in v2.0.** Adding to type definitions is a breaking change.
+- **Status:** ✅ **Resolved** -- Extracted `BaseCrossFileContext` with shared `filesSummary` and `fileReviewResults` fields. `GeneralCrossFileContext`, `SecurityCrossFileContext`, `PerformanceCrossFileContext`, and `TestingCrossFileContext` now extend the base interface.
 
 ---
 
@@ -194,45 +179,25 @@ These are correctness or quality risks. They do not require interface changes bu
 
 ### 2.4 Unvalidated `prIdentifier` Parsing Produces NaN
 
-- **Files:** `src/review/engine.ts` (lines 818, 1141)
-- **What it is:** Both `reviewFilesBatched` and `performFastReview` extract the PR number using `parseInt(prIdentifier.split("-PR")[1], 10)`. If `prIdentifier` does not contain `-PR`, the split returns `["entireString"]`, indexing `[1]` yields `undefined`, and `parseInt(undefined, 10)` yields `NaN`. This `NaN` is then passed to audit loggers.
-- **What happens if we don't fix it:** Audit logs contain `NaN` as the PR number. Harder to debug. Currently masked because `prIdentifier` is always correctly formatted by `generatePRIdentifier`, but there is no guarantee this remains true.
-- **Proposed fix:** Extract to a helper function that validates the result and throws if it's not a number.
-- **Effort:** Small
-- **Recommendation:** **Fix before release.** Defense-in-depth.
+- **Status:** ✅ **Resolved** -- Extracted `parsePRNumber()` helper in `src/utils/prIdentifier.ts`. Both call sites in `ReviewEngine` (`reviewFilesBatched`, `performFastReview`) now use the helper, which validates the format and throws on invalid identifiers.
 
 ---
 
 ### 2.5 Summary Table Silently Hides Categories
 
-- **Files:** `src/review/commentManager.ts` (lines 382-391)
-- **What it is:** The `buildCategoryTable` method renders a markdown table of finding counts by category. It hardcodes five categories: `bug`, `security`, `performance`, `quality`, `documentation`. However, the actual `FindingCategory` type also includes `architecture`, `design`, and `testing`. If the AI returns findings in these categories, `countByCategory` counts them correctly but the summary table silently omits them.
-- **What happens if we don't fix it:** Users see incomplete summary tables. Findings in `architecture`, `design`, or `testing` categories exist in the review but are invisible in the summary.
-- **Proposed fix:** Generate the table dynamically from all categories that have at least one finding.
-- **Effort:** Small
-- **Recommendation:** **Fix before release.** User-facing output is wrong.
+- **Status:** ✅ **Resolved** -- `buildCategoryTable` now dynamically renders all categories that have at least one finding, using `CATEGORY_EMOJI` for lookup. Previously omitted `architecture`, `design`, and `testing` categories.
 
 ---
 
 ### 2.6 Non-Exhaustive Switch in `executeAction`
 
-- **Files:** `src/review/engine.ts` (line 1286)
-- **What it is:** The `switch (action.type)` in `executeAction` only handles `case "create"`. The `CommentAction.type` is currently typed as `"create"` only, but the code references `action.existingCommentId` throughout, suggesting `"update"` and `"delete"` actions were planned.
-- **What happens if we don't fix it:** Adding a new action type later would silently no-op with no error or warning.
-- **Proposed fix:** Add a `default:` branch that throws an error, or make the switch exhaustive.
-- **Effort:** Small
-- **Recommendation:** **Fix before release.** Silent failure is dangerous.
+- **Status:** ✅ **Resolved** -- Made switch exhaustive with `never` type assertion in `default` branch. TypeScript will now error at compile time if a new `CommentActionType` value is added without a corresponding case.
 
 ---
 
 ### 2.7 Config `streamingEnabled` / `stream` Naming Inconsistency
 
-- **Files:** `src/config.ts` (line 70, 165), `src/program.ts` (line 45, 185)
-- **What it is:** The `Config` interface calls the field `streamingEnabled`. The CLI uses Commander's `--no-stream` convention, which sets a key called `stream`. The mapping at `program.ts:185` translates between them: `streamingEnabled: resolvedOptions.stream !== false ? undefined : false`. Functionally correct, but the two-tier naming is confusing.
-- **What happens if we don't fix it:** Contributors may add `streamingEnabled` directly to CLI options, creating a silent fork.
-- **Proposed fix:** Rename `stream` to `streamingEnabled` in the `ReviewOptions` interface.
-- **Effort:** Small
-- **Recommendation:** **Fix before release.** Shipping inconsistent naming to v2.0 locks it in.
+- **Status:** ✅ **Resolved** -- Renamed `stream` to `streamingEnabled` in the `ReviewOptions` interface. Commander's `--no-stream` flag is mapped to `streamingEnabled` in the action handler, maintaining backward-compatible CLI behavior while keeping internal naming consistent.
 
 ---
 
@@ -401,10 +366,10 @@ These are documented in the CHANGELOG and are already in progress or planned:
 
 - [ ] 1.1: Extract shared `BaseAIProvider` (the biggest single item)
 - [ ] 1.2: Consolidate error classes
-- [ ] 1.3: Add `getPlatformName()` to `PlatformAdapter`
+- [x] 1.3: Add `getPlatformName()` to `PlatformAdapter`
 - [ ] 2.1: Fix Azure change type bitmask bug
 - [ ] 2.2: Add binary file detection in Azure
-- [ ] 2.5: Fix summary table category omission
+- [x] 2.5: Fix summary table category omission
 - [ ] 2.8: Write tests for `reviewSelection.ts`
 - [ ] 2.9: Write tests for `diffStorage.ts`
 
@@ -414,14 +379,14 @@ These are documented in the CHANGELOG and are already in progress or planned:
 - [ ] 1.5: Standardize "passes" vs "phases" naming
 - [ ] 1.6: Route `verbose` through config
 - [x] 1.7: Remove `tokenSaver` dead field
-- [ ] 1.8: Fix `streamingLines` defaults
+- [x] 1.8: Fix `streamingLines` defaults
 - [ ] 1.9: Fix Azure error swallowing
 - [ ] 1.10: Narrow adapter constructors
-- [ ] 1.11: Extract `BaseCrossFileContext`
+- [x] 1.11: Extract `BaseCrossFileContext`
 - [ ] 2.3: Route Azure raw fetch through rate limiting
-- [ ] 2.4: Validate PR number parsing
-- [ ] 2.6: Make `executeAction` switch exhaustive
-- [ ] 2.7: Rename `stream` to `streamingEnabled`
+- [x] 2.4: Validate PR number parsing
+- [x] 2.6: Make `executeAction` switch exhaustive
+- [x] 2.7: Rename `stream` to `streamingEnabled`
 - [ ] 2.10: Increase specialist prompt test coverage
 - [x] 2.11: Static-import `fast.ts`
 - [x] 2.12: Extract `buildSelectedPassesSection`

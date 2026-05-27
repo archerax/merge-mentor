@@ -42,7 +42,7 @@ export interface ReviewOptions {
   reviewType?: string;
   passes?: string;
   strategy?: string;
-  stream?: boolean;
+  streamingEnabled?: boolean;
   streamLines?: number;
   tempPath?: string;
   // GitHub config
@@ -182,7 +182,7 @@ export async function executeReview(
     reviewType: resolvedOptions.reviewType,
     passes: resolvedOptions.passes,
     reviewStrategy: resolvedOptions.strategy,
-    streamingEnabled: resolvedOptions.stream !== false ? undefined : false,
+    streamingEnabled: resolvedOptions.streamingEnabled,
     streamingLines: resolvedOptions.streamLines,
     gitBackend: resolvedOptions.gitBackend,
   });
@@ -231,7 +231,7 @@ export async function executeReview(
     reviewType: resolvedOptions.reviewType ?? config.reviewType,
     reviewPasses: config.reviewPasses,
     reviewStrategy: config.reviewStrategy,
-    streamingEnabled: resolvedOptions.stream !== false && config.streamingEnabled,
+    streamingEnabled: resolvedOptions.streamingEnabled !== false && config.streamingEnabled,
     streamingLines: resolvedOptions.streamLines ?? config.streamingLines,
     ciMode: resolvedOptions.ci,
     tempPath: config.tempPath,
@@ -671,7 +671,10 @@ program
         process.exit(1);
       }
 
-      const { result, adapter, platform } = await executeReview(options);
+      const { result, adapter, platform } = await executeReview({
+        ...options,
+        streamingEnabled: (options as unknown as Record<string, unknown>).stream as boolean,
+      });
 
       const config = loadConfig({
         platform: options.platform,

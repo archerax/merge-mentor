@@ -363,6 +363,75 @@ describe("CommentManager", () => {
       expect(summaryActions[0].body).toContain("<!-- AI_CODE_REVIEW_SUMMARY -->");
     });
 
+    it("should include all categories with findings in the summary table", () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({ category: "architecture", line: 1 }),
+            createFileFinding({ category: "design", line: 2 }),
+            createFileFinding({ category: "testing", line: 3 }),
+            createFileFinding({ category: "bug", line: 4 }),
+            createFileFinding({ category: "security", line: 5 }),
+            createFileFinding({ category: "performance", line: 6 }),
+            createFileFinding({ category: "quality", line: 7 }),
+            createFileFinding({ category: "documentation", line: 8 }),
+          ],
+        },
+      ];
+
+      const actions = manager.determineActions(
+        [],
+        fileResults,
+        createCrossFileResult({ findings: [] })
+      );
+
+      const summaryActions = actions.filter((a) => a.type === "create" && !a.path);
+      expect(summaryActions).toHaveLength(1);
+
+      const body = summaryActions[0].body ?? "";
+
+      expect(body).toContain("Architecture");
+      expect(body).toContain("Design");
+      expect(body).toContain("Testing");
+      expect(body).toContain("Bug");
+      expect(body).toContain("Security");
+      expect(body).toContain("Performance");
+      expect(body).toContain("Quality");
+      expect(body).toContain("Documentation");
+    });
+
+    it("should not include empty categories in the summary table", () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [
+        {
+          filename: "test.ts",
+          findings: [
+            createFileFinding({ category: "bug", line: 1 }),
+            createFileFinding({ category: "security", line: 2 }),
+          ],
+        },
+      ];
+
+      const actions = manager.determineActions(
+        [],
+        fileResults,
+        createCrossFileResult({ findings: [] })
+      );
+
+      const summaryActions = actions.filter((a) => a.type === "create" && !a.path);
+      expect(summaryActions).toHaveLength(1);
+
+      const body = summaryActions[0].body ?? "";
+
+      expect(body).toContain("Bug");
+      expect(body).toContain("Security");
+      expect(body).not.toContain("Architecture");
+      expect(body).not.toContain("Design");
+      expect(body).not.toContain("Testing");
+    });
+
     it("should skip creating duplicate summary when it already exists", () => {
       const manager = createCommentManager();
       const existingComments: ExistingComment[] = [

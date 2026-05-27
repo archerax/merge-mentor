@@ -38,6 +38,10 @@ export class GitHubAdapter implements PlatformAdapter {
     return this.repo;
   }
 
+  getPlatformName(): "github" {
+    return "github";
+  }
+
   getRepoInfo(): RepoInfo {
     return {
       owner: this.owner,

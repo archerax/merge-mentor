@@ -74,6 +74,13 @@ describe("AzureDevOpsAdapter", () => {
     vi.clearAllMocks();
   });
 
+  describe("getPlatformName", () => {
+    it("returns azure", () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      expect(adapter.getPlatformName()).toBe("azure");
+    });
+  });
+
   describe("getPRDetails", () => {
     it("retrieves PR details successfully", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());

@@ -12,6 +12,7 @@ const mockAdapter = {
   getExistingBotComments: vi.fn(),
   postInlineComment: vi.fn(),
   postGeneralComment: vi.fn(),
+  getPlatformName: () => "github" as const,
 };
 
 // Mock dependencies with factory functions

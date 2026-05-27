@@ -75,6 +75,7 @@ import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from 
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
+import { parsePRNumber } from "../utils/prIdentifier.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
 import { mergeTokenUsage } from "../utils/tokenUsage.js";
@@ -293,9 +294,7 @@ export class ReviewEngine {
     this.options = options ?? {};
     this.streamingEnabled = options?.streamingEnabled ?? true;
     this.streamingLines = options?.streamingLines ?? 9;
-    this.platformName = platform.constructor.name.toLowerCase().includes("github")
-      ? "github"
-      : "azure";
+    this.platformName = platform.getPlatformName();
     this.logger.info(
       {
         aiProvider: providerType,
@@ -812,8 +811,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       return files.map((f) => ({ filename: f.filename, findings: [] }));
     }
 
-    // Extract PR number from identifier for audit logging
-    const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
+    const prNumber = parsePRNumber(prIdentifier);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
@@ -1141,8 +1139,7 @@ During the database pass, pay extra attention to query correctness, transaction 
   }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
 
-    // Extract PR number for audit logging
-    const prNumber = parseInt(prIdentifier.split("-PR")[1], 10);
+    const prNumber = parsePRNumber(prIdentifier);
     this.auditLogger.logFileReviewStart("fast-review", prNumber);
 
     // Filter files with patches
@@ -1301,8 +1298,10 @@ During the database pass, pay extra attention to query correctness, transaction 
           this.logger.info({ prNumber }, "General comment created");
         }
         break;
-      default:
-        throw new Error(`Unknown comment action type: ${(action as CommentAction).type}`);
+      default: {
+        const _exhaustive: never = action.type;
+        throw new Error(`Unknown comment action type: ${_exhaustive}`);
+      }
     }
   }
 

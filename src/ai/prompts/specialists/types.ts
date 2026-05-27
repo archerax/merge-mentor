@@ -6,6 +6,14 @@ import type { FileReviewResult } from "../../../platforms/types.js";
 type SupportedLanguage = "csharp" | "typescript" | "unknown";
 
 /**
+ * Base context shared by all cross-file specialist reviews.
+ */
+export interface BaseCrossFileContext {
+  readonly filesSummary: string;
+  readonly fileReviewResults: readonly FileReviewResult[];
+}
+
+/**
  * Context for testing specialist reviews.
  */
 export interface TestingReviewContext {
@@ -22,13 +30,9 @@ export interface TestingReviewContext {
 /**
  * Context for cross-file testing analysis.
  */
-export interface TestingCrossFileContext {
-  /** Results from individual file reviews */
-  readonly fileReviewResults: readonly FileReviewResult[];
+export interface TestingCrossFileContext extends BaseCrossFileContext {
   /** Mapping of production files to their test counterparts */
   readonly productionToTestMap: ReadonlyMap<string, string | undefined>;
   /** List of all changed files */
   readonly allChangedFiles: readonly string[];
-  /** Summary of files changed in the PR */
-  readonly filesSummary: string;
 }

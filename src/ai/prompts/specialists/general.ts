@@ -1,4 +1,4 @@
-import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
+import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import type { ReviewPass } from "../../../review/reviewSelection.js";
 import {
@@ -12,6 +12,7 @@ import {
   buildBatchedFileResultsOutputFormat,
   buildCrossFileOutputFormat,
 } from "./outputFormats.js";
+import type { BaseCrossFileContext } from "./types.js";
 
 function buildWorkspaceSection(repoPath?: string): string {
   if (!repoPath) return "";
@@ -254,9 +255,7 @@ IMPORTANT: ${focusInstruction}
 `;
 }
 
-export interface GeneralCrossFileContext {
-  readonly filesSummary: string;
-  readonly fileReviewResults: readonly FileReviewResult[];
+export interface GeneralCrossFileContext extends BaseCrossFileContext {
   readonly existingCommentsContext?: string;
 }
 

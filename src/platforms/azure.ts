@@ -61,7 +61,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 
   getProjectIdentifier(): string {
-    return this.project;
+    return `${this.org}/${this.project}/${this.repoName}`;
+  }
+
+  getPlatformName(): "azure" {
+    return "azure";
   }
 
   getRepoInfo(): RepoInfo {

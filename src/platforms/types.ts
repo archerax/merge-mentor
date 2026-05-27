@@ -127,9 +127,11 @@ export interface PlatformAdapter {
   getProjectIdentifier(): string;
 
   /**
-   * Gets repository information for cloning and context loading.
-   * @returns Repository information including owner, repo, and platform type
+   * Returns the platform name for dispatching platform-specific logic.
+   * @returns "github" or "azure"
    */
+  getPlatformName(): "github" | "azure";
+
   getRepoInfo(): RepoInfo;
 
   /**

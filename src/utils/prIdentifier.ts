@@ -75,6 +75,28 @@ export function generatePRIdentifier(
  * // Truncated to MAX_PROJECT_NAME_LENGTH chars
  * ```
  */
+/**
+ * Extracts the PR number from a platform-format PR identifier.
+ * The identifier format is `Platform-project-PR<number>`.
+ *
+ * @param prIdentifier - PR identifier string (e.g., "Github-myrepo-PR123")
+ * @returns The parsed PR number
+ * @throws {Error} If the identifier does not match the expected format
+ *
+ * @example
+ * ```typescript
+ * parsePRNumber("Github-myrepo-PR123"); // 123
+ * parsePRNumber("Azure-MyProject-PR456"); // 456
+ * ```
+ */
+export function parsePRNumber(prIdentifier: string): number {
+  const match = prIdentifier.match(/-PR(\d+)$/);
+  if (!match) {
+    throw new Error(`Cannot parse PR number from identifier: ${prIdentifier}`);
+  }
+  return Number.parseInt(match[1], 10);
+}
+
 export function sanitizeProjectName(project: string): string {
   return project
     .replace(/[/\\:*?"<>|]/g, "_") // Replace invalid filename characters

@@ -380,15 +380,21 @@ ${crossFileResult.overallAssessment}
   }
 
   private buildCategoryTable(counts: Record<string, number>): string {
-    return `### By Category
+    const categories = Object.keys(CATEGORY_EMOJI).filter((cat) => counts[cat] > 0);
+    if (categories.length === 0) {
+      return "";
+    }
+
+    let table = `### By Category
 | Category | Count |
 |----------|-------|
-| ${CATEGORY_EMOJI.bug} Bug | ${counts.bug} |
-| ${CATEGORY_EMOJI.security} Security | ${counts.security} |
-| ${CATEGORY_EMOJI.performance} Performance | ${counts.performance} |
-| ${CATEGORY_EMOJI.quality} Quality | ${counts.quality} |
-| ${CATEGORY_EMOJI.documentation} Documentation | ${counts.documentation} |
 `;
+    for (const category of categories) {
+      const emoji = CATEGORY_EMOJI[category as keyof typeof CATEGORY_EMOJI];
+      table += `| ${emoji} ${category.charAt(0).toUpperCase() + category.slice(1)} | ${counts[category]} |
+`;
+    }
+    return table;
   }
 
   private buildCrossFileFindingsSection(crossFileResult: CrossFileReviewResult): string {

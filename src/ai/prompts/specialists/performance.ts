@@ -1,4 +1,4 @@
-import type { FileReviewResult, PRDetails } from "../../../platforms/types.js";
+import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
@@ -6,6 +6,7 @@ import {
   buildBatchedFileResultsOutputFormat,
   buildCrossFileOutputFormat,
 } from "./outputFormats.js";
+import type { BaseCrossFileContext } from "./types.js";
 
 /**
  * Builds a workspace access section for prompts.
@@ -38,9 +39,7 @@ Your working directory is set to the repository root.
 /**
  * Context for performance cross-file analysis.
  */
-export interface PerformanceCrossFileContext {
-  readonly filesSummary: string;
-  readonly fileReviewResults: readonly FileReviewResult[];
+export interface PerformanceCrossFileContext extends BaseCrossFileContext {
   readonly existingCommentsContext?: string;
 }
 
