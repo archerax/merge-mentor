@@ -274,7 +274,7 @@ export function generateMarkdownReport(
   dryRun: boolean,
   reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
-  reviewStrategy: ReviewStrategy = "standard"
+  reviewStrategy: ReviewStrategy = "fast"
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
@@ -291,7 +291,7 @@ export function generateMarkdownReport(
   if (formattedPasses) {
     report += `**Review Passes:** ${formattedPasses}  \n`;
   }
-  if (reviewStrategy !== "standard") {
+  if (reviewStrategy !== "fast") {
     report += `**Review Strategy:** ${reviewStrategy}  \n`;
   }
   report += `**PR Title:** ${result.prDetails.title}  \n`;
@@ -472,7 +472,7 @@ export function displayResults(
   aiProvider?: AIProviderType,
   reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
-  reviewStrategy: ReviewStrategy = "standard",
+  reviewStrategy: ReviewStrategy = "fast",
   tempPath?: string,
   deps: ProgramDeps = {}
 ): void {
@@ -489,7 +489,7 @@ export function displayResults(
   if (formattedPasses) {
     output.log(`Review Passes: ${formattedPasses}`);
   }
-  if (reviewStrategy !== "standard") {
+  if (reviewStrategy !== "fast") {
     output.log(`Review Strategy: ${reviewStrategy}`);
   }
   output.log("");
@@ -611,7 +611,7 @@ program
     "--passes <passNames>",
     `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
   )
-  .option("--strategy <strategy>", "Execution strategy (standard or fast). Env: MM_REVIEW_STRATEGY")
+  .option("--strategy <strategy>", "Execution strategy (deep or fast). Env: MM_REVIEW_STRATEGY")
   .option(
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"

@@ -6,7 +6,22 @@ import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../pla
 import { createFixedClock } from "../ports/clock.test-helper.js";
 import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
 import { DiffStorage } from "./diffStorage.js";
-import { ReviewEngine } from "./engine.js";
+import { ReviewEngine as OriginalReviewEngine } from "./engine.js";
+import type { AIProviderType } from "../ai/types.js";
+
+class ReviewEngine extends OriginalReviewEngine {
+  constructor(
+    platform: PlatformAdapter,
+    botIdentifier: string,
+    providerType: AIProviderType,
+    options?: ConstructorParameters<typeof OriginalReviewEngine>[3]
+  ) {
+    super(platform, botIdentifier, providerType, {
+      reviewStrategy: "deep",
+      ...options,
+    });
+  }
+}
 
 // Stub nodeFs so engine and DiffStorage never touch the real filesystem during tests
 vi.mock("../ports/index.js", async () => {
@@ -715,7 +730,7 @@ describe("ReviewEngine", () => {
         "test.ts",
         2,
         expect.stringContaining(
-          `Merge Mentor v${packageJson.version}, Baseline review + security, claude-sonnet-4.6`
+          `Merge Mentor v${packageJson.version}, Baseline review + security (deep strategy), claude-sonnet-4.6`
         )
       );
     });

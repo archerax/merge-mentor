@@ -434,7 +434,7 @@ describe("CLI", () => {
         expect.objectContaining({
           reviewType: "custom",
           reviewPasses: ["scan", "logic"],
-          reviewStrategy: "standard",
+          reviewStrategy: "fast",
         })
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -824,7 +824,7 @@ describe("CLI", () => {
         "copilot-sdk",
         "general",
         undefined,
-        "standard",
+        "deep",
         undefined,
         mockDeps as { output?: OutputWriter }
       );
@@ -1003,15 +1003,15 @@ describe("CLI", () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(".git/config"));
     });
 
-    it("displays review strategy when not standard", () => {
+    it("displays review strategy when not fast", () => {
       const result = createMockReviewResult();
 
-      displayResults(result, true, undefined, undefined, undefined, "general", undefined, "fast");
+      displayResults(result, true, undefined, undefined, undefined, "general", undefined, "deep");
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Review Strategy: fast"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Review Strategy: deep"));
     });
 
-    it("does not display review strategy when standard", () => {
+    it("does not display review strategy when fast", () => {
       const result = createMockReviewResult();
 
       displayResults(
@@ -1022,7 +1022,7 @@ describe("CLI", () => {
         undefined,
         "general",
         undefined,
-        "standard"
+        "fast"
       );
 
       // Check that we don't log the strategy

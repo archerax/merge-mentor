@@ -241,8 +241,8 @@ export function validateReviewType(value: string | undefined): ReviewType {
 
 /**
  * Validates the review strategy.
- * Supported strategies are: standard, fast.
- * Unknown values default to standard.
+ * Supported strategies are: deep, fast.
+ * Unknown values default to fast.
  */
 export function validateReviewStrategy(value: string | undefined): ReviewStrategy {
   return validateReviewStrategyValue(value);

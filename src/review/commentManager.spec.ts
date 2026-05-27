@@ -157,7 +157,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Baseline review (fast strategy), claude-sonnet-4.6`
+        `Merge Mentor v${packageJson.version}, Baseline review, claude-sonnet-4.6`
       );
     });
 

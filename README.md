@@ -46,7 +46,7 @@ npx merge-mentor review --pr 123
 - **Multi-Platform Support** - Works with GitHub and Azure DevOps
 - **Intelligent Analysis** - Reviews for bugs, security, performance, quality, and documentation
 - **Additive Review Passes** - Start from a baseline review and add focused passes like testing, security, database, or monorepo
-- **Fast Review Strategy** - Choose between higher-accuracy standard mode and lower-cost fast mode
+- **Fast Review Strategy** - Choose between higher-accuracy deep mode and lower-cost fast mode (default)
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
@@ -227,7 +227,7 @@ export MM_SKIP_EXISTING_ISSUES=true
 export MM_RUNS=1  # 1-5 runs
 
 # Review profile
-export MM_REVIEW_STRATEGY=standard    # standard or fast
+export MM_REVIEW_STRATEGY=fast        # fast (default) or deep
 
 # Git backend for cloning repositories (default: cli uses system git binary)
 export MM_GIT_BACKEND=cli  # cli or isomorphic
@@ -256,9 +256,9 @@ merge-mentor review --pr 123 \
   --skip-existing-issues true \
   --comment-identifier "[custom-bot]"
 
-# Fast execution strategy
+# Deep execution strategy
 merge-mentor review --pr 123 \
-  --strategy fast
+  --strategy deep
 ```
 
 ### Audit Logging
@@ -438,7 +438,7 @@ merge-mentor review --pr 123 --passes "testing" --write
 | `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
 | `--provider <copilot-sdk\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
-| `--strategy <strategy>` | Execution strategy: `standard` or `fast` | `MM_REVIEW_STRATEGY` | `standard` |
+| `--strategy <strategy>` | Execution strategy: `deep` or `fast` | `MM_REVIEW_STRATEGY` | `fast` |
 | `--write` | Post comments (otherwise dry-run) | - | `false` |
 | `--verbose` | Enable verbose output | - | `true` |
 | `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
@@ -535,23 +535,20 @@ Ignored files are logged for transparency in the review output.
 
 ### Review Profiles, Passes, and Strategies
 
-Every review now includes a **baseline review**. You can optionally add ordered **passes** to increase attention in specific areas without restricting findings, and you can optionally switch to the **fast** execution strategy.
+Every review now includes a **baseline review** running with the **fast** execution strategy by default. You can optionally switch to the **deep** execution strategy for higher coverage, or add ordered **passes** to increase attention in specific areas.
 
 ```bash
-# Baseline review only (default)
+# Baseline review only (default fast strategy)
 merge-mentor review --pr 123 --write
 
-# Baseline review plus testing attention
+# Baseline review plus testing attention (default fast strategy)
 merge-mentor review --pr 123 --passes "testing" --write
 
-# Baseline review plus security attention
-merge-mentor review --pr 123 --passes "security" --write
+# Baseline review with deep strategy for maximum issues detection
+merge-mentor review --pr 123 --strategy deep --write
 
-# Baseline review plus multiple ordered passes
-merge-mentor review --pr 123 --passes "security,database,performance" --write
-
-# Same profile with fast strategy
-merge-mentor review --pr 123 --passes "security,database" --strategy fast --write
+# Baseline review plus multiple ordered passes with deep strategy
+merge-mentor review --pr 123 --passes "security,database,performance" --strategy deep --write
 
 # Legacy aliases remain supported
 merge-mentor review --pr 123 --review-type testing --write
@@ -565,16 +562,16 @@ merge-mentor review --pr 123 --review-type custom --passes "scan,monorepo,perfor
 
 - **Baseline review**: broad code review coverage across bugs, correctness, security, performance, maintainability, and documentation
 - **Passes**: extra specialist attention layered on top of the baseline review
-- **Strategy**: how the review runs (`standard` or `fast`)
+- **Strategy**: how the review runs (`deep` or `fast`)
 
 **Choosing a strategy:**
 
-- Use `standard` when you want the best issue detection rate.
-- Use `fast` when you want to reduce GitHub Copilot premium request usage and are comfortable with lower coverage.
+- Use `fast` (default) when you want to reduce GitHub Copilot premium request usage and get faster results.
+- Use `deep` when you want the highest issue detection rate.
 
-In our benchmark repository with deliberately introduced issues, `standard` found **76%** of the issues while
-`fast` found **64%**. Under current GitHub Copilot billing, `standard` costs **2x premium requests** and `fast`
-costs **1x premium request**, so `--strategy` gives you a direct accuracy-versus-cost tradeoff.
+In our benchmark repository with deliberately introduced issues, `deep` found **76%** of the issues while
+`fast` found **64%**. Under current GitHub Copilot billing, `deep` costs **2x premium requests** and `fast`
+costs **1x premium request** (default), so `--strategy` gives you a direct accuracy-versus-cost tradeoff.
 
 **Available passes:**
 

@@ -16,7 +16,7 @@ export const REVIEW_PASSES = [
 
 export type ReviewPass = (typeof REVIEW_PASSES)[number];
 
-const REVIEW_STRATEGIES = ["standard", "fast"] as const;
+const REVIEW_STRATEGIES = ["deep", "fast"] as const;
 
 export type ReviewStrategy = (typeof REVIEW_STRATEGIES)[number];
 
@@ -43,7 +43,7 @@ export function validateReviewStrategy(value: string | undefined): ReviewStrateg
     return value as ReviewStrategy;
   }
 
-  return "standard";
+  return "fast";
 }
 
 function parsePassList(
@@ -158,7 +158,7 @@ export function resolveReviewProfile(options: {
     reviewType,
     legacyAlias: reviewType === "general" ? undefined : reviewType,
     passes: mergeReviewPasses(explicitPasses, implicitPasses),
-    strategy: reviewType === "fast" ? "fast" : (options.reviewStrategy ?? "standard"),
+    strategy: reviewType === "fast" ? "fast" : (options.reviewStrategy ?? "fast"),
   };
 }
 
@@ -172,12 +172,12 @@ export function formatReviewPhases(reviewPasses?: readonly ReviewPass[]): string
 
 function formatReviewProfileLabel(
   reviewPasses?: readonly ReviewPass[],
-  reviewStrategy: ReviewStrategy = "standard"
+  reviewStrategy: ReviewStrategy = "fast"
 ): string {
   const reviewPassList = formatReviewPhases(reviewPasses);
   const baseLabel = reviewPassList ? `Baseline review + ${reviewPassList}` : "Baseline review";
 
-  return reviewStrategy === "fast" ? `${baseLabel} (fast strategy)` : baseLabel;
+  return reviewStrategy === "deep" ? `${baseLabel} (deep strategy)` : baseLabel;
 }
 
 export function formatReviewTypeLabel(
@@ -191,7 +191,7 @@ export function formatReviewTypeLabel(
     getImplicitPasses(normalizedReviewType as ReviewType)
   );
   const resolvedStrategy =
-    normalizedReviewType === "fast" ? "fast" : (reviewStrategy ?? "standard");
+    normalizedReviewType === "fast" ? "fast" : (reviewStrategy ?? "fast");
 
   return formatReviewProfileLabel(mergedPasses, resolvedStrategy);
 }

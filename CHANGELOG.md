@@ -17,9 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ReviewEngine` constructor**: The legacy overloaded constructor form (passing options as the third argument) has been removed. The `providerType: AIProviderType` argument is now required as the third positional argument.
 - **Removed `GeneralReviewPhase` type alias** and `parseCustomReviewPhases` function from `reviewSelection.ts`. Use `ReviewPass` instead.
 - **Removed `customReviewPhases` from `ReviewCommentManagerOptions`**. Use `reviewPasses` instead.
+- **Renamed `standard` review strategy to `deep`**: The `"standard"` execution strategy is now called `"deep"`. The `MM_REVIEW_STRATEGY` environment variable and `--strategy` parameter now accept `"deep"` instead of `"standard"`.
 
 ### Changed
 
+- **Default Review Strategy**: Changed the default review strategy from `"standard"` to `"fast"` to reduce Copilot/AI API cost and latency. The non-default, higher-accuracy strategy has been renamed to `"deep"` and remains selectable via `--strategy deep` or `MM_REVIEW_STRATEGY=deep`.
 - Reduced token usage for large reviews
 
 ## [1.33.0] - 2026-05-14

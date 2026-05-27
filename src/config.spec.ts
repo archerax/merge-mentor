@@ -31,7 +31,7 @@ describe("Config", () => {
       expect(config.gitBackend).toBe("cli");
       expect(config.skipPreExisting).toBe(true);
       expect(config.reviewPasses).toEqual([]);
-      expect(config.reviewStrategy).toBe("standard");
+      expect(config.reviewStrategy).toBe("fast");
     });
 
     it("should load values from environment variables", () => {
@@ -577,14 +577,14 @@ describe("Validator functions", () => {
 
   describe("validateReviewStrategy", () => {
     it("should accept valid review strategies", () => {
-      expect(validateReviewStrategy("standard")).toBe("standard");
+      expect(validateReviewStrategy("deep")).toBe("deep");
       expect(validateReviewStrategy("fast")).toBe("fast");
     });
 
-    it("should default to standard for invalid strategies", () => {
-      expect(validateReviewStrategy("invalid")).toBe("standard");
-      expect(validateReviewStrategy("")).toBe("standard");
-      expect(validateReviewStrategy(undefined)).toBe("standard");
+    it("should default to fast for invalid strategies", () => {
+      expect(validateReviewStrategy("invalid")).toBe("fast");
+      expect(validateReviewStrategy("")).toBe("fast");
+      expect(validateReviewStrategy(undefined)).toBe("fast");
     });
   });
 
