@@ -38,7 +38,7 @@ These require modifying public APIs, interfaces, or repository contracts. v2.0 i
 - **What happens if we don't fix it:** Future bug fixes must be applied in four places. Adding a fifth provider (e.g., Claude) means copy-pasting 500+ lines. Already, `OpenCodeCliError` extends `Error` directly while its three siblings extend `MergeMentorError` -- a bug caused by this duplication.
 - **Proposed fix:** Extract a `BaseAIProvider` abstract class. Concrete providers only implement `executePrompt()` (their actual API call) and a response-text extractor.
 - **Effort:** Large
-- **Recommendation:** **Block v2.0.** This is a ticking maintenance bomb.
+- **Recommendation:** **Deferred to v3.0 release.** (Kicked from v2.0 to simplify major version release scope).
 
 ---
 
@@ -364,7 +364,6 @@ These are documented in the CHANGELOG and are already in progress or planned:
 
 **Must complete before release:**
 
-- [ ] 1.1: Extract shared `BaseAIProvider` (the biggest single item)
 - [ ] 1.2: Consolidate error classes
 - [x] 1.3: Add `getPlatformName()` to `PlatformAdapter`
 - [ ] 2.1: Fix Azure change type bitmask bug
@@ -391,8 +390,9 @@ These are documented in the CHANGELOG and are already in progress or planned:
 - [x] 2.11: Static-import `fast.ts`
 - [x] 2.12: Extract `buildSelectedPassesSection`
 
-**Can ship after v2.0:**
+**Can ship after v2.0 / Deferred:**
 
+- [ ] 1.1: Extract shared `BaseAIProvider` (Kicked to v3.0 release)
 - [ ] 3.1: Decompose `ReviewEngine`
 - [ ] 3.2: Decompose specialist prompt builders
 - [ ] 3.3 - 3.6: Remaining Tier 3 refactoring
