@@ -50,7 +50,6 @@ npx merge-mentor review --pr 123
 - **Inline Comments** - Posts feedback on specific lines of code
 - **Smart Deduplication** - Avoids flagging the same issue multiple times
 - **Incremental Reviews** - Only analyzes changed files to save time
-- **Multi-Run Mode** - Aggregate findings from multiple passes for thoroughness
 - **Dry-Run Mode** - Preview changes before posting with detailed markdown reports (default)
 - **Streaming Output** - Real-time feedback showing AI model output during reviews
 
@@ -222,9 +221,6 @@ Deprecated v1 aliases have been removed in v2. Use `MM_AI_MODEL` / `--ai-model` 
 ```bash
 # Comment filtering
 export MM_SKIP_EXISTING_ISSUES=true
-
-# Multi-run mode
-export MM_RUNS=1  # 1-5 runs
 
 # Review profile
 export MM_REVIEW_STRATEGY=fast        # fast (default) or deep

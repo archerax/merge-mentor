@@ -9,20 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes (v2.0)
 
-- **Removed CLI providers (`copilot` and `opencode`)**: The CLI-based AI providers have been removed. The SDK providers (`copilot-sdk` and `opencode-sdk`) are strictly better in every dimension — faster (persistent client/server), more reliable (native JSON schemas, better error handling), more secure (permission restrictions), and feature-complete (BYOK support, token usage tracking). The `MM_AI_PROVIDER` / `--provider` options now accept only `copilot-sdk` and `opencode-sdk`. Old CLI provider configurations default to `copilot-sdk`.
-- **Removed `--runs` / `MM_REVIEW_RUNS`**: Multi-run mode has been removed. To run multiple reviews, simply invoke the app multiple times.
-- **Removed deprecated CLI options**: `--agent-timeout`, `--copilot-model`, `--copilot-sdk-model`, `--copilot-sdk-base-url`, `--copilot-sdk-api-key`, `--opencode-model`, `--opencode-sdk-model`, `--copilot-timeout`, `--copilot-sdk-timeout`, `--opencode-timeout`, `--opencode-sdk-timeout`, `--phases`. Use `--ai-model`, `--ai-timeout`, `--ai-base-url`, `--ai-api-key`, and `--passes` instead.
-- **Removed deprecated environment variables**: `MM_AGENT_TIMEOUT`, `MM_COPILOT_MODEL`, `MM_COPILOT_SDK_MODEL`, `MM_OPENCODE_MODEL`, `MM_OPENCODE_SDK_MODEL`, `MM_COPILOT_SDK_BASE_URL`, `MM_COPILOT_SDK_API_KEY`, `MM_COPILOT_TIMEOUT`, `MM_COPILOT_SDK_TIMEOUT`, `MM_OPENCODE_TIMEOUT`, `MM_OPENCODE_SDK_TIMEOUT`, `MM_REVIEW_RUNS`. Use `MM_AI_MODEL`, `MM_AI_TIMEOUT`, `MM_AI_BASE_URL`, and `MM_AI_API_KEY` instead.
-- **Removed deprecated `Config` interface fields**: `copilotModel`, `copilotTimeoutMs`, `copilotSdkModel`, `copilotSdkTimeoutMs`, `opencodeModel`, `opencodeTimeoutMs`, `opencodeSdkModel`, `opencodeSdkTimeoutMs`, `reviewRuns`, `customReviewPhases`. Use `aiModel`, `aiTimeoutMs`, `aiBaseUrl`, `aiApiKey`, and `reviewPasses` instead.
-- **`ReviewEngine` constructor**: The legacy overloaded constructor form (passing options as the third argument) has been removed. The `providerType: AIProviderType` argument is now required as the third positional argument.
-- **Removed `GeneralReviewPhase` type alias** and `parseCustomReviewPhases` function from `reviewSelection.ts`. Use `ReviewPass` instead.
-- **Removed `customReviewPhases` from `ReviewCommentManagerOptions`**. Use `reviewPasses` instead.
-- **Renamed `standard` review strategy to `deep`**: The `"standard"` execution strategy is now called `"deep"`. The `MM_REVIEW_STRATEGY` environment variable and `--strategy` parameter now accept `"deep"` instead of `"standard"`.
+- **Removed CLI providers (`copilot` and `opencode`)**: The legacy CLI-based AI providers have been removed. The newer SDK providers (`copilot-sdk` and `opencode-sdk`) are strictly better in every dimension—faster (utilizing a persistent client/server model), more reliable (using native JSON schemas and robust error handling), more secure, and feature-complete (supporting Bring Your Own Key / BYOK and token usage tracking). The `MM_AI_PROVIDER` environment variable and `--provider` CLI parameter now accept only `copilot-sdk` and `opencode-sdk`. Legacy configurations default to `copilot-sdk`.
+- **Removed `--runs` / `MM_REVIEW_RUNS`**: Multi-run mode has been removed. To run multiple review passes, simply invoke the application multiple times.
+- **Removed deprecated CLI options**: The deprecated options `--agent-timeout`, `--copilot-model`, `--copilot-sdk-model`, `--copilot-sdk-base-url`, `--copilot-sdk-api-key`, `--opencode-model`, `--opencode-sdk-model`, `--copilot-timeout`, `--copilot-sdk-timeout`, `--opencode-timeout`, `--opencode-sdk-timeout`, and `--phases` have been removed. Use their unified replacements: `--ai-model`, `--ai-timeout`, `--ai-base-url`, `--ai-api-key`, and `--passes` instead.
+- **Removed deprecated environment variables**: The deprecated environment variables `MM_AGENT_TIMEOUT`, `MM_COPILOT_MODEL`, `MM_COPILOT_SDK_MODEL`, `MM_OPENCODE_MODEL`, `MM_OPENCODE_SDK_MODEL`, `MM_COPILOT_SDK_BASE_URL`, `MM_COPILOT_SDK_API_KEY`, `MM_COPILOT_TIMEOUT`, `MM_COPILOT_SDK_TIMEOUT`, `MM_OPENCODE_TIMEOUT`, `MM_OPENCODE_SDK_TIMEOUT`, and `MM_REVIEW_RUNS` have been removed. Use their unified replacements: `MM_AI_MODEL`, `MM_AI_TIMEOUT`, `MM_AI_BASE_URL`, and `MM_AI_API_KEY` instead.
+- **Renamed `standard` review strategy to `deep`**: The `"standard"` execution strategy has been renamed to `"deep"`. The `MM_REVIEW_STRATEGY` environment variable and `--strategy` parameter now accept `"deep"` instead of `"standard"`.
 
 ### Changed
 
-- **Default Review Strategy**: Changed the default review strategy from `"standard"` to `"fast"` to reduce Copilot/AI API cost and latency. The non-default, higher-accuracy strategy has been renamed to `"deep"` and remains selectable via `--strategy deep` or `MM_REVIEW_STRATEGY=deep`.
-- Reduced token usage for large reviews
+- **Default Review Strategy**: Changed the default review strategy from `"standard"` to `"fast"` to reduce Copilot/AI API costs and latency. The higher-accuracy strategy remains available as `"deep"` and can be selected via `--strategy deep` or `MM_REVIEW_STRATEGY=deep`.
+- **Optimized token usage**: Reduced token consumption when reviewing large pull requests, resulting in faster execution and lower API costs.
 
 ## [1.33.0] - 2026-05-14
 
