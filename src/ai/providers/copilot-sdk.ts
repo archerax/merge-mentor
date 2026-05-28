@@ -2,7 +2,7 @@ import type { PermissionHandler, PermissionRequest } from "@github/copilot-sdk";
 import { CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
-import { CopilotSdkError, JsonParseError, ValidationError } from "../../errors/index.js";
+import { AIProviderError, JsonParseError, ValidationError } from "../../errors/index.js";
 import { createChildLogger } from "../../logger.js";
 import type {
   CrossFileFinding,
@@ -226,9 +226,10 @@ export class CopilotSdkProvider implements AIProviderClient {
       "failure",
       lastError?.message
     );
-    throw new CopilotSdkError(
+    throw new AIProviderError(
+      "copilot-sdk",
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
-      lastError ?? undefined
+      { cause: lastError ?? undefined }
     );
   }
 
@@ -358,7 +359,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
         const content = response?.data.content ?? chunks.join("");
         if (!content) {
-          throw new CopilotSdkError("No content in response from Copilot SDK");
+          throw new AIProviderError("copilot-sdk", "No content in response from Copilot SDK");
         }
 
         const parsed = this.parseJsonResponse(content);

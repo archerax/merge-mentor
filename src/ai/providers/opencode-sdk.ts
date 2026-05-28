@@ -1,7 +1,7 @@
 import { createOpencode } from "@opencode-ai/sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
-import { JsonParseError, OpenCodeSdkError, ValidationError } from "../../errors/index.js";
+import { AIProviderError, JsonParseError, ValidationError } from "../../errors/index.js";
 import { createChildLogger } from "../../logger.js";
 import type {
   CrossFileFinding,
@@ -317,9 +317,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       "failure",
       lastError?.message
     );
-    throw new OpenCodeSdkError(
+    throw new AIProviderError(
+      "opencode-sdk",
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
-      lastError ?? undefined
+      { cause: lastError ?? undefined }
     );
   }
 
@@ -410,7 +411,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         (session as { id?: string }).id;
 
       if (!sessionId) {
-        throw new OpenCodeSdkError("Failed to create session: no session ID returned");
+        throw new AIProviderError(
+          "opencode-sdk",
+          "Failed to create session: no session ID returned"
+        );
       }
 
       const promptParts: Array<{ type: "text"; text: string }> = [{ type: "text", text: prompt }];
@@ -450,7 +454,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
       // Check for structured output errors
       if (info?.error?.name === "StructuredOutputError") {
-        throw new OpenCodeSdkError(
+        throw new AIProviderError(
+          "opencode-sdk",
           `Structured output failed: ${info.error.message ?? "unknown error"}`
         );
       }
@@ -468,7 +473,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         .join("");
 
       if (!rawText) {
-        throw new OpenCodeSdkError("No content in response from OpenCode SDK");
+        throw new AIProviderError("opencode-sdk", "No content in response from OpenCode SDK");
       }
 
       const parsed = this.parseJsonResponse(rawText);
@@ -487,7 +492,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new OpenCodeSdkError(`Prompt timed out after ${ms}ms`)), ms);
+      timer = setTimeout(
+        () => reject(new AIProviderError("opencode-sdk", `Prompt timed out after ${ms}ms`)),
+        ms
+      );
     });
     try {
       return await Promise.race([promise, timeout]);

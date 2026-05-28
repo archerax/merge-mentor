@@ -25,7 +25,7 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly logger = createChildLogger({ component: "GitHubAdapter" });
   private readonly auditLogger = getAuditLogger();
 
-  constructor(config: Config) {
+  constructor(config: Pick<Config, "github" | "botCommentIdentifier">) {
     this.octokit = new Octokit({ auth: config.github.token });
     this.owner = config.github.owner;
     this.repo = config.github.repo;

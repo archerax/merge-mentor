@@ -14,7 +14,7 @@
  * - security: Security vulnerability and threat model analysis
  * - testing: Test coverage, quality, and edge case analysis
  * - performance: Performance bottlenecks, complexity analysis, optimization opportunities
- * - custom: General review prompt constrained to user-selected analysis phases
+ * - custom: General review prompt constrained to user-selected analysis passes
  *
  * Multiple review runs execute sequentially (with delay) and aggregate findings through
  * fingerprinting to deduplicate across runs. This improves finding diversity and robustness.

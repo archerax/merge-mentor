@@ -4,32 +4,8 @@ import type { ReviewPass } from "../../../review/reviewSelection.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildSelectedPassesSection } from "../shared/passHelpers.js";
+import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import { buildFastReviewOutputFormat } from "./outputFormats.js";
-
-function buildWorkspaceSection(repoPath?: string): string {
-  if (!repoPath) return "";
-
-  return `
----
-# WORKSPACE ACCESS ENABLED
-
-You have full access to the repository (not just changed files).
-Your working directory is set to the repository root.
-
-**Use these features extensively:**
-
-- \`@workspace /search <query>\` - Find patterns across all files
-- \`@file:relative/path/to/file.ts\` - Read any file in the repository
-- \`@workspace /find <filename>\` - Locate files by name
-
-**MANDATORY:** Always cross-reference the repository before reporting:
-- Verify existing patterns before flagging inconsistencies
-- Check for centralized handling before reporting missing checks
-- Understand the codebase architecture before reporting violations
-
----
-`;
-}
 
 const FAST_PASS_DETAILS: Record<ReviewPass, readonly string[]> = {
   scan: [
@@ -71,8 +47,8 @@ function buildAdditionalPassAnalysis(selectedPasses?: readonly ReviewPass[]): st
 ## Additional Focused Passes
 ${selectedPasses
   .map(
-    (phase, index) =>
-      `### Additive Pass ${index + 1}: ${phase}\n${FAST_PASS_DETAILS[phase].join("\n")}`
+    (pass, index) =>
+      `### Additive Pass ${index + 1}: ${pass}\n${FAST_PASS_DETAILS[pass].join("\n")}`
   )
   .join("\n\n")}
 `;
@@ -94,13 +70,7 @@ export function buildFastReviewPrompt(
   selectedPasses?: readonly ReviewPass[],
   additionalContextSections?: readonly string[]
 ): string {
-  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
-  const filesListing = manifest.files
-    .map(
-      (f) =>
-        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`
-    )
-    .join("\n");
+  const filesListing = buildFilesListing(manifest, repoPath);
 
   const commentsSection = existingCommentsContext
     ? `

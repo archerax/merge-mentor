@@ -2,39 +2,18 @@ import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import {
   buildBatchedFileResultsOutputFormat,
   buildCrossFileOutputFormat,
 } from "./outputFormats.js";
 import type { TestingCrossFileContext, TestingReviewContext } from "./types.js";
 
-/**
- * Builds a workspace access section for prompts.
- */
-function buildWorkspaceSection(repoPath?: string): string {
-  if (!repoPath) return "";
-
-  return `
----
-# WORKSPACE ACCESS ENABLED
-
-You have full access to the repository (not just changed files).
-Your working directory is set to the repository root.
-
-**Use these features extensively:**
-
-- \`@workspace /search <query>\` - Find patterns across all files
-- \`@file:relative/path/to/file.ts\` - Read any file in the repository
-- \`@workspace /find <filename>\` - Locate files by name
-
-**MANDATORY:** Always cross-reference the repository before reporting:
-- Check for existing test patterns and conventions
-- Verify test coverage for similar files
-- Understand the testing architecture before reporting gaps
-
----
-`;
-}
+const TESTING_WORKSPACE_BULLETS = [
+  "Check for existing test patterns and conventions",
+  "Verify test coverage for similar files",
+  "Understand the testing architecture before reporting gaps",
+] as const;
 
 /**
  * Gets language-specific testing guidance.
@@ -135,15 +114,9 @@ export function buildTestingFileReviewPrompt(
   context: TestingReviewContext,
   repoPath?: string
 ): string {
-  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
-  const filesListing = manifest.files
-    .map(
-      (f) =>
-        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`
-    )
-    .join("\n");
+  const filesListing = buildFilesListing(manifest, repoPath);
 
-  const workspaceSection = buildWorkspaceSection(repoPath);
+  const workspaceSection = buildWorkspaceSection(repoPath, TESTING_WORKSPACE_BULLETS);
   const languageGuidance = getLanguageTestingGuidance(context.language);
 
   const testFileContext =
@@ -555,7 +528,7 @@ export function buildTestingCrossFilePrompt(
 
   const coverageAnalysis = analyzeCoveragePatterns(context);
 
-  const workspaceSection = buildWorkspaceSection(repoPath);
+  const workspaceSection = buildWorkspaceSection(repoPath, TESTING_WORKSPACE_BULLETS);
 
   return `${buildSecurityPreamble()}# YOUR ROLE
 Expert test architect performing holistic test coverage analysis across a pull request.

@@ -364,29 +364,29 @@ These are documented in the CHANGELOG and are already in progress or planned:
 
 **Must complete before release:**
 
-- [ ] 1.2: Consolidate error classes
+- [x] 1.2: Consolidate error classes
 - [x] 1.3: Add `getPlatformName()` to `PlatformAdapter`
-- [ ] 2.1: Fix Azure change type bitmask bug
-- [ ] 2.2: Add binary file detection in Azure
+- [x] 2.1: Fix Azure change type bitmask bug
+- [x] 2.2: Add binary file detection in Azure
 - [x] 2.5: Fix summary table category omission
-- [ ] 2.8: Write tests for `reviewSelection.ts`
-- [ ] 2.9: Write tests for `diffStorage.ts`
+- [x] 2.8: Write tests for `reviewSelection.ts`
+- [x] 2.9: Write tests for `diffStorage.ts`
 
 **Strongly recommended before release:**
 
-- [ ] 1.4: Extract `buildWorkspaceSection` (touches AI prompts)
-- [ ] 1.5: Standardize "passes" vs "phases" naming
-- [ ] 1.6: Route `verbose` through config
+- [x] 1.4: Extract `buildWorkspaceSection` (touches AI prompts)
+- [x] 1.5: Standardize "passes" vs "phases" naming
+- [x] 1.6: Remove `--verbose` CLI option (Always default to true)
 - [x] 1.7: Remove `tokenSaver` dead field
 - [x] 1.8: Fix `streamingLines` defaults
-- [ ] 1.9: Fix Azure error swallowing
-- [ ] 1.10: Narrow adapter constructors
+- [x] 1.9: Fix Azure error swallowing
+- [x] 1.10: Narrow adapter constructors
 - [x] 1.11: Extract `BaseCrossFileContext`
-- [ ] 2.3: Route Azure raw fetch through rate limiting
+- [x] 2.3: Route Azure raw fetch through rate limiting
 - [x] 2.4: Validate PR number parsing
 - [x] 2.6: Make `executeAction` switch exhaustive
 - [x] 2.7: Rename `stream` to `streamingEnabled`
-- [ ] 2.10: Increase specialist prompt test coverage
+- [x] 2.10: Increase specialist prompt test coverage
 - [x] 2.11: Static-import `fast.ts`
 - [x] 2.12: Extract `buildSelectedPassesSection`
 

@@ -242,7 +242,7 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain("3. logic");
   });
 
-  test("includes focused pass analysis with phase details", () => {
+  test("includes focused pass analysis with pass details", () => {
     const passes = ["security"] as const;
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest, undefined, undefined, passes);
 
@@ -327,8 +327,8 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain("performance");
   });
 
-  test("handles all review phases in pass analysis", () => {
-    const allPhases = [
+  test("handles all review passes in pass analysis", () => {
+    const allPasses = [
       "scan",
       "security",
       "logic",
@@ -342,7 +342,7 @@ describe("buildFastReviewPrompt", () => {
       mockManifest,
       undefined,
       undefined,
-      allPhases
+      allPasses
     );
 
     expect(prompt).toContain("scan");

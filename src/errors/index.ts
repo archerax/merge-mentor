@@ -38,71 +38,47 @@
  * ```
  */
 export class MergeMentorError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "MergeMentorError";
   }
 }
 
 /**
- * Error thrown when the Copilot SDK fails or is unavailable.
+ * Error thrown when an AI provider SDK (Copilot or OpenCode) fails or is unavailable.
  *
- * Raised when the @github/copilot-sdk package fails, is not installed,
- * or returns an error. Use this to distinguish SDK failures from CLI failures.
+ * Raised when the AI provider SDK fails, is not installed, or returns an error.
+ * Includes the provider name and the underlying error cause for targeted recovery.
  *
  * @example
  * ```typescript
  * try {
- *   const result = await copilotClient.createMessage(...);
+ *   const result = await provider.executePrompt(...);
  * } catch (error) {
- *   if (error instanceof CopilotSdkError) {
- *     logger.error("Copilot SDK error", { cause: error.cause });
+ *   if (error instanceof AIProviderError) {
+ *     logger.error(`AI provider "${error.provider}" failed`, { cause: error.cause });
  *   }
  * }
  * ```
  */
-export class CopilotSdkError extends MergeMentorError {
+export class AIProviderError extends MergeMentorError {
   constructor(
-    message: string,
     /**
-     * The underlying error from the SDK (e.g., authentication, API response).
-     * Contains details needed for SDK debugging.
+     * The AI provider (copilot-sdk or opencode-sdk) where the error occurred.
      */
-    public readonly cause?: Error
+    public readonly provider: "copilot-sdk" | "opencode-sdk",
+    message: string,
+    options?: ErrorOptions
   ) {
-    super(message);
-    this.name = "CopilotSdkError";
+    super(`${provider} error: ${message}`, options);
+    this.name = "AIProviderError";
   }
-}
 
-/**
- * Error thrown when the OpenCode SDK fails or is unavailable.
- *
- * Raised when the OpenCode provider fails, is not installed, or returns an error.
- * Use this to distinguish OpenCode failures from other AI provider failures.
- *
- * @example
- * ```typescript
- * try {
- *   const result = await opencodeClient.generateCode(...);
- * } catch (error) {
- *   if (error instanceof OpenCodeSdkError) {
- *     logger.error("OpenCode SDK error", { cause: error.cause });
- *   }
- * }
- * ```
- */
-export class OpenCodeSdkError extends MergeMentorError {
-  constructor(
-    message: string,
-    /**
-     * The underlying error from the OpenCode SDK.
-     * Contains details needed for debugging OpenCode issues.
-     */
-    public readonly cause?: Error
-  ) {
-    super(message);
-    this.name = "OpenCodeSdkError";
+  /**
+   * The underlying error from the SDK.
+   */
+  public override get cause(): Error | undefined {
+    return super.cause as Error | undefined;
   }
 }
 
@@ -176,7 +152,7 @@ export class PlatformApiError extends MergeMentorError {
      */
     public readonly status?: number
   ) {
-    super(`${platform} API error during ${operation}: ${message}`);
+    super(`${platform} API error during ${operation}: ${message}`, { cause });
     this.name = "PlatformApiError";
   }
 }

@@ -161,7 +161,7 @@ describe("CommentManager", () => {
       );
     });
 
-    it("includes custom review phases in the footer", () => {
+    it("includes custom review passes in the footer", () => {
       const manager = createCommentManager({
         reviewType: "custom",
         reviewPasses: ["scan", "logic"],

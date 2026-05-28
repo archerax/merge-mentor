@@ -838,7 +838,7 @@ describe("General Review Prompts", () => {
       );
     });
 
-    it("includes monorepo-specific guidance when monorepo phase is selected", () => {
+    it("includes monorepo-specific guidance when monorepo pass is selected", () => {
       const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, undefined, ["monorepo"]);
 
       expect(prompt).toContain("1. monorepo");
@@ -961,7 +961,7 @@ describe("General Review Prompts", () => {
       expect(prompt).toContain("- Security: Authentication/authorization consistent?");
     });
 
-    it("includes monorepo checklist items when monorepo phase is selected", () => {
+    it("includes monorepo checklist items when monorepo pass is selected", () => {
       const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, undefined, [
         "monorepo",
       ]);

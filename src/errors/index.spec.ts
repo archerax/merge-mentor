@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AIProviderError,
   ConfigurationError,
   JsonParseError,
   MergeMentorError,
@@ -75,6 +76,27 @@ describe("Error Classes", () => {
       expect(error.message).toBe("Validation failed for email: Invalid email format");
       expect(error.name).toBe("ValidationError");
       expect(error.field).toBe("email");
+    });
+  });
+
+  describe("AIProviderError", () => {
+    it("creates error with provider information and message", () => {
+      const error = new AIProviderError("copilot-sdk", "Connection failed");
+
+      expect(error.message).toBe("copilot-sdk error: Connection failed");
+      expect(error.name).toBe("AIProviderError");
+      expect(error.provider).toBe("copilot-sdk");
+      expect(error.cause).toBeUndefined();
+    });
+
+    it("creates error with cause and supports error chaining", () => {
+      const cause = new Error("Connection timeout");
+      const error = new AIProviderError("opencode-sdk", "Request timed out", { cause });
+
+      expect(error.message).toBe("opencode-sdk error: Request timed out");
+      expect(error.provider).toBe("opencode-sdk");
+      expect(error.cause).toBe(cause);
+      expect((error as Error & { cause?: unknown }).cause).toBe(cause);
     });
   });
 });

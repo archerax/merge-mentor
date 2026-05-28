@@ -245,7 +245,6 @@ describe("CLI", () => {
     it("executes review in write mode", async () => {
       const options = createReviewOptions({
         write: true,
-        verbose: false,
       });
 
       await executeReview(options);
@@ -256,7 +255,7 @@ describe("CLI", () => {
         "copilot-sdk",
         expect.objectContaining({
           dryRun: false,
-          verbose: false,
+          verbose: true,
           aiModel: "claude-sonnet-4.6",
         })
       );
@@ -404,7 +403,7 @@ describe("CLI", () => {
       expect(dryRunCalls.length).toBe(0);
     });
 
-    it("passes custom review phases through config and engine options", async () => {
+    it("passes custom review passes through config and engine options", async () => {
       vi.mocked(loadConfig).mockReturnValue(
         createMockConfig({
           reviewType: "custom",
@@ -965,7 +964,7 @@ describe("CLI", () => {
       );
     });
 
-    it("shows custom review phases when provided", () => {
+    it("shows custom review passes when provided", () => {
       const result = createMockReviewResult();
 
       displayResults(result, true, undefined, undefined, undefined, "custom", ["scan", "logic"]);
@@ -1283,7 +1282,7 @@ describe("CLI", () => {
       expect(report).not.toContain("### 📝 Planned Actions (Dry-Run)");
     });
 
-    it("includes custom review phases in the report header", () => {
+    it("includes custom review passes in the report header", () => {
       const result = createMockReviewResult({});
       const report = generateMarkdownReport(result, "copilot-sdk", true, "custom", [
         "scan",
@@ -1730,7 +1729,6 @@ describe("CLI", () => {
         "https://github.com/test-owner/test-repo/pull/42",
         "--github-token",
         "gh-token",
-        "--verbose",
       ]);
 
       expect(loadConfig).toHaveBeenCalledWith(
@@ -1752,7 +1750,6 @@ describe("CLI", () => {
         "https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/123",
         "--azure-token",
         "az-token",
-        "--verbose",
       ]);
 
       expect(loadConfig).toHaveBeenCalledWith(
@@ -1775,7 +1772,6 @@ describe("CLI", () => {
         "https://oldorg.visualstudio.com/MyProject/_git/MyRepo/pullrequest/99",
         "--azure-token",
         "az-token",
-        "--verbose",
       ]);
 
       expect(loadConfig).toHaveBeenCalledWith(

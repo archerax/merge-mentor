@@ -44,7 +44,6 @@ describe("Config", () => {
         MM_AZURE_ORG: "org",
         MM_AZURE_PROJECT: "project",
         MM_AZURE_REPO: "az-repo",
-        MM_COMMENT_IDENTIFIER: "[Custom Bot]",
       });
 
       const config = loadConfig(undefined, env);
@@ -57,7 +56,7 @@ describe("Config", () => {
       expect(config.azure.org).toBe("org");
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
-      expect(config.botCommentIdentifier).toBe("[Custom Bot]");
+      expect(config.botCommentIdentifier).toBe("[merge-mentor]");
     });
 
     it("should load skipPreExisting setting from environment variable", () => {
@@ -183,7 +182,6 @@ describe("Config", () => {
         MM_AZURE_ORG: "org",
         MM_AZURE_PROJECT: "project",
         MM_AZURE_REPO: "az-repo",
-        MM_COMMENT_IDENTIFIER: "[MM Bot]",
         MM_AI_PROVIDER: "opencode-sdk",
         MM_AI_TIMEOUT: "180000",
         MM_AI_MODEL: "gpt-5.2-codex",
@@ -203,7 +201,7 @@ describe("Config", () => {
       expect(config.azure.org).toBe("org");
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
-      expect(config.botCommentIdentifier).toBe("[MM Bot]");
+      expect(config.botCommentIdentifier).toBe("[merge-mentor]");
       expect(config.aiProvider).toBe("opencode-sdk");
       expect(config.aiTimeoutMs).toBe(180000);
       expect(config.aiModel).toBe("gpt-5.2-codex");
@@ -242,7 +240,6 @@ describe("Config", () => {
           azureOrg: "org",
           azureProject: "project",
           azureRepo: "az-repo",
-          commentIdentifier: "[CLI Bot]",
           aiProvider: "copilot-sdk",
           aiTimeout: 180000,
           aiModel: "gpt-5.2-codex",
@@ -261,7 +258,7 @@ describe("Config", () => {
       expect(config.azure.org).toBe("org");
       expect(config.azure.project).toBe("project");
       expect(config.azure.repo).toBe("az-repo");
-      expect(config.botCommentIdentifier).toBe("[CLI Bot]");
+      expect(config.botCommentIdentifier).toBe("[merge-mentor]");
       expect(config.aiProvider).toBe("copilot-sdk");
       expect(config.aiTimeoutMs).toBe(180000);
       expect(config.aiModel).toBe("gpt-5.2-codex");

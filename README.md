@@ -232,9 +232,6 @@ export MM_REVIEW_STRATEGY=fast        # fast (default) or deep
 # Git backend for cloning repositories (default: cli uses system git binary)
 export MM_GIT_BACKEND=cli  # cli or isomorphic
 
-# Bot identifier
-export MM_COMMENT_IDENTIFIER="[merge-mentor]"
-
 # Temporary directory configuration
 export MM_TEMP_PATH=./.mergementor  # Base path for temporary files (cache, diffs, logs, repos, reports, transcripts)
 
@@ -253,8 +250,7 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 
 ```bash
 merge-mentor review --pr 123 \
-  --skip-existing-issues true \
-  --comment-identifier "[custom-bot]"
+  --skip-existing-issues true
 
 # Deep execution strategy
 merge-mentor review --pr 123 \
@@ -477,7 +473,6 @@ merge-mentor review --pr 123 --passes "testing" --write
 | Option | Description | Env Variable | Default |
 |--------|-------------|--------------|---------|
 | `--skip-existing-issues <bool>` | Skip pre-existing issues (true/false) | `MM_SKIP_EXISTING_ISSUES` | `true` |
-| `--comment-identifier <id>` | Bot comment identifier | `MM_COMMENT_IDENTIFIER` | `[merge-mentor]` |
 
 **Note:** Command-line parameters always override environment variables.
 

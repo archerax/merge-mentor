@@ -142,8 +142,7 @@ export function loadConfig(
       project: cliOverrides?.azureProject ?? env.get("MM_AZURE_PROJECT") ?? "",
       repo: cliOverrides?.azureRepo ?? env.get("MM_AZURE_REPO") ?? "",
     },
-    botCommentIdentifier:
-      cliOverrides?.commentIdentifier ?? env.get("MM_COMMENT_IDENTIFIER") ?? "[merge-mentor]",
+    botCommentIdentifier: "[merge-mentor]",
     aiProvider,
     gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
@@ -177,7 +176,6 @@ interface CliOverrides {
   readonly azureOrg?: string;
   readonly azureProject?: string;
   readonly azureRepo?: string;
-  readonly commentIdentifier?: string;
   readonly aiProvider?: string;
   readonly copilotToken?: string;
   readonly aiTimeout?: number;

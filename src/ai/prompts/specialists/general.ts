@@ -8,36 +8,12 @@ import {
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildSelectedPassesSection } from "../shared/passHelpers.js";
+import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import {
   buildBatchedFileResultsOutputFormat,
   buildCrossFileOutputFormat,
 } from "./outputFormats.js";
 import type { BaseCrossFileContext } from "./types.js";
-
-function buildWorkspaceSection(repoPath?: string): string {
-  if (!repoPath) return "";
-
-  return `
----
-# WORKSPACE ACCESS ENABLED
-
-You have full access to the repository (not just changed files).
-Your working directory is set to the repository root.
-
-**Use these features extensively:**
-
-- \`@workspace /search <query>\` - Find patterns across all files
-- \`@file:relative/path/to/file.ts\` - Read any file in the repository
-- \`@workspace /find <filename>\` - Locate files by name
-
-**MANDATORY:** Always cross-reference the repository before reporting:
-- Verify existing patterns before flagging inconsistencies
-- Check for centralized handling before reporting missing checks
-- Understand the codebase architecture before reporting violations
-
----
-`;
-}
 
 const FILE_REVIEW_ALLOWED_CATEGORIES = [
   "bug",
@@ -176,9 +152,9 @@ function buildAdditionalFilePassAnalysis(selectedPasses?: readonly ReviewPass[])
   return `
 ## Additional Focused Passes
 ${selectedPasses
-  .map((phase, index) => {
-    const details = FILE_REVIEW_PASS_DETAILS[phase].analysisLines.join("\n");
-    return `### Additive Pass ${index + 1}: ${phase}\n${details}`;
+  .map((pass, index) => {
+    const details = FILE_REVIEW_PASS_DETAILS[pass].analysisLines.join("\n");
+    return `### Additive Pass ${index + 1}: ${pass}\n${details}`;
   })
   .join("\n\n")}
 
@@ -193,7 +169,7 @@ function buildAdditionalReviewApproach(selectedPasses?: readonly ReviewPass[]): 
   return `
 ## Additional Pass Approach
 ${selectedPasses
-  .map((phase, index) => `${index + 1}. **${phase}**: ${FILE_REVIEW_PASS_DETAILS[phase].approach}`)
+  .map((pass, index) => `${index + 1}. **${pass}**: ${FILE_REVIEW_PASS_DETAILS[pass].approach}`)
   .join("\n")}
 `;
 }
@@ -205,8 +181,8 @@ function buildAdditionalReportFocus(selectedPasses?: readonly ReviewPass[]): str
 
   const items = new Set<string>();
 
-  for (const phase of selectedPasses) {
-    for (const item of FILE_REVIEW_PASS_DETAILS[phase].reportItems) {
+  for (const pass of selectedPasses) {
+    for (const item of FILE_REVIEW_PASS_DETAILS[pass].reportItems) {
       items.add(item);
     }
   }
@@ -226,7 +202,7 @@ function buildAdditionalCrossFileChecklist(selectedPasses?: readonly ReviewPass[
 
   return `
 ## Additional Pass Checklist
-${selectedPasses.map((phase) => `- **${phase}**: ${CROSS_FILE_PASS_DETAILS[phase]}`).join("\n")}
+${selectedPasses.map((pass) => `- **${pass}**: ${CROSS_FILE_PASS_DETAILS[pass]}`).join("\n")}
 `;
 }
 
@@ -266,13 +242,7 @@ export function buildGeneralFileReviewPrompt(
   selectedPasses?: readonly ReviewPass[],
   additionalContextSections?: readonly string[]
 ): string {
-  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
-  const filesListing = manifest.files
-    .map(
-      (f) =>
-        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`
-    )
-    .join("\n");
+  const filesListing = buildFilesListing(manifest, repoPath);
 
   const commentsSection = buildExistingCommentsSection(
     "# EXISTING PR COMMENTS",

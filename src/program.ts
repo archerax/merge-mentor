@@ -25,7 +25,7 @@ import {
 } from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import {
-  formatReviewPhases,
+  formatReviewPasses,
   formatReviewTypeLabel,
   REVIEW_PASSES,
 } from "./review/reviewSelection.js";
@@ -40,7 +40,7 @@ export interface ReviewOptions {
   platform?: string;
   provider?: string;
   write?: boolean;
-  verbose: boolean;
+  verbose?: boolean;
   reviewType?: string;
   passes?: string;
   strategy?: string;
@@ -56,8 +56,6 @@ export interface ReviewOptions {
   azureOrg?: string;
   azureProject?: string;
   azureRepo?: string;
-  // Bot config
-  commentIdentifier?: string;
   // AI provider config
   copilotToken?: string;
   aiTimeout?: number;
@@ -173,7 +171,6 @@ export async function executeReview(
     azureOrg: resolvedOptions.azureOrg,
     azureProject: resolvedOptions.azureProject,
     azureRepo: resolvedOptions.azureRepo,
-    commentIdentifier: resolvedOptions.commentIdentifier,
     tempPath: resolvedOptions.tempPath,
     aiProvider: resolvedOptions.provider,
     aiModel: resolvedOptions.aiModel,
@@ -223,7 +220,7 @@ export async function executeReview(
 
   const engine = new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun,
-    verbose: resolvedOptions.verbose,
+    verbose: true,
     aiModel,
     aiTimeoutMs,
     copilotToken: config.copilotToken,
@@ -280,7 +277,7 @@ export function generateMarkdownReport(
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
   const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
-  const formattedPasses = formatReviewPhases(reviewPasses);
+  const formattedPasses = formatReviewPasses(reviewPasses);
 
   let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
 
@@ -478,7 +475,7 @@ export function displayResults(
 ): void {
   const output = deps.output ?? consoleOutputWriter;
   const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
-  const formattedPasses = formatReviewPhases(reviewPasses);
+  const formattedPasses = formatReviewPasses(reviewPasses);
   output.log("=".repeat(60));
   output.log("📊 Review Complete");
   output.log("=".repeat(60));
@@ -601,7 +598,6 @@ program
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
-  .option("--verbose", "Enable verbose output", true)
   .option(
     "--review-type <type>",
     "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
@@ -625,8 +621,6 @@ program
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  // Bot config
-  .option("--comment-identifier <id>", "Bot comment identifier. Env: MM_COMMENT_IDENTIFIER")
   .option(
     "--temp-path <path>",
     "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
@@ -722,7 +716,6 @@ program
         azureOrg: options.azureOrg,
         azureProject: options.azureProject,
         azureRepo: options.azureRepo,
-        commentIdentifier: options.commentIdentifier,
         aiProvider: options.provider,
         copilotToken: options.copilotToken,
         aiTimeout: options.aiTimeout,

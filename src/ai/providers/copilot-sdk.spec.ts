@@ -22,7 +22,7 @@ vi.mock("@github/copilot-sdk", () => ({
   CopilotClient: MockCopilotClient,
 }));
 
-import { CopilotSdkError, ValidationError } from "../../errors/index.js";
+import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
 import { CopilotSdkProvider, createReviewPermissionHandler } from "./copilot-sdk.js";
 
@@ -200,7 +200,8 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(CopilotSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("copilot-sdk");
       expect(error.message).toContain("No content in response");
     });
 
@@ -325,7 +326,8 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(CopilotSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("copilot-sdk");
       expect(error.message).toContain("waiting for session.idle");
     });
 
@@ -338,7 +340,8 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(CopilotSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("copilot-sdk");
       expect(error.message).toContain("Failed after 2 attempts");
     });
 
@@ -354,7 +357,8 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(CopilotSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("copilot-sdk");
       expect(error.message).toContain("Failed after 1 attempts");
     });
 

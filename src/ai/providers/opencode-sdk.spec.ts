@@ -23,7 +23,7 @@ vi.mock("@opencode-ai/sdk", () => ({
   createOpencode: mockCreateOpencode,
 }));
 
-import { OpenCodeSdkError, ValidationError } from "../../errors/index.js";
+import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { AIResponse } from "../types.js";
 import { OpenCodeSdkProvider } from "./opencode-sdk.js";
 
@@ -308,7 +308,8 @@ describe("OpenCodeSdkProvider", () => {
       await vi.runAllTimersAsync();
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(OpenCodeSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("opencode-sdk");
       expect(error.message).toContain("Failed after 1 attempts");
     });
   });
@@ -569,7 +570,8 @@ describe("OpenCodeSdkProvider", () => {
       await vi.advanceTimersByTimeAsync(1500);
       const error = await rejection;
 
-      expect(error).toBeInstanceOf(OpenCodeSdkError);
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect((error as AIProviderError).provider).toBe("opencode-sdk");
       expect(error.message).toContain("timed out after 1000ms");
     });
   });

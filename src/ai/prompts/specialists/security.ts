@@ -2,39 +2,12 @@ import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
+import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import {
   buildBatchedFileResultsOutputFormat,
   buildCrossFileOutputFormat,
 } from "./outputFormats.js";
 import type { BaseCrossFileContext } from "./types.js";
-
-/**
- * Builds a workspace access section for prompts.
- */
-function buildWorkspaceSection(repoPath?: string): string {
-  if (!repoPath) return "";
-
-  return `
----
-# WORKSPACE ACCESS ENABLED
-
-You have full access to the repository (not just changed files).
-Your working directory is set to the repository root.
-
-**Use these features extensively:**
-
-- \`@workspace /search <query>\` - Find patterns across all files
-- \`@file:relative/path/to/file.ts\` - Read any file in the repository
-- \`@workspace /find <filename>\` - Locate files by name
-
-**MANDATORY:** Always cross-reference the repository before reporting:
-- Verify existing patterns before flagging inconsistencies
-- Check for centralized handling before reporting missing checks
-- Understand the codebase architecture before reporting violations
-
----
-`;
-}
 
 /**
  * Context for security cross-file analysis.
@@ -48,13 +21,7 @@ export interface SecurityCrossFileContext extends BaseCrossFileContext {
  * Instructs the AI to act as a security researcher and ONLY report security vulnerabilities.
  */
 export function buildSecurityFileReviewPrompt(manifest: DiffManifest, repoPath?: string): string {
-  const diffPrefix = repoPath ? ".mergementor/diffs/" : "";
-  const filesListing = manifest.files
-    .map(
-      (f) =>
-        `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) → @${diffPrefix}${f.diffPath}`
-    )
-    .join("\n");
+  const filesListing = buildFilesListing(manifest, repoPath);
 
   const workspaceSection = buildWorkspaceSection(repoPath);
 

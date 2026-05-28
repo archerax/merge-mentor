@@ -46,7 +46,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private readonly orgUrl: string;
   private readonly org: string;
 
-  constructor(config: Config) {
+  constructor(config: Pick<Config, "azure" | "botCommentIdentifier">) {
     const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
     this.orgUrl = `https://dev.azure.com/${config.azure.org}`;
     this.connection = new azdev.WebApi(this.orgUrl, authHandler);

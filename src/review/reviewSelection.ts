@@ -48,7 +48,7 @@ export function validateReviewStrategy(value: string | undefined): ReviewStrateg
 
 function parsePassList(
   value: string | undefined,
-  fieldName: "passes" | "phases"
+  fieldName: "passes"
 ): readonly ReviewPass[] | undefined {
   const rawValue = value?.trim();
 
@@ -64,7 +64,7 @@ function parsePassList(
   if (passNames.length === 0) {
     throw new ValidationError(
       fieldName,
-      `At least one ${fieldName === "passes" ? "pass" : "phase"} is required. Valid passes: ${REVIEW_PASSES.join(", ")}`
+      `At least one pass is required. Valid passes: ${REVIEW_PASSES.join(", ")}`
     );
   }
 
@@ -78,15 +78,12 @@ function parsePassList(
     if (!canonicalPass) {
       throw new ValidationError(
         fieldName,
-        `Unknown ${fieldName === "passes" ? "pass" : "phase"} "${passName}". Valid passes: ${REVIEW_PASSES.join(", ")}`
+        `Unknown pass "${passName}". Valid passes: ${REVIEW_PASSES.join(", ")}`
       );
     }
 
     if (seenPasses.has(normalizedPassName)) {
-      throw new ValidationError(
-        fieldName,
-        `Duplicate ${fieldName === "passes" ? "pass" : "phase"} "${canonicalPass}" is not allowed`
-      );
+      throw new ValidationError(fieldName, `Duplicate pass "${canonicalPass}" is not allowed`);
     }
 
     seenPasses.add(normalizedPassName);
@@ -149,7 +146,7 @@ export function resolveReviewProfile(options: {
   if (reviewType === "custom" && (!explicitPasses || explicitPasses.length === 0)) {
     throw new ValidationError(
       "passes",
-      `--passes or --phases is required for --review-type custom. Valid passes: ${REVIEW_PASSES.join(", ")}`
+      `--passes is required for --review-type custom. Valid passes: ${REVIEW_PASSES.join(", ")}`
     );
   }
 
@@ -162,7 +159,7 @@ export function resolveReviewProfile(options: {
   };
 }
 
-export function formatReviewPhases(reviewPasses?: readonly ReviewPass[]): string | undefined {
+export function formatReviewPasses(reviewPasses?: readonly ReviewPass[]): string | undefined {
   if (!reviewPasses || reviewPasses.length === 0) {
     return undefined;
   }
@@ -174,7 +171,7 @@ function formatReviewProfileLabel(
   reviewPasses?: readonly ReviewPass[],
   reviewStrategy: ReviewStrategy = "fast"
 ): string {
-  const reviewPassList = formatReviewPhases(reviewPasses);
+  const reviewPassList = formatReviewPasses(reviewPasses);
   const baseLabel = reviewPassList ? `Baseline review + ${reviewPassList}` : "Baseline review";
 
   return reviewStrategy === "deep" ? `${baseLabel} (deep strategy)` : baseLabel;
