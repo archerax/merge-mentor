@@ -76,7 +76,11 @@ export class CommentManager {
   private readonly botIdentifier: string;
   private readonly summaryMarker = "<!-- AI_CODE_REVIEW_SUMMARY -->";
   private readonly skipPreExisting: boolean;
-  private readonly footer: string;
+  private footer: string;
+  private readonly reviewType?: string;
+  private readonly reviewPasses?: readonly ReviewPass[];
+  private readonly reviewStrategy?: ReviewStrategy;
+  private model?: string;
   private readonly logger = createChildLogger({ component: "CommentManager" });
 
   /**
@@ -97,11 +101,39 @@ export class CommentManager {
   constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
     this.skipPreExisting = options?.skipPreExisting ?? true;
+    this.reviewType = options?.reviewType;
+    this.reviewPasses = options?.reviewPasses;
+    this.reviewStrategy = options?.reviewStrategy;
+    this.model = options?.model;
     this.footer = this.buildFooter(
-      options?.reviewType,
-      options?.reviewPasses,
-      options?.reviewStrategy,
-      options?.model
+      this.reviewType,
+      this.reviewPasses,
+      this.reviewStrategy,
+      this.model
+    );
+  }
+
+  /**
+   * Dynamically updates the AI model name used in the comment footer.
+   * Rebuilds the footer string immediately.
+   *
+   * @param model - The resolved AI model name
+   */
+  updateModel(model: string): void {
+    if (!model || model.trim().length === 0) return;
+    const trimmedModel = model.trim();
+    if (this.model === trimmedModel) return;
+
+    this.logger.info(
+      { previousModel: this.model, newModel: trimmedModel },
+      "Updating dynamic AI model name in comment footer"
+    );
+    this.model = trimmedModel;
+    this.footer = this.buildFooter(
+      this.reviewType,
+      this.reviewPasses,
+      this.reviewStrategy,
+      this.model
     );
   }
 

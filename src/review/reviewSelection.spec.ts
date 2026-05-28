@@ -179,31 +179,31 @@ describe("reviewSelection", () => {
 
   describe("formatReviewTypeLabel", () => {
     it("formats general / default baseline label", () => {
-      expect(formatReviewTypeLabel("general")).toBe("Baseline review");
-      expect(formatReviewTypeLabel("general", [], "fast")).toBe("Baseline review");
+      expect(formatReviewTypeLabel("general")).toBe("Standard review");
+      expect(formatReviewTypeLabel("general", [], "fast")).toBe("Standard review");
       expect(formatReviewTypeLabel("general", undefined, "deep")).toBe(
-        "Baseline review (deep strategy)"
+        "Standard review (deep strategy)"
       );
     });
 
     it("formats label with implicit passes from review type", () => {
-      expect(formatReviewTypeLabel("security")).toBe("Baseline review + security");
+      expect(formatReviewTypeLabel("security")).toBe("Standard review + security");
       expect(formatReviewTypeLabel("performance", [], "deep")).toBe(
-        "Baseline review + performance (deep strategy)"
+        "Standard review + performance (deep strategy)"
       );
     });
 
     it("formats label with merged explicit passes", () => {
       expect(formatReviewTypeLabel("custom", ["scan", "logic"])).toBe(
-        "Baseline review + scan → logic"
+        "Standard review + scan → logic"
       );
       expect(formatReviewTypeLabel("custom", ["scan", "logic"], "deep")).toBe(
-        "Baseline review + scan → logic (deep strategy)"
+        "Standard review + scan → logic (deep strategy)"
       );
     });
 
     it("formats fast review type label without deep strategy override", () => {
-      expect(formatReviewTypeLabel("fast", [], "deep")).toBe("Baseline review");
+      expect(formatReviewTypeLabel("fast", [], "deep")).toBe("Standard review");
     });
   });
 });

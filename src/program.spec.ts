@@ -437,7 +437,7 @@ describe("CLI", () => {
         })
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review:   Baseline review + scan → logic")
+        expect.stringContaining("Review:   Standard review + scan → logic")
       );
     });
 
@@ -970,7 +970,7 @@ describe("CLI", () => {
       displayResults(result, true, undefined, undefined, undefined, "custom", ["scan", "logic"]);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Review Profile: Baseline review + scan → logic")
+        expect.stringContaining("Review Profile: Standard review + scan → logic")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining("Review Passes: scan → logic")
@@ -1289,7 +1289,7 @@ describe("CLI", () => {
         "performance",
       ]);
 
-      expect(report).toContain("**Review Profile:** Baseline review + scan → performance");
+      expect(report).toContain("**Review Profile:** Standard review + scan → performance");
       expect(report).toContain("**Review Passes:** scan → performance");
     });
   });

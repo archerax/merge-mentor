@@ -283,7 +283,7 @@ export class ReviewEngine {
       reviewType: this.reviewProfile.reviewType,
       reviewPasses: this.reviewProfile.passes,
       reviewStrategy: this.reviewProfile.strategy,
-      model,
+      model: model || (providerType === "copilot-sdk" ? "GitHub Copilot" : "OpenCode"),
     });
     this.stateCache = new ReviewStateCache(tempPath);
     this.repoManager = new RepoManager(
@@ -399,6 +399,9 @@ export class ReviewEngine {
 
     const onTokenUsage = (usage: TokenUsage | undefined): void => {
       tokenUsage = mergeTokenUsage(tokenUsage, usage);
+      if (usage?.model) {
+        this.commentManager.updateModel(usage.model);
+      }
     };
 
     // Check if all files are ignored (but there were files originally)

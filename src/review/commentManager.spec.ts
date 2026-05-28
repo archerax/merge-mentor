@@ -19,7 +19,7 @@ vi.mock("../logger.js", () => ({
   }),
 }));
 
-const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Baseline review, AI model`;
+const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Standard review, AI model`;
 
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
@@ -157,7 +157,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Baseline review, claude-sonnet-4.6`
+        `Merge Mentor v${packageJson.version}, Standard review, claude-sonnet-4.6`
       );
     });
 
@@ -170,7 +170,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Baseline review + scan → logic, AI model`
+        `Merge Mentor v${packageJson.version}, Standard review + scan → logic, AI model`
       );
     });
   });
@@ -676,6 +676,37 @@ describe("CommentManager", () => {
       // First finding matches the legacy comment; second should create a new comment
       const createActions = actions.filter((a) => a.type === "create" && a.path);
       expect(createActions).toHaveLength(1);
+    });
+  });
+
+  describe("Dynamic Model Resolution", () => {
+    it("should start with the configured model or fallback", () => {
+      const manager = createCommentManager({ model: "InitialModel" });
+      const finding = createFileFinding();
+      const result = manager.formatInlineComment(finding);
+      expect(result).toContain("InitialModel");
+    });
+
+    it("should dynamically update the model and rebuild the footer on updateModel", () => {
+      const manager = createCommentManager({ model: "InitialModel" });
+      manager.updateModel("UpdatedModel-1.0");
+
+      const finding = createFileFinding();
+      const result = manager.formatInlineComment(finding);
+      expect(result).toContain("UpdatedModel-1.0");
+      expect(result).not.toContain("InitialModel");
+    });
+
+    it("should ignore empty, whitespace, or duplicate model updates", () => {
+      const manager = createCommentManager({ model: "InitialModel" });
+      manager.updateModel("");
+      expect(manager.formatInlineComment(createFileFinding())).toContain("InitialModel");
+
+      manager.updateModel("   ");
+      expect(manager.formatInlineComment(createFileFinding())).toContain("InitialModel");
+
+      manager.updateModel("InitialModel");
+      expect(manager.formatInlineComment(createFileFinding())).toContain("InitialModel");
     });
   });
 

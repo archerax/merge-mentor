@@ -730,7 +730,7 @@ describe("ReviewEngine", () => {
         "test.ts",
         2,
         expect.stringContaining(
-          `Merge Mentor v${packageJson.version}, Baseline review + security (deep strategy), claude-sonnet-4.6`
+          `Merge Mentor v${packageJson.version}, Standard review + security (deep strategy), claude-sonnet-4.6`
         )
       );
     });

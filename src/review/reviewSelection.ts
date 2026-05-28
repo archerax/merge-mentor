@@ -172,7 +172,7 @@ function formatReviewProfileLabel(
   reviewStrategy: ReviewStrategy = "fast"
 ): string {
   const reviewPassList = formatReviewPasses(reviewPasses);
-  const baseLabel = reviewPassList ? `Baseline review + ${reviewPassList}` : "Baseline review";
+  const baseLabel = reviewPassList ? `Standard review + ${reviewPassList}` : "Standard review";
 
   return reviewStrategy === "deep" ? `${baseLabel} (deep strategy)` : baseLabel;
 }
