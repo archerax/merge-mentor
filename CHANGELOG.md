@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking Changes (v2.0)
+## [2.0.0] - 2026-05-29
+
+### Breaking Changes
 
 - **Removed CLI providers (`copilot` and `opencode`)**: The legacy CLI-based AI providers have been removed. The newer SDK providers (`copilot-sdk` and `opencode-sdk`) are strictly better in every dimension—faster (utilizing a persistent client/server model), more reliable (using native JSON schemas and robust error handling), more secure, and feature-complete (supporting Bring Your Own Key / BYOK and token usage tracking). The `MM_AI_PROVIDER` environment variable and `--provider` CLI parameter now accept only `copilot-sdk` and `opencode-sdk`. Legacy configurations default to `copilot-sdk`.
 - **Removed `--runs` / `MM_REVIEW_RUNS`**: Multi-run mode has been removed. To run multiple review passes, simply invoke the application multiple times.
