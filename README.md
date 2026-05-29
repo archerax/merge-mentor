@@ -1,6 +1,18 @@
-# merge-mentor
+<p align="center">
+  <img alt="Merge Mentor Logo" src="assets/logo_transparent.png" width="220">
+</p>
 
-MergeMentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them. Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK.
+<h1 align="center">Merge Mentor</h1>
+
+<p align="center">
+  <strong>An AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them.</strong>
+</p>
+
+<p align="center">
+  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK.
+</p>
+
+<br>
 
 ## Why MergeMentor?
 

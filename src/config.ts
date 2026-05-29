@@ -1,4 +1,5 @@
 import path from "node:path";
+import { z } from "zod";
 import type { AIProviderType } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
 import { type Environment, processEnvironment } from "./ports/environment.js";
@@ -71,29 +72,35 @@ export interface Config {
   readonly tempPath: string;
 }
 
-/**
- * Parses an optional timeout value from string or number.
- * Returns undefined if not provided or if the value is not a positive number.
- * Invalid values (NaN, zero, negative) are silently ignored.
- *
- * @param raw - Raw timeout value (string, number, or undefined)
- * @returns Parsed timeout in milliseconds, or undefined if not provided or invalid
- *
- * @internal Used internally by loadConfig for consistent timeout parsing
- */
-function parseOptionalTimeout(raw: string | number | undefined): number | undefined {
-  if (raw === undefined || raw === "") {
-    return undefined;
-  }
+const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-sdk");
+const GitBackendSchema = z.enum(["cli", "isomorphic"]).catch("cli");
 
-  const value = typeof raw === "string" ? Number.parseInt(raw, 10) : raw;
-
-  if (!Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-
-  return value;
-}
+const ConfigParserSchema = z.object({
+  platform: z.enum(["github", "azure"]).catch("github"),
+  aiProvider: AIProviderSchema,
+  gitBackend: GitBackendSchema,
+  reviewType: z
+    .enum(["general", "testing", "security", "performance", "fast", "custom"])
+    .catch("general"),
+  reviewStrategy: z.enum(["deep", "fast"]).catch("fast"),
+  streamingEnabled: z.preprocess(
+    (val) => val !== "false" && val !== false,
+    z.boolean().default(true)
+  ),
+  streamingLines: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return undefined;
+      return typeof val === "string" ? Number.parseInt(val, 10) : val;
+    },
+    z.custom<number>((val) => typeof val === "number").catch(9)
+  ),
+  tempPath: z.string().default("./.mergementor"),
+  aiTimeoutMs: z.preprocess((val) => {
+    if (val === undefined || val === null || val === "") return undefined;
+    const parsed = typeof val === "string" ? Number.parseInt(val, 10) : val;
+    return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
+  }, z.number().int().positive().optional()),
+});
 
 /**
  * Loads configuration from environment variables or CLI overrides.
@@ -111,26 +118,32 @@ export function loadConfig(
   cliOverrides?: Partial<CliOverrides>,
   env: Environment = processEnvironment
 ): Config {
-  const aiTimeoutMs = parseOptionalTimeout(cliOverrides?.aiTimeout ?? env.get("MM_AI_TIMEOUT"));
+  const parsed = ConfigParserSchema.parse({
+    platform: cliOverrides?.platform ?? env.get("MM_PLATFORM"),
+    aiProvider: cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"),
+    gitBackend: cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"),
+    reviewType: cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"),
+    reviewStrategy: cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY"),
+    streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED"),
+    streamingLines:
+      cliOverrides?.streamingLines ??
+      (env.get("MM_STREAMING_LINES") ? (env.get("MM_STREAMING_LINES") ?? "") : undefined),
+    tempPath: cliOverrides?.tempPath ?? env.get("MM_TEMP_PATH"),
+    aiTimeoutMs: cliOverrides?.aiTimeout ?? env.get("MM_AI_TIMEOUT"),
+  });
 
-  const aiProvider = validateAIProvider(cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"));
-  const reviewType = validateReviewType(cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"));
-  const reviewStrategy = validateReviewStrategy(
-    cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY")
-  );
   const explicitReviewPasses = parseReviewPasses(
     cliOverrides?.passes ?? env.get("MM_REVIEW_PASSES")
   );
 
   const resolvedReviewProfile = resolveReviewProfile({
-    reviewType,
+    reviewType: parsed.reviewType,
     reviewPasses: explicitReviewPasses,
-    reviewStrategy,
+    reviewStrategy: parsed.reviewStrategy,
   });
-  const gitBackend = validateGitBackend(cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"));
 
   return {
-    defaultPlatform: ((cliOverrides?.platform ?? env.get("MM_PLATFORM")) as Platform) || "github",
+    defaultPlatform: parsed.platform as Platform,
     github: {
       token: cliOverrides?.githubToken ?? env.get("MM_GITHUB_TOKEN") ?? "",
       owner: cliOverrides?.githubRepoOwner ?? env.get("MM_GITHUB_REPO_OWNER") ?? "",
@@ -143,25 +156,21 @@ export function loadConfig(
       repo: cliOverrides?.azureRepo ?? env.get("MM_AZURE_REPO") ?? "",
     },
     botCommentIdentifier: "[merge-mentor]",
-    aiProvider,
-    gitBackend,
+    aiProvider: parsed.aiProvider,
+    gitBackend: parsed.gitBackend,
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
-    aiTimeoutMs,
+    aiTimeoutMs: parsed.aiTimeoutMs,
     aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
     aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
     aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
     skipPreExisting: true,
-    reviewType,
+    reviewType: parsed.reviewType,
     reviewPasses: resolvedReviewProfile.passes,
     reviewStrategy: resolvedReviewProfile.strategy,
     reviewProfile: resolvedReviewProfile,
-    streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED") !== "false",
-    streamingLines:
-      cliOverrides?.streamingLines ??
-      (env.get("MM_STREAMING_LINES")
-        ? Number.parseInt(env.get("MM_STREAMING_LINES") ?? "", 10)
-        : 9),
-    tempPath: path.resolve(cliOverrides?.tempPath ?? env.get("MM_TEMP_PATH") ?? "./.mergementor"),
+    streamingEnabled: parsed.streamingEnabled,
+    streamingLines: parsed.streamingLines,
+    tempPath: path.resolve(parsed.tempPath),
   };
 }
 
@@ -207,11 +216,7 @@ interface CliOverrides {
  * ```
  */
 export function validateAIProvider(value: string | undefined): AIProviderType {
-  const validProviders: AIProviderType[] = ["copilot-sdk", "opencode-sdk"];
-  if (value && validProviders.includes(value as AIProviderType)) {
-    return value as AIProviderType;
-  }
-  return "copilot-sdk"; // Default to copilot-sdk
+  return AIProviderSchema.parse(value);
 }
 
 /**
@@ -261,11 +266,7 @@ export function validateReviewStrategy(value: string | undefined): ReviewStrateg
  * ```
  */
 export function validateGitBackend(value: string | undefined): GitBackendType {
-  const validBackends: GitBackendType[] = ["cli", "isomorphic"];
-  if (value && validBackends.includes(value as GitBackendType)) {
-    return value as GitBackendType;
-  }
-  return "cli"; // Default to cli
+  return GitBackendSchema.parse(value);
 }
 
 /**

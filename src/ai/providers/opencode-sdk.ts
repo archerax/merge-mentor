@@ -9,6 +9,12 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import {
+  BatchedFileReviewResponseSchema,
+  CrossFileReviewResponseSchema,
+  FastReviewResponseSchema,
+  FileReviewResponseSchema,
+} from "../schemas.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -16,64 +22,6 @@ import type {
   ExecutePromptOptions,
   FastReviewResult,
 } from "../types.js";
-
-/** Raw finding structure from OpenCode SDK JSON response. */
-interface RawFileFinding {
-  line?: unknown;
-  severity?: unknown;
-  confidence?: unknown;
-  category?: unknown;
-  message?: unknown;
-  suggestion?: unknown;
-  reasoning?: unknown;
-  isPreExisting?: unknown;
-}
-
-/** Raw cross-file finding from OpenCode SDK JSON response. */
-interface RawCrossFileFinding {
-  severity?: unknown;
-  confidence?: unknown;
-  category?: unknown;
-  message?: unknown;
-  reasoning?: unknown;
-  affected_files?: unknown[];
-}
-
-/** Raw file review response from OpenCode SDK. */
-interface RawFileReviewResponse {
-  findings?: RawFileFinding[];
-}
-
-/** Raw cross-file review response from OpenCode SDK. */
-interface RawCrossFileReviewResponse {
-  overall_assessment?: string;
-  findings?: RawCrossFileFinding[];
-  recommendations?: unknown[];
-}
-
-/** Raw batched file review response from OpenCode SDK. */
-interface RawBatchedFileReviewResponse {
-  file_results?: Record<string, RawFileReviewResponse>;
-}
-
-/** Raw fast review finding from OpenCode SDK. */
-interface RawFastReviewFinding {
-  file?: unknown;
-  line?: unknown;
-  severity?: unknown;
-  confidence?: unknown;
-  category?: unknown;
-  message?: unknown;
-  suggestion?: unknown;
-  reasoning?: unknown;
-  isPreExisting?: unknown;
-}
-
-/** Raw fast review response from OpenCode SDK. */
-interface RawFastReviewResponse {
-  summary?: string;
-  findings?: RawFastReviewFinding[];
-}
 
 /** Detected prompt type used for schema selection and audit logging. */
 type PromptType =
@@ -570,33 +518,29 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   /**
    * Parses an OpenCode SDK response into a file review result.
    */
+  /**
+   * Parses an OpenCode SDK response into a file review result.
+   */
   parseFileReview(filename: string, response: AIResponse): FileReviewResult {
-    const data = response.parsed as RawFileReviewResponse;
-    const findings: FileFinding[] = [];
-
-    if (Array.isArray(data.findings)) {
-      for (const finding of data.findings) {
-        const reasoning = finding.reasoning
-          ? String(finding.reasoning)
-          : "Reasoning not provided by the model.";
-
-        if (finding.reasoning) {
-          const line = typeof finding.line === "number" ? finding.line : "unknown";
-          this.validateReasoning(reasoning, filename, line);
-        }
-
-        findings.push({
-          line: typeof finding.line === "number" ? finding.line : 0,
-          severity: this.validateSeverity(finding.severity),
-          confidence: this.validateConfidence(finding.confidence),
-          category: this.validateCategory(finding.category),
-          message: String(finding.message || ""),
-          suggestion: String(finding.suggestion || ""),
-          reasoning,
-          isPreExisting: typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
-        });
-      }
+    const result = FileReviewResponseSchema.safeParse(response.parsed);
+    if (!result.success) {
+      this.logger.warn({ error: result.error.format() }, "File review schema drift detected");
     }
+
+    const data = result.success ? result.data : { findings: [] };
+    const findings: FileFinding[] = data.findings.map((finding) => {
+      this.validateReasoning(finding.reasoning, filename, finding.line);
+      return {
+        line: finding.line,
+        severity: finding.severity,
+        confidence: finding.confidence,
+        category: finding.category,
+        message: finding.message,
+        suggestion: finding.suggestion,
+        reasoning: finding.reasoning,
+        isPreExisting: finding.isPreExisting,
+      };
+    });
 
     return { filename, findings };
   }
@@ -605,39 +549,32 @@ export class OpenCodeSdkProvider implements AIProviderClient {
    * Parses an OpenCode SDK response into a cross-file review result.
    */
   parseCrossFileReview(response: AIResponse): CrossFileReviewResult {
-    const data = response.parsed as RawCrossFileReviewResponse;
-    const findings: CrossFileFinding[] = [];
-
-    if (Array.isArray(data.findings)) {
-      for (const finding of data.findings) {
-        const reasoning = finding.reasoning
-          ? String(finding.reasoning)
-          : "Reasoning not provided by the model.";
-
-        if (finding.reasoning) {
-          const affectedFiles = Array.isArray(finding.affected_files)
-            ? finding.affected_files.map(String).join(", ")
-            : "unknown";
-          this.validateReasoning(reasoning, "cross-file", affectedFiles);
-        }
-
-        findings.push({
-          severity: this.validateSeverity(finding.severity),
-          confidence: this.validateConfidence(finding.confidence),
-          category: this.validateCrossFileCategory(finding.category),
-          message: String(finding.message || ""),
-          reasoning,
-          affectedFiles: Array.isArray(finding.affected_files)
-            ? finding.affected_files.map(String)
-            : [],
-        });
-      }
+    const result = CrossFileReviewResponseSchema.safeParse(response.parsed);
+    if (!result.success) {
+      this.logger.warn({ error: result.error.format() }, "Cross-file review schema drift detected");
     }
 
+    const data = result.success
+      ? result.data
+      : { overall_assessment: "Review completed", findings: [], recommendations: [] };
+
+    const findings: CrossFileFinding[] = data.findings.map((finding) => {
+      const affectedFilesStr = finding.affected_files.join(", ") || "unknown";
+      this.validateReasoning(finding.reasoning, "cross-file", affectedFilesStr);
+      return {
+        severity: finding.severity,
+        confidence: finding.confidence,
+        category: finding.category,
+        message: finding.message,
+        reasoning: finding.reasoning,
+        affectedFiles: finding.affected_files,
+      };
+    });
+
     return {
-      overallAssessment: String(data.overall_assessment || "Review completed"),
+      overallAssessment: data.overall_assessment,
       findings,
-      recommendations: Array.isArray(data.recommendations) ? data.recommendations.map(String) : [],
+      recommendations: data.recommendations,
     };
   }
 
@@ -645,41 +582,31 @@ export class OpenCodeSdkProvider implements AIProviderClient {
    * Parses a batched OpenCode SDK response containing reviews for multiple files.
    */
   parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
-    const data = response.parsed as RawBatchedFileReviewResponse;
-    const results: FileReviewResult[] = [];
-
-    if (!data.file_results || typeof data.file_results !== "object") {
-      return results;
+    const result = BatchedFileReviewResponseSchema.safeParse(response.parsed);
+    if (!result.success) {
+      this.logger.warn(
+        { error: result.error.format() },
+        "Batched file review schema drift detected"
+      );
     }
 
+    const data = result.success ? result.data : { file_results: {} };
+    const results: FileReviewResult[] = [];
+
     for (const [filename, fileData] of Object.entries(data.file_results)) {
-      const rawFileData = fileData as RawFileReviewResponse;
-      const findings: FileFinding[] = [];
-
-      if (Array.isArray(rawFileData.findings)) {
-        for (const finding of rawFileData.findings) {
-          const reasoning = finding.reasoning
-            ? String(finding.reasoning)
-            : "Reasoning not provided by the model.";
-
-          if (finding.reasoning) {
-            const line = typeof finding.line === "number" ? finding.line : "unknown";
-            this.validateReasoning(reasoning, filename, line);
-          }
-
-          findings.push({
-            line: typeof finding.line === "number" ? finding.line : 0,
-            severity: this.validateSeverity(finding.severity),
-            confidence: this.validateConfidence(finding.confidence),
-            category: this.validateCategory(finding.category),
-            message: String(finding.message || ""),
-            suggestion: String(finding.suggestion || ""),
-            reasoning,
-            isPreExisting:
-              typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
-          });
-        }
-      }
+      const findings: FileFinding[] = fileData.findings.map((finding) => {
+        this.validateReasoning(finding.reasoning, filename, finding.line);
+        return {
+          line: finding.line,
+          severity: finding.severity,
+          confidence: finding.confidence,
+          category: finding.category,
+          message: finding.message,
+          suggestion: finding.suggestion,
+          reasoning: finding.reasoning,
+          isPreExisting: finding.isPreExisting,
+        };
+      });
 
       results.push({ filename, findings });
     }
@@ -691,54 +618,45 @@ export class OpenCodeSdkProvider implements AIProviderClient {
    * Parses a fast review response (combined file + cross-file analysis).
    */
   parseFastReview(response: AIResponse): FastReviewResult {
-    const data = response.parsed as RawFastReviewResponse;
+    const result = FastReviewResponseSchema.safeParse(response.parsed);
+    if (!result.success) {
+      this.logger.warn({ error: result.error.format() }, "Fast review schema drift detected");
+    }
 
+    const data = result.success ? result.data : { summary: "Review completed", findings: [] };
     const fileFindings = new Map<string, FileFinding[]>();
     const crossFileFindings: CrossFileFinding[] = [];
 
-    if (Array.isArray(data.findings)) {
-      for (const finding of data.findings) {
-        const file = finding.file ? String(finding.file) : undefined;
-        const line = typeof finding.line === "number" ? finding.line : undefined;
+    for (const finding of data.findings) {
+      const file = finding.file;
+      const line = finding.line;
+      const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
+      this.validateReasoning(finding.reasoning, context, line || "general");
 
-        const reasoning = finding.reasoning
-          ? String(finding.reasoning)
-          : "Reasoning not provided by the model.";
-
-        if (finding.reasoning) {
-          const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
-          this.validateReasoning(reasoning, context, line || "general");
+      if (file) {
+        if (!fileFindings.has(file)) {
+          fileFindings.set(file, []);
         }
 
-        if (file) {
-          if (!fileFindings.has(file)) {
-            fileFindings.set(file, []);
-          }
-
-          const findings = fileFindings.get(file);
-          if (findings) {
-            findings.push({
-              line: line || 0,
-              severity: this.validateSeverity(finding.severity),
-              confidence: this.validateConfidence(finding.confidence),
-              category: this.validateCategory(finding.category),
-              message: String(finding.message || ""),
-              suggestion: String(finding.suggestion || ""),
-              reasoning,
-              isPreExisting:
-                typeof finding.isPreExisting === "boolean" ? finding.isPreExisting : false,
-            });
-          }
-        } else {
-          crossFileFindings.push({
-            severity: this.validateSeverity(finding.severity),
-            confidence: this.validateConfidence(finding.confidence),
-            category: this.validateCrossFileCategory(finding.category),
-            message: String(finding.message || ""),
-            reasoning,
-            affectedFiles: [],
-          });
-        }
+        fileFindings.get(file)?.push({
+          line: finding.line,
+          severity: finding.severity,
+          confidence: finding.confidence,
+          category: finding.category,
+          message: finding.message,
+          suggestion: finding.suggestion,
+          reasoning: finding.reasoning,
+          isPreExisting: finding.isPreExisting,
+        });
+      } else {
+        crossFileFindings.push({
+          severity: finding.severity,
+          confidence: finding.confidence,
+          category: finding.category as unknown as CrossFileFinding["category"],
+          message: finding.message,
+          reasoning: finding.reasoning,
+          affectedFiles: [],
+        });
       }
     }
 
@@ -747,52 +665,11 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     );
 
     const crossFileResult: CrossFileReviewResult = {
-      overallAssessment: String(data.summary || "Review completed"),
+      overallAssessment: data.summary,
       findings: crossFileFindings,
       recommendations: [],
     };
 
     return { fileResults, crossFileResult };
-  }
-
-  private validateSeverity(value: unknown): FileFinding["severity"] {
-    const validSeverities = ["critical", "high", "medium", "low"] as const;
-    const stringValue = String(value);
-    return validSeverities.includes(stringValue as (typeof validSeverities)[number])
-      ? (stringValue as FileFinding["severity"])
-      : "medium";
-  }
-
-  private validateConfidence(value: unknown): FileFinding["confidence"] {
-    const validConfidence = ["high", "medium", "low"] as const;
-    const stringValue = String(value);
-    return validConfidence.includes(stringValue as (typeof validConfidence)[number])
-      ? (stringValue as FileFinding["confidence"])
-      : "high";
-  }
-
-  private validateCategory(value: unknown): FileFinding["category"] {
-    const validCategories = ["bug", "security", "performance", "quality", "documentation"] as const;
-    const stringValue = String(value);
-    return validCategories.includes(stringValue as (typeof validCategories)[number])
-      ? (stringValue as FileFinding["category"])
-      : "quality";
-  }
-
-  private validateCrossFileCategory(value: unknown): CrossFileFinding["category"] {
-    const validCategories = [
-      "architecture",
-      "design",
-      "testing",
-      "documentation",
-      "bug",
-      "security",
-      "performance",
-      "quality",
-    ] as const;
-    const stringValue = String(value);
-    return validCategories.includes(stringValue as (typeof validCategories)[number])
-      ? (stringValue as CrossFileFinding["category"])
-      : "design";
   }
 }
