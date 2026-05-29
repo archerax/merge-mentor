@@ -84,7 +84,7 @@ jobs:
             merge-mentor-${{ steps.version.outputs.VERSION }}.tgz
             merge-mentor-docs-${{ steps.version.outputs.VERSION }}.zip
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
