@@ -219,9 +219,6 @@ Deprecated v1 aliases have been removed in v2. Use `MM_AI_MODEL` / `--ai-model` 
 **Linux/macOS:**
 
 ```bash
-# Comment filtering
-export MM_SKIP_EXISTING_ISSUES=true
-
 # Review profile
 export MM_REVIEW_STRATEGY=fast        # fast (default) or deep
 
@@ -245,8 +242,7 @@ export MM_STREAMING_LINES=5       # Number of lines in streaming display (defaul
 **Or use command-line parameters:**
 
 ```bash
-merge-mentor review --pr 123 \
-  --skip-existing-issues true
+merge-mentor review --pr 123 --write
 
 # Deep execution strategy
 merge-mentor review --pr 123 \
@@ -465,11 +461,6 @@ merge-mentor review --pr 123 --passes "testing" --write
 |--------|-------------|---------|
 | `--ignore <pattern>` | Glob pattern for files to ignore (repeatable) | `**/generated/**` |
 
-**Comment Filtering:**
-| Option | Description | Env Variable | Default |
-|--------|-------------|--------------|---------|
-| `--skip-existing-issues <bool>` | Skip pre-existing issues (true/false) | `MM_SKIP_EXISTING_ISSUES` | `true` |
-
 **Note:** Command-line parameters always override environment variables.
 
 ## Key Features Explained
@@ -499,13 +490,7 @@ merge-mentor review --pr 123 --git-backend isomorphic --write
 
 ### Pre-Existing Issue Detection
 
-Skips issues that existed before the PR:
-
-```bash
-export MM_SKIP_EXISTING_ISSUES=true  # default
-# Or use CLI parameter:
-merge-mentor review --pr 123 --skip-existing-issues true
-```
+merge-mentor automatically skips posting comments on issues that already existed in the target branch prior to the PR. This ensures only new issues introduced by the PR are flagged, keeping reviews focused and noise-free.
 
 ### Ignoring Files and Directories
 

@@ -62,8 +62,6 @@ export interface ReviewOptions {
   aiModel?: string;
   aiBaseUrl?: string;
   aiApiKey?: string;
-  // Comment filtering
-  skipExistingIssues?: string;
   // File filtering
   ignore?: string[];
   /**
@@ -177,7 +175,6 @@ export async function executeReview(
     aiTimeout: resolvedOptions.aiTimeout,
     aiBaseUrl: resolvedOptions.aiBaseUrl,
     aiApiKey: resolvedOptions.aiApiKey,
-    skipExistingIssues: resolvedOptions.skipExistingIssues,
     reviewType: resolvedOptions.reviewType,
     passes: resolvedOptions.passes,
     reviewStrategy: resolvedOptions.strategy,
@@ -634,11 +631,6 @@ program
     "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
   )
   .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
-  // Comment filtering
-  .option(
-    "--skip-existing-issues <bool>",
-    "Skip pre-existing issues (true/false). Env: MM_SKIP_EXISTING_ISSUES"
-  )
   // File filtering
   .option(
     "--ignore <pattern>",
@@ -722,7 +714,6 @@ program
         aiModel: options.aiModel,
         aiBaseUrl: options.aiBaseUrl,
         aiApiKey: options.aiApiKey,
-        skipExistingIssues: options.skipExistingIssues,
         reviewType: options.reviewType,
         passes: options.passes,
         reviewStrategy: options.strategy,

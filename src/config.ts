@@ -150,8 +150,7 @@ export function loadConfig(
     aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
     aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
     aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
-    skipPreExisting:
-      (cliOverrides?.skipExistingIssues ?? env.get("MM_SKIP_EXISTING_ISSUES")) !== "false",
+    skipPreExisting: true,
     reviewType,
     reviewPasses: resolvedReviewProfile.passes,
     reviewStrategy: resolvedReviewProfile.strategy,
@@ -182,7 +181,6 @@ interface CliOverrides {
   readonly aiModel?: string;
   readonly aiBaseUrl?: string;
   readonly aiApiKey?: string;
-  readonly skipExistingIssues?: string;
   readonly reviewType?: string;
   readonly passes?: string;
   readonly reviewStrategy?: string;

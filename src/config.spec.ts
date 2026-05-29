@@ -59,16 +59,6 @@ describe("Config", () => {
       expect(config.botCommentIdentifier).toBe("[merge-mentor]");
     });
 
-    it("should load skipPreExisting setting from environment variable", () => {
-      const env = createStubEnvironment({
-        MM_SKIP_EXISTING_ISSUES: "false",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.skipPreExisting).toBe(false);
-    });
-
     it("should default skipPreExisting to true when not set", () => {
       const env = createStubEnvironment();
 
@@ -188,7 +178,6 @@ describe("Config", () => {
         MM_AI_BASE_URL: "https://bedrock.example.com/openai/v1",
         MM_AI_API_KEY: "bedrock-key",
         MM_MIN_COMMENT_CONFIDENCE: "low",
-        MM_SKIP_EXISTING_ISSUES: "false",
       });
 
       const config = loadConfig(undefined, env);
@@ -207,7 +196,7 @@ describe("Config", () => {
       expect(config.aiModel).toBe("gpt-5.2-codex");
       expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
       expect(config.aiApiKey).toBe("bedrock-key");
-      expect(config.skipPreExisting).toBe(false);
+      expect(config.skipPreExisting).toBe(true);
     });
 
     it("should accept CLI overrides that take precedence over environment variables", () => {
@@ -245,7 +234,6 @@ describe("Config", () => {
           aiModel: "gpt-5.2-codex",
           aiBaseUrl: "https://bedrock.example.com/openai/v1",
           aiApiKey: "bedrock-key",
-          skipExistingIssues: "false",
         },
         env
       );
@@ -264,7 +252,7 @@ describe("Config", () => {
       expect(config.aiModel).toBe("gpt-5.2-codex");
       expect(config.aiBaseUrl).toBe("https://bedrock.example.com/openai/v1");
       expect(config.aiApiKey).toBe("bedrock-key");
-      expect(config.skipPreExisting).toBe(false);
+      expect(config.skipPreExisting).toBe(true);
     });
 
     it("should load MM_REVIEW_TYPE from environment", () => {
