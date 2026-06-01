@@ -40,9 +40,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Copilot CLI
-        run: npm install -g @github/copilot
-
       - name: Build CLI
         run: pnpm build
 

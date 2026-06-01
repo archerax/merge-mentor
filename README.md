@@ -69,10 +69,7 @@ npx merge-mentor review --pr 123
 
 - **Node.js 22+**
 - **AI provider prerequisites**:
-  - **Copilot SDK** (`copilot-sdk`): Requires the Copilot CLI to be installed for authentication:
-    ```bash
-    npm install -g @github/copilot
-    ```
+  - **Copilot SDK** (`copilot-sdk`): Requires a valid Copilot token set via `MM_COPILOT_TOKEN` or `--copilot-token`
   - **OpenCode SDK** (`opencode-sdk`): Follow the official OpenCode installation instructions at https://opencode.dev
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
@@ -810,9 +807,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install Copilot CLI
-        run: npm install -g @github/copilot
-
       - name: Run Review
         run: npx merge-mentor review --ci
         env:
@@ -835,9 +829,6 @@ steps:
   - task: NodeTool@0
     inputs:
       versionSpec: "22.x"
-
-  - script: npm install -g @github/copilot
-    displayName: Install Copilot CLI
 
   - script: npx merge-mentor review --ci
     displayName: Run Review
