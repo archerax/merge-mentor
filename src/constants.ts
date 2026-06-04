@@ -18,25 +18,7 @@ export const DEFAULT_TIMEOUT_MS = 3_600_000; // 1 hour
 export const RETRY_DELAY_BASE_MS = 1000;
 
 /** Number of context lines to include in diffs for AI review. */
-export const DIFF_CONTEXT_LINES = 50;
-
-/** File extensions to skip during code review. */
-export const SKIP_EXTENSIONS = [
-  ".lock",
-  ".min.js",
-  ".min.css",
-  ".map",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".ico",
-  ".svg",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".eot",
-] as const;
+export const DIFF_CONTEXT_LINES = 15;
 
 /** Emoji mapping for severity levels in comments. */
 export const SEVERITY_EMOJI = {

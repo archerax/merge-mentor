@@ -6,7 +6,6 @@ import {
   DEFAULT_TIMEOUT_MS,
   RETRY_DELAY_BASE_MS,
   SEVERITY_EMOJI,
-  SKIP_EXTENSIONS,
 } from "./constants.js";
 
 describe("Constants", () => {
@@ -29,35 +28,6 @@ describe("Constants", () => {
     it("should define RETRY_DELAY_BASE_MS", () => {
       expect(RETRY_DELAY_BASE_MS).toBe(1000);
       expect(typeof RETRY_DELAY_BASE_MS).toBe("number");
-    });
-  });
-
-  describe("SKIP_EXTENSIONS", () => {
-    it("should include common binary and generated file extensions", () => {
-      expect(SKIP_EXTENSIONS).toContain(".lock");
-      expect(SKIP_EXTENSIONS).toContain(".min.js");
-      expect(SKIP_EXTENSIONS).toContain(".min.css");
-      expect(SKIP_EXTENSIONS).toContain(".map");
-    });
-
-    it("should include image file extensions", () => {
-      expect(SKIP_EXTENSIONS).toContain(".png");
-      expect(SKIP_EXTENSIONS).toContain(".jpg");
-      expect(SKIP_EXTENSIONS).toContain(".jpeg");
-      expect(SKIP_EXTENSIONS).toContain(".gif");
-      expect(SKIP_EXTENSIONS).toContain(".ico");
-      expect(SKIP_EXTENSIONS).toContain(".svg");
-    });
-
-    it("should include font file extensions", () => {
-      expect(SKIP_EXTENSIONS).toContain(".woff");
-      expect(SKIP_EXTENSIONS).toContain(".woff2");
-      expect(SKIP_EXTENSIONS).toContain(".ttf");
-      expect(SKIP_EXTENSIONS).toContain(".eot");
-    });
-
-    it("should be readonly array", () => {
-      expect(Array.isArray(SKIP_EXTENSIONS)).toBe(true);
     });
   });
 

@@ -4,28 +4,34 @@ import { filterPRFiles, getIgnorePatterns, shouldIgnoreFile } from "./ignoreFilt
 
 describe("ignoreFilter", () => {
   describe("getIgnorePatterns", () => {
-    it("returns empty array when no user patterns provided", () => {
+    it("returns default patterns when no user patterns provided", () => {
       const patterns = getIgnorePatterns();
-      expect(patterns).toEqual([]);
+      expect(patterns.length).toBeGreaterThan(0);
+      expect(patterns).toContain("**/*.lock");
+      expect(patterns).toContain("**/package-lock.json");
     });
 
-    it("returns user patterns only (no defaults)", () => {
+    it("merges default patterns with user patterns", () => {
       const patterns = getIgnorePatterns(["*.test.ts", "src/config/"]);
-      expect(patterns).toEqual(["*.test.ts", "src/config/"]);
+      expect(patterns.length).toBeGreaterThan(2);
+      expect(patterns).toContain("*.test.ts");
+      expect(patterns).toContain("src/config/");
+      expect(patterns).toContain("**/*.lock");
     });
 
-    it("handles multiple user patterns", () => {
+    it("handles multiple user patterns with default patterns", () => {
       const userPatterns = ["*.spec.ts", "dist/", "*.lock"];
       const patterns = getIgnorePatterns(userPatterns);
-      expect(patterns).toHaveLength(3); // 0 defaults + 3 user
+      expect(patterns.length).toBeGreaterThan(3);
       userPatterns.forEach((pattern) => {
         expect(patterns).toContain(pattern);
       });
     });
 
-    it("handles empty user patterns array", () => {
+    it("handles empty user patterns array by returning defaults", () => {
       const patterns = getIgnorePatterns([]);
-      expect(patterns).toEqual([]);
+      expect(patterns.length).toBeGreaterThan(0);
+      expect(patterns).toContain("**/*.lock");
     });
   });
 
@@ -86,6 +92,13 @@ describe("ignoreFilter", () => {
 
     it("case-sensitive matching", () => {
       expect(shouldIgnoreFile("src/Generated/api.ts", ["**/generated/**"])).toBe(false);
+    });
+
+    it("handles negation patterns to override default ignore patterns", () => {
+      const patterns = ["**/generated/**", "**/*.svg", "!**/*.svg"];
+      expect(shouldIgnoreFile("src/generated/api.ts", patterns)).toBe(true);
+      expect(shouldIgnoreFile("src/image.svg", patterns)).toBe(false);
+      expect(shouldIgnoreFile("src/main.ts", patterns)).toBe(false);
     });
   });
 
@@ -162,11 +175,11 @@ describe("ignoreFilter", () => {
 
     it("handles default patterns with user patterns", () => {
       const files = mockFiles();
-      const patterns = getIgnorePatterns(["*.md"]);
+      const patterns = getIgnorePatterns(["**/*.md"]);
       const { kept, ignored } = filterPRFiles(files, patterns);
 
-      expect(ignored).toContain("README.md"); // user pattern only (no defaults)
-      expect(ignored).toHaveLength(1);
+      expect(ignored).toContain("README.md");
+      expect(ignored).toHaveLength(1); // None of the other files match the default ignore patterns
       expect(kept).toHaveLength(4);
     });
 

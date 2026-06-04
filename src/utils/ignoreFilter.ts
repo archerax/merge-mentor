@@ -1,8 +1,6 @@
 import micromatch from "micromatch";
 import type { PRFile } from "../platforms/types.js";
 
-const { isMatch } = micromatch;
-
 /**
  * File ignore filtering utilities for PR reviews.
  *
@@ -38,7 +36,56 @@ const { isMatch } = micromatch;
  * @returns Merged array of default + user patterns for matching
  */
 export function getIgnorePatterns(userPatterns: string[] = []): string[] {
-  const DEFAULT_IGNORE_PATTERNS: string[] = [];
+  const DEFAULT_IGNORE_PATTERNS = [
+    "**/*.lock",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/npm-shrinkwrap.json",
+    "**/bun.lockb",
+    "**/*.lockb",
+    "**/*.min.js",
+    "**/*.min.css",
+    "**/*.map",
+    // Image formats
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.ico",
+    "**/*.svg",
+    "**/*.webp",
+    // Font formats
+    "**/*.woff",
+    "**/*.woff2",
+    "**/*.ttf",
+    "**/*.eot",
+    // Archives
+    "**/*.zip",
+    "**/*.tar.gz",
+    "**/*.tgz",
+    "**/*.tar",
+    "**/*.gz",
+    "**/*.rar",
+    "**/*.7z",
+    // Media/Documents
+    "**/*.pdf",
+    "**/*.mp3",
+    "**/*.wav",
+    "**/*.mp4",
+    "**/*.mov",
+    "**/*.avi",
+    "**/*.webm",
+    // Compiled binaries / Database files
+    "**/*.exe",
+    "**/*.dll",
+    "**/*.so",
+    "**/*.dylib",
+    "**/*.class",
+    "**/*.pyc",
+    "**/*.db",
+    "**/*.sqlite",
+    "**/*.sqlite3",
+  ];
   return [...DEFAULT_IGNORE_PATTERNS, ...userPatterns];
 }
 
@@ -50,7 +97,10 @@ export function getIgnorePatterns(userPatterns: string[] = []): string[] {
  * @returns true if the file matches any pattern, false otherwise
  */
 export function shouldIgnoreFile(filePath: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => isMatch(filePath, pattern));
+  if (patterns.length === 0) {
+    return false;
+  }
+  return micromatch.match([filePath], patterns).length > 0;
 }
 
 /**

@@ -59,7 +59,6 @@ import {
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
 import { getAuditLogger } from "../audit/index.js";
-import { SKIP_EXTENSIONS } from "../constants.js";
 import { ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import type {
@@ -93,6 +92,9 @@ import {
   validateReviewType,
 } from "./reviewSelection.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
+
+/** Threshold size (150 KB) below which all file diffs are attached to the initial AI prompt. */
+const ATTACHMENT_SIZE_THRESHOLD_BYTES = 150 * 1024;
 
 /**
  * Complete results from a pull request review.
@@ -838,7 +840,11 @@ During the database pass, pay extra attention to query correctness, transaction 
 
       // Copy diff files to repo's .mergementor directory so AI can access them
       this.logger.debug("Copying diffs to repo's .mergementor directory for AI access");
-      await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
+      const { paths: diffFiles, totalSize } = await this.copyDiffsToRepoDir(
+        diffDir,
+        manifest,
+        repoPath
+      );
 
       // Build prompt from the resolved baseline + additive pass profile
       const commentsContext = formatExistingCommentsContext(existingComments);
@@ -858,6 +864,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       );
 
       // Single AI call for all files
+      const shouldAttach = totalSize <= ATTACHMENT_SIZE_THRESHOLD_BYTES;
       this.logger.debug(
         {
           promptLength: prompt.length,
@@ -866,6 +873,8 @@ During the database pass, pay extra attention to query correctness, transaction 
           hasRepoPath: !!repoPath,
           reviewType: this.reviewProfile.reviewType,
           reviewPasses: this.reviewProfile.passes,
+          totalSize,
+          shouldAttach,
         },
         "Batched prompt being sent"
       );
@@ -876,6 +885,7 @@ During the database pass, pay extra attention to query correctness, transaction 
         response = await this.provider.executePrompt(prompt, {
           workingDirectory: repoPath,
           onStreamData: streaming.callback,
+          ...(shouldAttach ? { diffFiles } : {}),
         });
       } finally {
         streaming.finish();
@@ -936,7 +946,7 @@ During the database pass, pay extra attention to query correctness, transaction 
     diffDir: string,
     manifest: DiffManifest,
     repoPath?: string
-  ): Promise<void> {
+  ): Promise<{ paths: string[]; totalSize: number }> {
     // Use repo's .mergementor/diffs directory if repoPath provided, otherwise global temp
     const targetDir = repoPath
       ? path.join(repoPath, ".mergementor", "diffs")
@@ -950,6 +960,9 @@ During the database pass, pay extra attention to query correctness, transaction 
       "Copying diff files to accessible directory"
     );
 
+    const paths: string[] = [];
+    let totalSize = 0;
+
     for (const fileEntry of manifest.files) {
       const sourcePath = path.join(diffDir, fileEntry.diffPath);
       const destPath = path.join(targetDir, fileEntry.diffPath);
@@ -962,6 +975,8 @@ During the database pass, pay extra attention to query correctness, transaction 
       try {
         const content = await this.fileSystem.readFile(sourcePath, "utf-8");
         await this.fileSystem.writeFile(destPath, content, "utf-8");
+        paths.push(destPath);
+        totalSize += content.length;
         this.logger.debug(
           { diffPath: fileEntry.diffPath, contentLength: content.length },
           "Successfully copied diff file"
@@ -974,6 +989,8 @@ During the database pass, pay extra attention to query correctness, transaction 
         throw error;
       }
     }
+
+    return { paths, totalSize };
   }
 
   /**
@@ -1176,7 +1193,11 @@ During the database pass, pay extra attention to query correctness, transaction 
       );
 
       // Copy diff files to repo's .mergementor directory for AI access
-      await this.copyDiffsToRepoDir(diffDir, manifest, repoPath);
+      const { paths: diffFiles, totalSize } = await this.copyDiffsToRepoDir(
+        diffDir,
+        manifest,
+        repoPath
+      );
 
       // Build combined prompt for fast review
       const commentsContext = formatExistingCommentsContext(existingComments);
@@ -1192,12 +1213,19 @@ During the database pass, pay extra attention to query correctness, transaction 
       this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
 
       // Single AI call for combined analysis
+      const shouldAttach = totalSize <= ATTACHMENT_SIZE_THRESHOLD_BYTES;
+      this.logger.info(
+        { totalSize, shouldAttach, threshold: ATTACHMENT_SIZE_THRESHOLD_BYTES },
+        "Evaluated diff size for fast review attachments"
+      );
+
       const streaming = this.createStreamingCallback("Fast review (file + architecture)...");
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
           workingDirectory: repoPath,
           onStreamData: streaming.callback,
+          ...(shouldAttach ? { diffFiles } : {}),
         });
       } finally {
         streaming.finish();
@@ -1315,8 +1343,7 @@ During the database pass, pay extra attention to query correctness, transaction 
 
   private shouldSkipFile(file: PRFile): boolean {
     if (file.status === "deleted") return true;
-    if (!file.patch) return true;
-    return SKIP_EXTENSIONS.some((ext) => file.filename.endsWith(ext));
+    return !file.patch;
   }
 
   private buildFileShaMap(files: PRFile[]): Map<string, string> {
