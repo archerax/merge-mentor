@@ -20,9 +20,33 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
 
 vi.mock("@github/copilot-sdk", () => ({
   CopilotClient: MockCopilotClient,
+  defineTool: vi.fn((name, config) => ({ name, ...config })),
 }));
 
+vi.mock("../../ports/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../ports/index.js")>();
+  return {
+    ...actual,
+    nodeFs: {
+      mkdir: vi.fn().mockResolvedValue(undefined),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      unlink: vi.fn().mockResolvedValue(undefined),
+      readFile: vi.fn().mockResolvedValue(""),
+      rm: vi.fn().mockResolvedValue(undefined),
+      access: vi.fn().mockResolvedValue(undefined),
+      readdir: vi.fn().mockResolvedValue([]),
+      stat: vi.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => true,
+        size: 0,
+        mtime: new Date("2025-01-01T00:00:00.000Z"),
+      }),
+    },
+  };
+});
+
 import { AIProviderError, ValidationError } from "../../errors/index.js";
+import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
 import { CopilotSdkProvider, createReviewPermissionHandler } from "./copilot-sdk.js";
 
@@ -1268,7 +1292,168 @@ describe("createReviewPermissionHandler", () => {
     const handler = createReviewPermissionHandler(logger);
 
     handler({ kind: "read" }, { sessionId: "s1" });
+  });
 
-    expect(logger.warn).not.toHaveBeenCalled();
+  describe("experimentalTools custom tool integration", () => {
+    it("registers custom tool when experimentalTools is true", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: true });
+      mockSuccessfulPrompt();
+      await provider.executePrompt("Test prompt");
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.arrayContaining([expect.objectContaining({ name: "postComment" })]),
+          availableTools: expect.arrayContaining(["postComment"]),
+        })
+      );
+    });
+
+    it("does not register custom tool when experimentalTools is false", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: false });
+      mockSuccessfulPrompt();
+      await provider.executePrompt("Test prompt");
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: undefined,
+          availableTools: expect.not.arrayContaining(["postComment"]),
+        })
+      );
+    });
+
+    it("extracts findings collected via tool calls", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: true });
+
+      mockSession.sendAndWait.mockImplementation(async () => {
+        // Simulate the tool execution adding a finding during the session
+        (
+          provider as unknown as { findingsCollector: FindingsCollector }
+        ).findingsCollector.addFinding({
+          file: "src/main.ts",
+          line: 15,
+          body: "Refactor this.",
+          severity: "medium",
+          category: "quality",
+          findingId: "f-123",
+          timestamp: Date.now(),
+        });
+        return {
+          type: "assistant.message",
+          data: { content: "Simulated tool calling" },
+        };
+      });
+
+      const response = await provider.executePrompt("Test prompt");
+
+      expect(response.parsed).toBeDefined();
+      const parsed = response.parsed as {
+        findings: Array<{ line: number; message: string }>;
+      };
+      expect(parsed.findings).toHaveLength(1);
+      expect(parsed.findings[0].line).toBe(15);
+      expect(parsed.findings[0].message).toBe("Refactor this.");
+    });
+
+    it("returns empty findings cleanly if no tool calls occurred and no JSON was outputted", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: true });
+
+      mockSession.sendAndWait.mockResolvedValue({
+        type: "assistant.message",
+        data: { content: "I reviewed this file and found no issues whatsoever!" },
+      });
+
+      const response = await provider.executePrompt("Test prompt");
+
+      expect(response.parsed).toBeDefined();
+      const parsed = response.parsed as {
+        findings: Array<{ line: number }>;
+      };
+      expect(parsed.findings).toHaveLength(0);
+      expect(response.raw).toBe("I reviewed this file and found no issues whatsoever!");
+    });
+
+    it("falls back to parsing JSON if no tool calls occurred but JSON was returned in content", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: true });
+
+      mockSession.sendAndWait.mockResolvedValue({
+        type: "assistant.message",
+        data: {
+          content: JSON.stringify({
+            findings: [
+              {
+                line: 22,
+                severity: "high",
+                category: "bug",
+                message: "Direct JSON response fallback",
+              },
+            ],
+          }),
+        },
+      });
+
+      const response = await provider.executePrompt("Test prompt");
+
+      expect(response.parsed).toBeDefined();
+      const parsed = response.parsed as {
+        findings: Array<{ line: number; message: string }>;
+      };
+      expect(parsed.findings).toHaveLength(1);
+      expect(parsed.findings[0].line).toBe(22);
+      expect(parsed.findings[0].message).toBe("Direct JSON response fallback");
+    });
+
+    it("combines findings from both tool calls and parsed JSON response content", async () => {
+      const provider = new CopilotSdkProvider({ experimentalTools: true });
+
+      mockSession.sendAndWait.mockImplementation(async () => {
+        // Simulate tool finding
+        (
+          provider as unknown as { findingsCollector: FindingsCollector }
+        ).findingsCollector.addFinding({
+          file: "src/main.ts",
+          line: 15,
+          body: "Tool finding body",
+          severity: "medium",
+          category: "quality",
+          findingId: "f-123",
+          timestamp: Date.now(),
+        });
+
+        // Return standard JSON response
+        return {
+          type: "assistant.message",
+          data: {
+            content: JSON.stringify({
+              findings: [
+                {
+                  line: 42,
+                  severity: "high",
+                  category: "bug",
+                  message: "JSON finding message",
+                  confidence: "high",
+                  reasoning: "Reasoning...",
+                  isPreExisting: false,
+                },
+              ],
+            }),
+          },
+        };
+      });
+
+      const response = await provider.executePrompt("Test prompt");
+
+      expect(response.parsed).toBeDefined();
+      const parsed = response.parsed as {
+        findings: Array<{ line: number; message: string }>;
+      };
+      // Should contain BOTH findings!
+      expect(parsed.findings).toHaveLength(2);
+
+      // JSON finding
+      expect(parsed.findings[0].line).toBe(42);
+      expect(parsed.findings[0].message).toBe("JSON finding message");
+
+      // Tool finding
+      expect(parsed.findings[1].line).toBe(15);
+      expect(parsed.findings[1].message).toBe("Tool finding body");
+    });
   });
 });

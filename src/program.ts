@@ -62,6 +62,7 @@ export interface ReviewOptions {
   aiModel?: string;
   aiBaseUrl?: string;
   aiApiKey?: string;
+  experimentalTools?: boolean;
   // File filtering
   ignore?: string[];
   /**
@@ -234,6 +235,7 @@ export async function executeReview(
     localWorkspacePath: resolvedOptions.localWorkspacePath,
     ignorePatterns: resolvedOptions.ignore,
     gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
+    experimentalTools: resolvedOptions.experimentalTools,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";
@@ -631,6 +633,11 @@ program
     "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
   )
   .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .option(
+    "--experimental-tools",
+    "Enable experimental structured output via Copilot SDK tool calls",
+    false
+  )
   // File filtering
   .option(
     "--ignore <pattern>",

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createOpencode } from "@opencode-ai/sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -9,6 +10,7 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import { type Clock, type FileSystem, nodeFs, systemClock } from "../../ports/index.js";
 import {
   BatchedFileReviewResponseSchema,
   CrossFileReviewResponseSchema,
@@ -193,6 +195,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "OpenCodeSdkProvider" });
 
+  private readonly tempPath: string;
+  private readonly fileSystem: FileSystem;
+  private readonly clock: Clock;
+
   private sdkClient?: Awaited<ReturnType<typeof createOpencode>>["client"];
   private sdkServer?: Awaited<ReturnType<typeof createOpencode>>["server"];
 
@@ -200,6 +206,9 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+    this.clock = options?.clock ?? systemClock;
   }
 
   /**
@@ -238,7 +247,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const { raw, parsed } = await this.runSdk(prompt, schema, options);
+        const { raw, parsed } = await this.runSdk(prompt, schema, options, attempt + 1);
         this.auditLogger.logAIProviderExecution("opencode-sdk", promptType, this.model, "success");
         return { raw, parsed };
       } catch (error) {
@@ -332,7 +341,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private async runSdk(
     prompt: string,
     schema: Record<string, unknown> | undefined,
-    options?: ExecutePromptOptions
+    options?: ExecutePromptOptions,
+    attempt = 1
   ): Promise<{ raw: string; parsed: unknown }> {
     let client: Awaited<ReturnType<typeof createOpencode>>["client"];
     try {
@@ -402,15 +412,34 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
       // Check for structured output errors
       if (info?.error?.name === "StructuredOutputError") {
-        throw new AIProviderError(
+        const err = new AIProviderError(
           "opencode-sdk",
           `Structured output failed: ${info.error.message ?? "unknown error"}`
         );
+
+        await this.saveTranscript({
+          prompt,
+          rawResponse: JSON.stringify(result, null, 2),
+          success: false,
+          error: err.message,
+          attempt,
+        });
+
+        throw err;
       }
 
       if (info?.structured_output != null) {
         const structured = info.structured_output;
         const raw = typeof structured === "string" ? structured : JSON.stringify(structured);
+
+        await this.saveTranscript({
+          prompt,
+          rawResponse: JSON.stringify(result, null, 2),
+          jsonOutput: raw,
+          success: true,
+          attempt,
+        });
+
         return { raw, parsed: structured };
       }
 
@@ -425,7 +454,24 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       }
 
       const parsed = this.parseJsonResponse(rawText);
+
+      await this.saveTranscript({
+        prompt,
+        rawResponse: JSON.stringify(result, null, 2),
+        jsonOutput: JSON.stringify(parsed, null, 2),
+        success: true,
+        attempt,
+      });
+
       return { raw: rawText, parsed };
+    } catch (error) {
+      await this.saveTranscript({
+        prompt,
+        success: false,
+        error: (error as Error).message,
+        attempt,
+      });
+      throw error;
     } finally {
       if (sessionId) {
         try {
@@ -434,6 +480,65 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           // Best-effort session cleanup
         }
       }
+    }
+  }
+
+  private async saveTranscript(data: {
+    prompt: string;
+    rawResponse?: string;
+    jsonOutput?: string;
+    success: boolean;
+    error?: string;
+    attempt: number;
+  }): Promise<void> {
+    try {
+      const transcriptDir = path.join(this.tempPath, "transcripts");
+      await this.fileSystem.mkdir(transcriptDir, { recursive: true });
+
+      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
+      const status = data.success ? "success" : "failure";
+      const filename = `transcript-opencode-${timestamp}-attempt-${data.attempt}-${status}.txt`;
+      const filepath = path.join(transcriptDir, filename);
+
+      const transcriptLines: string[] = [
+        "=".repeat(80),
+        "OPENCODE SDK PROVIDER TRANSCRIPT",
+        "=".repeat(80),
+        `Timestamp: ${this.clock.timestamp()}`,
+        `Status: ${status}`,
+        `Model: ${this.model || "default"}`,
+        `Attempt: ${data.attempt}`,
+        "",
+        "=".repeat(80),
+        "INPUT PROMPT",
+        "=".repeat(80),
+        data.prompt,
+        "",
+        "=".repeat(80),
+        "RAW API RESPONSE",
+        "=".repeat(80),
+        data.rawResponse || "(empty)",
+        "",
+        "=".repeat(80),
+        "JSON OUTPUT",
+        "=".repeat(80),
+        data.jsonOutput || "(empty)",
+      ];
+
+      if (data.error) {
+        transcriptLines.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
+      }
+
+      transcriptLines.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
+
+      await this.fileSystem.writeFile(filepath, transcriptLines.join("\n"), "utf-8");
+
+      this.logger.debug(
+        { filepath, success: data.success, attempt: data.attempt },
+        "Saved OpenCode SDK transcript for debugging"
+      );
+    } catch (err) {
+      this.logger.warn({ error: (err as Error).message }, "Failed to save OpenCode SDK transcript");
     }
   }
 

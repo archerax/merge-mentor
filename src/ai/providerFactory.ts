@@ -1,4 +1,4 @@
-import { ConfigurationError } from "../errors/index.js";
+import { ConfigurationError, ValidationError } from "../errors/index.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
 import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./types.js";
@@ -24,6 +24,13 @@ export function createAIProvider(
   type: AIProviderType,
   options?: AIProviderOptions
 ): AIProviderClient {
+  if (options?.experimentalTools && type !== "copilot-sdk") {
+    throw new ValidationError(
+      "experimentalTools",
+      `Structured tool calling (--experimental-tools) is only supported by the "copilot-sdk" provider. Got: "${type}"`
+    );
+  }
+
   switch (type) {
     case "copilot-sdk":
       return new CopilotSdkProvider(options);

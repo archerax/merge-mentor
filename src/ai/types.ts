@@ -2,6 +2,7 @@ import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types
 import type { Clock } from "../ports/clock.js";
 import type { ExecutableFinder } from "../ports/executableFinder.js";
 import type { FileSystem } from "../ports/fileSystem.js";
+import type { OutputWriter } from "../ports/outputWriter.js";
 import type { ProcessRunner } from "../ports/processRunner.js";
 
 /** Combined result from fast review (single-pass file + cross-file analysis). */
@@ -51,6 +52,10 @@ export interface AIProviderOptions {
   readonly fileSystem?: FileSystem;
   /** System clock (defaults to real clock). */
   readonly clock?: Clock;
+  /** Output writer for console/terminal output. */
+  readonly output?: OutputWriter;
+  /** Enable postComment tool for structured output (via --experimental-tools flag). */
+  readonly experimentalTools?: boolean;
 }
 
 /** Options for executing a prompt with additional context. */

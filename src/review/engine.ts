@@ -180,6 +180,8 @@ interface ReviewEngineOptions {
   readonly output?: OutputWriter;
   /** File system abstraction for I/O (dependency injection, defaults to nodeFs) */
   readonly fileSystem?: FileSystem;
+  /** Enable postComment tool for structured output (via --experimental-tools flag) */
+  readonly experimentalTools?: boolean;
 }
 
 /**
@@ -265,6 +267,9 @@ export class ReviewEngine {
         reviewStrategy: validateReviewStrategy(options?.reviewStrategy),
       });
 
+    this.output = options?.output ?? consoleOutputWriter;
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+
     // Build provider options
     const providerOptions = {
       model,
@@ -273,10 +278,10 @@ export class ReviewEngine {
       aiBaseUrl: options?.aiBaseUrl,
       aiApiKey: options?.aiApiKey,
       tempPath,
+      output: this.output,
+      experimentalTools: options?.experimentalTools,
     };
 
-    this.output = options?.output ?? consoleOutputWriter;
-    this.fileSystem = options?.fileSystem ?? nodeFs;
     this.provider = createAIProvider(providerType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: options?.skipPreExisting,

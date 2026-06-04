@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigurationError } from "../errors/index.js";
+import { ConfigurationError, ValidationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
@@ -32,6 +32,21 @@ describe("createAIProvider", () => {
       maxRetries: 3,
     });
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
+  });
+
+  it("should throw ValidationError if experimentalTools is requested on non-copilot-sdk", () => {
+    expect(() =>
+      createAIProvider("opencode-sdk", {
+        experimentalTools: true,
+      })
+    ).toThrow(ValidationError);
+    expect(() =>
+      createAIProvider("opencode-sdk", {
+        experimentalTools: true,
+      })
+    ).toThrow(
+      'Structured tool calling (--experimental-tools) is only supported by the "copilot-sdk" provider. Got: "opencode-sdk"'
+    );
   });
 
   it("should throw ConfigurationError for unsupported provider type", () => {

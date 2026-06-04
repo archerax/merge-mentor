@@ -1,4 +1,5 @@
-import type { PermissionHandler, PermissionRequest } from "@github/copilot-sdk";
+import path from "node:path";
+import type { PermissionHandler, PermissionRequest, SessionEvent } from "@github/copilot-sdk";
 import { CopilotClient } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -10,6 +11,14 @@ import type {
   FileFinding,
   FileReviewResult,
 } from "../../platforms/types.js";
+import {
+  type Clock,
+  consoleOutputWriter,
+  type FileSystem,
+  nodeFs,
+  type OutputWriter,
+  systemClock,
+} from "../../ports/index.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import {
   BatchedFileReviewResponseSchema,
@@ -17,6 +26,11 @@ import {
   FastReviewResponseSchema,
   FileReviewResponseSchema,
 } from "../schemas.js";
+import {
+  createPostCommentTool,
+  FindingsCollector,
+  type PostCommentFinding,
+} from "../tools/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -95,9 +109,15 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly token?: string;
   private readonly byokBaseUrl?: string;
   private readonly byokApiKey?: string;
+  private readonly experimentalTools: boolean;
+  private readonly findingsCollector = new FindingsCollector();
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
+  private readonly output: OutputWriter;
 
+  private readonly tempPath: string;
+  private readonly fileSystem: FileSystem;
+  private readonly clock: Clock;
   private client?: CopilotClient;
 
   constructor(options?: AIProviderOptions) {
@@ -107,6 +127,11 @@ export class CopilotSdkProvider implements AIProviderClient {
     this.token = options?.token;
     this.byokBaseUrl = this.normalizeOptionalString(options?.aiBaseUrl);
     this.byokApiKey = this.normalizeOptionalString(options?.aiApiKey);
+    this.experimentalTools = options?.experimentalTools ?? false;
+    this.output = options?.output ?? consoleOutputWriter;
+    this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
+    this.fileSystem = options?.fileSystem ?? nodeFs;
+    this.clock = options?.clock ?? systemClock;
     this.validateByokConfig();
   }
 
@@ -145,9 +170,14 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const { raw, parsed } = await this.runSdk(prompt, options, (usage) => {
-          accumulatedUsage = mergeTokenUsage(accumulatedUsage, usage);
-        });
+        const { raw, parsed } = await this.runSdk(
+          prompt,
+          options,
+          (usage) => {
+            accumulatedUsage = mergeTokenUsage(accumulatedUsage, usage);
+          },
+          attempt + 1
+        );
         this.auditLogger.logAIProviderExecution("copilot-sdk", promptType, this.model, "success");
         return { raw, parsed, tokenUsage: accumulatedUsage };
       } catch (error) {
@@ -243,7 +273,8 @@ export class CopilotSdkProvider implements AIProviderClient {
   private async runSdk(
     prompt: string,
     options?: ExecutePromptOptions,
-    onUsageCollected?: (usage: TokenUsage | undefined) => void
+    onUsageCollected?: (usage: TokenUsage | undefined) => void,
+    attempt = 1
   ): Promise<{ raw: string; parsed: unknown }> {
     let client: CopilotClient;
     try {
@@ -255,19 +286,31 @@ export class CopilotSdkProvider implements AIProviderClient {
     }
 
     const provider = this.buildByokProviderConfig();
+    const postCommentTool = createPostCommentTool(this.findingsCollector, { output: this.output });
     const session = await client.createSession({
       model: this.model,
       workingDirectory: options?.workingDirectory,
       streaming: true,
       includeSubAgentStreamingEvents: false,
-      availableTools: [...READ_ONLY_REVIEW_TOOLS],
+      availableTools: this.experimentalTools
+        ? [...READ_ONLY_REVIEW_TOOLS, "postComment"]
+        : [...READ_ONLY_REVIEW_TOOLS],
+      tools: this.experimentalTools ? [postCommentTool] : undefined,
       onPermissionRequest: createReviewPermissionHandler(this.logger),
       ...(provider ? { provider } : {}),
     });
 
     let collectedUsage: TokenUsage | undefined;
+    const sessionEvents: SessionEvent[] = [];
+    const unsubscribeAllEvents = session.on((event) => {
+      sessionEvents.push(event);
+    });
 
     try {
+      if (this.experimentalTools) {
+        this.findingsCollector.reset();
+      }
+
       const chunks: string[] = [];
       const unsubscribeDelta = session.on("assistant.message_delta", (event) => {
         const delta = event.data.deltaContent;
@@ -292,6 +335,18 @@ export class CopilotSdkProvider implements AIProviderClient {
         collectedUsage = mergeTokenUsage(collectedUsage, usageEvent);
       });
 
+      let unsubscribeToolComplete = () => {};
+      if (this.experimentalTools) {
+        unsubscribeToolComplete = session.on("tool.execution_complete", (event) => {
+          this.logger.debug(
+            {
+              toolCallId: event.data.toolCallId,
+            },
+            "Copilot SDK tool execution completed"
+          );
+        });
+      }
+
       const attachments: Array<{ type: "file"; path: string }> = [];
       if (options?.diffFiles) {
         for (const diffFile of options.diffFiles) {
@@ -304,13 +359,70 @@ export class CopilotSdkProvider implements AIProviderClient {
           { prompt, ...(attachments.length > 0 ? { attachments } : {}) },
           this.timeoutMs
         );
-
         const content = response?.data.content ?? chunks.join("");
+
         if (!content) {
           throw new AIProviderError("copilot-sdk", "No content in response from Copilot SDK");
         }
 
-        const parsed = this.parseJsonResponse(content);
+        let parsed: unknown;
+        let jsonParseError: unknown;
+        try {
+          parsed = this.parseJsonResponse(content);
+        } catch (error) {
+          jsonParseError = error;
+        }
+
+        if (this.experimentalTools) {
+          const toolFindings = this.findingsCollector.getAllFindings();
+          if (jsonParseError) {
+            if (toolFindings.length > 0) {
+              this.logger.info(
+                { count: toolFindings.length },
+                "JSON parse failed but tool calls were made. Returning tool findings."
+              );
+              parsed = convertFindingsToParsedResponse(toolFindings);
+            } else {
+              this.logger.info(
+                "JSON parse failed and no tool calls were made. Returning empty findings."
+              );
+              parsed = convertFindingsToParsedResponse([]);
+            }
+          } else {
+            this.logger.info(
+              { count: toolFindings.length },
+              "Combining findings from both tool calls and JSON response."
+            );
+            parsed = combineToolAndJsonFindings(parsed, toolFindings);
+          }
+
+          await this.saveTranscript({
+            prompt,
+            events: sessionEvents,
+            rawResponse: content,
+            jsonOutput: JSON.stringify(parsed, null, 2),
+            tokenUsage: collectedUsage,
+            success: true,
+            attempt,
+          });
+
+          return { raw: content, parsed };
+        }
+
+        if (jsonParseError) {
+          throw jsonParseError;
+        }
+
+        await this.saveTranscript({
+          prompt,
+          events: sessionEvents,
+          rawResponse: content,
+          jsonOutput: JSON.stringify(parsed, null, 2),
+          tokenUsage: collectedUsage,
+          success: true,
+          attempt,
+        });
+
         return { raw: content, parsed };
       } catch (error) {
         const streamedContent = chunks.join("");
@@ -324,21 +436,161 @@ export class CopilotSdkProvider implements AIProviderClient {
               },
               "Recovered Copilot SDK response from streamed output after session.idle timeout"
             );
+
+            await this.saveTranscript({
+              prompt,
+              events: sessionEvents,
+              rawResponse: recovered.raw,
+              jsonOutput: JSON.stringify(recovered.parsed, null, 2),
+              tokenUsage: collectedUsage,
+              success: true,
+              attempt,
+            });
+
             return recovered;
           }
         }
+
+        await this.saveTranscript({
+          prompt,
+          events: sessionEvents,
+          rawResponse: streamedContent || undefined,
+          tokenUsage: collectedUsage,
+          success: false,
+          error: (error as Error).message,
+          attempt,
+        });
+
         throw error;
       } finally {
         unsubscribeDelta();
         unsubscribeUsage();
+        if (this.experimentalTools) {
+          unsubscribeToolComplete();
+        }
         onUsageCollected?.(collectedUsage);
       }
     } finally {
+      unsubscribeAllEvents();
       try {
         await session.disconnect();
       } catch {
         // Best-effort session cleanup
       }
+    }
+  }
+
+  private async saveTranscript(data: {
+    prompt: string;
+    events: SessionEvent[];
+    rawResponse?: string;
+    jsonOutput?: string;
+    tokenUsage?: TokenUsage;
+    success: boolean;
+    error?: string;
+    attempt: number;
+  }): Promise<void> {
+    try {
+      const transcriptDir = path.join(this.tempPath, "transcripts");
+      await this.fileSystem.mkdir(transcriptDir, { recursive: true });
+
+      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
+      const status = data.success ? "success" : "failure";
+      const filename = `transcript-sdk-${timestamp}-attempt-${data.attempt}-${status}.txt`;
+      const filepath = path.join(transcriptDir, filename);
+
+      const transcriptLines: string[] = [
+        "=".repeat(80),
+        "COPILOT SDK PROVIDER TRANSCRIPT",
+        "=".repeat(80),
+        `Timestamp: ${this.clock.timestamp()}`,
+        `Status: ${status}`,
+        `Model: ${this.model || "default"}`,
+        `Attempt: ${data.attempt}`,
+        data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
+        "",
+        "=".repeat(80),
+        "INPUT PROMPT",
+        "=".repeat(80),
+        data.prompt,
+        "",
+        "=".repeat(80),
+        "SESSION TIMELINE",
+        "=".repeat(80),
+      ];
+
+      for (const event of data.events) {
+        const timeStr = event.timestamp ? `[${event.timestamp}]` : "";
+        switch (event.type) {
+          case "assistant.reasoning":
+            transcriptLines.push(`${timeStr} [REASONING]: ${event.data.content}`);
+            break;
+          case "assistant.reasoning_delta":
+            transcriptLines.push(`${timeStr} [REASONING DELTA]: ${event.data.deltaContent}`);
+            break;
+          case "assistant.message":
+            transcriptLines.push(`${timeStr} [MESSAGE]: ${event.data.content}`);
+            break;
+          case "assistant.message_delta":
+            transcriptLines.push(`${timeStr} [MESSAGE DELTA]: ${event.data.deltaContent}`);
+            break;
+          case "tool.execution_start":
+            transcriptLines.push(
+              `${timeStr} [TOOL CALL START] ${event.data.toolName} (Call ID: ${event.data.toolCallId})`,
+              `  Arguments: ${JSON.stringify(event.data.arguments || {}, null, 2)}`
+            );
+            break;
+          case "tool.execution_complete":
+            transcriptLines.push(
+              `${timeStr} [TOOL CALL COMPLETE] (Call ID: ${event.data.toolCallId})`,
+              `  Success: ${event.data.success}`,
+              `  Result: ${JSON.stringify(event.data.result || {}, null, 2)}`,
+              event.data.error ? `  Error: ${JSON.stringify(event.data.error)}` : ""
+            );
+            break;
+          case "session.error":
+            transcriptLines.push(
+              `${timeStr} [SESSION ERROR] Type: ${event.data.errorType} - Message: ${event.data.message}`,
+              event.data.stack ? `  Stack: ${event.data.stack}` : ""
+            );
+            break;
+          default:
+            transcriptLines.push(`${timeStr} [EVENT: ${event.type}]`);
+            break;
+        }
+      }
+
+      transcriptLines.push(
+        "",
+        "=".repeat(80),
+        "RAW RESPONSE",
+        "=".repeat(80),
+        data.rawResponse || "(empty)",
+        "",
+        "=".repeat(80),
+        "JSON OUTPUT",
+        "=".repeat(80),
+        data.jsonOutput || "(empty)"
+      );
+
+      if (data.error) {
+        transcriptLines.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
+      }
+
+      transcriptLines.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
+
+      await this.fileSystem.writeFile(
+        filepath,
+        transcriptLines.filter((line) => line !== undefined).join("\n"),
+        "utf-8"
+      );
+
+      this.logger.debug(
+        { filepath, success: data.success, attempt: data.attempt },
+        "Saved Copilot SDK transcript for debugging"
+      );
+    } catch (err) {
+      this.logger.warn({ error: (err as Error).message }, "Failed to save SDK transcript");
     }
   }
 
@@ -576,4 +828,128 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     return { fileResults, crossFileResult };
   }
+}
+
+function convertFindingsToParsedResponse(findings: PostCommentFinding[]): unknown {
+  return {
+    findings: findings.map((f) => ({
+      line: f.line,
+      severity: f.severity,
+      confidence: f.confidence ?? "high",
+      category: f.category,
+      message: f.body,
+      suggestion: f.suggestion ?? "",
+      reasoning: f.reasoning ?? "Recorded via tool call.",
+      isPreExisting: false,
+    })),
+    file_results: groupFindingsByFile(findings),
+    summary: `Review completed. Collected ${findings.length} findings via tool calls.`,
+    overall_assessment: `Review completed. Collected ${findings.length} findings via tool calls.`,
+    recommendations: [],
+  };
+}
+
+function groupFindingsByFile(
+  findings: PostCommentFinding[]
+): Record<string, { findings: FileFinding[] }> {
+  const fileResults: Record<string, { findings: FileFinding[] }> = {};
+  for (const f of findings) {
+    if (!fileResults[f.file]) {
+      fileResults[f.file] = { findings: [] };
+    }
+    fileResults[f.file].findings.push({
+      line: f.line,
+      severity: f.severity,
+      confidence: f.confidence ?? "high",
+      category: f.category,
+      message: f.body,
+      suggestion: f.suggestion ?? "",
+      reasoning: f.reasoning ?? "Recorded via tool call.",
+      isPreExisting: false,
+    });
+  }
+  return fileResults;
+}
+
+function combineToolAndJsonFindings(parsed: unknown, toolFindings: PostCommentFinding[]): unknown {
+  if (!parsed || typeof parsed !== "object") {
+    return convertFindingsToParsedResponse(toolFindings);
+  }
+
+  const parsedObj = parsed as Record<string, unknown>;
+
+  if ("file_results" in parsedObj) {
+    const fileResults = { ...(parsedObj.file_results as Record<string, unknown>) };
+    for (const f of toolFindings) {
+      if (!fileResults[f.file]) {
+        fileResults[f.file] = { findings: [] };
+      }
+      const fileData = { ...(fileResults[f.file] as Record<string, unknown>) };
+      const findings = Array.isArray(fileData.findings) ? [...fileData.findings] : [];
+      findings.push({
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+      fileResults[f.file] = { ...fileData, findings };
+    }
+    return { ...parsedObj, file_results: fileResults };
+  }
+
+  if ("summary" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        file: f.file,
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  if ("overall_assessment" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        affected_files: [f.file],
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  if ("findings" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  return parsedObj;
 }

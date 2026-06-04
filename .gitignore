@@ -42,3 +42,7 @@ package-lock.json
 # Generated API documentation
 docs/api/
 docs/site/
+
+# System and CLI configuration folders
+.antigravitycli/
+.gemini/

@@ -23,6 +23,28 @@ vi.mock("@opencode-ai/sdk", () => ({
   createOpencode: mockCreateOpencode,
 }));
 
+vi.mock("../../ports/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../ports/index.js")>();
+  return {
+    ...actual,
+    nodeFs: {
+      mkdir: vi.fn().mockResolvedValue(undefined),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      unlink: vi.fn().mockResolvedValue(undefined),
+      readFile: vi.fn().mockResolvedValue(""),
+      rm: vi.fn().mockResolvedValue(undefined),
+      access: vi.fn().mockResolvedValue(undefined),
+      readdir: vi.fn().mockResolvedValue([]),
+      stat: vi.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => true,
+        size: 0,
+        mtime: new Date("2025-01-01T00:00:00.000Z"),
+      }),
+    },
+  };
+});
+
 import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { AIResponse } from "../types.js";
 import { OpenCodeSdkProvider } from "./opencode-sdk.js";
