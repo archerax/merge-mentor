@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-05
+
 ### Added
 
 - **Experimental Custom Tools**: Equipped the AI review agent with an experimental tool-calling loop to interact directly with the pull request environment. Added a new `--experimental-tools` CLI flag and `MM_EXPERIMENTAL_TOOLS` environment variable.
