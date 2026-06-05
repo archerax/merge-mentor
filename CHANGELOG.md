@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Experimental Custom Tools**: Equipped the AI review agent with an experimental tool-calling loop to interact directly with the pull request environment. Added a new `--experimental-tools` CLI flag and `MM_EXPERIMENTAL_TOOLS` environment variable.
+- **Automated Comment Posting**: Introduced support for the AI review agent to dynamically post inline review comments back to the target pull request when experimental tools are enabled.
+- **Transcript Logging**: Added support for local transcript logging of AI execution steps and tool calls for debugging and auditing.
+
+### Changed
+
+- **Size-Bounded Diff Attachments**: Implemented a 150 KB size threshold for diff attachments in fast review. Diffs are only attached to the AI context if their total size is under 150 KB to prevent token limits and minimize API costs.
+- **Unified Skip Filtering**: Refactored default ignore patterns (lockfiles, images, binaries) to use standard glob ignore filters with support for negation patterns (e.g., `!**/*.svg` to override default ignores). Simplified file skip logic by delegating extension checks to the ignore filter.
+
+## [2.0.1] - 2026-06-01
+
+### Added
+
+- **Official Brand Assets**: Added official project logo assets in light, dark, and transparent styles.
+
+### Changed
+
+- **AI Response Validation**: Enhanced the reliability of SDK-based AI providers by validating their structured response data against strict schemas for improved error handling, safety, and stability.
+
 ## [2.0.0] - 2026-05-29
 
 ### Breaking Changes
