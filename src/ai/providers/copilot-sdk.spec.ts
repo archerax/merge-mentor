@@ -45,6 +45,7 @@ vi.mock("../../ports/index.js", async (importOriginal) => {
   };
 });
 
+import type { PermissionRequest } from "@github/copilot-sdk";
 import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
@@ -1207,7 +1208,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "read" }, { sessionId: "s1" });
+    const result = handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "approve-once" });
   });
@@ -1216,7 +1217,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "shell" }, { sessionId: "s1" });
+    const result = handler({ kind: "shell" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1225,7 +1226,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "write" }, { sessionId: "s1" });
+    const result = handler({ kind: "write" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1234,7 +1235,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "mcp" }, { sessionId: "s1" });
+    const result = handler({ kind: "mcp" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1243,7 +1244,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "url" }, { sessionId: "s1" });
+    const result = handler({ kind: "url" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1252,7 +1253,9 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "custom-tool" }, { sessionId: "s1" });
+    const result = handler({ kind: "custom-tool" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1261,7 +1264,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "memory" }, { sessionId: "s1" });
+    const result = handler({ kind: "memory" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1270,7 +1273,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    const result = handler({ kind: "hook" }, { sessionId: "s1" });
+    const result = handler({ kind: "hook" } as unknown as PermissionRequest, { sessionId: "s1" });
 
     expect(result).toEqual({ kind: "reject" });
   });
@@ -1279,7 +1282,9 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    handler({ kind: "shell", toolCallId: "tc-42" }, { sessionId: "s1" });
+    handler({ kind: "shell", toolCallId: "tc-42" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ permissionKind: "shell", toolCallId: "tc-42" }),
@@ -1291,7 +1296,7 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    handler({ kind: "read" }, { sessionId: "s1" });
+    handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
   });
 
   describe("experimentalTools custom tool integration", () => {

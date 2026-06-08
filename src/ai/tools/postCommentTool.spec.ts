@@ -165,7 +165,7 @@ describe("postCommentTool", () => {
         confidence: "high" as const,
       };
 
-      const result = (await postCommentTool.handler(args, mockInvocation)) as ToolResultObject;
+      const result = (await postCommentTool.handler?.(args, mockInvocation)) as ToolResultObject;
 
       expect(result.resultType).toBe("success");
       expect(result.textResultForLlm).toContain("Finding recorded:");
@@ -187,11 +187,11 @@ describe("postCommentTool", () => {
       };
 
       // Call first time
-      await postCommentTool.handler(args, mockInvocation);
+      await postCommentTool.handler?.(args, mockInvocation);
       const firstId = collector.getAllFindings()[0].findingId;
 
       // Call second time
-      const result2 = (await postCommentTool.handler(args, mockInvocation)) as ToolResultObject;
+      const result2 = (await postCommentTool.handler?.(args, mockInvocation)) as ToolResultObject;
 
       expect(result2.resultType).toBe("success");
       expect(result2.textResultForLlm).toBe(`Finding already recorded: ${firstId}`);
@@ -210,7 +210,7 @@ describe("postCommentTool", () => {
         category: "performance" as const,
       };
 
-      await postCommentTool.handler(args, mockInvocation);
+      await postCommentTool.handler?.(args, mockInvocation);
 
       expect(output.output).toHaveLength(1);
       expect(output.output[0].type).toBe("log");
