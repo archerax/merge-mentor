@@ -176,7 +176,15 @@ describe("CliGitClient", () => {
 
       expect(runner.execFile).toHaveBeenCalledWith(
         "git",
-        expect.arrayContaining(["-C", "/tmp/repo", "fetch", "--depth", "1", "origin", "main"]),
+        expect.arrayContaining([
+          "-C",
+          "/tmp/repo",
+          "fetch",
+          "--depth",
+          "1",
+          "origin",
+          "main:refs/remotes/origin/main",
+        ]),
         expect.any(Object)
       );
     });

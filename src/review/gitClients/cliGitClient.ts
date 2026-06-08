@@ -60,7 +60,16 @@ export class CliGitClient implements GitClient {
     const authArgs = buildAuthArgs(auth);
     const env = buildGitEnv(auth);
     await this.execFile(
-      [...authArgs, "-C", repoPath, "fetch", "--depth", String(depth), "origin", branch],
+      [
+        ...authArgs,
+        "-C",
+        repoPath,
+        "fetch",
+        "--depth",
+        String(depth),
+        "origin",
+        `${branch}:refs/remotes/origin/${branch}`,
+      ],
       this.timeoutMs,
       env
     );
