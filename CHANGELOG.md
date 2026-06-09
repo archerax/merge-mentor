@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-09
+
+### Added
+
+- **Reasoning Support**: Equipped the AI review agent with support for reasoning models when using the Copilot SDK provider. Added a new `--reasoning` CLI flag and `MM_REASONING` environment variable to control the reasoning effort.
+
+### Changed
+
+- **Package Upgrades**: Upgraded core dependencies including `@github/copilot-sdk` to `v1.0.0`, `commander` to `v15.0.0`, `zod` to `v4.4.3`, and `@opencode-ai/sdk` to `^1.16.2`.
+
+### Fixed
+
+- **CLI Git Client Fetch**: Fixed checkout failures on the CLI git backend by explicitly specifying the target refspec on fetch.
+
 ## [2.1.0] - 2026-06-05
 
 ### Added
