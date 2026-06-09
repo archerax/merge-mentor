@@ -590,6 +590,7 @@ program
 program
   .command("review")
   .description("Review a pull request")
+  .optionsGroup("General Options")
   .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
   .option(
     "--pr-url <url>",
@@ -601,8 +602,16 @@ program
     false
   )
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
-  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--write", "Post comments to PR (default is dry-run mode; CI mode defaults to write)")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
+  .optionsGroup("Review Configuration")
   .option(
     "--review-type <type>",
     "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
@@ -617,20 +626,17 @@ program
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
-  // GitHub options
+  .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
   .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
-  // Azure options
+  .optionsGroup("Azure DevOps Configuration")
   .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option(
-    "--temp-path <path>",
-    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
-  )
-  // AI provider config
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
@@ -649,13 +655,13 @@ program
     "--reasoning <level>",
     "Reasoning effort level for models that support it (low, medium, high, xhigh). Env: MM_REASONING"
   )
-  // File filtering
+  .optionsGroup("File Filtering")
   .option(
     "--ignore <pattern>",
     "Glob pattern for files to ignore (repeatable). Default ignores **/generated/**",
     (pattern: string, previous: string[] = []) => [...previous, pattern]
   )
-  // Streaming options
+  .optionsGroup("Console Output Options")
   .option("--no-stream", "Disable streaming output display")
   .option(
     "--stream-lines <number>",
@@ -667,10 +673,6 @@ program
       }
       return parsed;
     }
-  )
-  .option(
-    "--local-workspace-path <path>",
-    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
   )
   .action(async (options: ReviewOptions) => {
     try {
