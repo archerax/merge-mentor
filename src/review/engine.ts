@@ -48,6 +48,7 @@ import {
   type AIProviderType,
   type AIResponse,
   createAIProvider,
+  type ReasoningEffort,
   type TokenUsage,
 } from "../ai/index.js";
 import { buildFilesSummary } from "../ai/prompts/buildFilesSummary.js";
@@ -184,6 +185,10 @@ interface ReviewEngineOptions {
   readonly fileSystem?: FileSystem;
   /** Enable postComment tool for structured output (via --experimental-tools flag) */
   readonly experimentalTools?: boolean;
+  /** Pin the session to the long-context tier when the selected model supports it. */
+  readonly longContext?: boolean;
+  /** Reasoning effort level for models that support it. */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 /**
@@ -282,6 +287,8 @@ export class ReviewEngine {
       tempPath,
       output: this.output,
       experimentalTools: options?.experimentalTools,
+      longContext: options?.longContext,
+      reasoningEffort: options?.reasoningEffort,
     };
 
     this.provider = createAIProvider(providerType, providerOptions);

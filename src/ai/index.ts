@@ -11,5 +11,6 @@ export type {
   AIProviderClient,
   AIProviderType,
   AIResponse,
+  ReasoningEffort,
   TokenUsage,
 } from "./types.js";

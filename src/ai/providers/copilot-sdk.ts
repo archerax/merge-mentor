@@ -37,6 +37,7 @@ import type {
   AIResponse,
   ExecutePromptOptions,
   FastReviewResult,
+  ReasoningEffort,
   TokenUsage,
 } from "../types.js";
 
@@ -110,6 +111,8 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly byokBaseUrl?: string;
   private readonly byokApiKey?: string;
   private readonly experimentalTools: boolean;
+  private readonly longContext: boolean;
+  private readonly reasoningEffort?: ReasoningEffort;
   private readonly findingsCollector = new FindingsCollector();
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
@@ -128,6 +131,8 @@ export class CopilotSdkProvider implements AIProviderClient {
     this.byokBaseUrl = this.normalizeOptionalString(options?.aiBaseUrl);
     this.byokApiKey = this.normalizeOptionalString(options?.aiApiKey);
     this.experimentalTools = options?.experimentalTools ?? false;
+    this.longContext = options?.longContext ?? false;
+    this.reasoningEffort = options?.reasoningEffort;
     this.output = options?.output ?? consoleOutputWriter;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
@@ -297,6 +302,8 @@ export class CopilotSdkProvider implements AIProviderClient {
         : [...READ_ONLY_REVIEW_TOOLS],
       tools: this.experimentalTools ? [postCommentTool] : undefined,
       onPermissionRequest: createReviewPermissionHandler(this.logger),
+      contextTier: this.longContext ? "long_context" : undefined,
+      reasoningEffort: this.reasoningEffort,
       ...(provider ? { provider } : {}),
     });
 

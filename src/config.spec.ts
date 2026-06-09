@@ -126,6 +126,58 @@ describe("Config", () => {
       expect(config.aiApiKey).toBe("bedrock-key");
     });
 
+    it("should default longContext to false", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
+      expect(config.longContext).toBe(false);
+    });
+
+    it("should load longContext from environment", () => {
+      const env = createStubEnvironment({
+        MM_LONG_CONTEXT: "true",
+      });
+      const config = loadConfig(undefined, env);
+      expect(config.longContext).toBe(true);
+    });
+
+    it("should override longContext using CLI parameter", () => {
+      const env = createStubEnvironment({
+        MM_LONG_CONTEXT: "false",
+      });
+      const config = loadConfig({ longContext: true }, env);
+      expect(config.longContext).toBe(true);
+    });
+
+    it("should default reasoningEffort to undefined", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
+      expect(config.reasoningEffort).toBeUndefined();
+    });
+
+    it("should load reasoningEffort from environment", () => {
+      const env = createStubEnvironment({
+        MM_REASONING: "high",
+      });
+      const config = loadConfig(undefined, env);
+      expect(config.reasoningEffort).toBe("high");
+    });
+
+    it("should override reasoningEffort using CLI parameter", () => {
+      const env = createStubEnvironment({
+        MM_REASONING: "low",
+      });
+      const config = loadConfig({ reasoning: "high" }, env);
+      expect(config.reasoningEffort).toBe("high");
+    });
+
+    it("should default invalid reasoningEffort to undefined", () => {
+      const env = createStubEnvironment({
+        MM_REASONING: "invalid",
+      });
+      const config = loadConfig(undefined, env);
+      expect(config.reasoningEffort).toBeUndefined();
+    });
+
     it("should default MM_AI_PROVIDER to copilot-sdk for invalid values", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "invalid",

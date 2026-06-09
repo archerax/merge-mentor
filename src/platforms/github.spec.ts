@@ -55,6 +55,7 @@ function createTestConfig(): Config {
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
+    longContext: false,
   };
 }
 

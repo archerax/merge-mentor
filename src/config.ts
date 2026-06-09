@@ -1,6 +1,6 @@
 import path from "node:path";
 import { z } from "zod";
-import type { AIProviderType } from "./ai/types.js";
+import type { AIProviderType, ReasoningEffort } from "./ai/types.js";
 import { ConfigurationError } from "./errors/index.js";
 import { type Environment, processEnvironment } from "./ports/environment.js";
 import type { GitBackendType } from "./review/gitClient.js";
@@ -70,6 +70,10 @@ export interface Config {
   readonly streamingLines: number;
   /** Base path for temporary files (cache, diffs, logs, repos, etc.). Default: ./.mergementor */
   readonly tempPath: string;
+  /** Pin the session to the long-context tier when the selected model supports it. */
+  readonly longContext: boolean;
+  /** Reasoning effort level for models that support it. */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-sdk");
@@ -100,6 +104,11 @@ const ConfigParserSchema = z.object({
     const parsed = typeof val === "string" ? Number.parseInt(val, 10) : val;
     return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
   }, z.number().int().positive().optional()),
+  longContext: z.preprocess(
+    (val) => val === "true" || val === true || val === "1",
+    z.boolean().default(false)
+  ),
+  reasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional().catch(undefined),
 });
 
 /**
@@ -130,6 +139,8 @@ export function loadConfig(
       (env.get("MM_STREAMING_LINES") ? (env.get("MM_STREAMING_LINES") ?? "") : undefined),
     tempPath: cliOverrides?.tempPath ?? env.get("MM_TEMP_PATH"),
     aiTimeoutMs: cliOverrides?.aiTimeout ?? env.get("MM_AI_TIMEOUT"),
+    longContext: cliOverrides?.longContext ?? env.get("MM_LONG_CONTEXT"),
+    reasoningEffort: cliOverrides?.reasoning ?? env.get("MM_REASONING"),
   });
 
   const explicitReviewPasses = parseReviewPasses(
@@ -171,6 +182,8 @@ export function loadConfig(
     streamingEnabled: parsed.streamingEnabled,
     streamingLines: parsed.streamingLines,
     tempPath: path.resolve(parsed.tempPath),
+    longContext: parsed.longContext,
+    reasoningEffort: parsed.reasoningEffort,
   };
 }
 
@@ -197,6 +210,8 @@ interface CliOverrides {
   readonly streamingLines?: number;
   readonly tempPath?: string;
   readonly gitBackend?: string;
+  readonly longContext?: boolean;
+  readonly reasoning?: string;
 }
 
 /**

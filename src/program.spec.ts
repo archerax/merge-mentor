@@ -82,6 +82,7 @@ import { ReviewEngine } from "./review/engine.js";
 import { resolveReviewProfile } from "./review/reviewSelection.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
+  const { longContext = false, ...restOverrides } = overrides;
   const reviewType = overrides.reviewType ?? "general";
   const reviewProfile =
     overrides.reviewProfile ??
@@ -112,7 +113,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     streamingEnabled: true,
     streamingLines: 5,
     tempPath: "./.mergementor",
-    ...overrides,
+    longContext,
+    ...restOverrides,
   };
 }
 
@@ -226,6 +228,42 @@ describe("CLI", () => {
         adapter: expect.any(Object),
         platform: "github",
       });
+    });
+
+    it("passes longContext to ReviewEngine when longContext option is specified", async () => {
+      const options = createReviewOptions({
+        longContext: true,
+      });
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ longContext: true }));
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          longContext: true,
+        })
+      );
+    });
+
+    it("passes reasoningEffort to ReviewEngine when reasoning option is specified", async () => {
+      const options = createReviewOptions({
+        reasoning: "high",
+      });
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ reasoningEffort: "high" }));
+
+      await executeReview(options);
+
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          reasoningEffort: "high",
+        })
+      );
     });
 
     it("executes review with Azure platform", async () => {
@@ -1708,6 +1746,15 @@ describe("CLI", () => {
         expect.stringContaining("Could not load configuration")
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Config file not found"));
+    });
+  });
+
+  describe("review command option parsing", () => {
+    it("parses --long-context option and forwards it to loadConfig", async () => {
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig());
+      await program.parseAsync(["node", "test", "review", "--pr", "42", "--long-context"]);
+
+      expect(loadConfig).toHaveBeenCalledWith(expect.objectContaining({ longContext: true }));
     });
   });
 

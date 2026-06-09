@@ -14,6 +14,9 @@ export interface FastReviewResult {
 /** Supported AI provider types. */
 export type AIProviderType = "copilot-sdk" | "opencode-sdk";
 
+/** Valid reasoning effort levels for models that support it. */
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {
   readonly inputTokens: number;
@@ -56,6 +59,10 @@ export interface AIProviderOptions {
   readonly output?: OutputWriter;
   /** Enable postComment tool for structured output (via --experimental-tools flag). */
   readonly experimentalTools?: boolean;
+  /** Pin the session to the long-context tier when the selected model supports it. */
+  readonly longContext?: boolean;
+  /** Reasoning effort level for models that support it. */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 /** Options for executing a prompt with additional context. */

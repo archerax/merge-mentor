@@ -21,6 +21,7 @@ describe("createAIProvider", () => {
       model: "claude-haiku-4.5",
       timeoutMs: 60000,
       maxRetries: 5,
+      longContext: true,
     });
     expect(provider).toBeInstanceOf(CopilotSdkProvider);
   });

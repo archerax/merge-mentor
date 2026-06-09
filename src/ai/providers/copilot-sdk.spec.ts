@@ -597,6 +597,58 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
+    it("passes contextTier as long_context to createSession when longContext is true", async () => {
+      const provider = new CopilotSdkProvider({ longContext: true });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ contextTier: "long_context" })
+      );
+    });
+
+    it("does not pass contextTier to createSession when longContext is false or omitted", async () => {
+      const provider = new CopilotSdkProvider({});
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ contextTier: undefined })
+      );
+    });
+
+    it("passes reasoningEffort to createSession when reasoningEffort is provided", async () => {
+      const provider = new CopilotSdkProvider({ reasoningEffort: "high" });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ reasoningEffort: "high" })
+      );
+    });
+
+    it("does not pass reasoningEffort to createSession when reasoningEffort is omitted", async () => {
+      const provider = new CopilotSdkProvider({});
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ reasoningEffort: undefined })
+      );
+    });
+
     it("passes token as gitHubToken to CopilotClient", async () => {
       const provider = createProvider(1, 5000, undefined, "gh-token-123");
       mockSuccessfulPrompt();

@@ -73,6 +73,8 @@ export interface ReviewOptions {
   localWorkspacePath?: string;
   /** Git backend for repository cloning and fetching ('cli' or 'isomorphic'). Default: 'cli' */
   gitBackend?: string;
+  longContext?: boolean;
+  reasoning?: string;
 }
 
 interface ReviewExecutionResult {
@@ -182,6 +184,8 @@ export async function executeReview(
     streamingEnabled: resolvedOptions.streamingEnabled,
     streamingLines: resolvedOptions.streamLines,
     gitBackend: resolvedOptions.gitBackend,
+    longContext: resolvedOptions.longContext,
+    reasoning: resolvedOptions.reasoning,
   });
 
   // Initialize logger with configured temp path
@@ -236,6 +240,8 @@ export async function executeReview(
     ignorePatterns: resolvedOptions.ignore,
     gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
     experimentalTools: resolvedOptions.experimentalTools,
+    longContext: config.longContext,
+    reasoningEffort: config.reasoningEffort,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";
@@ -638,6 +644,11 @@ program
     "Enable experimental structured output via Copilot SDK tool calls",
     false
   )
+  .option("--long-context", "Pin the Copilot session to the long-context tier", false)
+  .option(
+    "--reasoning <level>",
+    "Reasoning effort level for models that support it (low, medium, high, xhigh). Env: MM_REASONING"
+  )
   // File filtering
   .option(
     "--ignore <pattern>",
@@ -724,6 +735,7 @@ program
         reviewType: options.reviewType,
         passes: options.passes,
         reviewStrategy: options.strategy,
+        reasoning: options.reasoning,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
