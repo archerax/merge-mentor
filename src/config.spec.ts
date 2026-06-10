@@ -178,6 +178,28 @@ describe("Config", () => {
       expect(config.reasoningEffort).toBeUndefined();
     });
 
+    it("should default experimentalTools to false", () => {
+      const env = createStubEnvironment();
+      const config = loadConfig(undefined, env);
+      expect(config.experimentalTools).toBe(false);
+    });
+
+    it("should load experimentalTools from environment", () => {
+      const env = createStubEnvironment({
+        MM_EXPERIMENTAL_TOOLS: "true",
+      });
+      const config = loadConfig(undefined, env);
+      expect(config.experimentalTools).toBe(true);
+    });
+
+    it("should override experimentalTools using CLI parameter", () => {
+      const env = createStubEnvironment({
+        MM_EXPERIMENTAL_TOOLS: "false",
+      });
+      const config = loadConfig({ experimentalTools: true }, env);
+      expect(config.experimentalTools).toBe(true);
+    });
+
     it("should default MM_AI_PROVIDER to copilot-sdk for invalid values", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "invalid",

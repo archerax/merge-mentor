@@ -186,6 +186,7 @@ export async function executeReview(
     gitBackend: resolvedOptions.gitBackend,
     longContext: resolvedOptions.longContext,
     reasoning: resolvedOptions.reasoning,
+    experimentalTools: resolvedOptions.experimentalTools,
   });
 
   // Initialize logger with configured temp path
@@ -239,7 +240,7 @@ export async function executeReview(
     localWorkspacePath: resolvedOptions.localWorkspacePath,
     ignorePatterns: resolvedOptions.ignore,
     gitBackend: resolvedOptions.gitBackend ?? config.gitBackend,
-    experimentalTools: resolvedOptions.experimentalTools,
+    experimentalTools: resolvedOptions.experimentalTools ?? config.experimentalTools,
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
   });
@@ -741,6 +742,7 @@ program
         passes: options.passes,
         reviewStrategy: options.strategy,
         reasoning: options.reasoning,
+        experimentalTools: options.experimentalTools,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";

@@ -71,6 +71,7 @@ npx merge-mentor review --pr 123
 - **AI provider prerequisites**:
   - **Copilot SDK** (`copilot-sdk`): Requires a valid Copilot token set via `MM_COPILOT_TOKEN` or `--copilot-token`
   - **OpenCode SDK** (`opencode-sdk`): Follow the official OpenCode installation instructions at https://opencode.dev
+  - **Claude Agent SDK** (`claude-agent-sdk`): Requires the `@anthropic-ai/claude-agent-sdk` package to be installed or available, plus a valid Anthropic API key configured via `ANTHROPIC_API_KEY` or `MM_AI_API_KEY` (or `--ai-api-key`).
 - **Platform Access** - Personal access token for GitHub or Azure DevOps
 
 **Supported Platforms**: Windows, macOS, and Linux
@@ -95,8 +96,6 @@ All environment variables use the `MM_` prefix to avoid conflicts with other app
 
 ### GitHub Configuration
 
-**Linux/macOS:**
-
 ```bash
 export MM_GITHUB_TOKEN=your_personal_access_token
 export MM_GITHUB_REPO_OWNER=username_or_org
@@ -104,27 +103,7 @@ export MM_GITHUB_REPO_NAME=repository_name
 export MM_PLATFORM=github
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-$env:MM_GITHUB_TOKEN="your_personal_access_token"
-$env:MM_GITHUB_REPO_OWNER="username_or_org"
-$env:MM_GITHUB_REPO_NAME="repository_name"
-$env:MM_PLATFORM="github"
-```
-
-**Windows (Command Prompt):**
-
-```cmd
-set MM_GITHUB_TOKEN=your_personal_access_token
-set MM_GITHUB_REPO_OWNER=username_or_org
-set MM_GITHUB_REPO_NAME=repository_name
-set MM_PLATFORM=github
-```
-
 ### Azure DevOps Configuration
-
-**Linux/macOS:**
 
 ```bash
 export MM_AZURE_TOKEN=your_pat
@@ -134,63 +113,26 @@ export MM_AZURE_REPO=repository_name
 export MM_PLATFORM=azure
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-$env:MM_AZURE_TOKEN="your_pat"
-$env:MM_AZURE_ORG="organization_name"
-$env:MM_AZURE_PROJECT="project_name"
-$env:MM_AZURE_REPO="repository_name"
-$env:MM_PLATFORM="azure"
-```
-
-**Windows (Command Prompt):**
-
-```cmd
-set MM_AZURE_TOKEN=your_pat
-set MM_AZURE_ORG=organization_name
-set MM_AZURE_PROJECT=project_name
-set MM_AZURE_REPO=repository_name
-set MM_PLATFORM=azure
-```
-
 ### AI Provider Configuration
 
 **Default Provider**: GitHub Copilot SDK (`copilot-sdk`)
 
-**Linux/macOS:**
-
 ```bash
-# Select AI provider (copilot-sdk, opencode-sdk)
+# Select AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk)
 export MM_AI_PROVIDER=copilot-sdk
 
 # Shared AI timeout (preferred)
 export MM_AI_TIMEOUT=3600000
 
 # Generic AI model setting
-export MM_AI_MODEL=gpt-5.2-codex
+export MM_AI_MODEL=gpt-5.3-codex
 
 # Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
 export MM_AI_BASE_URL=https://your-resource.openai.azure.com/openai/v1/
 export MM_AI_API_KEY=your_provider_api_key
 
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# Select AI provider
-$env:MM_AI_PROVIDER="copilot-sdk"
-
-# Shared AI timeout (preferred)
-$env:MM_AI_TIMEOUT="3600000"
-
-# Generic AI model setting
-$env:MM_AI_MODEL="gpt-5.2-codex"
-
-# Generic AI BYOK settings (currently used by Copilot SDK for OpenAI-compatible endpoints)
-$env:MM_AI_BASE_URL="https://your-resource.openai.azure.com/openai/v1/"
-$env:MM_AI_API_KEY="your_provider_api_key"
+# Enable experimental tool calls (only supported by Copilot SDK)
+export MM_EXPERIMENTAL_TOOLS=true
 ```
 
 **Or use command-line parameters:**
@@ -198,10 +140,24 @@ $env:MM_AI_API_KEY="your_provider_api_key"
 ```bash
 merge-mentor review --pr 123 \
   --provider copilot-sdk \
-  --ai-model gpt-5.2-codex \
+  --ai-model gpt-5.3-codex \
   --ai-base-url https://your-resource.openai.azure.com/openai/v1/ \
   --ai-api-key "$FOUNDRY_API_KEY" \
-  --ai-timeout 3600000
+  --ai-timeout 3600000 \
+  --experimental-tools
+```
+
+**Claude Agent SDK Provider Configuration:**
+
+```bash
+export MM_AI_PROVIDER=claude-agent-sdk
+
+# Use standard Anthropic API key
+export ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Or use generic BYOK settings:
+# export MM_AI_API_KEY=your_anthropic_api_key
+# export MM_AI_BASE_URL=https://api.anthropic.com/v1
 ```
 
 For GPT-5 series Copilot SDK BYOK models, merge-mentor automatically uses the SDK `responses`
@@ -212,7 +168,7 @@ wire API recommended by the Copilot SDK BYOK documentation.
 > Published model prices are only a rough guide and may not predict real review cost or issue-finding
 > performance well. The table below shows illustrative results from a small repository with **12 changed
 > files** via **OpenRouter** — treat these as indicative only, and set usage limits or budgets with
-> your provider. The same Haiku review cost **0.33× GitHub Copilot premium requests** via the
+> your provider. The same Haiku review consumes **GitHub AI Credits** based on token usage when run via the
 > Copilot SDK provider.
 
 | Model            | Cost (12-file review) | Issues found    |
@@ -224,8 +180,6 @@ wire API recommended by the Copilot SDK BYOK documentation.
 Deprecated v1 aliases have been removed in v2. Use `MM_AI_MODEL` / `--ai-model` for all providers.
 
 ### Optional Settings
-
-**Linux/macOS:**
 
 ```bash
 # Review profile
@@ -245,7 +199,7 @@ export AUDIT_LOGGING_ENABLED=true
 
 # Streaming output display
 export MM_STREAMING_ENABLED=true  # Enable/disable streaming output (default: true)
-export MM_STREAMING_LINES=5       # Number of lines in streaming display (default: 5)
+export MM_STREAMING_LINES=9       # Number of lines in streaming display (default: 9)
 ```
 
 **Or use command-line parameters:**
@@ -337,14 +291,13 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 
 ### Available Models
 
-**Preferred**: Configure the active provider model via `MM_AI_MODEL` or `--ai-model`.
+Configure the active provider model via `MM_AI_MODEL` or `--ai-model`.
 
 - `claude-sonnet-4.6` (default)
-- `claude-sonnet-4.5`
 - `claude-haiku-4.5`
-- `claude-opus-4.5`
+- `claude-opus-4.8`
 
-- Check OpenCode documentation for supported models
+Check provider documentation for supported models
 
 ## Usage
 
@@ -373,8 +326,8 @@ merge-mentor review --pr 123 --passes "security,database" --write
 # Same profile with fast execution
 merge-mentor review --pr 123 --passes "performance" --strategy fast --write
 
-# Quiet mode
-merge-mentor review --pr 123 --verbose false
+# Run without real-time streaming output
+merge-mentor review --pr 123 --no-stream
 ```
 
 ### Common Use Cases
@@ -428,18 +381,24 @@ merge-mentor review --pr 123 --passes "testing" --write
 
 ### Command Options
 
-**Core Options:**
+**General Options:**
 | Option | Description | Env Variable | Default |
 |--------|-------------|--------------|---------|
-| `--pr <number>` | Pull request number (required) | - | - |
-| `--platform <github\|azure>` | Platform to use | `MM_PLATFORM` | `github` |
-| `--provider <copilot-sdk\|opencode-sdk>` | AI provider to use | `MM_AI_PROVIDER` | `copilot-sdk` |
-| `--git-backend <cli\|isomorphic>` | Git backend for repo cloning | `MM_GIT_BACKEND` | `cli` |
-| `--strategy <strategy>` | Execution strategy: `deep` or `fast` | `MM_REVIEW_STRATEGY` | `fast` |
-| `--write` | Post comments (otherwise dry-run) | - | `false` |
-| `--verbose` | Enable verbose output | - | `true` |
-| `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
-| `--stream-lines <n>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES` | `5` |
+| `--pr <number>` | Pull request number (required unless `--pr-url` or `--ci` is used) | - | - |
+| `--pr-url <url>` | PR URL (e.g. `https://github.com/...`). Automatically sets platform, repository details, and PR number | - | - |
+| `--ci` | CI mode: auto-detect platform and PR from the environment | - | `false` |
+| `--platform <platform>` | Platform to use (`github` or `azure`) | `MM_PLATFORM` | `github` |
+| `--write` | Post comments to PR (otherwise dry-run; CI mode defaults to write) | - | `false` |
+| `--temp-path <path>` | Base path for temporary files (cache, diffs, logs, etc.) | `MM_TEMP_PATH` | `./.mergementor` |
+| `--local-workspace-path <path>` | Path to a pre-existing local repository checkout | - | - |
+
+**Review Configuration:**
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--review-type <type>` | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`) | `MM_REVIEW_TYPE` | `general` |
+| `--passes <passNames>` | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | `MM_REVIEW_PASSES` | - |
+| `--strategy <strategy>` | Execution strategy (`deep` or `fast`) | `MM_REVIEW_STRATEGY` | `fast` |
+| `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`) | `MM_GIT_BACKEND` | `cli` |
 
 **GitHub Configuration:**
 | Option | Description | Env Variable |
@@ -457,20 +416,69 @@ merge-mentor review --pr 123 --passes "testing" --write
 | `--azure-repo <repo>` | Azure DevOps repository | `MM_AZURE_REPO` |
 
 **AI Provider Configuration:**
-| Option | Description | Env Variable |
-|--------|-------------|--------------|
-| `--copilot-token <token>` | GitHub token for Copilot SDK auth (CI use) | `MM_COPILOT_TOKEN` |
-| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` |
-| `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` |
-| `--ai-base-url <url>` | Generic OpenAI-compatible BYOK base URL | `MM_AI_BASE_URL` |
-| `--ai-api-key <key>` | Generic BYOK API key | `MM_AI_API_KEY` |
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`, `claude-agent-sdk`) | `MM_AI_PROVIDER` | `copilot-sdk` |
+| `--copilot-token <token>` | Copilot GitHub token | `MM_COPILOT_TOKEN` | - |
+| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` | - |
+| `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` | - |
+| `--ai-base-url <url>` | OpenAI-compatible API base URL for BYOK | `MM_AI_BASE_URL` | - |
+| `--ai-api-key <key>` | API key for BYOK | `MM_AI_API_KEY` | - |
+| `--experimental-tools` | Enable experimental structured output via Copilot SDK tool calls | `MM_EXPERIMENTAL_TOOLS` | `false` |
+| `--long-context` | Pin the Copilot session to the long-context tier | `MM_LONG_CONTEXT` | `false` |
+| `--reasoning <level>` | Reasoning effort level (`low`, `medium`, `high`, `xhigh`) | `MM_REASONING` | - |
 
 **File Filtering:**
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--ignore <pattern>` | Glob pattern for files to ignore (repeatable) | `**/generated/**` |
 
+**Console Output Options:**
+| Option | Description | Env Variable | Default |
+|--------|-------------|--------------|---------|
+| `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
+| `--stream-lines <number>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES` | `9` |
+
 **Note:** Command-line parameters always override environment variables.
+
+### CLI Commands
+
+Merge Mentor supports several subcommands. If no subcommand is specified, it defaults to the `review` subcommand.
+
+#### `review`
+
+Reviews a pull request. This is the primary subcommand and accepts all options listed above.
+
+#### `repos`
+
+Manages cloned repositories used for context loading.
+
+**Usage:**
+
+```bash
+merge-mentor repos [options]
+```
+
+**Options:**
+
+- `--list`: List all cloned repositories.
+- `--clean`: Remove all cloned repositories.
+- `--clean-repo <name>`: Remove a specific cloned repository by folder name.
+- `--temp-path <path>`: Base path for temporary files (overrides `MM_TEMP_PATH`).
+
+#### `doctor`
+
+Diagnostic command to check AI provider CLI installations and configuration.
+
+**Usage:**
+
+```bash
+merge-mentor doctor [options]
+```
+
+**Options:**
+
+- `--provider <provider>`: Check a specific provider (`copilot`, `opencode`, or `claude-agent-sdk`).
 
 ## Key Features Explained
 
@@ -534,13 +542,6 @@ merge-mentor review --pr 123 --strategy deep --write
 
 # Baseline review plus multiple ordered passes with deep strategy
 merge-mentor review --pr 123 --passes "security,database,performance" --strategy deep --write
-
-# Legacy aliases remain supported
-merge-mentor review --pr 123 --review-type testing --write
-merge-mentor review --pr 123 --review-type fast --write
-
-# Legacy custom alias maps to baseline review plus explicit passes
-merge-mentor review --pr 123 --review-type custom --passes "scan,monorepo,performance" --write
 ```
 
 **What each piece means:**
@@ -551,12 +552,12 @@ merge-mentor review --pr 123 --review-type custom --passes "scan,monorepo,perfor
 
 **Choosing a strategy:**
 
-- Use `fast` (default) when you want to reduce GitHub Copilot premium request usage and get faster results.
+- Use `fast` (default) when you want to minimize token/credit usage and get faster results.
 - Use `deep` when you want the highest issue detection rate.
 
 In our benchmark repository with deliberately introduced issues, `deep` found **76%** of the issues while
-`fast` found **64%**. Under current GitHub Copilot billing, `deep` costs **2x premium requests** and `fast`
-costs **1x premium request** (default), so `--strategy` gives you a direct accuracy-versus-cost tradeoff.
+`fast` found **64%**. Under GitHub Copilot's usage-based billing, `deep` consumes roughly **2x the AI credits/tokens**
+compared to `fast` (default) since it uses multiple API calls, so `--strategy` gives you a direct accuracy-versus-cost tradeoff.
 
 **Available passes:**
 
@@ -578,17 +579,6 @@ merge-mentor review --pr 123 \
 Use `monorepo` when the PR touches workspace structure, package boundaries, shared tooling, dependency ownership, or other cross-package concerns.
 
 Use `database` when the PR changes schemas, migrations, repositories, ORMs, transaction handling, or query-heavy code.
-
-**Legacy alias mapping:**
-
-| Alias         | Resolved review profile               |
-| ------------- | ------------------------------------- |
-| `general`     | Baseline review                       |
-| `testing`     | Baseline review + `testing`           |
-| `security`    | Baseline review + `security`          |
-| `performance` | Baseline review + `performance`       |
-| `fast`        | Baseline review + fast strategy       |
-| `custom`      | Baseline review + explicit `--passes` |
 
 **Common profile choices:**
 
@@ -959,7 +949,7 @@ Proprietary software. See [LICENSE](./LICENSE) for details.
 
 ---
 
-**Version**: 1.9.0
+**Version**: 2.2.0
 **Author**: archerax
 **Documentation**: Included in npm package
 
