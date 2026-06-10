@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="Merge Mentor Logo" src="assets/logo_transparent.png" width="220">
+  <img alt="Merge Mentor Logo" src="https://www.agile-casino.co.uk/merge-mentor/logo_transparent.png" width="220">
 </p>
 
 <h1 align="center">Merge Mentor</h1>
@@ -160,6 +160,28 @@ export ANTHROPIC_API_KEY=your_anthropic_api_key
 # export MM_AI_BASE_URL=https://api.anthropic.com/v1
 ```
 
+**Bring Your Own Key (BYOK) Examples:**
+
+You can use `MM_AI_BASE_URL` and `MM_AI_API_KEY` to configure custom OpenAI-compatible endpoints:
+
+_Locally-Hosted Model (e.g., Ollama or vLLM):_
+
+```bash
+export MM_AI_PROVIDER=copilot-sdk
+export MM_AI_BASE_URL=http://localhost:11434/v1/
+export MM_AI_API_KEY=ollama             # Some clients require a non-empty key
+export MM_AI_MODEL=llama3.1             # Your local model name
+```
+
+_Azure OpenAI:_
+
+```bash
+export MM_AI_PROVIDER=copilot-sdk
+export MM_AI_BASE_URL=https://your-resource-name.openai.azure.com/openai/deployments/your-deployment-name/
+export MM_AI_API_KEY=your_azure_api_key
+export MM_AI_MODEL=gpt-4o               # Your deployed model name
+```
+
 For GPT-5 series Copilot SDK BYOK models, merge-mentor automatically uses the SDK `responses`
 wire API recommended by the Copilot SDK BYOK documentation.
 
@@ -284,6 +306,9 @@ merge-mentor review --pr 123 --temp-path /tmp/merge-mentor
 - `repo` scope (full control of private repositories)
 - Or `public_repo` for public repositories only
 
+> [!NOTE]
+> If running inside a GitHub Actions workflow, you can use the built-in `GITHUB_TOKEN` rather than a Personal Access Token. Just ensure that the workflow job has the `permissions: pull-requests: write` block configured so the bot has permission to post PR comments.
+
 **Azure DevOps PAT** (set via `MM_AZURE_TOKEN` or `--azure-token`):
 
 - Code: Read & Write
@@ -385,7 +410,7 @@ merge-mentor review --pr 123 --passes "testing" --write
 | Option | Description | Env Variable | Default |
 |--------|-------------|--------------|---------|
 | `--pr <number>` | Pull request number (required unless `--pr-url` or `--ci` is used) | - | - |
-| `--pr-url <url>` | PR URL (e.g. `https://github.com/...`). Automatically sets platform, repository details, and PR number | - | - |
+| `--pr-url <url>` | PR URL (e.g. `https://github.com/...`). Automatically sets platform, repository details, and PR number. Cannot be combined with other PR/repository flags. | - | - |
 | `--ci` | CI mode: auto-detect platform and PR from the environment | - | `false` |
 | `--platform <platform>` | Platform to use (`github` or `azure`) | `MM_PLATFORM` | `github` |
 | `--write` | Post comments to PR (otherwise dry-run; CI mode defaults to write) | - | `false` |
@@ -420,7 +445,7 @@ merge-mentor review --pr 123 --passes "testing" --write
 |--------|-------------|--------------|---------|
 | `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`, `claude-agent-sdk`) | `MM_AI_PROVIDER` | `copilot-sdk` |
 | `--copilot-token <token>` | Copilot GitHub token | `MM_COPILOT_TOKEN` | - |
-| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` | - |
+| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` | `3600000` (1h) |
 | `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` | - |
 | `--ai-base-url <url>` | OpenAI-compatible API base URL for BYOK | `MM_AI_BASE_URL` | - |
 | `--ai-api-key <key>` | API key for BYOK | `MM_AI_API_KEY` | - |
@@ -764,7 +789,10 @@ Only analyzes changed files on re-reviews, saving time and cost. Cache stored in
 - 🔒 **Security** - Security vulnerabilities
 - ⚡ **Performance** - Performance issues
 - 📝 **Quality** - Code quality and readability
-- 📖 **Documentation** - Missing or inadequate documentation
+- 📚 **Documentation** - Missing or inadequate documentation
+- 🏗️ **Architecture** - Architectural boundaries, coupling, and system structure concerns
+- 🎨 **Design** - Software design patterns, clean code principles, and API design
+- 🧪 **Testing** - Test quality, coverage gaps, assertions, and mock verification
 
 **Severity Levels**:
 

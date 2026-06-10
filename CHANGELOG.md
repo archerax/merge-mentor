@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-06-10
+
+### Added
+
+- **Claude Agent SDK Provider**: Introduced a new `claude-agent-sdk` AI provider with full feature parity support, integrating the `@anthropic-ai/claude-agent-sdk` package. Also added diagnostic checks for this provider to the `doctor` CLI command.
+- **Custom Test Mapping**: Enhanced the test file mapper to support custom glob patterns (`testFilePatterns`) and regex-based mapping overrides (`testMapping`) loaded from a `.mergementor.json` configuration file at the workspace root.
+- **Experimental Tools Configuration**: Added support for configuring the `experimentalTools` flag via the `MM_EXPERIMENTAL_TOOLS` environment variable or the `.mergementor.json` config file, in addition to the existing `--experimental-tools` CLI flag.
+- **Bring Your Own Key (BYOK) Documentation**: Added configuration examples in `README.md` for integrating Bring Your Own Key (BYOK) configurations with local models (Ollama, vLLM) and Azure OpenAI.
+
+### Changed
+
+- **CLI Options Grouping**: Refactored the `review` command CLI parameters into clearly organized option groups (`General Options`, `Review Configuration`, `GitHub Configuration`, `Azure DevOps Configuration`, `AI Provider Configuration`, `File Filtering`, and `Console Output Options`).
+- **Expanded Comment Categories**: Added `Architecture`, `Design`, and `Testing` categories to the review engine, and updated the documentation category emoji.
+
 ## [2.2.0] - 2026-06-09
 
 ### Added
