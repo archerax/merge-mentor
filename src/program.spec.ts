@@ -602,7 +602,7 @@ describe("CLI", () => {
       });
 
       await expect(executeReview(options)).rejects.toThrow(
-        'Invalid AI provider "invalid". Must be "copilot-sdk" or "opencode-sdk".'
+        'Invalid AI provider "invalid". Must be "copilot-sdk", "opencode-sdk", or "claude-agent-sdk".'
       );
     });
 

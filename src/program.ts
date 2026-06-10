@@ -200,10 +200,10 @@ export async function executeReview(
 
   // Validate and resolve AI provider
   const aiProvider = (resolvedOptions.provider || config.aiProvider) as AIProviderType;
-  if (!["copilot-sdk", "opencode-sdk"].includes(aiProvider)) {
+  if (!["copilot-sdk", "opencode-sdk", "claude-agent-sdk"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot-sdk" or "opencode-sdk".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot-sdk", "opencode-sdk", or "claude-agent-sdk".`
     );
   }
 
@@ -636,7 +636,10 @@ program
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
   .optionsGroup("AI Provider Configuration")
-  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option(
+    "--provider <provider>",
+    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk). Env: MM_AI_PROVIDER"
+  )
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
@@ -873,8 +876,8 @@ program
 program
   .command("doctor")
   .description("Check AI provider CLI installations and configuration")
-  .option("--provider <provider>", "Check specific provider (copilot, opencode)")
-  .action((options: { provider?: string }) => {
+  .option("--provider <provider>", "Check specific provider (copilot, opencode, claude-agent-sdk)")
+  .action(async (options: { provider?: string }) => {
     const output = consoleOutputWriter;
     const env = processEnvironment;
     output.log("\n🔍 merge-mentor diagnostics\n");
@@ -888,6 +891,19 @@ program
     if (providersToCheck.length > 0) {
       for (const provider of providersToCheck) {
         output.log(`\n📦 Checking ${provider} CLI:`);
+
+        if (provider === "claude-agent-sdk" || provider === "claude") {
+          try {
+            await import("@anthropic-ai/claude-agent-sdk");
+            output.log("  ✅ Installed: @anthropic-ai/claude-agent-sdk package is importable");
+          } catch (error) {
+            output.log(
+              "  ❌ Not found: @anthropic-ai/claude-agent-sdk is not installed or importable"
+            );
+            output.log(`     Error: ${(error as Error).message}`);
+          }
+          continue;
+        }
 
         try {
           const versionOutput = execSync(`${provider} --version`, {

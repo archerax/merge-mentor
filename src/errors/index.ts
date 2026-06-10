@@ -66,7 +66,7 @@ export class AIProviderError extends MergeMentorError {
     /**
      * The AI provider (copilot-sdk or opencode-sdk) where the error occurred.
      */
-    public readonly provider: "copilot-sdk" | "opencode-sdk",
+    public readonly provider: "copilot-sdk" | "opencode-sdk" | "claude-agent-sdk",
     message: string,
     options?: ErrorOptions
   ) {

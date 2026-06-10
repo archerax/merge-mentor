@@ -1,4 +1,5 @@
 import { ConfigurationError, ValidationError } from "../errors/index.js";
+import { ClaudeAgentSdkProvider } from "./providers/claude-agent-sdk.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
 import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./types.js";
@@ -36,10 +37,12 @@ export function createAIProvider(
       return new CopilotSdkProvider(options);
     case "opencode-sdk":
       return new OpenCodeSdkProvider(options);
+    case "claude-agent-sdk":
+      return new ClaudeAgentSdkProvider(options);
     default:
       throw new ConfigurationError(
         "AI_PROVIDER",
-        `Unsupported AI provider: ${type as string}. Valid options are: copilot-sdk, opencode-sdk`
+        `Unsupported AI provider: ${type as string}. Valid options are: copilot-sdk, opencode-sdk, claude-agent-sdk`
       );
   }
 }

@@ -12,7 +12,7 @@ export interface FastReviewResult {
 }
 
 /** Supported AI provider types. */
-export type AIProviderType = "copilot-sdk" | "opencode-sdk";
+export type AIProviderType = "copilot-sdk" | "opencode-sdk" | "claude-agent-sdk";
 
 /** Valid reasoning effort levels for models that support it. */
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";

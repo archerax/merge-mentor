@@ -76,7 +76,9 @@ export interface Config {
   readonly reasoningEffort?: ReasoningEffort;
 }
 
-const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-sdk");
+const AIProviderSchema = z
+  .enum(["copilot-sdk", "opencode-sdk", "claude-agent-sdk"])
+  .catch("copilot-sdk");
 const GitBackendSchema = z.enum(["cli", "isomorphic"]).catch("cli");
 
 const ConfigParserSchema = z.object({
