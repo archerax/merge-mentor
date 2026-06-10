@@ -328,6 +328,68 @@ describe("ReviewEngine", () => {
       expect(result.filesSkipped).toBe(0);
     });
 
+    it("loads project configuration when .mergementor.json is present", async () => {
+      const { nodeFs } = await import("../ports/index.js");
+      try {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+        });
+        const prDetails = createPRDetails();
+        const files: PRFile[] = [createPRFile({ filename: "src/auth.ts" })];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+        vi.mocked(nodeFs.access).mockResolvedValue(undefined);
+        vi.mocked(nodeFs.readFile).mockImplementation(async (filePath) => {
+          if (typeof filePath === "string" && filePath.endsWith(".mergementor.json")) {
+            return JSON.stringify({
+              testFilePatterns: ["tests/**/*.ts"],
+              testMapping: {
+                "^src/(.*)\\.ts$": "tests/$1.test.ts",
+              },
+            });
+          }
+          return "";
+        });
+
+        const result = await engine.reviewPR(123);
+        expect(result).toBeDefined();
+      } finally {
+        vi.mocked(nodeFs.readFile).mockImplementation(async () => "");
+        vi.mocked(nodeFs.access).mockImplementation(async () => undefined);
+      }
+    });
+
+    it("throws error when .mergementor.json is malformed JSON", async () => {
+      const { nodeFs } = await import("../ports/index.js");
+      try {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+        });
+        const prDetails = createPRDetails();
+        const files: PRFile[] = [createPRFile({ filename: "src/auth.ts" })];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+        vi.mocked(nodeFs.access).mockResolvedValue(undefined);
+        vi.mocked(nodeFs.readFile).mockImplementation(async (filePath) => {
+          if (typeof filePath === "string" && filePath.endsWith(".mergementor.json")) {
+            return "{invalid-json}";
+          }
+          return "";
+        });
+
+        await expect(engine.reviewPR(123)).rejects.toThrow("Failed to parse .mergementor.json");
+      } finally {
+        vi.mocked(nodeFs.readFile).mockImplementation(async () => "");
+        vi.mocked(nodeFs.access).mockImplementation(async () => undefined);
+      }
+    });
+
     it("skips binary and generated files", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,

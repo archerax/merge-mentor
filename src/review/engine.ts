@@ -43,6 +43,7 @@
  */
 
 import path from "node:path";
+import { z } from "zod";
 import {
   type AIProviderClient,
   type AIProviderType,
@@ -77,8 +78,20 @@ import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
 import { parsePRNumber } from "../utils/prIdentifier.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
-import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
+import {
+  findTestFileForProduction,
+  isTestFile,
+  type TestMapperOptions,
+} from "../utils/testFileMapper.js";
 import { mergeTokenUsage } from "../utils/tokenUsage.js";
+
+const ProjectConfigSchema = z
+  .object({
+    testFilePatterns: z.array(z.string()).optional(),
+    testMapping: z.record(z.string(), z.string()).optional(),
+  })
+  .strict();
+
 import { CommentManager } from "./commentManager.js";
 import { type DiffManifest, DiffStorage } from "./diffStorage.js";
 import type { GitBackendType } from "./gitClient.js";
@@ -238,6 +251,7 @@ export class ReviewEngine {
   private platformName = "unknown";
   private readonly streamingEnabled: boolean;
   private readonly streamingLines: number;
+  private projectConfig: TestMapperOptions = {};
 
   /**
    * Creates a new ReviewEngine.
@@ -401,6 +415,9 @@ export class ReviewEngine {
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
     const repoPath = await this.resolveWorkspace(prDetails.headBranch);
+
+    // Load custom project configuration if available
+    await this.loadProjectConfig(repoPath);
 
     const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
     const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
@@ -630,6 +647,44 @@ export class ReviewEngine {
   }
 
   /**
+   * Loads custom project configuration (.mergementor.json) from the workspace root if it exists.
+   */
+  private async loadProjectConfig(repoPath: string): Promise<void> {
+    const configPath = path.join(repoPath, ".mergementor.json");
+    try {
+      await this.fileSystem.access(configPath);
+      const content = await this.fileSystem.readFile(configPath, "utf-8");
+      if (!content || content.trim() === "") {
+        return;
+      }
+      const parsed = JSON.parse(content);
+      const result = ProjectConfigSchema.safeParse(parsed);
+      if (result.success) {
+        this.projectConfig = {
+          testFilePatterns: result.data.testFilePatterns,
+          testMapping: result.data.testMapping,
+        };
+        this.logger.info(
+          { projectConfig: this.projectConfig },
+          "Loaded custom project configuration from .mergementor.json"
+        );
+      } else {
+        this.logger.warn(
+          { error: result.error.format() },
+          "Invalid .mergementor.json schema configuration"
+        );
+      }
+    } catch (error) {
+      // Configuration is optional, do not throw on failure unless it is malformed JSON
+      if (error instanceof SyntaxError) {
+        this.logger.error({ error }, "Malformed JSON in .mergementor.json");
+        throw new Error(`Failed to parse .mergementor.json: ${error.message}`);
+      }
+      this.logger.debug({ error }, "No custom project configuration found or readable");
+    }
+  }
+
+  /**
    * Ensures repository is cloned for CLI agent workspace access.
    * Returns the path to the cloned repository.
    * @throws {Error} If repository cloning fails
@@ -685,19 +740,23 @@ export class ReviewEngine {
   }
 
   private buildTestingPassContextSection(filenames: readonly string[]): string {
-    const productionFiles = filenames.filter((filename) => !isTestFile(filename));
+    const productionFiles = filenames.filter(
+      (filename) => !isTestFile(filename, this.projectConfig)
+    );
     const language = productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
     const mappedTests = productionFiles
       .map((productionFile) => ({
         productionFile,
-        testFile: findTestFileForProduction(productionFile, filenames),
+        testFile: findTestFileForProduction(productionFile, filenames, this.projectConfig),
       }))
       .filter((entry) => entry.testFile !== undefined)
       .map((entry) => `${entry.productionFile} -> ${entry.testFile}`);
     const missingTests = productionFiles.filter(
-      (productionFile) => !findTestFileForProduction(productionFile, filenames)
+      (productionFile) => !findTestFileForProduction(productionFile, filenames, this.projectConfig)
     );
-    const changedTestFiles = filenames.filter((filename) => isTestFile(filename));
+    const changedTestFiles = filenames.filter((filename) =>
+      isTestFile(filename, this.projectConfig)
+    );
 
     return `# TESTING PASS CONTEXT
 - Detected language: ${language}

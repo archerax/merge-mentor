@@ -1,4 +1,13 @@
+import micromatch from "micromatch";
 import { detectLanguage } from "./languageDetector.js";
+
+/**
+ * Options for customizing test file mapping.
+ */
+export interface TestMapperOptions {
+  readonly testFilePatterns?: readonly string[];
+  readonly testMapping?: Record<string, string>;
+}
 
 /**
  * Test file mapping utilities for code reviews.
@@ -43,7 +52,11 @@ import { detectLanguage } from "./languageDetector.js";
  * isTestFile("UserService.ts") // false
  * ```
  */
-export function isTestFile(filename: string): boolean {
+export function isTestFile(filename: string, options?: TestMapperOptions): boolean {
+  if (options?.testFilePatterns && options.testFilePatterns.length > 0) {
+    return micromatch.isMatch(filename, options.testFilePatterns as string[]);
+  }
+
   const lowercaseFilename = filename.toLowerCase();
   const language = detectLanguage(filename);
 
@@ -77,11 +90,30 @@ export function isTestFile(filename: string): boolean {
  */
 export function findTestFileForProduction(
   productionFilename: string,
-  allFiles: readonly string[]
+  allFiles: readonly string[],
+  options?: TestMapperOptions
 ): string | undefined {
   // Skip if the file itself is a test file
-  if (isTestFile(productionFilename)) {
+  if (isTestFile(productionFilename, options)) {
     return undefined;
+  }
+
+  // Check custom test mappings first if configured
+  if (options?.testMapping) {
+    for (const [pattern, replacement] of Object.entries(options.testMapping)) {
+      try {
+        const regex = new RegExp(pattern, "i");
+        if (regex.test(productionFilename)) {
+          const mappedName = productionFilename.replace(regex, replacement);
+          const match = allFiles.find(
+            (f) => f === mappedName || f.toLowerCase() === mappedName.toLowerCase()
+          );
+          if (match) return match;
+        }
+      } catch {
+        // Skip invalid regexes
+      }
+    }
   }
 
   const language = detectLanguage(productionFilename);

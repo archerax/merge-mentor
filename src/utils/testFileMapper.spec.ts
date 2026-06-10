@@ -169,5 +169,32 @@ describe("testFileMapper", () => {
         expect(findTestFileForProduction("Makefile", files)).toBeUndefined();
       });
     });
+
+    describe("custom patterns and mapping options", () => {
+      test("identifies test files using custom glob patterns", () => {
+        const options = { testFilePatterns: ["tests/unit/**/*.ts", "**/test-*.ts"] };
+        expect(isTestFile("tests/unit/auth.ts", options)).toBe(true);
+        expect(isTestFile("src/test-auth.ts", options)).toBe(true);
+        expect(isTestFile("src/auth.ts", options)).toBe(false);
+      });
+
+      test("finds test file using custom regex mapping", () => {
+        const options = {
+          testMapping: {
+            "^src/(.*)\\.ts$": "tests/unit/$1.test.ts",
+          },
+        };
+        const files = ["src/auth.ts", "tests/unit/auth.test.ts"];
+        expect(findTestFileForProduction("src/auth.ts", files, options)).toBe(
+          "tests/unit/auth.test.ts"
+        );
+      });
+
+      test("exclusively uses custom patterns when provided", () => {
+        const options = { testFilePatterns: ["tests/unit/**/*.ts"] };
+        expect(isTestFile("tests/unit/auth.ts", options)).toBe(true);
+        expect(isTestFile("auth.test.ts", options)).toBe(false);
+      });
+    });
   });
 });

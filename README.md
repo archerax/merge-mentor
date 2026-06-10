@@ -851,6 +851,38 @@ steps:
 >
 > When `MM_AZURE_TOKEN` is set, `SYSTEM_ACCESSTOKEN` is not required. Store your PAT as a pipeline secret variable named `MERGE_MENTOR_PAT` (or any name you prefer) in the pipeline library or variable group.
 
+### CI/CD Caching (Highly Recommended)
+
+Merge Mentor automatically caches the review state (under `.mergementor/`) to skip reviewing files that haven't changed since the last run. Since CI environments run on ephemeral runner VMs that are destroyed after completion, you should configure your workflow to persist this directory across builds. This prevents redundant reviews and saves AI token costs.
+
+#### GitHub Actions
+
+Use `actions/cache` to persist the `.mergementor` directory:
+
+```yaml
+- name: Cache Merge Mentor State
+  uses: actions/cache@v4
+  with:
+    path: .mergementor
+    key: ${{ runner.os }}-merge-mentor-${{ github.ref_name }}-${{ github.run_id }}
+    restore-keys: |
+      ${{ runner.os }}-merge-mentor-${{ github.ref_name }}-
+      ${{ runner.os }}-merge-mentor-
+```
+
+#### Azure Pipelines
+
+Use the `Cache@2` task to persist the `.mergementor` directory:
+
+```yaml
+- task: Cache@2
+  inputs:
+    key: 'merge-mentor | "$(Agent.OS)" | "$(Build.SourceBranchName)"'
+    path: .mergementor
+    cacheHitVar: CACHE_RESTORED
+  displayName: Cache Merge Mentor State
+```
+
 ### Overriding CI-detected values
 
 Explicit flags always take priority over CI-detected values, so you can still override individual options:
