@@ -35,7 +35,7 @@
     "static-analysis"
   ],
   "author": "archerax",
-  "license": "PROPRIETARY",
+  "license": "MIT",
   "preferGlobal": true,
   "type": "module",
   "engines": {
