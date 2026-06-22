@@ -173,4 +173,35 @@ export interface PlatformAdapter {
    * @param body - Comment body
    */
   postGeneralComment(prNumber: number, body: string): Promise<void>;
+
+  /**
+   * Retrieves Product Backlog Item / User Story / Issue details by ID.
+   * @param id - The work item ID or issue number
+   */
+  getPBIDetails(id: string): Promise<PBIDetails>;
+
+  /**
+   * Posts or updates a comment/discussion on a PBI/Issue.
+   * @param id - The work item ID or issue number
+   * @param body - Comment body
+   * @param commentId - Optional comment ID to update an existing comment in-place
+   */
+  postPBIComment(id: string, body: string, commentId?: number | string): Promise<void>;
+}
+
+/** A comment on a Product Backlog Item / User Story / Issue. */
+export interface PBIComment {
+  readonly id: number | string;
+  readonly body: string;
+}
+
+/** Details about a Product Backlog Item / User Story / Issue. */
+export interface PBIDetails {
+  readonly id: string;
+  readonly platform: "github" | "azure";
+  readonly title: string;
+  readonly description: string;
+  readonly acceptanceCriteria?: string;
+  readonly storyPoints?: number;
+  readonly comments: readonly PBIComment[];
 }

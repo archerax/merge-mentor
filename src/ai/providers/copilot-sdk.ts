@@ -1,6 +1,7 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PermissionHandler, PermissionRequest, SessionEvent } from "@github/copilot-sdk";
-import { CopilotClient } from "@github/copilot-sdk";
+import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { AIProviderError, JsonParseError, ValidationError } from "../../errors/index.js";
@@ -227,9 +228,26 @@ export class CopilotSdkProvider implements AIProviderClient {
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
+    let resolvedCliPath: string | undefined;
+    try {
+      const sdkUrl = import.meta.resolve("@github/copilot/sdk");
+      const sdkPath = fileURLToPath(sdkUrl);
+      resolvedCliPath = path.join(path.dirname(path.dirname(sdkPath)), "index.js");
+    } catch (error) {
+      this.logger.debug(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Could not resolve @github/copilot/sdk path dynamically"
+      );
+    }
+
     const config: Record<string, unknown> = {};
     if (this.token) {
       config.gitHubToken = this.token;
+    }
+    if (process.env.COPILOT_CLI_PATH) {
+      config.connection = RuntimeConnection.forStdio({ path: process.env.COPILOT_CLI_PATH });
+    } else if (resolvedCliPath) {
+      config.connection = RuntimeConnection.forStdio({ path: resolvedCliPath });
     }
 
     this.client = new CopilotClient(Object.keys(config).length > 0 ? config : undefined);

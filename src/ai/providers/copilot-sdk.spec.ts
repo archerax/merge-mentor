@@ -21,6 +21,9 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
 vi.mock("@github/copilot-sdk", () => ({
   CopilotClient: MockCopilotClient,
   defineTool: vi.fn((name, config) => ({ name, ...config })),
+  RuntimeConnection: {
+    forStdio: vi.fn((options) => ({ kind: "stdio", ...options })),
+  },
 }));
 
 vi.mock("../../ports/index.js", async (importOriginal) => {
@@ -662,7 +665,7 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
-    it("does not pass config when no token provided", async () => {
+    it("does not pass gitHubToken when no token provided", async () => {
       const provider = createProvider(1, 5000);
       mockSuccessfulPrompt();
 
@@ -670,7 +673,12 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      expect(MockCopilotClient).toHaveBeenCalledWith(undefined);
+      const lastCallArgs = MockCopilotClient.mock.calls[MockCopilotClient.mock.calls.length - 1][0];
+      if (lastCallArgs !== undefined) {
+        expect(lastCallArgs.gitHubToken).toBeUndefined();
+      } else {
+        expect(lastCallArgs).toBeUndefined();
+      }
     });
 
     it("disables sub-agent streaming deltas to preserve JSON-only output", async () => {

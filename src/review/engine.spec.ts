@@ -138,6 +138,8 @@ function createMockPlatform(): PlatformAdapter {
     getExistingBotComments: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
+    getPBIDetails: vi.fn(),
+    postPBIComment: vi.fn(),
   };
 }
 

@@ -48,6 +48,7 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
+    "@github/copilot": "^1.0.63",
     "@github/copilot-sdk": "^1.0.2",
     "@octokit/rest": "^22.0.1",
     "@opencode-ai/sdk": "^1.17.9",

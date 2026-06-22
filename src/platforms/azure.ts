@@ -13,6 +13,8 @@ import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
   FileStatus,
+  PBIComment,
+  PBIDetails,
   PlatformAdapter,
   PRDetails,
   PRFile,
@@ -665,4 +667,108 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       throw error;
     }
   }
+
+  async getPBIDetails(id: string): Promise<PBIDetails> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await this.connection.getWorkItemTrackingApi();
+      const workItem = await withRateLimitHandling(
+        () => witApi.getWorkItem(workItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
+      );
+
+      if (!workItem?.fields) {
+        throw new Error(`Work item with ID ${id} not found.`);
+      }
+
+      const title = (workItem.fields["System.Title"] as string) || "";
+      const rawDescription = (workItem.fields["System.Description"] as string) || "";
+      const rawAcceptanceCriteria =
+        (workItem.fields["Microsoft.VSTS.Common.AcceptanceCriteria"] as string) || "";
+
+      const storyPointsValue =
+        workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
+        workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
+      const storyPoints =
+        storyPointsValue !== undefined && storyPointsValue !== null
+          ? Number.parseFloat(storyPointsValue.toString())
+          : undefined;
+
+      const description = stripHtml(rawDescription);
+      const acceptanceCriteria = stripHtml(rawAcceptanceCriteria);
+
+      const commentsList = await withRateLimitHandling(() =>
+        witApi.getComments(this.project, workItemId)
+      );
+
+      const comments: PBIComment[] = (commentsList.comments || []).map((c) => ({
+        id: c.id ?? "",
+        body: stripHtml(c.text || ""),
+      }));
+
+      return {
+        id,
+        platform: "azure",
+        title,
+        description,
+        acceptanceCriteria: acceptanceCriteria || undefined,
+        storyPoints,
+        comments,
+      };
+    } catch (error) {
+      this.logger.error(
+        { id, error: (error as Error).message },
+        "Failed to fetch Azure DevOps work item details"
+      );
+      throw error;
+    }
+  }
+
+  async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await this.connection.getWorkItemTrackingApi();
+      if (commentId !== undefined) {
+        const numericCommentId =
+          typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
+        await withRateLimitHandling(() =>
+          witApi.updateComment({ text: body }, this.project, workItemId, numericCommentId)
+        );
+        this.logger.info({ id, commentId }, "Work item comment updated successfully");
+      } else {
+        await withRateLimitHandling(() =>
+          witApi.addComment({ text: body }, this.project, workItemId)
+        );
+        this.logger.info({ id }, "Work item comment created successfully");
+      }
+    } catch (error) {
+      this.logger.error(
+        { id, commentId, error: (error as Error).message },
+        "Failed to post/update Azure DevOps comment"
+      );
+      throw error;
+    }
+  }
+}
+
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<li>/gi, "\n- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .trim();
 }

@@ -7,6 +7,7 @@ import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
   FileStatus,
+  PBIDetails,
   PlatformAdapter,
   PRDetails,
   PRFile,
@@ -247,4 +248,103 @@ export class GitHubAdapter implements PlatformAdapter {
       throw error;
     }
   }
+
+  async getPBIDetails(id: string): Promise<PBIDetails> {
+    const issueNumber = Number.parseInt(id, 10);
+    if (Number.isNaN(issueNumber)) {
+      throw new Error(`Invalid GitHub issue number: "${id}"`);
+    }
+
+    try {
+      const { data: issue } = await withRateLimitHandling(() =>
+        this.octokit.issues.get({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: issueNumber,
+        })
+      );
+
+      const commentsData = await withRateLimitHandling(() =>
+        this.octokit.paginate(this.octokit.issues.listComments, {
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: issueNumber,
+          per_page: DEFAULT_PAGE_SIZE,
+        })
+      );
+
+      const description = issue.body || "";
+      return {
+        id,
+        platform: "github",
+        title: issue.title,
+        description,
+        acceptanceCriteria: parseAcceptanceCriteria(description),
+        storyPoints: parseStoryPoints(description),
+        comments: commentsData.map((c) => ({
+          id: c.id,
+          body: c.body || "",
+        })),
+      };
+    } catch (error) {
+      this.logger.error(
+        { id, error: (error as Error).message },
+        "Failed to fetch GitHub PBI details"
+      );
+      throw error;
+    }
+  }
+
+  async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
+    const issueNumber = Number.parseInt(id, 10);
+    if (Number.isNaN(issueNumber)) {
+      throw new Error(`Invalid GitHub issue number: "${id}"`);
+    }
+
+    try {
+      if (commentId !== undefined) {
+        const numericCommentId =
+          typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
+        await withRateLimitHandling(() =>
+          this.octokit.issues.updateComment({
+            owner: this.owner,
+            repo: this.repo,
+            comment_id: numericCommentId,
+            body,
+          })
+        );
+        this.logger.info({ id, commentId }, "PBI comment updated successfully");
+      } else {
+        await withRateLimitHandling(() =>
+          this.octokit.issues.createComment({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issueNumber,
+            body,
+          })
+        );
+        this.logger.info({ id }, "PBI comment created successfully");
+      }
+    } catch (error) {
+      this.logger.error(
+        { id, commentId, error: (error as Error).message },
+        "Failed to post/update PBI comment"
+      );
+      throw error;
+    }
+  }
+}
+
+function parseAcceptanceCriteria(body: string | null): string | undefined {
+  if (!body) return undefined;
+  const match = body.match(
+    /(?:^|\n)(?:[#*_\s]*acceptance\s+criteria[#*_\s]*)\r?\n([\s\S]*?)(?=(?:\n\s*#{1,6}\s|\n\s*\*+\s*|$))/i
+  );
+  return match ? match[1].trim() : undefined;
+}
+
+function parseStoryPoints(body: string | null): number | undefined {
+  if (!body) return undefined;
+  const match = body.match(/(?:story\s+points?|sp|points?)\s*[:=-]\s*(\d+(?:\.\d+)?)/i);
+  return match ? Number.parseFloat(match[1]) : undefined;
 }
