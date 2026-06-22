@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-06-22
+
+### Added
+
+- **PBI and User Story Review**: Introduced automated review support for Product Backlog Items (PBIs) and User Stories. Users can now run INVEST quality checks and receive structured feedback.
+- **Git Remote Parsing**: Added a new git remote URL parser to automatically detect and identify GitHub and Azure DevOps platforms and repository coordinates.
+
+### Fixed
+
+- **Copilot CLI Path Resolution**: Resolved the "Copilot CLI not found" error when running reviews under the Copilot SDK provider by ensuring a reliable search path and fallback for the Copilot CLI binary.
+
 ## [2.3.0] - 2026-06-10
 
 ### Added
