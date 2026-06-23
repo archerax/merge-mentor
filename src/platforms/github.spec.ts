@@ -447,7 +447,7 @@ describe("GitHubAdapter", () => {
         mockOctokitInstance.issues.get.mockResolvedValue({
           data: {
             title: "Test Issue",
-            body: "Some body text\n### Acceptance Criteria\n- AC1\n- AC2\nStory Points: 8\n",
+            body: "Some body text\n### Acceptance Criteria\n- AC1\n- AC2\n### Story Points\nStory Points: 8\n",
           },
         });
         mockOctokitInstance.paginate.mockResolvedValue([
