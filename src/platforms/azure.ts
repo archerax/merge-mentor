@@ -738,13 +738,82 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       if (commentId !== undefined) {
         const numericCommentId =
           typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
+        const routeValues = {
+          project: this.project,
+          workItemId,
+          commentId: numericCommentId,
+        };
+        const verData = await (
+          witApi as unknown as {
+            vsoClient: {
+              getVersioningData: (
+                apiVersion: string,
+                area: string,
+                locationId: string,
+                routeValues: Record<string, unknown>
+              ) => Promise<{ requestUrl: string; apiVersion: string }>;
+            };
+          }
+        ).vsoClient.getVersioningData(
+          "7.1-preview.3",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          routeValues
+        );
+        const url = `${verData.requestUrl}?format=markdown`;
+        const options = (
+          witApi as unknown as {
+            createRequestOptions: (type: string, apiVersion?: string) => unknown;
+          }
+        ).createRequestOptions("application/json", verData.apiVersion);
+
         await withRateLimitHandling(() =>
-          witApi.updateComment({ text: body }, this.project, workItemId, numericCommentId)
+          (
+            witApi as unknown as {
+              rest: {
+                update: (url: string, data: unknown, options: unknown) => Promise<unknown>;
+              };
+            }
+          ).rest.update(url, { text: body }, options)
         );
         this.logger.info({ id, commentId }, "Work item comment updated successfully");
       } else {
+        const routeValues = {
+          project: this.project,
+          workItemId,
+        };
+        const verData = await (
+          witApi as unknown as {
+            vsoClient: {
+              getVersioningData: (
+                apiVersion: string,
+                area: string,
+                locationId: string,
+                routeValues: Record<string, unknown>
+              ) => Promise<{ requestUrl: string; apiVersion: string }>;
+            };
+          }
+        ).vsoClient.getVersioningData(
+          "7.1-preview.3",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          routeValues
+        );
+        const url = `${verData.requestUrl}?format=markdown`;
+        const options = (
+          witApi as unknown as {
+            createRequestOptions: (type: string, apiVersion?: string) => unknown;
+          }
+        ).createRequestOptions("application/json", verData.apiVersion);
+
         await withRateLimitHandling(() =>
-          witApi.addComment({ text: body }, this.project, workItemId)
+          (
+            witApi as unknown as {
+              rest: {
+                create: (url: string, data: unknown, options: unknown) => Promise<unknown>;
+              };
+            }
+          ).rest.create(url, { text: body }, options)
         );
         this.logger.info({ id }, "Work item comment created successfully");
       }
@@ -760,7 +829,15 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
-  return html
+
+  // Temporarily store HTML comments in a placeholder map to keep them from being stripped
+  const comments: string[] = [];
+  const placeholderHtml = html.replace(/<!--[\s\S]*?-->/g, (match) => {
+    comments.push(match);
+    return `__HTML_COMMENT_PLACEHOLDER_${comments.length - 1}__`;
+  });
+
+  let stripped = placeholderHtml
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/div>/gi, "\n")
@@ -771,4 +848,11 @@ function stripHtml(html: string | null | undefined): string {
     .replace(/&gt;/gi, ">")
     .replace(/&amp;/gi, "&")
     .trim();
+
+  // Restore the original HTML comments
+  for (let i = 0; i < comments.length; i++) {
+    stripped = stripped.replace(`__HTML_COMMENT_PLACEHOLDER_${i}__`, comments[i]);
+  }
+
+  return stripped;
 }

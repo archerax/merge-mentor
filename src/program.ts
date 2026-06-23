@@ -1033,9 +1033,12 @@ async function executePBIReview(id: string, options: PBIOptions): Promise<void> 
     }
   }
 
+  const resolvedPlatform =
+    options.platform ?? processEnvironment.get("MM_PLATFORM") ?? detectedPlatform;
+
   // Load config. Standard values will default if undefined.
   const config = loadConfig({
-    platform: options.platform ?? detectedPlatform,
+    platform: resolvedPlatform,
     githubToken: options.githubToken,
     githubRepoOwner: options.githubRepoOwner ?? detectedGithubOwner,
     githubRepoName: options.githubRepoName ?? detectedGithubRepo,
@@ -1050,7 +1053,7 @@ async function executePBIReview(id: string, options: PBIOptions): Promise<void> 
     tempPath: options.tempPath,
   });
 
-  const platform = (options.platform ?? detectedPlatform ?? config.defaultPlatform) as Platform;
+  const platform = config.defaultPlatform;
   if (!["github", "azure"].includes(platform)) {
     throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
   }
@@ -1077,6 +1080,7 @@ async function executePBIReview(id: string, options: PBIOptions): Promise<void> 
     dryRun: !options.write,
     tempPath: config.tempPath,
     aiProvider,
+    aiModel: config.aiModel,
   });
 
   await engine.reviewPBI(id);

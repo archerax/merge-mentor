@@ -1950,6 +1950,28 @@ describe("CLI", () => {
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
 
+    it("respects MM_PLATFORM environment variable when CLI option is not provided", async () => {
+      vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
+      process.env.MM_PLATFORM = "azure";
+
+      vi.mocked(loadConfig).mockImplementationOnce((cliOverrides) => {
+        return createMockConfig({
+          defaultPlatform: (cliOverrides?.platform ?? "github") as "github" | "azure",
+        });
+      });
+
+      await program.parseAsync(["node", "test", "pbi", "12345"]);
+
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "azure",
+        })
+      );
+      expect(AzureDevOpsAdapter).toHaveBeenCalled();
+
+      delete process.env.MM_PLATFORM;
+    });
+
     it("errors and exits when executePBIReview throws", async () => {
       const mockPbiEngine = await import("./review/pbiEngine.js");
       // biome-ignore lint/complexity/useArrowFunction: regular function required so it can be constructible when called with new

@@ -8,6 +8,14 @@ const mockWitApiInstance = {
   getComments: vi.fn(),
   addComment: vi.fn(),
   updateComment: vi.fn(),
+  vsoClient: {
+    getVersioningData: vi.fn(),
+  },
+  rest: {
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+  createRequestOptions: vi.fn(),
 };
 
 const mockGitApiInstance = {
@@ -1127,6 +1135,23 @@ describe("AzureDevOpsAdapter", () => {
         expect(result.comments[0].body).toBe("Comment 1");
       });
 
+      it("preserves HTML comments (like review signatures) when stripping HTML from comments", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({
+          comments: [{ id: 1, text: "<p>Old review</p><!-- merge-mentor-pbi-review -->" }],
+        });
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(result.comments).toHaveLength(1);
+        expect(result.comments[0].body).toBe("Old review\n<!-- merge-mentor-pbi-review -->");
+      });
+
       it("handles missing description, acceptance criteria, story points, and comments", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockResolvedValue({
@@ -1166,48 +1191,95 @@ describe("AzureDevOpsAdapter", () => {
 
       it("creates a new comment if commentId is undefined", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        mockWitApiInstance.addComment.mockResolvedValue({});
+        mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
+          requestUrl:
+            "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments",
+          apiVersion: "7.1-preview.3",
+        });
+        mockWitApiInstance.createRequestOptions.mockReturnValue({
+          acceptHeader: "application/json",
+        });
+        mockWitApiInstance.rest.create.mockResolvedValue({ result: {} });
 
         await adapter.postPBIComment("123", "test comment");
 
-        expect(mockWitApiInstance.addComment).toHaveBeenCalledWith(
+        expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
+          "7.1-preview.3",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          { project: "test-project", workItemId: 123 }
+        );
+        expect(mockWitApiInstance.createRequestOptions).toHaveBeenCalledWith(
+          "application/json",
+          "7.1-preview.3"
+        );
+        expect(mockWitApiInstance.rest.create).toHaveBeenCalledWith(
+          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments?format=markdown",
           { text: "test comment" },
-          "test-project",
-          123
+          { acceptHeader: "application/json" }
         );
       });
 
       it("updates an existing comment if commentId is defined", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        mockWitApiInstance.updateComment.mockResolvedValue({});
+        mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
+          requestUrl:
+            "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999",
+          apiVersion: "7.1-preview.3",
+        });
+        mockWitApiInstance.createRequestOptions.mockReturnValue({
+          acceptHeader: "application/json",
+        });
+        mockWitApiInstance.rest.update.mockResolvedValue({ result: {} });
 
         await adapter.postPBIComment("123", "updated comment", 999);
 
-        expect(mockWitApiInstance.updateComment).toHaveBeenCalledWith(
+        expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
+          "7.1-preview.3",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          { project: "test-project", workItemId: 123, commentId: 999 }
+        );
+        expect(mockWitApiInstance.rest.update).toHaveBeenCalledWith(
+          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999?format=markdown",
           { text: "updated comment" },
-          "test-project",
-          123,
-          999
+          { acceptHeader: "application/json" }
         );
       });
 
       it("updates comment if commentId is a string", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        mockWitApiInstance.updateComment.mockResolvedValue({});
+        mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
+          requestUrl:
+            "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999",
+          apiVersion: "7.1-preview.3",
+        });
+        mockWitApiInstance.createRequestOptions.mockReturnValue({
+          acceptHeader: "application/json",
+        });
+        mockWitApiInstance.rest.update.mockResolvedValue({ result: {} });
 
         await adapter.postPBIComment("123", "updated comment", "999");
 
-        expect(mockWitApiInstance.updateComment).toHaveBeenCalledWith(
-          { text: "updated comment" },
-          "test-project",
-          123,
-          999
+        expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
+          "7.1-preview.3",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          { project: "test-project", workItemId: 123, commentId: 999 }
         );
       });
 
       it("logs error and rethrows on post/update failure", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        mockWitApiInstance.addComment.mockRejectedValue(new Error("Post failed"));
+        mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
+          requestUrl:
+            "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments",
+          apiVersion: "7.1-preview.3",
+        });
+        mockWitApiInstance.createRequestOptions.mockReturnValue({
+          acceptHeader: "application/json",
+        });
+        mockWitApiInstance.rest.create.mockRejectedValue(new Error("Post failed"));
 
         await expect(adapter.postPBIComment("123", "test")).rejects.toThrow("Post failed");
       });

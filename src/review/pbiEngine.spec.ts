@@ -108,6 +108,39 @@ describe("PBIReviewEngine", () => {
     );
   });
 
+  it("includes Merge Mentor version and AI model in the PBI review footer", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new PBIReviewEngine(adapter, aiClient, {
+      dryRun: false,
+      aiModel: "custom-test-model",
+    });
+
+    await engine.reviewPBI("12345");
+
+    expect(adapter.postPBIComment).toHaveBeenCalledWith(
+      "12345",
+      expect.stringContaining("Merge Mentor v")
+    );
+    expect(adapter.postPBIComment).toHaveBeenCalledWith(
+      "12345",
+      expect.stringContaining("PBI review, custom-test-model")
+    );
+  });
+
+  it("defaults to 'AI model' in the footer if no aiModel option is specified", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+
+    await engine.reviewPBI("12345");
+
+    expect(adapter.postPBIComment).toHaveBeenCalledWith(
+      "12345",
+      expect.stringContaining("PBI review, AI model")
+    );
+  });
+
   it("should skip writing comment when dryRun option is set", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();

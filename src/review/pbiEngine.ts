@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import packageJson from "../../package.json" with { type: "json" };
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
 import { createChildLogger } from "../logger.js";
 import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
@@ -32,6 +33,7 @@ export interface PBIReviewEngineOptions {
   readonly dryRun?: boolean;
   readonly tempPath?: string;
   readonly aiProvider?: AIProviderType;
+  readonly aiModel?: string;
 }
 
 export class PBIReviewEngine {
@@ -246,17 +248,18 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 
   private generateMarkdownReport(data: PBIReviewResponse, id: string): string {
     const evalObj = data.invest_evaluation;
+    const model = this.options.aiModel?.trim() || "AI model";
     return `## 📋 PBI INVEST Review: #${id} - ${data.title}
 
 ### 📊 INVEST Model Evaluation
 
-| Dimension | Status | Feedback |
-| :--- | :--- | :--- |
-| **Independent** | ${this.getStatusEmoji(evalObj.independent.status)} | ${evalObj.independent.feedback} |
-| **Negotiable** | ${this.getStatusEmoji(evalObj.negotiable.status)} | ${evalObj.negotiable.feedback} |
-| **Valuable** | ${this.getStatusEmoji(evalObj.valuable.status)} | ${evalObj.valuable.feedback} |
-| **Estimable** | ${this.getStatusEmoji(evalObj.estimable.status)} | ${evalObj.estimable.feedback} |
-| **Testable** | ${this.getStatusEmoji(evalObj.testable.status)} | ${evalObj.testable.feedback} |
+| Dimension | Feedback |
+| :--- | :--- |
+| **Independent** | ${evalObj.independent.feedback} |
+| **Negotiable** | ${evalObj.negotiable.feedback} |
+| **Valuable** | ${evalObj.valuable.feedback} |
+| **Estimable** | ${evalObj.estimable.feedback} |
+| **Testable** | ${evalObj.testable.feedback} |
 
 ### 🎯 Overall Assessment
 ${data.overall_assessment}
@@ -268,7 +271,8 @@ ${
 }
 
 ---
-*Reviewed by Merge Mentor* <!-- merge-mentor-pbi-review -->
+Merge Mentor v${packageJson.version}, PBI review, ${model}
+<!-- merge-mentor-pbi-review -->
 `;
   }
 
