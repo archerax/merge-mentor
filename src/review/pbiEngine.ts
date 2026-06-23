@@ -56,9 +56,9 @@ export class PBIReviewEngine {
     const pbiDetails = await this.adapter.getPBIDetails(id);
 
     output.log(`📋 PBI Title: ${pbiDetails.title}`);
-    output.log(`🤖 Requesting AI review using ${provider} against INVEST model...\n`);
+    output.log(`🤖 Requesting AI review using ${provider} against quality guidelines...\n`);
 
-    const prompt = this.buildINVESTPrompt(pbiDetails);
+    const prompt = this.buildPBIReviewPrompt(pbiDetails);
     const aiResponse = await this.aiClient.executePrompt(prompt);
 
     const parsedResult = PBIReviewResponseSchema.safeParse(aiResponse.parsed);
@@ -76,7 +76,7 @@ export class PBIReviewEngine {
     try {
       const reportDir = join(tempPath, "reports");
       mkdirSync(reportDir, { recursive: true });
-      const reportFile = join(reportDir, `pbi-${id}-invest-report.md`);
+      const reportFile = join(reportDir, `pbi-${id}-review-report.md`);
       writeFileSync(reportFile, reportMarkdown, "utf-8");
       output.log(`📄 Detailed report saved to: ${reportFile}\n`);
     } catch (error) {
@@ -108,13 +108,13 @@ export class PBIReviewEngine {
     return reviewData;
   }
 
-  private buildINVESTPrompt(pbi: PBIDetails): string {
+  private buildPBIReviewPrompt(pbi: PBIDetails): string {
     const commentsList =
       pbi.comments.length > 0
         ? pbi.comments.map((c, i) => `Comment #${i + 1}: ${c.body}`).join("\n\n")
         : "No comments yet.";
 
-    return `You are an expert Agile Coach and Product Owner reviewing a Product Backlog Item (PBI) / User Story / Issue against the INVEST model.
+    return `You are an expert Agile Coach and Product Owner reviewing a Product Backlog Item (PBI) / User Story / Issue against backlog quality guidelines.
 
 # PBI DETAILS
 - **Title:** ${pbi.title}
@@ -125,7 +125,7 @@ export class PBIReviewEngine {
 # PBI COMMENTS/DISCUSSION
 ${commentsList}
 
-# EVALUATION CRITERIA (INVEST)
+# EVALUATION CRITERIA (PBI Quality Guidelines)
 Review the PBI details against the following dimensions, treating them as guidelines rather than a strict tick list:
 1. **Independent:** Can this story be completed and delivered independently of other stories?
 2. **Negotiable:** Is there room for discussion? Avoid overly prescriptive "contracts".
@@ -210,9 +210,9 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
   private generateMarkdownReport(data: PBIReviewResponse, id: string): string {
     const evalObj = data.invest_evaluation;
     const model = this.options.aiModel?.trim() || "AI model";
-    return `## 📋 PBI INVEST Review: #${id} - ${data.title}
+    return `## 📋 PBI Review: #${id} - ${data.title}
 
-### 📊 INVEST Model Evaluation
+### 📊 PBI Quality Guidelines
 
 | Dimension | Feedback |
 | :--- | :--- |
@@ -242,7 +242,7 @@ Merge Mentor v${packageJson.version}, PBI review, ${model}
     const evalObj = data.invest_evaluation;
 
     output.log("=".repeat(60));
-    output.log(`📊 INVEST Review Results: ${data.title}`);
+    output.log(`📊 PBI Review Results: ${data.title}`);
     output.log("=".repeat(60));
 
     const printDimension = (name: string, feedback: string) => {
