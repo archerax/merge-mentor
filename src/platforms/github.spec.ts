@@ -470,6 +470,24 @@ describe("GitHubAdapter", () => {
         expect(result.comments[0].body).toBe("Comment 1");
       });
 
+      it("handles missing acceptance criteria, story points, and description", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.get.mockResolvedValue({
+          data: {
+            title: "Test Issue",
+            body: null,
+          },
+        });
+        mockOctokitInstance.paginate.mockResolvedValue([]);
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(result.description).toBe("");
+        expect(result.acceptanceCriteria).toBeUndefined();
+        expect(result.storyPoints).toBeUndefined();
+        expect(result.comments).toHaveLength(0);
+      });
+
       it("logs error and rethrows on failure", async () => {
         const adapter = new GitHubAdapter(createTestConfig());
         mockOctokitInstance.issues.get.mockRejectedValue(new Error("API Error"));

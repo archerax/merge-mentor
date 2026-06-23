@@ -1123,6 +1123,27 @@ describe("AzureDevOpsAdapter", () => {
         expect(result.comments[0].body).toBe("Comment 1");
       });
 
+      it("handles missing description, acceptance criteria, story points, and comments", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({
+          comments: null,
+        });
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(result.id).toBe("123");
+        expect(result.title).toBe("Test Work Item");
+        expect(result.description).toBe("");
+        expect(result.acceptanceCriteria).toBeUndefined();
+        expect(result.storyPoints).toBeUndefined();
+        expect(result.comments).toHaveLength(0);
+      });
+
       it("logs error and rethrows on failure", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockRejectedValue(new Error("API Error"));
