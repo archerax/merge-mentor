@@ -1194,7 +1194,7 @@ describe("AzureDevOpsAdapter", () => {
         mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
           requestUrl:
             "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments",
-          apiVersion: "7.1-preview.3",
+          apiVersion: "7.1",
         });
         mockWitApiInstance.createRequestOptions.mockReturnValue({
           acceptHeader: "application/json",
@@ -1204,17 +1204,17 @@ describe("AzureDevOpsAdapter", () => {
         await adapter.postPBIComment("123", "test comment");
 
         expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
-          "7.1-preview.3",
+          "7.1",
           "wit",
           "608aac0a-32e1-4493-a863-b9cf4566d257",
           { project: "test-project", workItemId: 123 }
         );
         expect(mockWitApiInstance.createRequestOptions).toHaveBeenCalledWith(
           "application/json",
-          "7.1-preview.3"
+          "7.1"
         );
         expect(mockWitApiInstance.rest.create).toHaveBeenCalledWith(
-          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments?format=markdown",
+          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments?format=Markdown",
           { text: "test comment" },
           { acceptHeader: "application/json" }
         );
@@ -1225,7 +1225,7 @@ describe("AzureDevOpsAdapter", () => {
         mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
           requestUrl:
             "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999",
-          apiVersion: "7.1-preview.3",
+          apiVersion: "7.1",
         });
         mockWitApiInstance.createRequestOptions.mockReturnValue({
           acceptHeader: "application/json",
@@ -1235,13 +1235,13 @@ describe("AzureDevOpsAdapter", () => {
         await adapter.postPBIComment("123", "updated comment", 999);
 
         expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
-          "7.1-preview.3",
+          "7.1",
           "wit",
           "608aac0a-32e1-4493-a863-b9cf4566d257",
           { project: "test-project", workItemId: 123, commentId: 999 }
         );
         expect(mockWitApiInstance.rest.update).toHaveBeenCalledWith(
-          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999?format=markdown",
+          "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999?format=Markdown",
           { text: "updated comment" },
           { acceptHeader: "application/json" }
         );
@@ -1252,7 +1252,7 @@ describe("AzureDevOpsAdapter", () => {
         mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
           requestUrl:
             "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments/999",
-          apiVersion: "7.1-preview.3",
+          apiVersion: "7.1",
         });
         mockWitApiInstance.createRequestOptions.mockReturnValue({
           acceptHeader: "application/json",
@@ -1262,7 +1262,7 @@ describe("AzureDevOpsAdapter", () => {
         await adapter.postPBIComment("123", "updated comment", "999");
 
         expect(mockWitApiInstance.vsoClient.getVersioningData).toHaveBeenCalledWith(
-          "7.1-preview.3",
+          "7.1",
           "wit",
           "608aac0a-32e1-4493-a863-b9cf4566d257",
           { project: "test-project", workItemId: 123, commentId: 999 }
@@ -1274,7 +1274,7 @@ describe("AzureDevOpsAdapter", () => {
         mockWitApiInstance.vsoClient.getVersioningData.mockResolvedValue({
           requestUrl:
             "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/123/comments",
-          apiVersion: "7.1-preview.3",
+          apiVersion: "7.1",
         });
         mockWitApiInstance.createRequestOptions.mockReturnValue({
           acceptHeader: "application/json",

@@ -755,12 +755,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             };
           }
         ).vsoClient.getVersioningData(
-          "7.1-preview.3",
+          "7.1",
           "wit",
           "608aac0a-32e1-4493-a863-b9cf4566d257",
           routeValues
         );
-        const url = `${verData.requestUrl}?format=markdown`;
+        const url = `${verData.requestUrl}?format=Markdown`;
         const options = (
           witApi as unknown as {
             createRequestOptions: (type: string, apiVersion?: string) => unknown;
@@ -794,12 +794,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             };
           }
         ).vsoClient.getVersioningData(
-          "7.1-preview.3",
+          "7.1",
           "wit",
           "608aac0a-32e1-4493-a863-b9cf4566d257",
           routeValues
         );
-        const url = `${verData.requestUrl}?format=markdown`;
+        const url = `${verData.requestUrl}?format=Markdown`;
         const options = (
           witApi as unknown as {
             createRequestOptions: (type: string, apiVersion?: string) => unknown;

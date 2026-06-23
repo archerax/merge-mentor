@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-06-23
+
+### Fixed
+
+- **Azure DevOps Compatibility**: Updated the Azure DevOps comments API version to the stable `7.1` to ensure Markdown comments are processed and rendered correctly.
+
 ## [2.5.0] - 2026-06-23
 
 ### Changed
