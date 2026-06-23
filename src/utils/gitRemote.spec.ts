@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { execSync } from "node:child_process";
-import { parseGitRemoteUrl, detectGitRemoteUrl } from "./gitRemote.js";
+import { describe, expect, it, vi } from "vitest";
+import { detectGitRemoteUrl, parseGitRemoteUrl } from "./gitRemote.js";
 
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),

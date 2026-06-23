@@ -45,6 +45,14 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
+vi.mock("./review/pbiEngine.js", () => {
+  return {
+    PBIReviewEngine: vi.fn(function PBIReviewEngine() {
+      return { reviewPBI: vi.fn().mockResolvedValue({ title: "Mock PBI" }) };
+    }),
+  };
+});
+
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return {
@@ -1921,6 +1929,39 @@ describe("CLI", () => {
       await program.parseAsync(["node", "test", "review", "--pr-url", "not-a-valid-url"]);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("is not a valid URL"));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe("pbi command", () => {
+    let exitSpy: ReturnType<typeof vi.spyOn>;
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("successfully reviews PBI in dry-run mode", async () => {
+      vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
+
+      await program.parseAsync(["node", "test", "pbi", "12345"]);
+
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("errors and exits when executePBIReview throws", async () => {
+      const mockPbiEngine = await import("./review/pbiEngine.js");
+      // biome-ignore lint/complexity/useArrowFunction: regular function required so it can be constructible when called with new
+      vi.mocked(mockPbiEngine.PBIReviewEngine).mockImplementationOnce(function () {
+        throw new Error("PBI Review Failed");
+      });
+
+      await program.parseAsync(["node", "test", "pbi", "12345"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error: PBI Review Failed")
+      );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });

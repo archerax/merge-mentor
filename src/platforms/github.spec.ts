@@ -499,7 +499,9 @@ describe("GitHubAdapter", () => {
     describe("postPBIComment", () => {
       it("throws error for NaN ID", async () => {
         const adapter = new GitHubAdapter(createTestConfig());
-        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow("Invalid GitHub issue number");
+        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow(
+          "Invalid GitHub issue number"
+        );
       });
 
       it("creates a new comment if commentId is undefined", async () => {

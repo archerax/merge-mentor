@@ -115,7 +115,7 @@ describe("CopilotSdkProvider", () => {
       process.env.COPILOT_CLI_PATH = "/dummy/path/to/copilot-cli";
       try {
         const provider = new CopilotSdkProvider();
-        const client = (provider as any).getClient();
+        const client = (provider as unknown as { getClient: () => unknown }).getClient();
         expect(client).toBeDefined();
       } finally {
         process.env.COPILOT_CLI_PATH = originalEnv;

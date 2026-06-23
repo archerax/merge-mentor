@@ -49,7 +49,7 @@
   ],
   "dependencies": {
     "@github/copilot": "^1.0.63",
-    "@github/copilot-sdk": "^1.0.2",
+    "@github/copilot-sdk": "^1.0.3",
     "@octokit/rest": "^22.0.1",
     "@opencode-ai/sdk": "^1.17.9",
     "azure-devops-node-api": "^15.1.2",
@@ -68,7 +68,7 @@
     "cross-env": "^10.1.0",
     "esbuild": "^0.28.1",
     "husky": "^9.1.7",
-    "knip": "^6.17.1",
+    "knip": "^6.17.2",
     "prettier": "^3.8.4",
     "typedoc": "^0.28.19",
     "typedoc-plugin-markdown": "^4.12.0",

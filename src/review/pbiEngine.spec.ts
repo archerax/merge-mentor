@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
 import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { PBIReviewEngine } from "./pbiEngine.js";
@@ -7,12 +7,14 @@ vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return {
     ...actual,
-    writeFileSync: vi.fn().mockImplementation((...args) => {
-      if ((globalThis as any).__throwWriteFileError) {
-        throw new Error("Write failed");
-      }
-      return actual.writeFileSync(...args);
-    }),
+    writeFileSync: vi
+      .fn()
+      .mockImplementation((...args: Parameters<typeof actual.writeFileSync>) => {
+        if ((globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError) {
+          throw new Error("Write failed");
+        }
+        return actual.writeFileSync(...args);
+      }),
   };
 });
 
@@ -117,7 +119,7 @@ describe("PBIReviewEngine", () => {
   });
 
   afterEach(() => {
-    (globalThis as any).__throwWriteFileError = false;
+    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = false;
   });
 
   it("should handle writeFileSync failure when saving report", async () => {
@@ -125,7 +127,7 @@ describe("PBIReviewEngine", () => {
     const aiClient = createMockAiClient();
     const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
 
-    (globalThis as any).__throwWriteFileError = true;
+    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = true;
 
     // Should not throw, should handle error gracefully in catch block
     await expect(engine.reviewPBI("12345")).resolves.toBeDefined();
@@ -155,7 +157,8 @@ describe("PBIReviewEngine", () => {
 
   it("should parse fallback JSON wrapped in markdown code blocks", async () => {
     const adapter = createMockAdapter();
-    const markdownRaw = "Some explanation\n```json\n{\n  \"title\": \"Wrapped Story\",\n  \"invest_evaluation\": {\n    \"independent\": { \"status\": \"pass\", \"feedback\": \"Good\" }\n  }\n}\n```\nSome other explanation";
+    const markdownRaw =
+      'Some explanation\n```json\n{\n  "title": "Wrapped Story",\n  "invest_evaluation": {\n    "independent": { "status": "pass", "feedback": "Good" }\n  }\n}\n```\nSome other explanation';
     const invalidParsedResponse: AIResponse = {
       raw: markdownRaw,
       parsed: { invalid: true }, // Will fail zod validation
@@ -193,13 +196,16 @@ describe("PBIReviewEngine", () => {
     const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
 
     // Call private method directly using type casting
-    const emoji = (engine as any).getStatusEmoji("some-unknown-status");
+    const emoji = (engine as unknown as { getStatusEmoji(status: string): string }).getStatusEmoji(
+      "some-unknown-status"
+    );
     expect(emoji).toBe("⚪ **UNKNOWN**");
   });
 
   it("should parse fallback JSON not wrapped in markdown code blocks", async () => {
     const adapter = createMockAdapter();
-    const rawJson = "{\n  \"title\": \"Direct JSON Story\",\n  \"invest_evaluation\": {\n    \"independent\": { \"status\": \"pass\", \"feedback\": \"Good\" }\n  }\n}";
+    const rawJson =
+      '{\n  "title": "Direct JSON Story",\n  "invest_evaluation": {\n    "independent": { "status": "pass", "feedback": "Good" }\n  }\n}';
     const invalidParsedResponse: AIResponse = {
       raw: rawJson,
       parsed: { invalid: true },

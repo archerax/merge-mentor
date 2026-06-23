@@ -1083,14 +1083,18 @@ describe("AzureDevOpsAdapter", () => {
     describe("getPBIDetails", () => {
       it("throws error for NaN work item ID", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        await expect(adapter.getPBIDetails("abc")).rejects.toThrow("Invalid Azure DevOps work item ID");
+        await expect(adapter.getPBIDetails("abc")).rejects.toThrow(
+          "Invalid Azure DevOps work item ID"
+        );
       });
 
       it("throws error if work item is not found", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockResolvedValue(null);
 
-        await expect(adapter.getPBIDetails("123")).rejects.toThrow("Work item with ID 123 not found");
+        await expect(adapter.getPBIDetails("123")).rejects.toThrow(
+          "Work item with ID 123 not found"
+        );
       });
 
       it("fetches and parses work item details with HTML stripping", async () => {
@@ -1155,7 +1159,9 @@ describe("AzureDevOpsAdapter", () => {
     describe("postPBIComment", () => {
       it("throws error for NaN ID", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
-        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow("Invalid Azure DevOps work item ID");
+        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow(
+          "Invalid Azure DevOps work item ID"
+        );
       });
 
       it("creates a new comment if commentId is undefined", async () => {
