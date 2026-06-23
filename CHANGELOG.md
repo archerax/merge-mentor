@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-06-23
+
+### Fixed
+
+- **Test Coverage**: Added unit tests for missing fields in GitHub and Azure DevOps adapters to stabilize branch coverage above the 85% threshold.
+
 ## [2.4.2] - 2026-06-23
 
 ### Fixed
