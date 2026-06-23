@@ -7,21 +7,14 @@ import { createChildLogger } from "../logger.js";
 import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { consoleOutputWriter } from "../ports/outputWriter.js";
 
-const InvestStatusSchema = z.enum(["pass", "fail", "needs-improvement"]).catch("needs-improvement");
-
-const InvestDimensionSchema = z.object({
-  status: InvestStatusSchema,
-  feedback: z.string().default(""),
-});
-
 const PBIReviewResponseSchema = z.object({
   title: z.string().default(""),
   invest_evaluation: z.object({
-    independent: InvestDimensionSchema,
-    negotiable: InvestDimensionSchema,
-    valuable: InvestDimensionSchema,
-    estimable: InvestDimensionSchema,
-    testable: InvestDimensionSchema,
+    independent: z.string().default(""),
+    negotiable: z.string().default(""),
+    valuable: z.string().default(""),
+    estimable: z.string().default(""),
+    testable: z.string().default(""),
   }),
   overall_assessment: z.string().default(""),
   suggestions: z.array(z.string()).default([]),
@@ -133,18 +126,14 @@ export class PBIReviewEngine {
 ${commentsList}
 
 # EVALUATION CRITERIA (INVEST)
-Review the PBI details against the following dimensions:
+Review the PBI details against the following dimensions, treating them as guidelines rather than a strict tick list:
 1. **Independent:** Can this story be completed and delivered independently of other stories?
 2. **Negotiable:** Is there room for discussion? Avoid overly prescriptive "contracts".
 3. **Valuable:** Does this story deliver clear, recognizable value to the user or customer?
 4. **Estimable:** Is the scope clear enough to be estimated by the team? (Consider the current description complexity).
 5. **Testable:** Are there clear Acceptance Criteria or paths to verify the story?
 
-# SEVERITY / STATUS LEVELS
-For each dimension, output one of:
-- \`pass\`: The PBI meets this criterion well.
-- \`needs-improvement\`: There are minor gaps or improvements recommended.
-- \`fail\`: The criterion is not met, presenting a significant blocker for refinement/development.
+For each dimension, provide constructive, qualitative feedback explaining how well the PBI aligns with the guideline and any suggestions/nuance. Do not assign status ratings like Pass, Fail, or Needs Improvement.
 
 # OUTPUT FORMAT
 You must respond in strict JSON format within a \`\`\`json markdown block.
@@ -153,26 +142,11 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 {
   "title": "${pbi.title.replace(/"/g, '\\"')}",
   "invest_evaluation": {
-    "independent": {
-      "status": "pass | fail | needs-improvement",
-      "feedback": "Concise feedback for Independent dimension"
-    },
-    "negotiable": {
-      "status": "pass | fail | needs-improvement",
-      "feedback": "Concise feedback for Negotiable dimension"
-    },
-    "valuable": {
-      "status": "pass | fail | needs-improvement",
-      "feedback": "Concise feedback for Valuable dimension"
-    },
-    "estimable": {
-      "status": "pass | fail | needs-improvement",
-      "feedback": "Concise feedback for Estimable dimension"
-    },
-    "testable": {
-      "status": "pass | fail | needs-improvement",
-      "feedback": "Concise feedback for Testable dimension"
-    }
+    "independent": "Concise qualitative feedback for Independent guideline",
+    "negotiable": "Concise qualitative feedback for Negotiable guideline",
+    "valuable": "Concise qualitative feedback for Valuable guideline",
+    "estimable": "Concise qualitative feedback for Estimable guideline",
+    "testable": "Concise qualitative feedback for Testable guideline"
   },
   "overall_assessment": "Holistic assessment of the story quality and development readiness.",
   "suggestions": [
@@ -193,26 +167,26 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
       return {
         title: obj.title || fallbackTitle,
         invest_evaluation: {
-          independent: {
-            status: obj.invest_evaluation?.independent?.status || "needs-improvement",
-            feedback: obj.invest_evaluation?.independent?.feedback || "",
-          },
-          negotiable: {
-            status: obj.invest_evaluation?.negotiable?.status || "needs-improvement",
-            feedback: obj.invest_evaluation?.negotiable?.feedback || "",
-          },
-          valuable: {
-            status: obj.invest_evaluation?.valuable?.status || "needs-improvement",
-            feedback: obj.invest_evaluation?.valuable?.feedback || "",
-          },
-          estimable: {
-            status: obj.invest_evaluation?.estimable?.status || "needs-improvement",
-            feedback: obj.invest_evaluation?.estimable?.feedback || "",
-          },
-          testable: {
-            status: obj.invest_evaluation?.testable?.status || "needs-improvement",
-            feedback: obj.invest_evaluation?.testable?.feedback || "",
-          },
+          independent:
+            typeof obj.invest_evaluation?.independent === "string"
+              ? obj.invest_evaluation.independent
+              : obj.invest_evaluation?.independent?.feedback || "",
+          negotiable:
+            typeof obj.invest_evaluation?.negotiable === "string"
+              ? obj.invest_evaluation.negotiable
+              : obj.invest_evaluation?.negotiable?.feedback || "",
+          valuable:
+            typeof obj.invest_evaluation?.valuable === "string"
+              ? obj.invest_evaluation.valuable
+              : obj.invest_evaluation?.valuable?.feedback || "",
+          estimable:
+            typeof obj.invest_evaluation?.estimable === "string"
+              ? obj.invest_evaluation.estimable
+              : obj.invest_evaluation?.estimable?.feedback || "",
+          testable:
+            typeof obj.invest_evaluation?.testable === "string"
+              ? obj.invest_evaluation.testable
+              : obj.invest_evaluation?.testable?.feedback || "",
         },
         overall_assessment: obj.overall_assessment || "",
         suggestions: obj.suggestions || [],
@@ -221,28 +195,15 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
       return {
         title: fallbackTitle,
         invest_evaluation: {
-          independent: { status: "needs-improvement", feedback: "Failed to parse AI evaluation." },
-          negotiable: { status: "needs-improvement", feedback: "Failed to parse AI evaluation." },
-          valuable: { status: "needs-improvement", feedback: "Failed to parse AI evaluation." },
-          estimable: { status: "needs-improvement", feedback: "Failed to parse AI evaluation." },
-          testable: { status: "needs-improvement", feedback: "Failed to parse AI evaluation." },
+          independent: "Failed to parse AI evaluation.",
+          negotiable: "Failed to parse AI evaluation.",
+          valuable: "Failed to parse AI evaluation.",
+          estimable: "Failed to parse AI evaluation.",
+          testable: "Failed to parse AI evaluation.",
         },
         overall_assessment: "AI review failed to generate a parseable response.",
         suggestions: [],
       };
-    }
-  }
-
-  private getStatusEmoji(status: string): string {
-    switch (status) {
-      case "pass":
-        return "🟢 **PASS**";
-      case "needs-improvement":
-        return "🟡 **NEEDS IMPROVEMENT**";
-      case "fail":
-        return "🔴 **FAIL**";
-      default:
-        return "⚪ **UNKNOWN**";
     }
   }
 
@@ -255,11 +216,11 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 
 | Dimension | Feedback |
 | :--- | :--- |
-| **Independent** | ${evalObj.independent.feedback} |
-| **Negotiable** | ${evalObj.negotiable.feedback} |
-| **Valuable** | ${evalObj.valuable.feedback} |
-| **Estimable** | ${evalObj.estimable.feedback} |
-| **Testable** | ${evalObj.testable.feedback} |
+| **Independent** | ${evalObj.independent} |
+| **Negotiable** | ${evalObj.negotiable} |
+| **Valuable** | ${evalObj.valuable} |
+| **Estimable** | ${evalObj.estimable} |
+| **Testable** | ${evalObj.testable} |
 
 ### 🎯 Overall Assessment
 ${data.overall_assessment}
@@ -284,18 +245,15 @@ Merge Mentor v${packageJson.version}, PBI review, ${model}
     output.log(`📊 INVEST Review Results: ${data.title}`);
     output.log("=".repeat(60));
 
-    const printDimension = (name: string, status: string, feedback: string) => {
-      output.log(`• ${name}: ${this.getStatusEmoji(status)}`);
-      if (feedback) {
-        output.log(`  Feedback: ${feedback}`);
-      }
+    const printDimension = (name: string, feedback: string) => {
+      output.log(`• ${name}: ${feedback}`);
     };
 
-    printDimension("Independent", evalObj.independent.status, evalObj.independent.feedback);
-    printDimension("Negotiable", evalObj.negotiable.status, evalObj.negotiable.feedback);
-    printDimension("Valuable", evalObj.valuable.status, evalObj.valuable.feedback);
-    printDimension("Estimable", evalObj.estimable.status, evalObj.estimable.feedback);
-    printDimension("Testable", evalObj.testable.status, evalObj.testable.feedback);
+    printDimension("Independent", evalObj.independent);
+    printDimension("Negotiable", evalObj.negotiable);
+    printDimension("Valuable", evalObj.valuable);
+    printDimension("Estimable", evalObj.estimable);
+    printDimension("Testable", evalObj.testable);
     output.log("");
 
     output.log(`🎯 Overall Assessment:\n${data.overall_assessment}\n`);

@@ -32,11 +32,11 @@ describe("PBIReviewEngine", () => {
   const mockAiOutput = {
     title: "Test User Story",
     invest_evaluation: {
-      independent: { status: "pass", feedback: "Ind feedback" },
-      negotiable: { status: "pass", feedback: "Neg feedback" },
-      valuable: { status: "pass", feedback: "Val feedback" },
-      estimable: { status: "needs-improvement", feedback: "Est feedback" },
-      testable: { status: "fail", feedback: "Test feedback" },
+      independent: "Ind feedback",
+      negotiable: "Neg feedback",
+      valuable: "Val feedback",
+      estimable: "Est feedback",
+      testable: "Test feedback",
     },
     overall_assessment: "Good overall, but estimability and testability need work.",
     suggestions: ["Add more details to acceptance criteria"],
@@ -79,8 +79,8 @@ describe("PBIReviewEngine", () => {
     expect(adapter.getPBIDetails).toHaveBeenCalledWith("12345");
     expect(aiClient.executePrompt).toHaveBeenCalled();
     expect(result.title).toBe("Test User Story");
-    expect(result.invest_evaluation.estimable.status).toBe("needs-improvement");
-    expect(result.invest_evaluation.testable.status).toBe("fail");
+    expect(result.invest_evaluation.estimable).toBe("Est feedback");
+    expect(result.invest_evaluation.testable).toBe("Test feedback");
 
     // Should post a new comment because no comment with signature was found
     expect(adapter.postPBIComment).toHaveBeenCalledWith(
@@ -184,11 +184,11 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Malformed Story");
-    expect(result.invest_evaluation.independent.status).toBe("needs-improvement");
+    expect(result.invest_evaluation.independent).toBe("");
     expect(result.overall_assessment).toBe("Invalid structure");
   });
 
-  it("should parse fallback JSON wrapped in markdown code blocks", async () => {
+  it("should parse fallback JSON wrapped in markdown code blocks (old object structure)", async () => {
     const adapter = createMockAdapter();
     const markdownRaw =
       'Some explanation\n```json\n{\n  "title": "Wrapped Story",\n  "invest_evaluation": {\n    "independent": { "status": "pass", "feedback": "Good" }\n  }\n}\n```\nSome other explanation';
@@ -202,9 +202,26 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Wrapped Story");
-    expect(result.invest_evaluation.independent.status).toBe("pass");
-    expect(result.invest_evaluation.independent.feedback).toBe("Good");
-    expect(result.invest_evaluation.negotiable.status).toBe("needs-improvement");
+    expect(result.invest_evaluation.independent).toBe("Good");
+    expect(result.invest_evaluation.negotiable).toBe("");
+  });
+
+  it("should parse fallback JSON wrapped in markdown code blocks (new string structure)", async () => {
+    const adapter = createMockAdapter();
+    const markdownRaw =
+      'Some explanation\n```json\n{\n  "title": "Wrapped Story",\n  "invest_evaluation": {\n    "independent": "Good"\n  }\n}\n```\nSome other explanation';
+    const invalidParsedResponse: AIResponse = {
+      raw: markdownRaw,
+      parsed: { invalid: true }, // Will fail zod validation
+    };
+    const aiClient = createMockAiClient(invalidParsedResponse);
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+
+    const result = await engine.reviewPBI("12345");
+
+    expect(result.title).toBe("Wrapped Story");
+    expect(result.invest_evaluation.independent).toBe("Good");
+    expect(result.invest_evaluation.negotiable).toBe("");
   });
 
   it("should return fully failing fallback structure when parsing completely fails", async () => {
@@ -220,25 +237,13 @@ describe("PBIReviewEngine", () => {
 
     expect(result.title).toBe("Test User Story"); // Fallbacks to story title
     expect(result.overall_assessment).toBe("AI review failed to generate a parseable response.");
-    expect(result.invest_evaluation.independent.status).toBe("needs-improvement");
-  });
-
-  it("should handle unknown status in getStatusEmoji", () => {
-    const adapter = createMockAdapter();
-    const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
-
-    // Call private method directly using type casting
-    const emoji = (engine as unknown as { getStatusEmoji(status: string): string }).getStatusEmoji(
-      "some-unknown-status"
-    );
-    expect(emoji).toBe("⚪ **UNKNOWN**");
+    expect(result.invest_evaluation.independent).toBe("Failed to parse AI evaluation.");
   });
 
   it("should parse fallback JSON not wrapped in markdown code blocks", async () => {
     const adapter = createMockAdapter();
     const rawJson =
-      '{\n  "title": "Direct JSON Story",\n  "invest_evaluation": {\n    "independent": { "status": "pass", "feedback": "Good" }\n  }\n}';
+      '{\n  "title": "Direct JSON Story",\n  "invest_evaluation": {\n    "independent": "Good"\n  }\n}';
     const invalidParsedResponse: AIResponse = {
       raw: rawJson,
       parsed: { invalid: true },
@@ -249,6 +254,6 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Direct JSON Story");
-    expect(result.invest_evaluation.independent.status).toBe("pass");
+    expect(result.invest_evaluation.independent).toBe("Good");
   });
 });
