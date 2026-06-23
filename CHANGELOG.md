@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-06-23
+
+### Changed
+
+- **PBI Review Guidelines**: Transitioned the Product Backlog Item (PBI) and User Story review from a rigid check-list evaluation of individual INVEST criteria to a more holistic, guideline-oriented assessment.
+- **PBI Footer Metadata**: Added the application version and AI model identifier to the PBI review footer for consistent reporting.
+
+### Fixed
+
+- **PBI Review Adaptability**: Respect the `MM_PLATFORM` environment variable for PBI reviews.
+- **Azure DevOps Compatibility**: Configured Azure DevOps PBI comments to post correctly in Markdown.
+- **PBI Review Formatting**: Removed the PASS/FAIL column from the PBI review table to simplify the output.
+- **License Metadata**: Corrected the license reference in `README.md` to indicate the MIT License.
+
 ## [2.4.4] - 2026-06-23
 
 ### Added

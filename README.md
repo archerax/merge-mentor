@@ -973,7 +973,7 @@ export MM_AI_TIMEOUT=3600000  # 1 hour for all AI providers
 
 ## License
 
-Proprietary software. See [LICENSE](./LICENSE) for details.
+MIT License. See [LICENSE](./LICENSE) for details.
 
 ---
 
