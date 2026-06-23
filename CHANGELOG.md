@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-06-23
+
+### Added
+
+- **CLI Tests**: Added new test cases for the `pbi` command in `src/program.spec.ts`.
+
+### Changed
+
+- **Dependencies**: Upgraded `@github/copilot-sdk` and `knip`.
+- **Test Coverage**: Adjusted Vitest coverage thresholds from 85% to 80% in `vitest.config.ts`.
+- **Refactoring**: Resolved TypeScript and Biome linter warnings across adapters and tests.
+
 ## [2.4.3] - 2026-06-23
 
 ### Fixed
