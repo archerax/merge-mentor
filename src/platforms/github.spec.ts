@@ -12,8 +12,10 @@ const mockOctokitInstance = {
     getReviewComment: vi.fn(),
   },
   issues: {
+    get: vi.fn(),
     listComments: vi.fn(),
     createComment: vi.fn(),
+    updateComment: vi.fn(),
   },
   paginate: vi.fn(),
   graphql: vi.fn(),
@@ -430,6 +432,106 @@ describe("GitHubAdapter", () => {
       const token = adapter.getToken();
 
       expect(token).toBe("test-token");
+    });
+  });
+
+  describe("PBI and Issue review features", () => {
+    describe("getPBIDetails", () => {
+      it("throws error for NaN issue ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        await expect(adapter.getPBIDetails("abc")).rejects.toThrow("Invalid GitHub issue number");
+      });
+
+      it("fetches and parses issue details with acceptance criteria and story points", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.get.mockResolvedValue({
+          data: {
+            title: "Test Issue",
+            body: "Some body text\n### Acceptance Criteria\n- AC1\n- AC2\nStory Points: 8\n",
+          },
+        });
+        mockOctokitInstance.paginate.mockResolvedValue([
+          { id: 1, body: "Comment 1" },
+          { id: 2, body: "Comment 2" },
+        ]);
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(mockOctokitInstance.issues.get).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          issue_number: 123,
+        });
+        expect(result.id).toBe("123");
+        expect(result.title).toBe("Test Issue");
+        expect(result.acceptanceCriteria).toBe("- AC1\n- AC2");
+        expect(result.storyPoints).toBe(8);
+        expect(result.comments).toHaveLength(2);
+        expect(result.comments[0].body).toBe("Comment 1");
+      });
+
+      it("logs error and rethrows on failure", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.get.mockRejectedValue(new Error("API Error"));
+
+        await expect(adapter.getPBIDetails("123")).rejects.toThrow("API Error");
+      });
+    });
+
+    describe("postPBIComment", () => {
+      it("throws error for NaN ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow("Invalid GitHub issue number");
+      });
+
+      it("creates a new comment if commentId is undefined", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.createComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "test comment");
+
+        expect(mockOctokitInstance.issues.createComment).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          issue_number: 123,
+          body: "test comment",
+        });
+      });
+
+      it("updates an existing comment if commentId is defined", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.updateComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "updated comment", 999);
+
+        expect(mockOctokitInstance.issues.updateComment).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          comment_id: 999,
+          body: "updated comment",
+        });
+      });
+
+      it("updates comment if commentId is a string", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.updateComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "updated comment", "999");
+
+        expect(mockOctokitInstance.issues.updateComment).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          comment_id: 999,
+          body: "updated comment",
+        });
+      });
+
+      it("logs error and rethrows on post/update failure", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.issues.createComment.mockRejectedValue(new Error("Post failed"));
+
+        await expect(adapter.postPBIComment("123", "test")).rejects.toThrow("Post failed");
+      });
     });
   });
 });

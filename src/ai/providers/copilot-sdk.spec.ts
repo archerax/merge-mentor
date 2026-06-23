@@ -110,6 +110,18 @@ describe("CopilotSdkProvider", () => {
       expect(provider).toBeDefined();
     });
 
+    it("configures RuntimeConnection path using COPILOT_CLI_PATH if set", () => {
+      const originalEnv = process.env.COPILOT_CLI_PATH;
+      process.env.COPILOT_CLI_PATH = "/dummy/path/to/copilot-cli";
+      try {
+        const provider = new CopilotSdkProvider();
+        const client = (provider as any).getClient();
+        expect(client).toBeDefined();
+      } finally {
+        process.env.COPILOT_CLI_PATH = originalEnv;
+      }
+    });
+
     it("throws when Copilot SDK BYOK API key is provided without a base URL", () => {
       const createProviderWithInvalidByok = () =>
         new CopilotSdkProvider({

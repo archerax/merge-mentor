@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { parseGitRemoteUrl } from "./gitRemote.js";
+import { describe, expect, it, vi } from "vitest";
+import { execSync } from "node:child_process";
+import { parseGitRemoteUrl, detectGitRemoteUrl } from "./gitRemote.js";
+
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(),
+}));
 
 describe("parseGitRemoteUrl", () => {
   describe("GitHub", () => {
@@ -89,6 +94,23 @@ describe("parseGitRemoteUrl", () => {
       expect(parseGitRemoteUrl("https://gitlab.com/owner/repo.git")).toBeNull();
       expect(parseGitRemoteUrl("")).toBeNull();
       expect(parseGitRemoteUrl("   ")).toBeNull();
+    });
+  });
+
+  describe("detectGitRemoteUrl", () => {
+    it("should return the git remote URL on success", () => {
+      vi.mocked(execSync).mockReturnValueOnce("https://github.com/owner/repo.git\n");
+      const url = detectGitRemoteUrl();
+      expect(url).toBe("https://github.com/owner/repo.git");
+      expect(execSync).toHaveBeenCalledWith("git remote get-url origin", expect.any(Object));
+    });
+
+    it("should return null when git command fails", () => {
+      vi.mocked(execSync).mockImplementationOnce(() => {
+        throw new Error("Git command failed");
+      });
+      const url = detectGitRemoteUrl();
+      expect(url).toBeNull();
     });
   });
 });

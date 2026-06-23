@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-06-23
+
+### Fixed
+
+- **Test Coverage**: Added unit tests for PBI features across GitHub, Azure DevOps, Copilot SDK, and git remote parser to meet the 85% branch coverage threshold.
+- **Workspace Configuration**: Tuned `pnpm-workspace.yaml` packages setting to prevent Vitest from double-loading the root package.
+
 ## [2.4.1] - 2026-06-23
 
 ### Fixed

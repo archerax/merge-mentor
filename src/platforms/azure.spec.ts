@@ -3,6 +3,13 @@ import type { Config } from "../config.js";
 import { resolveReviewProfile } from "../review/reviewSelection.js";
 import { AzureDevOpsAdapter } from "./azure.js";
 
+const mockWitApiInstance = {
+  getWorkItem: vi.fn(),
+  getComments: vi.fn(),
+  addComment: vi.fn(),
+  updateComment: vi.fn(),
+};
+
 const mockGitApiInstance = {
   getPullRequestById: vi.fn(),
   getPullRequestIterations: vi.fn(),
@@ -19,6 +26,9 @@ vi.mock("azure-devops-node-api", () => ({
   WebApi: class {
     async getGitApi() {
       return mockGitApiInstance;
+    }
+    async getWorkItemTrackingApi() {
+      return mockWitApiInstance;
     }
   },
   getPersonalAccessTokenHandler: vi.fn(() => ({})),
@@ -1066,6 +1076,114 @@ describe("AzureDevOpsAdapter", () => {
       const token = adapter.getToken();
 
       expect(token).toBe("test-token");
+    });
+  });
+
+  describe("PBI and Work Item review features", () => {
+    describe("getPBIDetails", () => {
+      it("throws error for NaN work item ID", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        await expect(adapter.getPBIDetails("abc")).rejects.toThrow("Invalid Azure DevOps work item ID");
+      });
+
+      it("throws error if work item is not found", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue(null);
+
+        await expect(adapter.getPBIDetails("123")).rejects.toThrow("Work item with ID 123 not found");
+      });
+
+      it("fetches and parses work item details with HTML stripping", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+            "System.Description": "<p>As a user, I want to review...</p><br/>",
+            "Microsoft.VSTS.Common.AcceptanceCriteria": "<li>AC1</li><li>AC2</li>",
+            "Microsoft.VSTS.Scheduling.StoryPoints": 5,
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({
+          comments: [
+            { id: 1, text: "<p>Comment 1</p>" },
+            { id: 2, text: "Comment 2" },
+          ],
+        });
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(mockWitApiInstance.getWorkItem).toHaveBeenCalledWith(123, undefined, undefined, 4);
+        expect(mockWitApiInstance.getComments).toHaveBeenCalledWith("test-project", 123);
+        expect(result.id).toBe("123");
+        expect(result.title).toBe("Test Work Item");
+        expect(result.description).toBe("As a user, I want to review...");
+        expect(result.acceptanceCriteria).toBe("- AC1\n- AC2");
+        expect(result.storyPoints).toBe(5);
+        expect(result.comments).toHaveLength(2);
+        expect(result.comments[0].body).toBe("Comment 1");
+      });
+
+      it("logs error and rethrows on failure", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockRejectedValue(new Error("API Error"));
+
+        await expect(adapter.getPBIDetails("123")).rejects.toThrow("API Error");
+      });
+    });
+
+    describe("postPBIComment", () => {
+      it("throws error for NaN ID", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        await expect(adapter.postPBIComment("abc", "test")).rejects.toThrow("Invalid Azure DevOps work item ID");
+      });
+
+      it("creates a new comment if commentId is undefined", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.addComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "test comment");
+
+        expect(mockWitApiInstance.addComment).toHaveBeenCalledWith(
+          { text: "test comment" },
+          "test-project",
+          123
+        );
+      });
+
+      it("updates an existing comment if commentId is defined", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.updateComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "updated comment", 999);
+
+        expect(mockWitApiInstance.updateComment).toHaveBeenCalledWith(
+          { text: "updated comment" },
+          "test-project",
+          123,
+          999
+        );
+      });
+
+      it("updates comment if commentId is a string", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.updateComment.mockResolvedValue({});
+
+        await adapter.postPBIComment("123", "updated comment", "999");
+
+        expect(mockWitApiInstance.updateComment).toHaveBeenCalledWith(
+          { text: "updated comment" },
+          "test-project",
+          123,
+          999
+        );
+      });
+
+      it("logs error and rethrows on post/update failure", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.addComment.mockRejectedValue(new Error("Post failed"));
+
+        await expect(adapter.postPBIComment("123", "test")).rejects.toThrow("Post failed");
+      });
     });
   });
 });
