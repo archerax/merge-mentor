@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-24
+
+### Added
+
+- **Doctor Mode Diagnostics**: Added comprehensive diagnostics to the `doctor` command:
+  - System `git` CLI availability and version check.
+  - Verification of `COPILOT_CLI_PATH` environment variable executable.
+  - Automatic defaulting to check the configured active AI provider when `--provider` is not specified.
+  - Added `gitBackend` and `tempPath` details to the configuration output.
+  - Workspace temporary directory (`tempPath`) writability check.
+  - System architecture metadata in diagnostics header.
+
+### Changed
+
+- **Version Output Cleaning**: Stripped the update reminder instructions ("Run 'copilot update' to check for updates") from doctor mode CLI outputs for cleaner formatting.
+
 ## [2.5.1] - 2026-06-23
 
 ### Fixed
