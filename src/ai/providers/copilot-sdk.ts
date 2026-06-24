@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PermissionHandler, PermissionRequest, SessionEvent } from "@github/copilot-sdk";
@@ -232,7 +233,29 @@ export class CopilotSdkProvider implements AIProviderClient {
     try {
       const sdkUrl = import.meta.resolve("@github/copilot/sdk");
       const sdkPath = fileURLToPath(sdkUrl);
-      resolvedCliPath = path.join(path.dirname(path.dirname(sdkPath)), "index.js");
+
+      // Climb up to find the @github/copilot package root directory
+      let currentDir = fs.statSync(sdkPath).isDirectory() ? sdkPath : path.dirname(sdkPath);
+      while (currentDir && currentDir !== path.dirname(currentDir)) {
+        const pkgJsonPath = path.join(currentDir, "package.json");
+        if (fs.existsSync(pkgJsonPath)) {
+          try {
+            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
+            if (pkg.name === "@github/copilot") {
+              resolvedCliPath = path.join(currentDir, "index.js");
+              break;
+            }
+          } catch {
+            // Ignore JSON parse errors and keep climbing
+          }
+        }
+        currentDir = path.dirname(currentDir);
+      }
+
+      // Fallback to old behavior if climbing fails
+      if (!resolvedCliPath) {
+        resolvedCliPath = path.join(path.dirname(path.dirname(sdkPath)), "index.js");
+      }
     } catch (error) {
       this.logger.debug(
         { error: error instanceof Error ? error.message : String(error) },
