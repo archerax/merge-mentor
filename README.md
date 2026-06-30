@@ -28,10 +28,9 @@
 
 ### What it is NOT
 
-- A replacement for compiler warnings
-- A replacement for lint tools like ESLint or Biome
-- A replacement for formatters like Prettier
-- A replacement for human reviews
+- **A replacement for formatters and linters** (like ESLint, Biome, or Prettier). We strongly recommend continuing to use these tools in your workflow. They are extremely fast, deterministic, and do not consume costly AI tokens. While Merge Mentor may occasionally flag syntax or style issues, catching them is not the primary goal of this project.
+- **A replacement for compiler warnings**
+- **A replacement for human reviews**
 
 ### What it IS
 
