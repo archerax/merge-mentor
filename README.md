@@ -24,6 +24,21 @@
 - **🔁 Safe to try** — Dry-run is the default: preview every review before posting a single comment. Built-in audit logging keeps a compliance trail of all bot activity.
 - **🌐 Works where your PRs already live** — Native support for GitHub and Azure DevOps, with CI integration for GitHub Actions and Azure Pipelines.
 
+## What Merge Mentor is (and is NOT)
+
+### What it is NOT
+
+- A replacement for compiler warnings
+- A replacement for lint tools like ESLint or Biome
+- A replacement for formatters like Prettier
+- A replacement for human reviews
+
+### What it IS
+
+- A great way to augment human reviews
+- A way to get a super fast initial review
+- Able to spot some issues that a human may miss
+
 ## Quick Start
 
 ```bash
