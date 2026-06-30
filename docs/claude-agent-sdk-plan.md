@@ -113,11 +113,7 @@ Add `"claude-agent-sdk"` to the `AIProviderType` union:
 
 ```typescript
 export type AIProviderType =
-  | "copilot"
-  | "copilot-sdk"
-  | "opencode"
-  | "opencode-sdk"
-  | "claude-agent-sdk"; // ADD
+  "copilot" | "copilot-sdk" | "opencode" | "opencode-sdk" | "claude-agent-sdk"; // ADD
 ```
 
 ### 4. `src/ai/providerFactory.ts`

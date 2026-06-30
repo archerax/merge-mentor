@@ -421,62 +421,69 @@ merge-mentor review --pr 123 --passes "testing" --write
 ### Command Options
 
 **General Options:**
-| Option | Description | Env Variable | Default |
-|--------|-------------|--------------|---------|
-| `--pr <number>` | Pull request number (required unless `--pr-url` or `--ci` is used) | - | - |
-| `--pr-url <url>` | PR URL (e.g. `https://github.com/...`). Automatically sets platform, repository details, and PR number. Cannot be combined with other PR/repository flags. | - | - |
-| `--ci` | CI mode: auto-detect platform and PR from the environment | - | `false` |
-| `--platform <platform>` | Platform to use (`github` or `azure`) | `MM_PLATFORM` | `github` |
-| `--write` | Post comments to PR (otherwise dry-run; CI mode defaults to write) | - | `false` |
-| `--temp-path <path>` | Base path for temporary files (cache, diffs, logs, etc.) | `MM_TEMP_PATH` | `./.mergementor` |
-| `--local-workspace-path <path>` | Path to a pre-existing local repository checkout | - | - |
+
+| Option                          | Description                                                                                                                                                | Env Variable   | Default          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `--pr <number>`                 | Pull request number (required unless `--pr-url` or `--ci` is used)                                                                                         | -              | -                |
+| `--pr-url <url>`                | PR URL (e.g. `https://github.com/...`). Automatically sets platform, repository details, and PR number. Cannot be combined with other PR/repository flags. | -              | -                |
+| `--ci`                          | CI mode: auto-detect platform and PR from the environment                                                                                                  | -              | `false`          |
+| `--platform <platform>`         | Platform to use (`github` or `azure`)                                                                                                                      | `MM_PLATFORM`  | `github`         |
+| `--write`                       | Post comments to PR (otherwise dry-run; CI mode defaults to write)                                                                                         | -              | `false`          |
+| `--temp-path <path>`            | Base path for temporary files (cache, diffs, logs, etc.)                                                                                                   | `MM_TEMP_PATH` | `./.mergementor` |
+| `--local-workspace-path <path>` | Path to a pre-existing local repository checkout                                                                                                           | -              | -                |
 
 **Review Configuration:**
-| Option | Description | Env Variable | Default |
-|--------|-------------|--------------|---------|
-| `--review-type <type>` | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`) | `MM_REVIEW_TYPE` | `general` |
-| `--passes <passNames>` | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | `MM_REVIEW_PASSES` | - |
-| `--strategy <strategy>` | Execution strategy (`deep` or `fast`) | `MM_REVIEW_STRATEGY` | `fast` |
-| `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`) | `MM_GIT_BACKEND` | `cli` |
+
+| Option                    | Description                                                                                                            | Env Variable         | Default   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------- | --------- |
+| `--review-type <type>`    | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`)                                     | `MM_REVIEW_TYPE`     | `general` |
+| `--passes <passNames>`    | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | `MM_REVIEW_PASSES`   | -         |
+| `--strategy <strategy>`   | Execution strategy (`deep` or `fast`)                                                                                  | `MM_REVIEW_STRATEGY` | `fast`    |
+| `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                                                               | `MM_GIT_BACKEND`     | `cli`     |
 
 **GitHub Configuration:**
-| Option | Description | Env Variable |
-|--------|-------------|--------------|
-| `--github-token <token>` | GitHub personal access token | `MM_GITHUB_TOKEN` |
-| `--github-repo-owner <owner>` | GitHub repository owner | `MM_GITHUB_REPO_OWNER` |
-| `--github-repo-name <name>` | GitHub repository name | `MM_GITHUB_REPO_NAME` |
+
+| Option                        | Description                  | Env Variable           |
+| ----------------------------- | ---------------------------- | ---------------------- |
+| `--github-token <token>`      | GitHub personal access token | `MM_GITHUB_TOKEN`      |
+| `--github-repo-owner <owner>` | GitHub repository owner      | `MM_GITHUB_REPO_OWNER` |
+| `--github-repo-name <name>`   | GitHub repository name       | `MM_GITHUB_REPO_NAME`  |
 
 **Azure DevOps Configuration:**
-| Option | Description | Env Variable |
-|--------|-------------|--------------|
-| `--azure-token <token>` | Azure DevOps PAT | `MM_AZURE_TOKEN` |
-| `--azure-org <org>` | Azure DevOps organization | `MM_AZURE_ORG` |
-| `--azure-project <project>` | Azure DevOps project | `MM_AZURE_PROJECT` |
-| `--azure-repo <repo>` | Azure DevOps repository | `MM_AZURE_REPO` |
+
+| Option                      | Description               | Env Variable       |
+| --------------------------- | ------------------------- | ------------------ |
+| `--azure-token <token>`     | Azure DevOps PAT          | `MM_AZURE_TOKEN`   |
+| `--azure-org <org>`         | Azure DevOps organization | `MM_AZURE_ORG`     |
+| `--azure-project <project>` | Azure DevOps project      | `MM_AZURE_PROJECT` |
+| `--azure-repo <repo>`       | Azure DevOps repository   | `MM_AZURE_REPO`    |
 
 **AI Provider Configuration:**
-| Option | Description | Env Variable | Default |
-|--------|-------------|--------------|---------|
-| `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`, `claude-agent-sdk`) | `MM_AI_PROVIDER` | `copilot-sdk` |
-| `--copilot-token <token>` | Copilot GitHub token | `MM_COPILOT_TOKEN` | - |
-| `--ai-timeout <ms>` | Timeout in ms for all AI providers | `MM_AI_TIMEOUT` | `3600000` (1h) |
-| `--ai-model <model>` | Model name for the active AI provider | `MM_AI_MODEL` | - |
-| `--ai-base-url <url>` | OpenAI-compatible API base URL for BYOK | `MM_AI_BASE_URL` | - |
-| `--ai-api-key <key>` | API key for BYOK | `MM_AI_API_KEY` | - |
-| `--experimental-tools` | Enable experimental structured output via Copilot SDK tool calls | `MM_EXPERIMENTAL_TOOLS` | `false` |
-| `--long-context` | Pin the Copilot session to the long-context tier | `MM_LONG_CONTEXT` | `false` |
-| `--reasoning <level>` | Reasoning effort level (`low`, `medium`, `high`, `xhigh`) | `MM_REASONING` | - |
+
+| Option                    | Description                                                      | Env Variable            | Default        |
+| ------------------------- | ---------------------------------------------------------------- | ----------------------- | -------------- |
+| `--provider <provider>`   | AI provider (`copilot-sdk`, `opencode-sdk`, `claude-agent-sdk`)  | `MM_AI_PROVIDER`        | `copilot-sdk`  |
+| `--copilot-token <token>` | Copilot GitHub token                                             | `MM_COPILOT_TOKEN`      | -              |
+| `--ai-timeout <ms>`       | Timeout in ms for all AI providers                               | `MM_AI_TIMEOUT`         | `3600000` (1h) |
+| `--ai-model <model>`      | Model name for the active AI provider                            | `MM_AI_MODEL`           | -              |
+| `--ai-base-url <url>`     | OpenAI-compatible API base URL for BYOK                          | `MM_AI_BASE_URL`        | -              |
+| `--ai-api-key <key>`      | API key for BYOK                                                 | `MM_AI_API_KEY`         | -              |
+| `--experimental-tools`    | Enable experimental structured output via Copilot SDK tool calls | `MM_EXPERIMENTAL_TOOLS` | `false`        |
+| `--long-context`          | Pin the Copilot session to the long-context tier                 | `MM_LONG_CONTEXT`       | `false`        |
+| `--reasoning <level>`     | Reasoning effort level (`low`, `medium`, `high`, `xhigh`)        | `MM_REASONING`          | -              |
 
 **File Filtering:**
-| Option | Description | Default |
-|--------|-------------|---------|
+
+| Option               | Description                                   | Default           |
+| -------------------- | --------------------------------------------- | ----------------- |
 | `--ignore <pattern>` | Glob pattern for files to ignore (repeatable) | `**/generated/**` |
 
 **Console Output Options:**
-| Option | Description | Env Variable | Default |
-|--------|-------------|--------------|---------|
-| `--no-stream` | Disable streaming output display | `MM_STREAMING_ENABLED` | - |
-| `--stream-lines <number>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES` | `9` |
+
+| Option                    | Description                                 | Env Variable           | Default |
+| ------------------------- | ------------------------------------------- | ---------------------- | ------- |
+| `--no-stream`             | Disable streaming output display            | `MM_STREAMING_ENABLED` | -       |
+| `--stream-lines <number>` | Number of lines in streaming display (1-20) | `MM_STREAMING_LINES`   | `9`     |
 
 **Note:** Command-line parameters always override environment variables.
 
