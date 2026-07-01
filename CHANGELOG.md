@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.2] - 2026-07-01
+
+### Fixed
+
+- **CI/CD Workflow**: Resolved a version mismatch error in GitHub Actions by removing the hardcoded `pnpm` version input and allowing `pnpm/action-setup` to automatically detect the version from the `packageManager` field in `package.json`.
+
 ## [2.6.1] - 2026-07-01
 
 ### Changed
