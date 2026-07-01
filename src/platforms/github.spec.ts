@@ -59,6 +59,7 @@ function createTestConfig(): Config {
     tempPath: "./.mergementor",
     longContext: false,
     experimentalTools: false,
+    verifyPbi: false,
   };
 }
 
@@ -551,6 +552,59 @@ describe("GitHubAdapter", () => {
         mockOctokitInstance.issues.createComment.mockRejectedValue(new Error("Post failed"));
 
         await expect(adapter.postPBIComment("123", "test")).rejects.toThrow("Post failed");
+      });
+    });
+
+    describe("getLinkedPBIIds", () => {
+      it("returns empty array if no links are found", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.pulls.get.mockResolvedValue({
+          data: {
+            number: 10,
+            title: "Just a regular PR title",
+            body: "This description has no links.",
+            user: { login: "testuser" },
+            base: { ref: "main" },
+            head: { ref: "feature" },
+          },
+        });
+
+        const result = await adapter.getLinkedPBIIds(10);
+        expect(result).toEqual([]);
+      });
+
+      it("extracts and deduplicates closing and generic links from title and body", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.pulls.get.mockResolvedValue({
+          data: {
+            number: 10,
+            title: "Fixes #123 and closes #456",
+            body: "This PR relates to issue #123, task #789 and story #101. Also closed #456.",
+            user: { login: "testuser" },
+            base: { ref: "main" },
+            head: { ref: "feature" },
+          },
+        });
+
+        const result = await adapter.getLinkedPBIIds(10);
+        expect([...result].sort()).toEqual(["101", "123", "456", "789"].sort());
+      });
+
+      it("is case-insensitive and handles multiple spacing/prefixes", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.pulls.get.mockResolvedValue({
+          data: {
+            number: 10,
+            title: "RESOLVED #555",
+            body: "Some description with BUG #888, PBI  #999, and regular #111.",
+            user: { login: "testuser" },
+            base: { ref: "main" },
+            head: { ref: "feature" },
+          },
+        });
+
+        const result = await adapter.getLinkedPBIIds(10);
+        expect([...result].sort()).toEqual(["111", "555", "888", "999"].sort());
       });
     });
   });

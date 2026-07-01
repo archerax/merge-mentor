@@ -709,6 +709,59 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         body: stripHtml(c.text || ""),
       }));
 
+      const workItemType = workItem.fields["System.WorkItemType"] as string;
+
+      if (workItemType === "Task") {
+        const parentRelation = workItem.relations?.find(
+          (rel) => rel.rel === "System.LinkTypes.Hierarchy-Reverse"
+        );
+        if (parentRelation?.url) {
+          const match = parentRelation.url.match(/\/workItems\/(\d+)(?:\?|$)/);
+          if (match) {
+            const parentId = match[1];
+            try {
+              const parentDetails = await this.getPBIDetails(parentId);
+              const combinedTitle = `Task: ${title} (Parent PBI #${parentId}: ${parentDetails.title})`;
+
+              const combinedDescription = [
+                "Task Description:",
+                description || "(No description)",
+                "Parent PBI Description:",
+                parentDetails.description || "(No description)",
+              ].join("\n\n");
+
+              const taskAC = acceptanceCriteria;
+              const parentAC = parentDetails.acceptanceCriteria;
+              let combinedAcceptanceCriteria: string | undefined;
+              if (taskAC && parentAC) {
+                combinedAcceptanceCriteria = `Task Acceptance Criteria:\n${taskAC}\n\nParent PBI Acceptance Criteria:\n${parentAC}`;
+              } else if (taskAC) {
+                combinedAcceptanceCriteria = `Task Acceptance Criteria:\n${taskAC}`;
+              } else if (parentAC) {
+                combinedAcceptanceCriteria = `Parent PBI Acceptance Criteria:\n${parentAC}`;
+              }
+
+              const combinedComments = [...comments, ...parentDetails.comments];
+
+              return {
+                id,
+                platform: "azure",
+                title: combinedTitle,
+                description: combinedDescription,
+                acceptanceCriteria: combinedAcceptanceCriteria,
+                storyPoints: storyPoints ?? parentDetails.storyPoints,
+                comments: combinedComments,
+              };
+            } catch (parentError) {
+              this.logger.warn(
+                { id, parentId, error: (parentError as Error).message },
+                "Failed to fetch parent PBI details for task; using task details only."
+              );
+            }
+          }
+        }
+      }
+
       return {
         id,
         platform: "azure",
@@ -821,6 +874,42 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       this.logger.error(
         { id, commentId, error: (error as Error).message },
         "Failed to post/update Azure DevOps comment"
+      );
+      throw error;
+    }
+  }
+
+  async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        this.logger.warn({ prNumber }, "Could not find repository ID for PR");
+        return [];
+      }
+
+      const workItemRefs = (await withRateLimitHandling(() =>
+        gitApi.getPullRequestWorkItemRefs(repositoryId, prNumber, this.project)
+      )) as Array<{ id?: string | number }> | null | undefined;
+
+      if (!workItemRefs) {
+        return [];
+      }
+
+      const ids = workItemRefs
+        .map((ref) => ref.id)
+        .filter((id): id is string | number => id !== undefined && id !== null)
+        .map((id) => id.toString());
+
+      return ids;
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to fetch linked work items for PR"
       );
       throw error;
     }

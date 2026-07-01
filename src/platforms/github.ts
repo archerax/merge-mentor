@@ -295,6 +295,39 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
+    try {
+      const pr = await this.getPRDetails(prNumber);
+      const text = `${pr.title}\n${pr.description}`;
+      const ids = new Set<string>();
+
+      const closingRegex =
+        /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+      let match = closingRegex.exec(text);
+      while (match !== null) {
+        ids.add(match[1]);
+        match = closingRegex.exec(text);
+      }
+
+      const genericRegex = /(?:issue|task|pbi|bug|story)?\s*#(\d+)/gi;
+      match = genericRegex.exec(text);
+      while (match !== null) {
+        ids.add(match[1]);
+        match = genericRegex.exec(text);
+      }
+
+      const result = Array.from(ids);
+      this.logger.debug({ prNumber, linkedIds: result }, "Identified linked GitHub issues");
+      return result;
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to scan linked issues for PR"
+      );
+      throw error;
+    }
+  }
+
   async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
     const issueNumber = Number.parseInt(id, 10);
     if (Number.isNaN(issueNumber)) {

@@ -190,6 +190,22 @@ describe("CommentManager", () => {
       expect(result).toContain("This PR looks good");
     });
 
+    it("should preserve collapsible markdown segments inside overallAssessment", () => {
+      const manager = createCommentManager();
+      const fileResults: FileReviewResult[] = [];
+      const crossFileResult = createCrossFileResult({
+        overallAssessment:
+          "This PR looks good\n\n<details>\n<summary>🔗 Work Item #123 Alignment Report</summary>\n- Met: Yes\n</details>",
+      });
+
+      const result = manager.formatSummaryComment(fileResults, crossFileResult);
+
+      expect(result).toContain("<details>");
+      expect(result).toContain("<summary>🔗 Work Item #123 Alignment Report</summary>");
+      expect(result).toContain("- Met: Yes");
+      expect(result).toContain("</details>");
+    });
+
     it("should include statistics", () => {
       const manager = createCommentManager();
       const fileResults: FileReviewResult[] = [

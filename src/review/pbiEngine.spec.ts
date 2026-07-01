@@ -57,6 +57,7 @@ describe("PBIReviewEngine", () => {
     getExistingBotComments: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
+    getLinkedPBIIds: vi.fn(),
     getPBIDetails: vi.fn().mockResolvedValue({ ...mockPbiDetails, comments }),
     postPBIComment: vi.fn(),
   });

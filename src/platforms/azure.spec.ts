@@ -28,6 +28,7 @@ const mockGitApiInstance = {
   getItemText: vi.fn(),
   getBlobContent: vi.fn(),
   getItem: vi.fn(),
+  getPullRequestWorkItemRefs: vi.fn(),
 };
 
 vi.mock("azure-devops-node-api", () => ({
@@ -86,6 +87,7 @@ function createTestConfig(): Config {
     tempPath: "./.mergementor",
     longContext: false,
     experimentalTools: false,
+    verifyPbi: false,
   };
 }
 
@@ -1173,6 +1175,53 @@ describe("AzureDevOpsAdapter", () => {
         expect(result.comments).toHaveLength(0);
       });
 
+      it("traverses to parent PBI/User Story and combines details if work item is a Task", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+        mockWitApiInstance.getWorkItem.mockResolvedValueOnce({
+          fields: {
+            "System.Title": "Subtask Title",
+            "System.Description": "Subtask Description",
+            "Microsoft.VSTS.Common.AcceptanceCriteria": "Subtask AC",
+            "System.WorkItemType": "Task",
+          },
+          relations: [
+            {
+              rel: "System.LinkTypes.Hierarchy-Reverse",
+              url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/999",
+            },
+          ],
+        });
+        mockWitApiInstance.getComments.mockResolvedValueOnce({ comments: [] });
+
+        mockWitApiInstance.getWorkItem.mockResolvedValueOnce({
+          fields: {
+            "System.Title": "Parent PBI Title",
+            "System.Description": "Parent PBI Description",
+            "Microsoft.VSTS.Common.AcceptanceCriteria": "Parent PBI AC",
+            "System.WorkItemType": "Product Backlog Item",
+            "Microsoft.VSTS.Scheduling.StoryPoints": 8,
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValueOnce({
+          comments: [{ id: 1, text: "Parent Comment" }],
+        });
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(result.id).toBe("123");
+        expect(result.title).toBe("Task: Subtask Title (Parent PBI #999: Parent PBI Title)");
+        expect(result.description).toContain("Task Description:\n\nSubtask Description");
+        expect(result.description).toContain("Parent PBI Description:\n\nParent PBI Description");
+        expect(result.acceptanceCriteria).toContain("Task Acceptance Criteria:\nSubtask AC");
+        expect(result.acceptanceCriteria).toContain(
+          "Parent PBI Acceptance Criteria:\nParent PBI AC"
+        );
+        expect(result.storyPoints).toBe(8);
+        expect(result.comments).toHaveLength(1);
+        expect(result.comments[0].body).toBe("Parent Comment");
+      });
+
       it("logs error and rethrows on failure", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockRejectedValue(new Error("API Error"));
@@ -1282,6 +1331,43 @@ describe("AzureDevOpsAdapter", () => {
         mockWitApiInstance.rest.create.mockRejectedValue(new Error("Post failed"));
 
         await expect(adapter.postPBIComment("123", "test")).rejects.toThrow("Post failed");
+      });
+    });
+
+    describe("getLinkedPBIIds", () => {
+      it("fetches linked work item IDs for PR successfully", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getPullRequestById.mockResolvedValue({
+          pullRequestId: 123,
+          repository: { id: "repo-uuid-123" },
+        });
+        const mockGetPullRequestWorkItemRefs = vi
+          .fn()
+          .mockResolvedValue([{ id: 456 }, { id: "789" }]);
+        mockGitApiInstance.getPullRequestWorkItemRefs = mockGetPullRequestWorkItemRefs;
+
+        const result = await adapter.getLinkedPBIIds(123);
+
+        expect(mockGitApiInstance.getPullRequestById).toHaveBeenCalledWith(123, "test-project");
+        expect(mockGetPullRequestWorkItemRefs).toHaveBeenCalledWith(
+          "repo-uuid-123",
+          123,
+          "test-project"
+        );
+        expect(result).toEqual(["456", "789"]);
+      });
+
+      it("returns empty array if getPullRequestWorkItemRefs returns null/undefined", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getPullRequestById.mockResolvedValue({
+          pullRequestId: 123,
+          repository: { id: "repo-uuid-123" },
+        });
+        const mockGetPullRequestWorkItemRefs = vi.fn().mockResolvedValue(null);
+        mockGitApiInstance.getPullRequestWorkItemRefs = mockGetPullRequestWorkItemRefs;
+
+        const result = await adapter.getLinkedPBIIds(123);
+        expect(result).toEqual([]);
       });
     });
   });

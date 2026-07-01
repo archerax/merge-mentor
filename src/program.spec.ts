@@ -92,7 +92,12 @@ import { ReviewEngine } from "./review/engine.js";
 import { resolveReviewProfile } from "./review/reviewSelection.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
-  const { longContext = false, experimentalTools = false, ...restOverrides } = overrides;
+  const {
+    longContext = false,
+    experimentalTools = false,
+    verifyPbi = false,
+    ...restOverrides
+  } = overrides;
   const reviewType = overrides.reviewType ?? "general";
   const reviewProfile =
     overrides.reviewProfile ??
@@ -125,6 +130,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     tempPath: "./.mergementor",
     longContext,
     experimentalTools,
+    verifyPbi,
     ...restOverrides,
   };
 }

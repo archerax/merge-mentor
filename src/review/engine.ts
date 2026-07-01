@@ -49,9 +49,13 @@ import {
   type AIProviderType,
   type AIResponse,
   createAIProvider,
+  formatPBIAlignmentReport,
+  type PBIAlignmentResult,
+  parsePBIAlignmentResponse,
   type ReasoningEffort,
   type TokenUsage,
 } from "../ai/index.js";
+import { buildPBIAlignmentPrompt } from "../ai/prompts/alignment.js";
 import { buildFilesSummary } from "../ai/prompts/buildFilesSummary.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
 import { buildFastReviewPrompt } from "../ai/prompts/specialists/fast.js";
@@ -202,6 +206,8 @@ interface ReviewEngineOptions {
   readonly longContext?: boolean;
   /** Reasoning effort level for models that support it. */
   readonly reasoningEffort?: ReasoningEffort;
+  /** Verify pull request changes against linked Product Backlog Items/Issues */
+  readonly verifyPbi?: boolean;
 }
 
 /**
@@ -507,6 +513,78 @@ export class ReviewEngine {
           repoPath,
           onTokenUsage
         );
+      }
+    }
+
+    if (this.options.verifyPbi) {
+      this.log("\n🔍 Verifying PR alignment with linked work items...");
+      let pbiIds: readonly string[] = [];
+      try {
+        pbiIds = await this.platform.getLinkedPBIIds(prNumber);
+      } catch (error) {
+        this.logger.error(
+          { prNumber, error: (error as Error).message },
+          "Failed to get linked PBI/issue IDs"
+        );
+      }
+
+      if (pbiIds.length === 0) {
+        this.log("⚠️ Warning: No linked work items or issues found for this PR.");
+        crossFileResult = {
+          ...crossFileResult,
+          overallAssessment: `⚠️ **Warning:** No linked work items or issues found for this PR.\n\n${crossFileResult.overallAssessment}`,
+        };
+      } else {
+        const prDiff = files
+          .filter((f) => f.patch)
+          .map((f) => `--- a/${f.filename}\n+++ b/${f.filename}\n${f.patch}`)
+          .join("\n");
+
+        const alignmentReports: string[] = [];
+
+        for (const id of pbiIds) {
+          try {
+            this.log(`📋 Fetching details for linked work item #${id}...`);
+            const pbiDetails = await this.platform.getPBIDetails(id);
+
+            this.log(`🤖 Verifying alignment against work item #${id}: ${pbiDetails.title}...`);
+            const prompt = buildPBIAlignmentPrompt(
+              pbiDetails.id,
+              pbiDetails.title,
+              pbiDetails.description,
+              pbiDetails.acceptanceCriteria || "",
+              prDiff
+            );
+
+            const aiResponse = await this.provider.executePrompt(prompt);
+            onTokenUsage(aiResponse.tokenUsage);
+
+            const alignmentResult: PBIAlignmentResult = parsePBIAlignmentResponse(
+              aiResponse.raw,
+              pbiDetails.id,
+              pbiDetails.title
+            );
+
+            const reportMarkdown = formatPBIAlignmentReport(alignmentResult);
+            alignmentReports.push(reportMarkdown);
+          } catch (error) {
+            this.logger.error(
+              { id, error: (error as Error).message },
+              "Failed to verify PBI alignment"
+            );
+            this.log(`⚠️ Warning: Failed to fetch or verify work item #${id}.`);
+            alignmentReports.push(
+              `<details>\n<summary>🔗 Work Item #${id} Alignment Report</summary>\n\n⚠️ **Error:** Failed to fetch or analyze alignment details for this work item.\n\n</details>`
+            );
+          }
+        }
+
+        if (alignmentReports.length > 0) {
+          crossFileResult = {
+            ...crossFileResult,
+            overallAssessment: `${crossFileResult.overallAssessment}\n\n### 🔗 Work Item Alignment Verification\n\n${alignmentReports.join("\n\n")}`,
+          };
+        }
       }
     }
 

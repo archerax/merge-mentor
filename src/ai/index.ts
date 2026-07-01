@@ -6,6 +6,11 @@
 
 // Specialized review prompts
 
+export {
+  formatPBIAlignmentReport,
+  type PBIAlignmentResult,
+  parsePBIAlignmentResponse,
+} from "./pbiParser.js";
 export { createAIProvider } from "./providerFactory.js";
 export type {
   AIProviderClient,

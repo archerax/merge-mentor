@@ -175,6 +175,12 @@ export interface PlatformAdapter {
   postGeneralComment(prNumber: number, body: string): Promise<void>;
 
   /**
+   * Identifies work items, issues, or PBIs linked to a given PR.
+   * @param prNumber - The PR number
+   */
+  getLinkedPBIIds(prNumber: number): Promise<readonly string[]>;
+
+  /**
    * Retrieves Product Backlog Item / User Story / Issue details by ID.
    * @param id - The work item ID or issue number
    */

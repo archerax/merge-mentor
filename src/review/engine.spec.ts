@@ -53,15 +53,19 @@ const mockParseCrossFileReview = vi.fn();
 const mockParseBatchedFileReview = vi.fn();
 const mockParseFastReview = vi.fn();
 
-vi.mock("../ai/index.js", () => ({
-  createAIProvider: vi.fn(() => ({
-    executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
-    parseFileReview: (...args: unknown[]) => mockParseFileReview(...args),
-    parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
-    parseBatchedFileReview: (...args: unknown[]) => mockParseBatchedFileReview(...args),
-    parseFastReview: (...args: unknown[]) => mockParseFastReview(...args),
-  })),
-}));
+vi.mock("../ai/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../ai/index.js")>();
+  return {
+    ...actual,
+    createAIProvider: vi.fn(() => ({
+      executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
+      parseFileReview: (...args: unknown[]) => mockParseFileReview(...args),
+      parseCrossFileReview: (...args: unknown[]) => mockParseCrossFileReview(...args),
+      parseBatchedFileReview: (...args: unknown[]) => mockParseBatchedFileReview(...args),
+      parseFastReview: (...args: unknown[]) => mockParseFastReview(...args),
+    })),
+  };
+});
 
 // Mock the RepoManager to avoid actual git operations
 const mockEnsureRepo = vi.fn().mockResolvedValue("/mock/repo/path");
@@ -138,6 +142,7 @@ function createMockPlatform(): PlatformAdapter {
     getExistingBotComments: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
+    getLinkedPBIIds: vi.fn(),
     getPBIDetails: vi.fn(),
     postPBIComment: vi.fn(),
   };
@@ -1342,6 +1347,146 @@ describe("ReviewEngine", () => {
       expect(result).toBeDefined();
       expect(result.commentErrors.length).toBeGreaterThan(0);
       expect(result.commentErrors[0]).toContain("API rate limit exceeded");
+    });
+
+    describe("verifyPbi orchestration", () => {
+      it("does not perform verification if verifyPbi is disabled", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          verifyPbi: false,
+        });
+        const prDetails = createPRDetails();
+        const files = [createPRFile()];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+        mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+        mockParseBatchedFileReview.mockReturnValue([]);
+        mockParseCrossFileReview.mockReturnValue({
+          overallAssessment: "Review completed.",
+          findings: [],
+          recommendations: [],
+        });
+
+        await engine.reviewPR(123);
+
+        expect(mockPlatform.getLinkedPBIIds).not.toHaveBeenCalled();
+      });
+
+      it("adds a warning to overallAssessment if no linked PBIs are found", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          verifyPbi: true,
+        });
+        const prDetails = createPRDetails();
+        const files = [createPRFile()];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+        vi.mocked(mockPlatform.getLinkedPBIIds).mockResolvedValue([]);
+        mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+        mockParseBatchedFileReview.mockReturnValue([]);
+        mockParseCrossFileReview.mockReturnValue({
+          overallAssessment: "Review completed.",
+          findings: [],
+          recommendations: [],
+        });
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockPlatform.getLinkedPBIIds).toHaveBeenCalledWith(123);
+        expect(result.crossFileResult.overallAssessment).toContain(
+          "⚠️ **Warning:** No linked work items or issues found for this PR."
+        );
+      });
+
+      it("fetches PBI details, performs AI alignment, and appends report to overallAssessment", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          verifyPbi: true,
+        });
+        const prDetails = createPRDetails();
+        const files = [{ ...createPRFile(), patch: "some patch data" }];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+        vi.mocked(mockPlatform.getLinkedPBIIds).mockResolvedValue(["999"]);
+        vi.mocked(mockPlatform.getPBIDetails).mockResolvedValue({
+          id: "999",
+          platform: "github",
+          title: "User Story Title",
+          description: "Story Description",
+          acceptanceCriteria: "Must do X",
+          comments: [],
+        });
+
+        const mockAiOutput = {
+          pbiId: "999",
+          title: "User Story Title",
+          metCriteria: ["Must do X"],
+          partialCriteria: [],
+          missingCriteria: [],
+          scopeCreep: [],
+          overallAssessment: "Alignment looks good.",
+        };
+
+        mockExecutePrompt.mockImplementation((prompt: string) => {
+          if (prompt.includes("Verify whether the pull request changes satisfy")) {
+            return Promise.resolve({
+              raw: JSON.stringify(mockAiOutput),
+              parsed: mockAiOutput,
+            });
+          }
+          return Promise.resolve({ raw: "{}", parsed: {} });
+        });
+        mockParseBatchedFileReview.mockReturnValue([]);
+        mockParseCrossFileReview.mockReturnValue({
+          overallAssessment: "Review completed.",
+          findings: [],
+          recommendations: [],
+        });
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockPlatform.getPBIDetails).toHaveBeenCalledWith("999");
+        expect(mockExecutePrompt).toHaveBeenCalled();
+        expect(result.crossFileResult.overallAssessment).toContain(
+          "### 🔗 Work Item Alignment Verification"
+        );
+        expect(result.crossFileResult.overallAssessment).toContain("User Story Title");
+        expect(result.crossFileResult.overallAssessment).toContain("Alignment looks good.");
+      });
+
+      it("gracefully appends error report if PBI verification fails", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          verifyPbi: true,
+        });
+        const prDetails = createPRDetails();
+        const files = [{ ...createPRFile(), patch: "some patch data" }];
+
+        vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+        vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+        vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+        vi.mocked(mockPlatform.getLinkedPBIIds).mockResolvedValue(["999"]);
+        vi.mocked(mockPlatform.getPBIDetails).mockRejectedValue(new Error("Network Failure"));
+
+        mockParseBatchedFileReview.mockReturnValue([]);
+        mockParseCrossFileReview.mockReturnValue({
+          overallAssessment: "Review completed.",
+          findings: [],
+          recommendations: [],
+        });
+
+        const result = await engine.reviewPR(123);
+
+        expect(result.crossFileResult.overallAssessment).toContain(
+          "⚠️ **Error:** Failed to fetch or analyze alignment details for this work item."
+        );
+      });
     });
   });
 });

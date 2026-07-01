@@ -76,6 +76,8 @@ export interface Config {
   readonly reasoningEffort?: ReasoningEffort;
   /** Enable experimental structured output via Copilot SDK tool calls. */
   readonly experimentalTools: boolean;
+  /** Verify pull request changes against linked Product Backlog Items/Issues */
+  readonly verifyPbi: boolean;
 }
 
 const AIProviderSchema = z
@@ -117,6 +119,10 @@ const ConfigParserSchema = z.object({
     (val) => val === "true" || val === true || val === "1",
     z.boolean().default(false)
   ),
+  verifyPbi: z.preprocess(
+    (val) => val === "true" || val === true || val === "1",
+    z.boolean().default(false)
+  ),
 });
 
 /**
@@ -150,6 +156,7 @@ export function loadConfig(
     longContext: cliOverrides?.longContext ?? env.get("MM_LONG_CONTEXT"),
     reasoningEffort: cliOverrides?.reasoning ?? env.get("MM_REASONING"),
     experimentalTools: cliOverrides?.experimentalTools ?? env.get("MM_EXPERIMENTAL_TOOLS"),
+    verifyPbi: cliOverrides?.verifyPbi ?? env.get("MM_VERIFY_PBI"),
   });
 
   const explicitReviewPasses = parseReviewPasses(
@@ -194,6 +201,7 @@ export function loadConfig(
     longContext: parsed.longContext,
     reasoningEffort: parsed.reasoningEffort,
     experimentalTools: parsed.experimentalTools,
+    verifyPbi: parsed.verifyPbi,
   };
 }
 
@@ -223,6 +231,7 @@ interface CliOverrides {
   readonly longContext?: boolean;
   readonly reasoning?: string;
   readonly experimentalTools?: boolean;
+  readonly verifyPbi?: boolean;
 }
 
 /**

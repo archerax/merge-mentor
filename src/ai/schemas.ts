@@ -70,3 +70,20 @@ export const FastReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
   findings: z.array(FastReviewFindingSchema).default([]),
 });
+
+export const PBIAlignmentResponseSchema = z.object({
+  pbiId: z.coerce.string(),
+  title: z.coerce.string(),
+  metCriteria: z.array(z.coerce.string()).default([]),
+  partialCriteria: z
+    .array(
+      z.object({
+        criterion: z.coerce.string(),
+        explanation: z.coerce.string(),
+      })
+    )
+    .default([]),
+  missingCriteria: z.array(z.coerce.string()).default([]),
+  scopeCreep: z.array(z.coerce.string()).default([]),
+  overallAssessment: z.coerce.string().default(""),
+});

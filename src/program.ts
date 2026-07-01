@@ -79,6 +79,7 @@ export interface ReviewOptions {
   gitBackend?: string;
   longContext?: boolean;
   reasoning?: string;
+  verifyPbi?: boolean;
 }
 
 interface ReviewExecutionResult {
@@ -247,6 +248,7 @@ export async function executeReview(
     experimentalTools: resolvedOptions.experimentalTools ?? config.experimentalTools,
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
+    verifyPbi: config.verifyPbi,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";
@@ -662,6 +664,11 @@ program
   .option(
     "--reasoning <level>",
     "Reasoning effort level for models that support it (low, medium, high, xhigh). Env: MM_REASONING"
+  )
+  .option(
+    "--verify-pbi",
+    "Verify pull request changes against linked Product Backlog Items/Issues",
+    false
   )
   .optionsGroup("File Filtering")
   .option(
