@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-07-01
+
+### Changed
+
+- **Script Alignment**: Streamlined build, typecheck, lint, and test scripts in `package.json` to ensure clean execution and consistent formatting across development environments.
+- **Dependency Upgrades**: Upgraded core and developer dependencies, including `@github/copilot`, `@github/copilot-sdk`, `@opencode-ai/sdk`, Biome, Knip, Prettier, and `@anthropic-ai/claude-agent-sdk` to their latest stable patch versions.
+- **GitHub Workflows**: Updated GitHub action versions/digests (`actions/checkout`, `pnpm/action-setup`, `softprops/action-gh-release`, `codecov/codecov-action`) for enhanced security and reliability in CI/CD.
+- **Documentation Updates**: Added plans for the interactive comment loop and PBI alignment, and updated `README.md` with new information.
+
 ## [2.6.0] - 2026-06-24
 
 ### Added
