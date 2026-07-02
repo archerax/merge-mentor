@@ -192,6 +192,7 @@ export async function executeReview(
     longContext: resolvedOptions.longContext,
     reasoning: resolvedOptions.reasoning,
     experimentalTools: resolvedOptions.experimentalTools,
+    verifyPbi: resolvedOptions.verifyPbi,
   });
 
   // Initialize logger with configured temp path
@@ -754,6 +755,7 @@ program
         reviewStrategy: options.strategy,
         reasoning: options.reasoning,
         experimentalTools: options.experimentalTools,
+        verifyPbi: options.verifyPbi,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
       const reviewType = options.reviewType ?? config.reviewType ?? "general";
