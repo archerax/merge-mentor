@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-07-02
+
+### Added
+
+- **PBI-to-PR Alignment Verification**: Implemented automated PBI (Product Backlog Item) alignment verification. Added CLI flag `--verify-pbi` to review whether changes in a PR align with requirements described in linked PBIs.
+- **Design Plans**: Added design documents for codebase semantic search (`docs/codebase-semantic-search-plan.md`) and pull request description generation (`docs/pr-description-generation-plan.md`).
+
+### Fixed
+
+- **CLI Config Integration**: Ensured the `verifyPbi` CLI flag is correctly propagated to the config configuration object in the CLI main program.
+
 ## [2.6.2] - 2026-07-01
 
 ### Fixed
