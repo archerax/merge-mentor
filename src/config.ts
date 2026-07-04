@@ -362,4 +362,11 @@ export function validateConfig(config: Config, platform: Platform): void {
       );
     }
   }
+
+  if (config.copilotToken && !config.copilotToken.startsWith("github_pat_")) {
+    throw new ConfigurationError(
+      "MM_COPILOT_TOKEN",
+      "GitHub Copilot requires a fine-grained personal access token starting with 'github_pat_'."
+    );
+  }
 }

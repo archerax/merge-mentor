@@ -599,6 +599,31 @@ describe("Config", () => {
 
       expect(() => validateConfig(config, unknownPlatform)).not.toThrow();
     });
+
+    it("should throw ConfigurationError when MM_COPILOT_TOKEN does not start with github_pat_", () => {
+      const env = createStubEnvironment({
+        MM_GITHUB_TOKEN: "token",
+        MM_GITHUB_REPO_OWNER: "owner",
+        MM_GITHUB_REPO_NAME: "repo",
+        MM_COPILOT_TOKEN: "invalid-token",
+      });
+      const config = loadConfig(undefined, env);
+
+      expect(() => validateConfig(config, "github" as Platform)).toThrow(ConfigurationError);
+      expect(() => validateConfig(config, "github" as Platform)).toThrow("MM_COPILOT_TOKEN");
+    });
+
+    it("should not throw when MM_COPILOT_TOKEN is valid (starts with github_pat_)", () => {
+      const env = createStubEnvironment({
+        MM_GITHUB_TOKEN: "token",
+        MM_GITHUB_REPO_OWNER: "owner",
+        MM_GITHUB_REPO_NAME: "repo",
+        MM_COPILOT_TOKEN: "github_pat_validtoken123",
+      });
+      const config = loadConfig(undefined, env);
+
+      expect(() => validateConfig(config, "github" as Platform)).not.toThrow();
+    });
   });
 });
 
