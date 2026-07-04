@@ -144,6 +144,7 @@ function createMockPlatform(): PlatformAdapter {
     postGeneralComment: vi.fn(),
     getLinkedPBIIds: vi.fn(),
     getPBIDetails: vi.fn(),
+    getProjectDetails: vi.fn(),
     postPBIComment: vi.fn(),
     updatePRDetails: vi.fn(),
   };

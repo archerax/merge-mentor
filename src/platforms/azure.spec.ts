@@ -1370,5 +1370,111 @@ describe("AzureDevOpsAdapter", () => {
         expect(result).toEqual([]);
       });
     });
+
+    describe("getProjectDetails", () => {
+      it("throws error for NaN work item ID", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        await expect(adapter.getProjectDetails("abc")).rejects.toThrow(
+          "Invalid Azure DevOps work item ID"
+        );
+      });
+
+      it("throws error if root work item is not found", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue(null);
+
+        await expect(adapter.getProjectDetails("123")).rejects.toThrow(
+          "Root work item #123 could not be resolved"
+        );
+      });
+
+      it("successfully fetches work item hierarchy, stopping at story/PBI level, and maps dependencies", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+        mockWitApiInstance.getWorkItem.mockImplementation((id: number) => {
+          if (id === 100) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Test Feature",
+                "System.WorkItemType": "Feature",
+                "System.Description": "Feature description",
+                "System.State": "New",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/101",
+                },
+              ],
+            });
+          }
+          if (id === 101) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Child PBI",
+                "System.WorkItemType": "Product Backlog Item",
+                "System.Description": "PBI description",
+                "System.State": "In Progress",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/102",
+                },
+                {
+                  rel: "System.LinkTypes.Dependency-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/103",
+                },
+              ],
+            });
+          }
+          if (id === 103) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "External Successor Story",
+                "System.WorkItemType": "User Story",
+                "System.State": "Done",
+              },
+              relations: [],
+            });
+          }
+          return Promise.resolve(null);
+        });
+
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getProjectDetails("100");
+
+        // The root item 100 was requested
+        expect(result.rootId).toBe("100");
+        expect(result.rootTitle).toBe("Test Feature");
+        expect(result.rootType).toBe("Feature");
+        expect(result.rootDescription).toBe("Feature description");
+
+        // Should retrieve 100, 101, 103. 102 should NOT be fetched because 101 is a PBI (leaf) type.
+        expect(result.workItems).toHaveLength(3);
+        const itemIds = result.workItems.map((wi) => wi.id);
+        expect(itemIds).toContain("100");
+        expect(itemIds).toContain("101");
+        expect(itemIds).toContain("103");
+        expect(itemIds).not.toContain("102");
+
+        // 101 depends on 103 (successor dependency)
+        expect(result.dependencies).toHaveLength(1);
+        expect(result.dependencies[0]).toEqual({
+          sourceId: "101",
+          targetId: "103",
+          type: "successor",
+        });
+
+        // Verify state normalization
+        const item100 = result.workItems.find((wi) => wi.id === "100");
+        const item101 = result.workItems.find((wi) => wi.id === "101");
+        const item103 = result.workItems.find((wi) => wi.id === "103");
+        expect(item100?.normalizedState).toBe("todo");
+        expect(item101?.normalizedState).toBe("inprogress");
+        expect(item103?.normalizedState).toBe("done");
+      });
+    });
   });
 });

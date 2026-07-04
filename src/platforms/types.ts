@@ -187,6 +187,12 @@ export interface PlatformAdapter {
   getPBIDetails(id: string): Promise<PBIDetails>;
 
   /**
+   * Retrieves hierarchical project details (Epics, Features, child stories/PBIs, and dependencies).
+   * @param id - The root work item ID
+   */
+  getProjectDetails(id: string): Promise<ProjectDetails>;
+
+  /**
    * Posts or updates a comment/discussion on a PBI/Issue.
    * @param id - The work item ID or issue number
    * @param body - Comment body
@@ -220,4 +226,38 @@ export interface PBIDetails {
   readonly acceptanceCriteria?: string;
   readonly storyPoints?: number;
   readonly comments: readonly PBIComment[];
+}
+
+/** A simple representation of a work item state/status. */
+export type WorkItemState = "todo" | "inprogress" | "done" | "unknown";
+
+/** A basic work item in a project hierarchy. */
+export interface ProjectWorkItem {
+  readonly id: string;
+  readonly title: string;
+  readonly type: string;
+  readonly description: string;
+  readonly acceptanceCriteria?: string;
+  readonly state: string;
+  readonly normalizedState: WorkItemState;
+  readonly storyPoints?: number;
+  readonly comments: readonly PBIComment[];
+}
+
+/** A link representing a dependency relationship. */
+export interface ProjectDependency {
+  readonly sourceId: string;
+  readonly targetId: string;
+  readonly type: "predecessor" | "successor";
+}
+
+/** Details about a whole project/feature hierarchy. */
+export interface ProjectDetails {
+  readonly rootId: string;
+  readonly rootTitle: string;
+  readonly rootType: string;
+  readonly rootDescription: string;
+  readonly platform: "github" | "azure";
+  readonly workItems: readonly ProjectWorkItem[];
+  readonly dependencies: readonly ProjectDependency[];
 }

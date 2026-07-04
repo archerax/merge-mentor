@@ -18,7 +18,11 @@ import type {
   PlatformAdapter,
   PRDetails,
   PRFile,
+  ProjectDependency,
+  ProjectDetails,
+  ProjectWorkItem,
   RepoInfo,
+  WorkItemState,
 } from "./types.js";
 
 /** Azure DevOps thread status values. */
@@ -942,6 +946,168 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       throw error;
     }
   }
+
+  async getProjectDetails(id: string): Promise<ProjectDetails> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+    const rootId = id;
+    try {
+      const witApi = await this.connection.getWorkItemTrackingApi();
+
+      const workItemsMap = new Map<string, ProjectWorkItem>();
+      const dependenciesList: ProjectDependency[] = [];
+
+      const queue: string[] = [id];
+      const visited = new Set<string>([id]);
+      const hierarchyIds = new Set<string>([id]);
+
+      this.logger.info({ rootId }, "Fetching project details hierarchy starting at root work item");
+
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        if (currentId === undefined) {
+          continue;
+        }
+        const workItemId = Number.parseInt(currentId, 10);
+        if (Number.isNaN(workItemId)) {
+          this.logger.warn(
+            { currentId },
+            "Skipping invalid work item ID in project details fetching"
+          );
+          continue;
+        }
+
+        const workItem = await withRateLimitHandling(
+          () => witApi.getWorkItem(workItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
+        ).catch((error) => {
+          this.logger.error(
+            { currentId, error: (error as Error).message },
+            "Failed to fetch work item details in project review"
+          );
+          return null;
+        });
+
+        if (!workItem?.fields) {
+          this.logger.warn({ currentId }, "Work item has no fields or is not found");
+          continue;
+        }
+
+        const title = (workItem.fields["System.Title"] as string) || "";
+        const type = (workItem.fields["System.WorkItemType"] as string) || "";
+        const rawDescription = (workItem.fields["System.Description"] as string) || "";
+        const rawAcceptanceCriteria =
+          (workItem.fields["Microsoft.VSTS.Common.AcceptanceCriteria"] as string) || "";
+
+        const storyPointsValue =
+          workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
+          workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
+        const storyPoints =
+          storyPointsValue !== undefined && storyPointsValue !== null
+            ? Number.parseFloat(storyPointsValue.toString())
+            : undefined;
+
+        const state = (workItem.fields["System.State"] as string) || "";
+        const normalizedState = normalizeState(state);
+        const description = stripHtml(rawDescription);
+        const acceptanceCriteria = stripHtml(rawAcceptanceCriteria);
+
+        let comments: PBIComment[] = [];
+        try {
+          const commentsList = await withRateLimitHandling(() =>
+            witApi.getComments(this.project, workItemId)
+          );
+          comments = (commentsList.comments || []).map((c) => ({
+            id: c.id ?? "",
+            body: stripHtml(c.text || ""),
+          }));
+        } catch (commentError) {
+          this.logger.warn(
+            { currentId, error: (commentError as Error).message },
+            "Failed to fetch comments for project work item"
+          );
+        }
+
+        workItemsMap.set(currentId, {
+          id: currentId,
+          title,
+          type,
+          description,
+          acceptanceCriteria: acceptanceCriteria || undefined,
+          state,
+          normalizedState,
+          storyPoints,
+          comments,
+        });
+
+        const shouldFollowHierarchy =
+          hierarchyIds.has(currentId) && ContainerWorkItemTypes.has(type);
+
+        for (const rel of workItem.relations || []) {
+          if (!rel.url) continue;
+
+          const match = rel.url.match(/\/workItems\/(\d+)(?:\?|$)/);
+          if (!match) continue;
+
+          const targetId = match[1];
+
+          if (rel.rel === "System.LinkTypes.Hierarchy-Forward" && shouldFollowHierarchy) {
+            if (!visited.has(targetId)) {
+              visited.add(targetId);
+              hierarchyIds.add(targetId);
+              queue.push(targetId);
+            }
+          } else if (
+            rel.rel === "System.LinkTypes.Dependency-Reverse" ||
+            rel.rel === "System.LinkTypes.Dependency-Forward"
+          ) {
+            const linkType =
+              rel.rel === "System.LinkTypes.Dependency-Reverse" ? "predecessor" : "successor";
+            dependenciesList.push({
+              sourceId: currentId,
+              targetId,
+              type: linkType,
+            });
+
+            if (!visited.has(targetId)) {
+              visited.add(targetId);
+              queue.push(targetId);
+            }
+          }
+        }
+      }
+
+      const rootItemDetails = workItemsMap.get(rootId);
+      if (!rootItemDetails) {
+        throw new Error(`Root work item #${rootId} could not be resolved.`);
+      }
+
+      const seenDeps = new Set<string>();
+      const dependencies = dependenciesList.filter((dep) => {
+        const key = `${dep.sourceId}:${dep.targetId}:${dep.type}`;
+        if (seenDeps.has(key)) return false;
+        seenDeps.add(key);
+        return true;
+      });
+
+      return {
+        rootId,
+        rootTitle: rootItemDetails.title,
+        rootType: rootItemDetails.type,
+        rootDescription: rootItemDetails.description,
+        platform: "azure",
+        workItems: Array.from(workItemsMap.values()),
+        dependencies,
+      };
+    } catch (error) {
+      this.logger.error(
+        { id, error: (error as Error).message },
+        "Failed to fetch Azure DevOps project details"
+      );
+      throw error;
+    }
+  }
 }
 
 function stripHtml(html: string | null | undefined): string {
@@ -972,4 +1138,21 @@ function stripHtml(html: string | null | undefined): string {
   }
 
   return stripped;
+}
+
+const ContainerWorkItemTypes = new Set(["Epic", "Feature"]);
+
+function normalizeState(state: string | null | undefined): WorkItemState {
+  if (!state) return "unknown";
+  const lower = state.toLowerCase().replace(/\s+/g, "");
+  if (["new", "approved", "todo", "proposed", "open", "backlog"].includes(lower)) {
+    return "todo";
+  }
+  if (["inprogress", "active", "developing", "committed"].includes(lower)) {
+    return "inprogress";
+  }
+  if (["done", "completed", "closed", "resolved"].includes(lower)) {
+    return "done";
+  }
+  return "unknown";
 }

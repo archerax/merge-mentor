@@ -27,6 +27,7 @@ import {
 } from "./ports/index.js";
 import { ReviewEngine, type ReviewResult } from "./review/engine.js";
 import { PBIReviewEngine } from "./review/pbiEngine.js";
+import { ProjectReviewEngine } from "./review/projectEngine.js";
 import {
   formatReviewPasses,
   formatReviewTypeLabel,
@@ -1639,6 +1640,132 @@ async function executePBIReview(id: string, options: PBIOptions): Promise<void> 
   });
 
   await engine.reviewPBI(id);
+}
+
+// Project Review command
+program
+  .command("project <id>")
+  .description("Review a project/feature plan hierarchy against planning guidelines")
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
+  .option("--write", "Post comments back to the root Epic/Feature (default is dry-run mode)", false)
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .option(
+    "--provider <provider>",
+    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk). Env: MM_AI_PROVIDER"
+  )
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option("--ai-base-url <url>", "API base URL for BYOK. Env: MM_AI_BASE_URL")
+  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
+  .option("--temp-path <path>", "Base path for temporary files. Env: MM_TEMP_PATH")
+  .action(async (id: string, options: ProjectOptions) => {
+    try {
+      await executeProjectReview(id, options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+interface ProjectOptions {
+  platform?: string;
+  write?: boolean;
+  githubToken?: string;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  azureToken?: string;
+  azureOrg?: string;
+  azureProject?: string;
+  azureRepo?: string;
+  provider?: string;
+  aiModel?: string;
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+  tempPath?: string;
+}
+
+async function executeProjectReview(id: string, options: ProjectOptions): Promise<void> {
+  // 1. Auto-detect platform and repository from git remote if possible
+  let detectedPlatform: Platform | undefined;
+  let detectedGithubOwner: string | undefined;
+  let detectedGithubRepo: string | undefined;
+  let detectedAzureOrg: string | undefined;
+  let detectedAzureProject: string | undefined;
+  let detectedAzureRepo: string | undefined;
+
+  const remoteUrl = detectGitRemoteUrl();
+  if (remoteUrl) {
+    const parsed = parseGitRemoteUrl(remoteUrl);
+    if (parsed) {
+      detectedPlatform = parsed.platform;
+      if (parsed.platform === "github") {
+        detectedGithubOwner = parsed.owner;
+        detectedGithubRepo = parsed.repo;
+      } else {
+        detectedAzureOrg = parsed.org;
+        detectedAzureProject = parsed.project;
+        detectedAzureRepo = parsed.repo;
+      }
+    }
+  }
+
+  const resolvedPlatform =
+    options.platform ?? processEnvironment.get("MM_PLATFORM") ?? detectedPlatform;
+
+  // Load config. Standard values will default if undefined.
+  const config = loadConfig({
+    platform: resolvedPlatform,
+    githubToken: options.githubToken,
+    githubRepoOwner: options.githubRepoOwner ?? detectedGithubOwner,
+    githubRepoName: options.githubRepoName ?? detectedGithubRepo,
+    azureToken: options.azureToken,
+    azureOrg: options.azureOrg ?? detectedAzureOrg,
+    azureProject: options.azureProject ?? detectedAzureProject,
+    azureRepo: options.azureRepo ?? detectedAzureRepo,
+    aiProvider: options.provider,
+    aiModel: options.aiModel,
+    aiBaseUrl: options.aiBaseUrl,
+    aiApiKey: options.aiApiKey,
+    tempPath: options.tempPath,
+  });
+
+  const platform = config.defaultPlatform;
+  if (!["github", "azure"].includes(platform)) {
+    throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
+  }
+
+  validateConfig(config, platform);
+
+  let adapter: PlatformAdapter;
+  if (platform === "github") {
+    adapter = new GitHubAdapter(config);
+  } else {
+    adapter = new AzureDevOpsAdapter(config);
+  }
+
+  const aiProvider = (options.provider ?? config.aiProvider) as AIProviderType;
+  const aiClient = createAIProvider(aiProvider, {
+    model: config.aiModel,
+    token: config.copilotToken,
+    aiBaseUrl: config.aiBaseUrl,
+    aiApiKey: config.aiApiKey,
+    tempPath: config.tempPath,
+  });
+
+  const engine = new ProjectReviewEngine(adapter, aiClient, {
+    dryRun: !options.write,
+    tempPath: config.tempPath,
+    aiProvider,
+    aiModel: config.aiModel,
+  });
+
+  await engine.reviewProject(id);
 }
 
 export { program };

@@ -11,6 +11,7 @@ import type {
   PlatformAdapter,
   PRDetails,
   PRFile,
+  ProjectDetails,
   RepoInfo,
 } from "./types.js";
 
@@ -392,6 +393,10 @@ export class GitHubAdapter implements PlatformAdapter {
       this.auditLogger.logPRDetailsUpdate(prNumber, "github", "failure", (error as Error).message);
       throw error;
     }
+  }
+
+  async getProjectDetails(_id: string): Promise<ProjectDetails> {
+    throw new Error("GitHub project review is not yet supported in this version.");
   }
 }
 
