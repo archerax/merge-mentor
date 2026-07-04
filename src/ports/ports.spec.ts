@@ -16,9 +16,8 @@ describe("createSystemExecutableFinder", () => {
       execSync: vi.fn().mockReturnValue("/usr/bin/git\n"),
     });
     const finder = createSystemExecutableFinder(stub);
-    const uniqueCmd = `found-cmd-${randomUUID()}`;
 
-    const result = finder.find(uniqueCmd);
+    const result = finder.find("git");
 
     expect(result).toBe("/usr/bin/git");
     expect(stub.execSync).toHaveBeenCalledOnce();
@@ -31,9 +30,8 @@ describe("createSystemExecutableFinder", () => {
       }),
     });
     const finder = createSystemExecutableFinder(stub);
-    const uniqueCmd = `missing-cmd-${randomUUID()}`;
 
-    const result = finder.find(uniqueCmd);
+    const result = finder.find("non-existent-cmd");
 
     expect(result).toBeUndefined();
   });
@@ -43,10 +41,9 @@ describe("createSystemExecutableFinder", () => {
       execSync: vi.fn().mockReturnValue("/usr/bin/node\n"),
     });
     const finder = createSystemExecutableFinder(stub);
-    const uniqueCmd = `cached-cmd-${randomUUID()}`;
 
-    const first = finder.find(uniqueCmd);
-    const second = finder.find(uniqueCmd);
+    const first = finder.find("node");
+    const second = finder.find("node");
 
     expect(first).toBe("/usr/bin/node");
     expect(second).toBe("/usr/bin/node");
@@ -60,9 +57,8 @@ describe("createSystemExecutableFinder", () => {
         .mockReturnValue("C:\\Program Files\\Git\\cmd\\git.exe\r\nC:\\Git\\git.exe\r\n"),
     });
     const finder = createSystemExecutableFinder(stub);
-    const uniqueCmd = `multiline-cmd-${randomUUID()}`;
 
-    const result = finder.find(uniqueCmd);
+    const result = finder.find("git");
 
     expect(result).toBe("C:\\Program Files\\Git\\cmd\\git.exe");
   });
@@ -76,11 +72,10 @@ describe("createSystemExecutableFinder", () => {
         execSync: vi.fn().mockReturnValue("C:\\tools\\run.bat\n"),
       });
       const finder = createSystemExecutableFinder(stub);
-      const uniqueCmd = `bat-cmd-${randomUUID()}`;
 
-      const result = finder.find(uniqueCmd);
+      const result = finder.find("run-bat");
 
-      expect(result).toBe(uniqueCmd);
+      expect(result).toBe("run-bat");
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform });
     }
@@ -95,11 +90,10 @@ describe("createSystemExecutableFinder", () => {
         execSync: vi.fn().mockReturnValue("C:\\tools\\run.cmd\n"),
       });
       const finder = createSystemExecutableFinder(stub);
-      const uniqueCmd = `cmd-cmd-${randomUUID()}`;
 
-      const result = finder.find(uniqueCmd);
+      const result = finder.find("run-cmd");
 
-      expect(result).toBe(uniqueCmd);
+      expect(result).toBe("run-cmd");
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform });
     }
@@ -114,12 +108,11 @@ describe("createSystemExecutableFinder", () => {
         execSync: vi.fn().mockReturnValue("/usr/bin/ls\n"),
       });
       const finder = createSystemExecutableFinder(stub);
-      const uniqueCmd = `linux-cmd-${randomUUID()}`;
 
-      finder.find(uniqueCmd);
+      finder.find("ls");
 
       expect(stub.execSync).toHaveBeenCalledWith(
-        `which ${uniqueCmd}`,
+        "which ls",
         expect.objectContaining({ encoding: "utf-8", timeout: 5000 })
       );
     } finally {
@@ -136,12 +129,11 @@ describe("createSystemExecutableFinder", () => {
         execSync: vi.fn().mockReturnValue("C:\\bin\\tool.exe\n"),
       });
       const finder = createSystemExecutableFinder(stub);
-      const uniqueCmd = `win-cmd-${randomUUID()}`;
 
-      finder.find(uniqueCmd);
+      finder.find("tool");
 
       expect(stub.execSync).toHaveBeenCalledWith(
-        `where ${uniqueCmd}`,
+        "where tool",
         expect.objectContaining({ encoding: "utf-8", timeout: 5000 })
       );
     } finally {

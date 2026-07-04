@@ -26,9 +26,6 @@ export interface ExecutableFinder {
   find(command: string): string | undefined;
 }
 
-/** Cache for resolved executable paths. */
-const pathCache = new Map<string, string>();
-
 /**
  * Production implementation that searches PATH using where/which.
  *
@@ -56,6 +53,9 @@ const pathCache = new Map<string, string>();
 export function createSystemExecutableFinder(
   runner: ProcessRunner = nodeProcessRunner
 ): ExecutableFinder {
+  /** Cache for resolved executable paths. */
+  const pathCache = new Map<string, string>();
+
   return {
     find(command: string): string | undefined {
       const cached = pathCache.get(command);
