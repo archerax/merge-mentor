@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-07-04
+
+### Added
+
+- **PR Description & Changelog Generation**: Introduced the `describe` command to automatically generate PR titles, summaries, and changelogs using AI, with options to write suggestions directly to remote platforms.
+- **Hierarchical Project Review**: Implemented the `project <id>` command to hierarchically review work item planning structures (Epics, Features, PBIs, Tasks) against quality guidelines.
+
+### Changed
+
+- **Token Validation**: Enhanced `MM_COPILOT_TOKEN` validation by ensuring the token string contains the required `github_pat_` prefix.
+- **Biome Configuration**: Migrated Biome configuration to the latest settings format.
+
+### Fixed
+
+- **Test Isolation**: Isolated the `executableFinder` path cache in ports and cleaned up test workarounds to prevent cache pollution.
+
 ## [2.7.0] - 2026-07-02
 
 ### Added
