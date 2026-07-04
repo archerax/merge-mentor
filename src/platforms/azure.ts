@@ -914,6 +914,34 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       throw error;
     }
   }
+
+  async updatePRDetails(
+    prNumber: number,
+    details: { readonly title?: string; readonly body?: string }
+  ): Promise<void> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        throw new Error(`Could not find repository ID for PR #${prNumber}`);
+      }
+
+      const updateData: { title?: string; description?: string } = {};
+      if (details.title !== undefined) updateData.title = details.title;
+      if (details.body !== undefined) updateData.description = details.body;
+
+      await withRateLimitHandling(() =>
+        gitApi.updatePullRequest(updateData, repositoryId, prNumber, this.project)
+      );
+      this.auditLogger.logPRDetailsUpdate(prNumber, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logPRDetailsUpdate(prNumber, "azure", "failure", (error as Error).message);
+      throw error;
+    }
+  }
 }
 
 function stripHtml(html: string | null | undefined): string {

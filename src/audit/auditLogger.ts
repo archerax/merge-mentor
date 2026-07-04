@@ -52,6 +52,7 @@ import { type Clock, systemClock } from "../ports/index.js";
  */
 type AuditEventType =
   | "pr.details.fetch"
+  | "pr.details.update"
   | "pr.files.fetch"
   | "pr.comments.fetch"
   | "comment.post.inline"
@@ -60,6 +61,8 @@ type AuditEventType =
   | "ai.provider.execute"
   | "review.start"
   | "review.complete"
+  | "describe.start"
+  | "describe.complete"
   | "file.review.start"
   | "file.review.complete"
   | "crossfile.review.start"
@@ -224,6 +227,70 @@ export class AuditLogger {
       `Fetch PR #${prNumber} details`,
       result,
       { platform },
+      error
+    );
+  }
+
+  /**
+   * Logs PR details update operation.
+   *
+   * @param prNumber - PR number/ID
+   * @param platform - Platform name (github, azure)
+   * @param result - Operation result (success or failure)
+   * @param error - Error message if operation failed
+   */
+  logPRDetailsUpdate(
+    prNumber: number,
+    platform: string,
+    result: "success" | "failure",
+    error?: string
+  ): void {
+    this.logEvent(
+      "pr.details.update",
+      { type: "pr", id: prNumber.toString(), details: { platform } },
+      `Update PR #${prNumber} details`,
+      result,
+      { platform },
+      error
+    );
+  }
+
+  /**
+   * Logs description generation start operation.
+   *
+   * @param prNumber - PR number/ID
+   * @param platform - Platform name (github, azure)
+   */
+  logDescribeStart(prNumber: number, platform: string): void {
+    this.logEvent(
+      "describe.start",
+      { type: "review", id: `pr-${prNumber}`, details: { platform } },
+      `Start description generation for PR #${prNumber}`,
+      "success",
+      { prNumber, platform }
+    );
+  }
+
+  /**
+   * Logs description generation completion operation.
+   *
+   * @param prNumber - PR number/ID
+   * @param platform - Platform name (github, azure)
+   * @param result - Operation result (success or failure)
+   * @param error - Error message if operation failed
+   */
+  logDescribeComplete(
+    prNumber: number,
+    platform: string,
+    result: "success" | "failure",
+    error?: string
+  ): void {
+    this.logEvent(
+      "describe.complete",
+      { type: "review", id: `pr-${prNumber}`, details: { platform } },
+      `Complete description generation for PR #${prNumber}`,
+      result,
+      { prNumber, platform },
       error
     );
   }

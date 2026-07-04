@@ -193,6 +193,16 @@ export interface PlatformAdapter {
    * @param commentId - Optional comment ID to update an existing comment in-place
    */
   postPBIComment(id: string, body: string, commentId?: number | string): Promise<void>;
+
+  /**
+   * Updates the title and description body of a pull request.
+   * @param prNumber - The PR number
+   * @param details - The new title and/or description to apply
+   */
+  updatePRDetails(
+    prNumber: number,
+    details: { readonly title?: string; readonly body?: string }
+  ): Promise<void>;
 }
 
 /** A comment on a Product Backlog Item / User Story / Issue. */

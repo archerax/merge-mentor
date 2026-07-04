@@ -60,6 +60,7 @@ describe("PBIReviewEngine", () => {
     getLinkedPBIIds: vi.fn(),
     getPBIDetails: vi.fn().mockResolvedValue({ ...mockPbiDetails, comments }),
     postPBIComment: vi.fn(),
+    updatePRDetails: vi.fn(),
   });
 
   const createMockAiClient = (response: AIResponse = mockAiResponse): AIProviderClient => ({

@@ -366,6 +366,33 @@ export class GitHubAdapter implements PlatformAdapter {
       throw error;
     }
   }
+
+  async updatePRDetails(
+    prNumber: number,
+    details: { readonly title?: string; readonly body?: string }
+  ): Promise<void> {
+    try {
+      const updateParams: {
+        owner: string;
+        repo: string;
+        pull_number: number;
+        title?: string;
+        body?: string;
+      } = {
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+      };
+      if (details.title !== undefined) updateParams.title = details.title;
+      if (details.body !== undefined) updateParams.body = details.body;
+
+      await withRateLimitHandling(() => this.octokit.pulls.update(updateParams));
+      this.auditLogger.logPRDetailsUpdate(prNumber, "github", "success");
+    } catch (error) {
+      this.auditLogger.logPRDetailsUpdate(prNumber, "github", "failure", (error as Error).message);
+      throw error;
+    }
+  }
 }
 
 function parseAcceptanceCriteria(body: string | null): string | undefined {

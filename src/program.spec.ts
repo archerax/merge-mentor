@@ -6,6 +6,7 @@ import { generateMarkdownReport } from "./program.js";
 import type { ReviewResult } from "./review/engine.js";
 
 const mockReviewPR = vi.fn();
+const mockDescribePR = vi.fn();
 const mockAdapter = {
   getPRDetails: vi.fn(),
   getPRFiles: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock("./platforms/azure.js", () => {
 vi.mock("./review/engine.js", () => {
   return {
     ReviewEngine: vi.fn(function ReviewEngine() {
-      return { reviewPR: mockReviewPR };
+      return { reviewPR: mockReviewPR, describePR: mockDescribePR };
     }),
   };
 });
@@ -82,7 +83,10 @@ import { AzureDevOpsAdapter } from "./platforms/azure.js";
 import { GitHubAdapter } from "./platforms/github.js";
 import { processEnvironment } from "./ports/index.js";
 import {
+  type DescribeOptions,
+  displayDescribeResults,
   displayResults,
+  executeDescribe,
   executeReview,
   hasCriticalIssues,
   program,
@@ -215,6 +219,7 @@ describe("CLI", () => {
     vi.mocked(loadConfig).mockReturnValue(createMockConfig());
     vi.mocked(validateConfig).mockImplementation(() => {});
     mockReviewPR.mockResolvedValue(createMockReviewResult());
+    mockDescribePR.mockResolvedValue({ title: "feat: add feature", body: "Description body" });
   });
 
   describe("executeReview", () => {
@@ -760,6 +765,63 @@ describe("CLI", () => {
           "could not determine PR number"
         );
       });
+    });
+  });
+
+  describe("executeDescribe", () => {
+    it("executes describe with default platform in dry-run mode", async () => {
+      const options: DescribeOptions = {
+        pr: 42,
+        ci: false,
+        write: false,
+        suggestTitle: true,
+      };
+
+      const result = await executeDescribe(options);
+
+      expect(loadConfig).toHaveBeenCalled();
+      expect(validateConfig).toHaveBeenCalledWith(expect.any(Object), "github");
+      expect(GitHubAdapter).toHaveBeenCalled();
+      expect(ReviewEngine).toHaveBeenCalledWith(
+        expect.any(Object),
+        "[merge-mentor]",
+        "copilot-sdk",
+        expect.objectContaining({
+          verbose: true,
+        })
+      );
+      expect(mockDescribePR).toHaveBeenCalledWith({
+        prNumber: 42,
+        suggestTitle: true,
+        write: false,
+        streamingEnabled: true,
+      });
+      expect(result).toEqual({
+        title: "feat: add feature",
+        body: "Description body",
+        adapter: expect.any(Object),
+        platform: "github",
+      });
+    });
+
+    it("throws when PR number is missing", async () => {
+      const options: DescribeOptions = {
+        ci: false,
+      };
+      await expect(executeDescribe(options)).rejects.toThrow("PR number is required");
+    });
+  });
+
+  describe("displayDescribeResults", () => {
+    it("displays generated PR description details", () => {
+      displayDescribeResults("feat: add feature", "Description body", false);
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("PR Description Generation Complete")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Suggested Title: feat: add feature")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Description body"));
     });
   });
 
@@ -1962,6 +2024,35 @@ describe("CLI", () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error: PBI Review Failed")
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe("describe command", () => {
+    let exitSpy: ReturnType<typeof vi.spyOn>;
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("successfully generates PR description in dry-run mode", async () => {
+      vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
+
+      await program.parseAsync(["node", "test", "describe", "--pr", "42"]);
+
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it("errors and exits when executeDescribe throws", async () => {
+      mockDescribePR.mockRejectedValueOnce(new Error("Describe Failed"));
+
+      await program.parseAsync(["node", "test", "describe", "--pr", "42"]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error: Describe Failed")
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
