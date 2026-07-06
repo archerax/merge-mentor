@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-07-06
+
+### Added
+
+- **Project-Level Review & Traversal**: Added support for hierarchical work item planning structure (Epics, Features, PBIs, Tasks) review using the `project <id>` command.
+- **MoSCoW Classification**: Supported MoSCoW (Must have, Should have, Could have, Won't have) rule verification for project items.
+- **Review Table Formatting**: Enhanced the readability and visual layout of generated review comments and tables.
+
+### Changed
+
+- **CLI Architecture Refactoring**: Extracted command handlers (such as `describe`, `doctor`, `pbi`, `project`, `repos`, `review`) from the monolithic `program.ts` into individual modular files under `src/commands/` for better maintainability.
+
 ## [2.8.0] - 2026-07-04
 
 ### Added
