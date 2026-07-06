@@ -1,6 +1,6 @@
 {
   "name": "merge-mentor",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Automated code review bot powered by AI CLI tools (Copilot, OpenCode, Cursor)",
   "main": "dist/cli.js",
   "bin": {
