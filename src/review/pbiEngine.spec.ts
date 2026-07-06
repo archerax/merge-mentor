@@ -47,7 +47,10 @@ describe("PBIReviewEngine", () => {
     parsed: mockAiOutput,
   };
 
-  const createMockAdapter = (comments: PBIDetails["comments"] = []): PlatformAdapter => ({
+  const createMockAdapter = (
+    comments: PBIDetails["comments"] = [],
+    pbiDetailsOverride?: Partial<PBIDetails>
+  ): PlatformAdapter => ({
     getProjectIdentifier: vi.fn().mockReturnValue("test-project"),
     getPlatformName: vi.fn().mockReturnValue("github"),
     getRepoInfo: vi.fn().mockReturnValue({ owner: "owner", repo: "repo", platform: "github" }),
@@ -58,7 +61,9 @@ describe("PBIReviewEngine", () => {
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
     getLinkedPBIIds: vi.fn(),
-    getPBIDetails: vi.fn().mockResolvedValue({ ...mockPbiDetails, comments }),
+    getPBIDetails: vi
+      .fn()
+      .mockResolvedValue({ ...mockPbiDetails, comments, ...pbiDetailsOverride }),
     getProjectDetails: vi.fn(),
     postPBIComment: vi.fn(),
     updatePRDetails: vi.fn(),
@@ -258,5 +263,23 @@ describe("PBIReviewEngine", () => {
 
     expect(result.title).toBe("Direct JSON Story");
     expect(result.invest_evaluation.independent).toBe("Good");
+  });
+
+  it("should include moscowTag and backlogPriority in the prompt if defined", async () => {
+    const adapter = createMockAdapter([], {
+      moscowTag: "Must",
+      backlogPriority: 10,
+    });
+    const aiClient = createMockAiClient();
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+
+    await engine.reviewPBI("12345");
+
+    expect(aiClient.executePrompt).toHaveBeenCalledWith(
+      expect.stringContaining("MoSCoW Tag:** Must")
+    );
+    expect(aiClient.executePrompt).toHaveBeenCalledWith(
+      expect.stringContaining("Backlog Priority:** 10")
+    );
   });
 });

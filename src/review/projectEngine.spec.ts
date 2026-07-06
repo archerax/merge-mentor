@@ -70,9 +70,10 @@ describe("ProjectReviewEngine", () => {
   };
 
   const createMockAdapter = (
-    rootComments: { id: number; body: string }[] = []
+    rootComments: { id: number; body: string }[] = [],
+    projectDetailsOverride?: Partial<ProjectDetails>
   ): PlatformAdapter => {
-    const details = { ...mockProjectDetails };
+    const details = { ...mockProjectDetails, ...projectDetailsOverride };
     // inject comments on the root work item
     details.workItems = details.workItems.map((wi) => {
       if (wi.id === details.rootId) {
@@ -212,5 +213,36 @@ describe("ProjectReviewEngine", () => {
     expect(result.title).toBe("Test Feature"); // Fallbacks to project title
     expect(result.overall_assessment).toBe("AI review failed to generate a parseable response.");
     expect(result.completeness_assessment).toBe("Failed to parse AI evaluation.");
+  });
+
+  it("should include moscowTag and backlogPriority in the prompt for work items if defined", async () => {
+    const detailsOverride: Partial<ProjectDetails> = {
+      workItems: [
+        {
+          id: "100",
+          title: "Test Feature",
+          type: "Feature",
+          description: "High level epic feature description.",
+          state: "New",
+          normalizedState: "todo",
+          comments: [],
+          moscowTag: "Must",
+          backlogPriority: 1.25,
+        },
+      ],
+    };
+
+    const adapter = createMockAdapter([], detailsOverride);
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+
+    await engine.reviewProject("100");
+
+    expect(aiClient.executePrompt).toHaveBeenCalledWith(
+      expect.stringContaining("MoSCoW Tag:** Must")
+    );
+    expect(aiClient.executePrompt).toHaveBeenCalledWith(
+      expect.stringContaining("Backlog Priority:** 1.25")
+    );
   });
 });

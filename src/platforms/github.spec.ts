@@ -449,6 +449,7 @@ describe("GitHubAdapter", () => {
           data: {
             title: "Test Issue",
             body: "Some body text\n### Acceptance Criteria\n- AC1\n- AC2\n### Story Points\nStory Points: 8\n",
+            labels: [{ name: "should have" }, "random-tag"],
           },
         });
         mockOctokitInstance.paginate.mockResolvedValue([
@@ -469,6 +470,7 @@ describe("GitHubAdapter", () => {
         expect(result.storyPoints).toBe(8);
         expect(result.comments).toHaveLength(2);
         expect(result.comments[0].body).toBe("Comment 1");
+        expect(result.moscowTag).toBe("Should");
       });
 
       it("handles missing acceptance criteria, story points, and description", async () => {

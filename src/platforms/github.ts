@@ -3,6 +3,7 @@ import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
 import { createChildLogger } from "../logger.js";
+import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
@@ -275,6 +276,16 @@ export class GitHubAdapter implements PlatformAdapter {
       );
 
       const description = issue.body || "";
+      const labelNames = (issue.labels || [])
+        .map((label) => {
+          if (typeof label === "string") {
+            return label;
+          }
+          return label.name || "";
+        })
+        .filter(Boolean);
+      const moscowTag = extractMoSCoWTag(labelNames);
+
       return {
         id,
         platform: "github",
@@ -286,6 +297,7 @@ export class GitHubAdapter implements PlatformAdapter {
           id: c.id,
           body: c.body || "",
         })),
+        moscowTag,
       };
     } catch (error) {
       this.logger.error(

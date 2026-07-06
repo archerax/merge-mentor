@@ -226,6 +226,8 @@ export interface PBIDetails {
   readonly acceptanceCriteria?: string;
   readonly storyPoints?: number;
   readonly comments: readonly PBIComment[];
+  readonly moscowTag?: "Must" | "Should" | "Could" | "Won't";
+  readonly backlogPriority?: number;
 }
 
 /** A simple representation of a work item state/status. */
@@ -242,6 +244,8 @@ export interface ProjectWorkItem {
   readonly normalizedState: WorkItemState;
   readonly storyPoints?: number;
   readonly comments: readonly PBIComment[];
+  readonly moscowTag?: "Must" | "Should" | "Could" | "Won't";
+  readonly backlogPriority?: number;
 }
 
 /** A link representing a dependency relationship. */

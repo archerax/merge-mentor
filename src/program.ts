@@ -1647,7 +1647,11 @@ program
   .command("project <id>")
   .description("Review a project/feature plan hierarchy against planning guidelines")
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
-  .option("--write", "Post comments back to the root Epic/Feature (default is dry-run mode)", false)
+  .option(
+    "--write",
+    "Post comments back to the root Project/Epic/Feature (default is dry-run mode)",
+    false
+  )
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
   .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")

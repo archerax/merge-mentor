@@ -9,6 +9,7 @@ import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
 import { PlatformApiError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
+import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
@@ -696,9 +697,32 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const storyPointsValue =
         workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
         workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
-      const storyPoints =
+      const parsedStoryPoints =
         storyPointsValue !== undefined && storyPointsValue !== null
           ? Number.parseFloat(storyPointsValue.toString())
+          : undefined;
+      const storyPoints =
+        parsedStoryPoints !== undefined && !Number.isNaN(parsedStoryPoints)
+          ? parsedStoryPoints
+          : undefined;
+
+      const tagsString = (workItem.fields["System.Tags"] as string) || "";
+      const tags = tagsString
+        .split(/[;,]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const moscowTag = extractMoSCoWTag(tags);
+
+      const backlogPriorityValue =
+        workItem.fields["Microsoft.VSTS.Common.BacklogPriority"] ??
+        workItem.fields["Microsoft.VSTS.Common.StackRank"];
+      const parsedBacklogPriority =
+        backlogPriorityValue !== undefined && backlogPriorityValue !== null
+          ? Number.parseFloat(backlogPriorityValue.toString())
+          : undefined;
+      const backlogPriority =
+        parsedBacklogPriority !== undefined && !Number.isNaN(parsedBacklogPriority)
+          ? parsedBacklogPriority
           : undefined;
 
       const description = stripHtml(rawDescription);
@@ -755,6 +779,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
                 acceptanceCriteria: combinedAcceptanceCriteria,
                 storyPoints: storyPoints ?? parentDetails.storyPoints,
                 comments: combinedComments,
+                moscowTag: moscowTag ?? parentDetails.moscowTag,
+                backlogPriority: backlogPriority ?? parentDetails.backlogPriority,
               };
             } catch (parentError) {
               this.logger.warn(
@@ -774,6 +800,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         acceptanceCriteria: acceptanceCriteria || undefined,
         storyPoints,
         comments,
+        moscowTag,
+        backlogPriority,
       };
     } catch (error) {
       this.logger.error(
@@ -1003,9 +1031,32 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         const storyPointsValue =
           workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
           workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
-        const storyPoints =
+        const parsedStoryPoints =
           storyPointsValue !== undefined && storyPointsValue !== null
             ? Number.parseFloat(storyPointsValue.toString())
+            : undefined;
+        const storyPoints =
+          parsedStoryPoints !== undefined && !Number.isNaN(parsedStoryPoints)
+            ? parsedStoryPoints
+            : undefined;
+
+        const tagsString = (workItem.fields["System.Tags"] as string) || "";
+        const tags = tagsString
+          .split(/[;,]/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const moscowTag = extractMoSCoWTag(tags);
+
+        const backlogPriorityValue =
+          workItem.fields["Microsoft.VSTS.Common.BacklogPriority"] ??
+          workItem.fields["Microsoft.VSTS.Common.StackRank"];
+        const parsedBacklogPriority =
+          backlogPriorityValue !== undefined && backlogPriorityValue !== null
+            ? Number.parseFloat(backlogPriorityValue.toString())
+            : undefined;
+        const backlogPriority =
+          parsedBacklogPriority !== undefined && !Number.isNaN(parsedBacklogPriority)
+            ? parsedBacklogPriority
             : undefined;
 
         const state = (workItem.fields["System.State"] as string) || "";
@@ -1039,6 +1090,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           normalizedState,
           storyPoints,
           comments,
+          moscowTag,
+          backlogPriority,
         });
 
         const shouldFollowHierarchy =
@@ -1140,7 +1193,7 @@ function stripHtml(html: string | null | undefined): string {
   return stripped;
 }
 
-const ContainerWorkItemTypes = new Set(["Epic", "Feature"]);
+const ContainerWorkItemTypes = new Set(["Project", "Epic", "Feature"]);
 
 function normalizeState(state: string | null | undefined): WorkItemState {
   if (!state) return "unknown";

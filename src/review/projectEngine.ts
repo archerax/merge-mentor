@@ -126,6 +126,8 @@ export class ProjectReviewEngine {
 - **Type:** ${wi.type}
 - **Title:** ${wi.title}
 - **State:** ${wi.state} (Normalized: ${wi.normalizedState})
+- **MoSCoW Tag:** ${wi.moscowTag || "None"}
+- **Backlog Priority:** ${wi.backlogPriority !== undefined ? wi.backlogPriority : "Not ordered"}
 - **Story Points/Effort:** ${wi.storyPoints !== undefined ? wi.storyPoints : "Not estimated"}
 - **Description:** ${wi.description || "(No description)"}
 - **Acceptance Criteria:** ${wi.acceptanceCriteria || "(No acceptance criteria)"}
@@ -144,7 +146,7 @@ export class ProjectReviewEngine {
             .join("\n")
         : "No explicit dependencies linked.";
 
-    return `You are an expert Agile Coach and Product Owner reviewing a project/feature plan structure (Epics, Features, and child PBIs/User Stories) against Agile planning and quality guidelines.
+    return `You are an expert Agile Coach and Product Owner reviewing a project/feature plan structure (Projects, Epics, Features, and child PBIs/User Stories) against Agile planning and quality guidelines.
 
 # PROJECT/FEATURE ROOT Details
 - **Root ID:** ${project.rootId}
@@ -162,10 +164,10 @@ ${dependenciesText}
 
 # EVALUATION CRITERIA
 Review the project plan details against the following planning dimensions:
-1. **Plan Completeness & Gaps:** Do the child stories fully cover the scope of the root Epic/Feature? Identify missing requirements, gaps, or holes in the story breakdown.
-2. **Dependency & Sequencing Risks:** Validate the work states against their dependency relationships. Flag if any successor is "In Progress" or "Done" while its predecessor is still "To Do" or "New". Detect circular dependencies.
+1. **Plan Completeness & Gaps:** Do the child stories/items fully cover the scope of the root Project/Epic/Feature? Identify missing requirements, gaps, or holes in the story breakdown.
+2. **Dependency & Sequencing Risks:** Validate the work states against their dependency relationships. Flag if any successor is "In Progress" or "Done" while its predecessor is still "To Do" or "New". Detect circular dependencies. Also validate sequencing using priorities/order: flag if a higher-priority item (e.g. "Must" or a higher backlog position / lower Stack Rank value) depends on or is scheduled after a lower-priority item.
 3. **Acceptance Criteria Alignment:** Verify that child stories have clear, testable acceptance criteria matching the high-level project goals.
-4. **Estimation & Scope Consistency:** Check if estimates are missing, if any story is excessively large (epic-sized) and needs breaking down, or if there is scope creep.
+4. **Estimation & Scope Consistency:** Check if estimates are missing, if any story is excessively large (epic-sized) and needs breaking down, or if there is scope creep. Verify if "Must" and "Should" items are prioritized and estimated properly.
 
 # OUTPUT FORMAT
 You must respond in strict JSON format within a \`\`\`json markdown block.
@@ -220,12 +222,17 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 
 ### 🔍 Planning Quality Guidelines
 
-| Dimension | Feedback |
-| :--- | :--- |
-| **Plan Completeness & Gaps** | ${data.completeness_assessment} |
-| **Dependency & Sequencing Risks** | ${data.dependency_risks} |
-| **Acceptance Criteria Alignment** | ${data.acceptance_criteria_alignment} |
-| **Estimation & Scope Consistency** | ${data.estimation_consistency} |
+#### 📋 Plan Completeness & Gaps
+${data.completeness_assessment}
+
+#### 🔗 Dependency & Sequencing Risks
+${data.dependency_risks}
+
+#### 🎯 Acceptance Criteria Alignment
+${data.acceptance_criteria_alignment}
+
+#### ⚖️ Estimation & Scope Consistency
+${data.estimation_consistency}
 
 ### 🎯 Overall Assessment
 ${data.overall_assessment}

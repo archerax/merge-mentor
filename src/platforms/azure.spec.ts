@@ -1222,6 +1222,38 @@ describe("AzureDevOpsAdapter", () => {
         expect(result.comments[0].body).toBe("Parent Comment");
       });
 
+      it("extracts moscowTag and backlogPriority correctly", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+            "System.Tags": "some-tag; must-have; another-tag",
+            "Microsoft.VSTS.Common.BacklogPriority": 42.5,
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getPBIDetails("123");
+        expect(result.moscowTag).toBe("Must");
+        expect(result.backlogPriority).toBe(42.5);
+      });
+
+      it("handles non-numeric storyPoints and backlogPriority values as undefined", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+            "Microsoft.VSTS.Scheduling.StoryPoints": "invalid-points",
+            "Microsoft.VSTS.Common.BacklogPriority": "invalid-priority",
+          },
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getPBIDetails("123");
+        expect(result.storyPoints).toBeUndefined();
+        expect(result.backlogPriority).toBeUndefined();
+      });
+
       it("logs error and rethrows on failure", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockRejectedValue(new Error("API Error"));
@@ -1415,6 +1447,8 @@ describe("AzureDevOpsAdapter", () => {
                 "System.WorkItemType": "Product Backlog Item",
                 "System.Description": "PBI description",
                 "System.State": "In Progress",
+                "System.Tags": "Could Have, some-other-tag",
+                "Microsoft.VSTS.Common.StackRank": 100.5,
               },
               relations: [
                 {
@@ -1474,6 +1508,99 @@ describe("AzureDevOpsAdapter", () => {
         expect(item100?.normalizedState).toBe("todo");
         expect(item101?.normalizedState).toBe("inprogress");
         expect(item103?.normalizedState).toBe("done");
+
+        // Verify moscowTag and backlogPriority extraction
+        expect(item101?.moscowTag).toBe("Could");
+        expect(item101?.backlogPriority).toBe(100.5);
+      });
+
+      it("successfully fetches hierarchy starting from Project down to Epic, Feature, and PBI", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+        mockWitApiInstance.getWorkItem.mockImplementation((id: number) => {
+          if (id === 200) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Test Project Work Item",
+                "System.WorkItemType": "Project",
+                "System.Description": "Project description",
+                "System.State": "New",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/201",
+                },
+              ],
+            });
+          }
+          if (id === 201) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Child Epic",
+                "System.WorkItemType": "Epic",
+                "System.Description": "Epic description",
+                "System.State": "Active",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/202",
+                },
+              ],
+            });
+          }
+          if (id === 202) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Grandchild Feature",
+                "System.WorkItemType": "Feature",
+                "System.Description": "Feature description",
+                "System.State": "Active",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/203",
+                },
+              ],
+            });
+          }
+          if (id === 203) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Leaf User Story",
+                "System.WorkItemType": "User Story",
+                "System.State": "Closed",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/204",
+                },
+              ],
+            });
+          }
+          return Promise.resolve(null);
+        });
+
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getProjectDetails("200");
+
+        expect(result.rootId).toBe("200");
+        expect(result.rootTitle).toBe("Test Project Work Item");
+        expect(result.rootType).toBe("Project");
+        expect(result.rootDescription).toBe("Project description");
+
+        // Should retrieve 200 (Project), 201 (Epic), 202 (Feature), 203 (User Story). 204 should NOT be fetched.
+        expect(result.workItems).toHaveLength(4);
+        const itemIds = result.workItems.map((wi) => wi.id);
+        expect(itemIds).toContain("200");
+        expect(itemIds).toContain("201");
+        expect(itemIds).toContain("202");
+        expect(itemIds).toContain("203");
+        expect(itemIds).not.toContain("204");
       });
     });
   });

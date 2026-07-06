@@ -121,6 +121,8 @@ export class PBIReviewEngine {
 - **Description:** ${pbi.description || "(No description provided)"}
 - **Acceptance Criteria:** ${pbi.acceptanceCriteria || "(No acceptance criteria provided)"}
 - **Story Points/Estimation:** ${pbi.storyPoints !== undefined ? pbi.storyPoints : "Not estimated yet"}
+- **MoSCoW Tag:** ${pbi.moscowTag || "None"}
+- **Backlog Priority:** ${pbi.backlogPriority !== undefined ? pbi.backlogPriority : "Not ordered"}
 
 # PBI COMMENTS/DISCUSSION
 ${commentsList}
@@ -214,13 +216,20 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 
 ### 📊 PBI Quality Guidelines
 
-| Dimension | Feedback |
-| :--- | :--- |
-| **Independent** | ${evalObj.independent} |
-| **Negotiable** | ${evalObj.negotiable} |
-| **Valuable** | ${evalObj.valuable} |
-| **Estimable** | ${evalObj.estimable} |
-| **Testable** | ${evalObj.testable} |
+#### 🧩 Independent
+${evalObj.independent}
+
+#### 💬 Negotiable
+${evalObj.negotiable}
+
+#### 💎 Valuable
+${evalObj.valuable}
+
+#### 📐 Estimable
+${evalObj.estimable}
+
+#### 🧪 Testable
+${evalObj.testable}
 
 ### 🎯 Overall Assessment
 ${data.overall_assessment}
