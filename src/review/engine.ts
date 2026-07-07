@@ -43,19 +43,14 @@
  */
 
 import path from "node:path";
-import { z } from "zod";
 import {
   type AIProviderClient,
   type AIProviderType,
   type AIResponse,
   createAIProvider,
-  formatPBIAlignmentReport,
-  type PBIAlignmentResult,
-  parsePBIAlignmentResponse,
   type ReasoningEffort,
   type TokenUsage,
 } from "../ai/index.js";
-import { buildPBIAlignmentPrompt } from "../ai/prompts/alignment.js";
 import { buildFilesSummary } from "../ai/prompts/buildFilesSummary.js";
 import { formatExistingCommentsContext } from "../ai/prompts/commentContext.js";
 import { buildDescribePrompt, buildSuggestTitlePrompt } from "../ai/prompts/describe.js";
@@ -78,7 +73,6 @@ import type {
   PRFile,
 } from "../platforms/types.js";
 import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from "../ports/index.js";
-import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
 import { parsePRNumber } from "../utils/prIdentifier.js";
@@ -90,17 +84,13 @@ import {
 } from "../utils/testFileMapper.js";
 import { mergeTokenUsage } from "../utils/tokenUsage.js";
 
-const ProjectConfigSchema = z
-  .object({
-    testFilePatterns: z.array(z.string()).optional(),
-    testMapping: z.record(z.string(), z.string()).optional(),
-  })
-  .strict();
-
 import { CommentManager } from "./commentManager.js";
-import { type DiffManifest, DiffStorage } from "./diffStorage.js";
+import { ConfigLoader } from "./configLoader.js";
+import { DiffStorage } from "./diffStorage.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
+import { LineNumberValidator } from "./lineNumberValidator.js";
+import { PbiVerifier } from "./pbiVerifier.js";
 import { RepoManager } from "./repoManager.js";
 import {
   type ResolvedReviewProfile,
@@ -111,6 +101,7 @@ import {
   validateReviewType,
 } from "./reviewSelection.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
+import { WorkspaceManager } from "./workspaceManager.js";
 
 /** Threshold size (150 KB) below which all file diffs are attached to the initial AI prompt. */
 const ATTACHMENT_SIZE_THRESHOLD_BYTES = 150 * 1024;
@@ -256,6 +247,10 @@ export class ReviewEngine {
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
   private readonly repoManager: RepoManager;
+  private readonly workspaceManager: WorkspaceManager;
+  private readonly configLoader: ConfigLoader;
+  private readonly pbiVerifier: PbiVerifier;
+  private readonly lineNumberValidator: LineNumberValidator;
   private readonly output: OutputWriter;
   private readonly fileSystem: FileSystem;
   private readonly options: ReviewEngineOptions;
@@ -333,6 +328,23 @@ export class ReviewEngine {
       { ciMode: options?.ciMode },
       createGitClient((options?.gitBackend ?? "cli") as GitBackendType)
     );
+    this.workspaceManager = new WorkspaceManager(
+      platform,
+      this.repoManager,
+      this.fileSystem,
+      this.output,
+      {
+        tempPath,
+        localWorkspacePath: options?.localWorkspacePath,
+        verbose: options?.verbose,
+        ciMode: options?.ciMode,
+      }
+    );
+    this.configLoader = new ConfigLoader(this.fileSystem);
+    this.pbiVerifier = new PbiVerifier(platform, this.provider, this.output, {
+      verbose: options?.verbose,
+    });
+    this.lineNumberValidator = new LineNumberValidator();
     this.options = options ?? {};
     this.streamingEnabled = options?.streamingEnabled ?? true;
     this.streamingLines = options?.streamingLines ?? 9;
@@ -515,10 +527,10 @@ export class ReviewEngine {
     const cachedState = await this.stateCache.getState(prIdentifier);
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
-    const repoPath = await this.resolveWorkspace(prDetails.headBranch);
+    const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
 
     // Load custom project configuration if available
-    await this.loadProjectConfig(repoPath);
+    this.projectConfig = await this.configLoader.loadProjectConfig(repoPath);
 
     const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
     const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
@@ -578,7 +590,7 @@ export class ReviewEngine {
       filesAnalyzed = fastReviewData.filesAnalyzed;
 
       // Validate line numbers against actual diff content
-      fileResults = this.validateLineNumbers(fileResults, files);
+      fileResults = this.lineNumberValidator.validate(fileResults, files);
     } else {
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -592,7 +604,7 @@ export class ReviewEngine {
       filesSkipped = reviewData.filesSkipped;
 
       // Validate line numbers against actual diff content
-      fileResults = this.validateLineNumbers(fileResults, files);
+      fileResults = this.lineNumberValidator.validate(fileResults, files);
 
       // Skip cross-file analysis if all files were cached
       if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
@@ -612,75 +624,12 @@ export class ReviewEngine {
     }
 
     if (this.options.verifyPbi) {
-      this.log("\n🔍 Verifying PR alignment with linked work items...");
-      let pbiIds: readonly string[] = [];
-      try {
-        pbiIds = await this.platform.getLinkedPBIIds(prNumber);
-      } catch (error) {
-        this.logger.error(
-          { prNumber, error: (error as Error).message },
-          "Failed to get linked PBI/issue IDs"
-        );
-      }
-
-      if (pbiIds.length === 0) {
-        this.log("⚠️ Warning: No linked work items or issues found for this PR.");
-        crossFileResult = {
-          ...crossFileResult,
-          overallAssessment: `⚠️ **Warning:** No linked work items or issues found for this PR.\n\n${crossFileResult.overallAssessment}`,
-        };
-      } else {
-        const prDiff = files
-          .filter((f) => f.patch)
-          .map((f) => `--- a/${f.filename}\n+++ b/${f.filename}\n${f.patch}`)
-          .join("\n");
-
-        const alignmentReports: string[] = [];
-
-        for (const id of pbiIds) {
-          try {
-            this.log(`📋 Fetching details for linked work item #${id}...`);
-            const pbiDetails = await this.platform.getPBIDetails(id);
-
-            this.log(`🤖 Verifying alignment against work item #${id}: ${pbiDetails.title}...`);
-            const prompt = buildPBIAlignmentPrompt(
-              pbiDetails.id,
-              pbiDetails.title,
-              pbiDetails.description,
-              pbiDetails.acceptanceCriteria || "",
-              prDiff
-            );
-
-            const aiResponse = await this.provider.executePrompt(prompt);
-            onTokenUsage(aiResponse.tokenUsage);
-
-            const alignmentResult: PBIAlignmentResult = parsePBIAlignmentResponse(
-              aiResponse.raw,
-              pbiDetails.id,
-              pbiDetails.title
-            );
-
-            const reportMarkdown = formatPBIAlignmentReport(alignmentResult);
-            alignmentReports.push(reportMarkdown);
-          } catch (error) {
-            this.logger.error(
-              { id, error: (error as Error).message },
-              "Failed to verify PBI alignment"
-            );
-            this.log(`⚠️ Warning: Failed to fetch or verify work item #${id}.`);
-            alignmentReports.push(
-              `<details>\n<summary>🔗 Work Item #${id} Alignment Report</summary>\n\n⚠️ **Error:** Failed to fetch or analyze alignment details for this work item.\n\n</details>`
-            );
-          }
-        }
-
-        if (alignmentReports.length > 0) {
-          crossFileResult = {
-            ...crossFileResult,
-            overallAssessment: `${crossFileResult.overallAssessment}\n\n### 🔗 Work Item Alignment Verification\n\n${alignmentReports.join("\n\n")}`,
-          };
-        }
-      }
+      crossFileResult = await this.pbiVerifier.verifyPRAlignment(
+        prNumber,
+        files,
+        crossFileResult,
+        onTokenUsage
+      );
     }
 
     const actions = this.commentManager.determineActions(
@@ -794,96 +743,6 @@ export class ReviewEngine {
     );
     this.log(`Found ${existingComments.length} existing bot comments`);
     return existingComments;
-  }
-
-  /**
-   * Returns the path to the repository workspace for CLI agent access.
-   * Uses a pre-existing local checkout when available (e.g. in CI), otherwise
-   * clones the repository to a local temp directory.
-   */
-  private async resolveWorkspace(branch: string): Promise<string> {
-    const localPath = this.options.localWorkspacePath;
-    if (localPath) {
-      try {
-        await this.fileSystem.access(localPath);
-      } catch {
-        throw new Error(
-          `CI workspace path does not exist or is not accessible: ${localPath}. ` +
-            "Ensure the repository has been checked out before running merge-mentor."
-        );
-      }
-      this.log(`📦 Using CI workspace: ${localPath}`);
-      this.logger.info({ localPath }, "Using pre-existing CI workspace, skipping clone");
-      return localPath;
-    }
-    return this.ensureRepoCloned(branch);
-  }
-
-  /**
-   * Loads custom project configuration (.mergementor.json) from the workspace root if it exists.
-   */
-  private async loadProjectConfig(repoPath: string): Promise<void> {
-    const configPath = path.join(repoPath, ".mergementor.json");
-    try {
-      await this.fileSystem.access(configPath);
-      const content = await this.fileSystem.readFile(configPath, "utf-8");
-      if (!content || content.trim() === "") {
-        return;
-      }
-      const parsed = JSON.parse(content);
-      const result = ProjectConfigSchema.safeParse(parsed);
-      if (result.success) {
-        this.projectConfig = {
-          testFilePatterns: result.data.testFilePatterns,
-          testMapping: result.data.testMapping,
-        };
-        this.logger.info(
-          { projectConfig: this.projectConfig },
-          "Loaded custom project configuration from .mergementor.json"
-        );
-      } else {
-        this.logger.warn(
-          { error: result.error.format() },
-          "Invalid .mergementor.json schema configuration"
-        );
-      }
-    } catch (error) {
-      // Configuration is optional, do not throw on failure unless it is malformed JSON
-      if (error instanceof SyntaxError) {
-        this.logger.error({ error }, "Malformed JSON in .mergementor.json");
-        throw new Error(`Failed to parse .mergementor.json: ${error.message}`);
-      }
-      this.logger.debug({ error }, "No custom project configuration found or readable");
-    }
-  }
-
-  /**
-   * Ensures repository is cloned for CLI agent workspace access.
-   * Returns the path to the cloned repository.
-   * @throws {Error} If repository cloning fails
-   */
-  private async ensureRepoCloned(branch: string): Promise<string> {
-    this.log("📦 Cloning repository for workspace access...");
-    this.logger.debug({ branch }, "Ensuring repository is cloned");
-
-    const repoInfo = this.platform.getRepoInfo();
-    const token = this.platform.getToken();
-
-    try {
-      const repoPath = await this.repoManager.ensureRepo(repoInfo, branch, token);
-
-      this.log(`  ✓ Repository ready at: ${repoPath}`);
-      this.logger.info({ repoPath }, "Repository cloned successfully");
-      return repoPath;
-    } catch (error) {
-      const errorMsg = `Failed to clone repository: ${(error as Error).message}`;
-      this.log(`  ❌ ${errorMsg}`);
-      this.logger.error(
-        { error: (error as Error).message, branch },
-        "Repository cloning failed, aborting review"
-      );
-      throw new Error(errorMsg);
-    }
   }
 
   private hasReviewPass(pass: ReviewPass): boolean {
@@ -1079,7 +938,7 @@ During the database pass, pay extra attention to query correctness, transaction 
 
       // Copy diff files to repo's .mergementor directory so AI can access them
       this.logger.debug("Copying diffs to repo's .mergementor directory for AI access");
-      const { paths: diffFiles, totalSize } = await this.copyDiffsToRepoDir(
+      const { paths: diffFiles, totalSize } = await this.workspaceManager.copyDiffsToRepoDir(
         diffDir,
         manifest,
         repoPath
@@ -1175,152 +1034,6 @@ During the database pass, pay extra attention to query correctness, transaction 
       // Clean up diffs
       await diffStorage.cleanup(prIdentifier);
     }
-  }
-
-  /**
-   * Copies diff files to the repo's .mergementor directory so Copilot CLI can access them.
-   * If repoPath is not provided, falls back to the global temp directory.
-   */
-  private async copyDiffsToRepoDir(
-    diffDir: string,
-    manifest: DiffManifest,
-    repoPath?: string
-  ): Promise<{ paths: string[]; totalSize: number }> {
-    // Use repo's .mergementor/diffs directory if repoPath provided, otherwise global temp
-    const targetDir = repoPath
-      ? path.join(repoPath, ".mergementor", "diffs")
-      : path.join(this.options.tempPath ?? ".mergementor", "temp");
-
-    // Ensure target directory exists
-    await this.fileSystem.mkdir(targetDir, { recursive: true });
-
-    this.logger.debug(
-      { fileCount: manifest.files.length, targetDir },
-      "Copying diff files to accessible directory"
-    );
-
-    const paths: string[] = [];
-    let totalSize = 0;
-
-    for (const fileEntry of manifest.files) {
-      const sourcePath = path.join(diffDir, fileEntry.diffPath);
-      const destPath = path.join(targetDir, fileEntry.diffPath);
-
-      this.logger.debug(
-        { diffPath: fileEntry.diffPath, sourcePath, destPath },
-        "Copying diff file"
-      );
-
-      try {
-        const content = await this.fileSystem.readFile(sourcePath, "utf-8");
-        await this.fileSystem.writeFile(destPath, content, "utf-8");
-        paths.push(destPath);
-        totalSize += content.length;
-        this.logger.debug(
-          { diffPath: fileEntry.diffPath, contentLength: content.length },
-          "Successfully copied diff file"
-        );
-      } catch (error) {
-        this.logger.warn(
-          { diffPath: fileEntry.diffPath, error: (error as Error).message },
-          "Failed to copy diff file"
-        );
-        throw error;
-      }
-    }
-
-    return { paths, totalSize };
-  }
-
-  /**
-   * Validates and adjusts line numbers in findings to match actual diff lines.
-   * Filters out findings with invalid line numbers that can't be mapped.
-   */
-  private validateLineNumbers(
-    fileResults: FileReviewResult[],
-    files: PRFile[]
-  ): FileReviewResult[] {
-    // Create a map of filename to valid line numbers
-    const validLinesMap = new Map<string, Set<number>>();
-    for (const file of files) {
-      validLinesMap.set(file.filename, getValidDiffLines(file.patch));
-    }
-
-    const validatedResults: FileReviewResult[] = [];
-
-    for (const result of fileResults) {
-      const validLines = validLinesMap.get(result.filename);
-      if (!validLines || validLines.size === 0) {
-        this.logger.warn(
-          {
-            filename: result.filename,
-            findingsCount: result.findings.length,
-          },
-          "No valid diff lines found for file, skipping inline comments"
-        );
-        continue;
-      }
-
-      const validatedFindings = result.findings
-        .map((finding) => {
-          if (validLines.has(finding.line)) {
-            return finding;
-          }
-
-          // Try to find nearest valid line
-          const nearestLine = findNearestValidLine(finding.line, validLines);
-          if (nearestLine !== undefined) {
-            this.logger.info(
-              {
-                filename: result.filename,
-                requestedLine: finding.line,
-                adjustedLine: nearestLine,
-                severity: finding.severity,
-                category: finding.category,
-              },
-              "Adjusted finding line number to nearest valid diff line"
-            );
-
-            return {
-              ...finding,
-              line: nearestLine,
-            };
-          }
-
-          // No valid line found, log and filter out
-          this.logger.warn(
-            {
-              filename: result.filename,
-              invalidLine: finding.line,
-              severity: finding.severity,
-              category: finding.category,
-              message: finding.message.slice(0, 100),
-            },
-            "Cannot find valid diff line for finding, skipping inline comment"
-          );
-
-          return null;
-        })
-        .filter((f): f is NonNullable<typeof f> => f !== null);
-
-      if (validatedFindings.length > 0 || result.findings.length === 0) {
-        // Include files with validated findings OR files with no findings at all
-        validatedResults.push({
-          filename: result.filename,
-          findings: validatedFindings,
-        });
-      } else if (result.findings.length > 0) {
-        this.logger.warn(
-          {
-            filename: result.filename,
-            originalFindingsCount: result.findings.length,
-          },
-          "All findings filtered out due to invalid line numbers"
-        );
-      }
-    }
-
-    return validatedResults;
   }
 
   private async performCrossFileAnalysis(
@@ -1432,7 +1145,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       );
 
       // Copy diff files to repo's .mergementor directory for AI access
-      const { paths: diffFiles, totalSize } = await this.copyDiffsToRepoDir(
+      const { paths: diffFiles, totalSize } = await this.workspaceManager.copyDiffsToRepoDir(
         diffDir,
         manifest,
         repoPath
