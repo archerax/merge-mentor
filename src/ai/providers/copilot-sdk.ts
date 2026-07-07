@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { PermissionHandler, PermissionRequest, SessionEvent } from "@github/copilot-sdk";
+import type {
+  GetAuthStatusResponse,
+  PermissionHandler,
+  PermissionRequest,
+  SessionEvent,
+} from "@github/copilot-sdk";
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -21,6 +26,7 @@ import {
   type OutputWriter,
   systemClock,
 } from "../../ports/index.js";
+import { resolveCopilotCliPath } from "../../utils/copilotCliResolver.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import {
   BatchedFileReviewResponseSchema,
@@ -124,6 +130,7 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly fileSystem: FileSystem;
   private readonly clock: Clock;
   private client?: CopilotClient;
+  private isAuthVerified = false;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -154,6 +161,7 @@ export class CopilotSdkProvider implements AIProviderClient {
         // Ignore server shutdown errors
       }
       this.client = undefined;
+      this.isAuthVerified = false;
     }
   }
 
@@ -189,6 +197,12 @@ export class CopilotSdkProvider implements AIProviderClient {
         return { raw, parsed, tokenUsage: accumulatedUsage };
       } catch (error) {
         lastError = error as Error;
+        if (
+          lastError.message.includes("Copilot authentication failed") ||
+          lastError.message.includes("Failed to retrieve Copilot authentication status")
+        ) {
+          break;
+        }
         this.logger.warn(
           {
             attempt: attempt + 1,
@@ -229,38 +243,9 @@ export class CopilotSdkProvider implements AIProviderClient {
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
-    let resolvedCliPath: string | undefined;
-    try {
-      const sdkUrl = import.meta.resolve("@github/copilot/sdk");
-      const sdkPath = fileURLToPath(sdkUrl);
-
-      // Climb up to find the @github/copilot package root directory
-      let currentDir = fs.statSync(sdkPath).isDirectory() ? sdkPath : path.dirname(sdkPath);
-      while (currentDir && currentDir !== path.dirname(currentDir)) {
-        const pkgJsonPath = path.join(currentDir, "package.json");
-        if (fs.existsSync(pkgJsonPath)) {
-          try {
-            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-            if (pkg.name === "@github/copilot") {
-              resolvedCliPath = path.join(currentDir, "index.js");
-              break;
-            }
-          } catch {
-            // Ignore JSON parse errors and keep climbing
-          }
-        }
-        currentDir = path.dirname(currentDir);
-      }
-
-      // Fallback to old behavior if climbing fails
-      if (!resolvedCliPath) {
-        resolvedCliPath = path.join(path.dirname(path.dirname(sdkPath)), "index.js");
-      }
-    } catch (error) {
-      this.logger.debug(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Could not resolve @github/copilot/sdk path dynamically"
-      );
+    const resolvedCliPath = resolveCopilotCliPath();
+    if (!resolvedCliPath) {
+      this.logger.debug("Could not resolve @github/copilot path dynamically");
     }
 
     const config: Record<string, unknown> = {};
@@ -329,6 +314,29 @@ export class CopilotSdkProvider implements AIProviderClient {
       // Client creation failed; reset cache and let the retry loop handle it
       this.destroy();
       throw error;
+    }
+
+    if (!this.byokBaseUrl && !this.isAuthVerified) {
+      this.logger.debug("Verifying Copilot authentication status...");
+      let authStatus: GetAuthStatusResponse;
+      try {
+        authStatus = await client.getAuthStatus();
+      } catch (error) {
+        throw new AIProviderError(
+          "copilot-sdk",
+          `Failed to retrieve Copilot authentication status: ${(error as Error).message}`,
+          { cause: error as Error }
+        );
+      }
+
+      if (!authStatus.isAuthenticated) {
+        throw new AIProviderError(
+          "copilot-sdk",
+          `Copilot authentication failed: ${authStatus.statusMessage || "User is not logged in."}`
+        );
+      }
+      this.isAuthVerified = true;
+      this.logger.debug("Copilot authentication verified successfully.");
     }
 
     const provider = this.buildByokProviderConfig();

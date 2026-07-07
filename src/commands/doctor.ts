@@ -2,8 +2,11 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
+import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
 import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
+import { resolveCopilotCliPath } from "../utils/copilotCliResolver.js";
 
 export async function executeDoctorCommand(options: { provider?: string }): Promise<void> {
   const output = consoleOutputWriter;
@@ -42,10 +45,9 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
   output.log("🤖 AI Provider Status:");
 
   let copilotStatus = "Not Installed";
-  try {
-    const sdkUrl = import.meta.resolve("@github/copilot/sdk");
-    if (sdkUrl) copilotStatus = "Available";
-  } catch {
+  if (resolveCopilotCliPath()) {
+    copilotStatus = "Available";
+  } else {
     try {
       const cmd = "copilot";
       execSync(process.platform === "win32" ? `where ${cmd}` : `which ${cmd}`, {
@@ -80,9 +82,10 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
   output.log("");
 
   let activeProvider = "copilot-sdk";
+  let loadedConfig: Config | null = null;
   try {
-    const config = loadConfig({});
-    activeProvider = config.aiProvider;
+    loadedConfig = loadConfig({});
+    activeProvider = loadedConfig.aiProvider;
   } catch {}
 
   const providersToCheck = options.provider ? [options.provider] : [activeProvider];
@@ -100,6 +103,14 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
           );
           output.log(`     Error: ${(error as Error).message}`);
         }
+        const hasKey = !!(
+          env.get("MM_AI_API_KEY") ||
+          env.get("ANTHROPIC_API_KEY") ||
+          loadedConfig?.aiApiKey
+        );
+        output.log(
+          `  API Key: ${hasKey ? "✅ Configured" : "❌ Not set (requires ANTHROPIC_API_KEY or MM_AI_API_KEY)"}`
+        );
         continue;
       }
 
@@ -177,33 +188,7 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
         }
 
         // Check if @github/copilot CLI package is locally resolved
-        let resolvedCliPath: string | undefined;
-        try {
-          const sdkUrl = import.meta.resolve("@github/copilot/sdk");
-          const sdkPath = fileURLToPath(sdkUrl);
-
-          // Climb up to find the @github/copilot package root directory
-          let currentDir = fs.statSync(sdkPath).isDirectory() ? sdkPath : path.dirname(sdkPath);
-          while (currentDir && currentDir !== path.dirname(currentDir)) {
-            const pkgJsonPath = path.join(currentDir, "package.json");
-            if (fs.existsSync(pkgJsonPath)) {
-              try {
-                const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-                if (pkg.name === "@github/copilot") {
-                  resolvedCliPath = path.join(currentDir, "index.js");
-                  break;
-                }
-              } catch {}
-            }
-            currentDir = path.dirname(currentDir);
-          }
-          if (!resolvedCliPath) {
-            resolvedCliPath = path.join(path.dirname(path.dirname(sdkPath)), "index.js");
-          }
-        } catch (error) {
-          output.log("  ❌ Not found: Could not resolve @github/copilot/sdk path dynamically");
-          output.log(`     Error: ${(error as Error).message}`);
-        }
+        const resolvedCliPath = resolveCopilotCliPath();
 
         if (resolvedCliPath) {
           if (fs.existsSync(resolvedCliPath)) {
@@ -227,6 +212,49 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
             }
           } else {
             output.log(`  ❌ Not found: Resolved CLI path does not exist: ${resolvedCliPath}`);
+          }
+        }
+
+        // Check Copilot authentication status
+        output.log("\n🔐 Checking Copilot authentication status:");
+        if (!loadedConfig) {
+          output.log("  ❌ Skipped: Could not load configuration to verify Copilot settings.");
+        } else if (loadedConfig.aiBaseUrl) {
+          output.log(`  ℹ️  Skipped: BYOK mode is active (base URL: ${loadedConfig.aiBaseUrl})`);
+        } else {
+          try {
+            const config: Record<string, unknown> = {};
+            if (loadedConfig.copilotToken) {
+              config.gitHubToken = loadedConfig.copilotToken;
+            }
+            if (env.get("COPILOT_CLI_PATH")) {
+              config.connection = RuntimeConnection.forStdio({ path: env.get("COPILOT_CLI_PATH") });
+            } else if (resolvedCliPath) {
+              config.connection = RuntimeConnection.forStdio({ path: resolvedCliPath });
+            }
+
+            const client = new CopilotClient(config);
+            await client.start();
+            const authStatus = await client.getAuthStatus();
+            await client.stop();
+
+            if (authStatus.isAuthenticated) {
+              output.log(
+                `  ✅ Authenticated: user=${authStatus.login || "unknown"}, type=${
+                  authStatus.authType || "unknown"
+                }`
+              );
+              if (authStatus.statusMessage) {
+                output.log(`  💬 Status: ${authStatus.statusMessage}`);
+              }
+            } else {
+              output.log("  ❌ Not Authenticated");
+              if (authStatus.statusMessage) {
+                output.log(`  💬 Status: ${authStatus.statusMessage}`);
+              }
+            }
+          } catch (error) {
+            output.log(`  ❌ Failed to check auth status: ${(error as Error).message}`);
           }
         }
         continue;
@@ -308,15 +336,30 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
   // Check configuration
   try {
     const config = loadConfig({});
+    const isGithubRequired = config.defaultPlatform === "github";
+    const isAzureRequired = config.defaultPlatform === "azure";
     output.log("🔌 Platforms:");
-    output.log(`  GitHub token: ${config.github.token ? "✅ Set" : "❌ Not set"}`);
-    output.log(`  Azure token: ${config.azure.token ? "✅ Set" : "❌ Not set"}`);
+    output.log(
+      `  GitHub token: ${config.github.token ? "✅ Set" : isGithubRequired ? "❌ Not set" : "Not set"}`
+    );
+    output.log(
+      `  Azure token: ${config.azure.token ? "✅ Set" : isAzureRequired ? "❌ Not set" : "Not set"}`
+    );
     output.log("");
     output.log("⚙️  Configuration:");
     output.log(`  Default platform: ${config.defaultPlatform}`);
     output.log(`  AI provider: ${config.aiProvider}`);
-    output.log(`  AI base URL: ${config.aiBaseUrl ? "✅ Set" : "❌ Not set"}`);
-    output.log(`  AI API key: ${config.aiApiKey ? "✅ Set" : "❌ Not set"}`);
+    if (config.aiProvider === "copilot-sdk" || config.copilotToken) {
+      output.log(`  Copilot token: ${config.copilotToken ? "✅ Set" : "Not set"}`);
+    }
+    output.log(`  AI model: ${config.aiModel || "Default"}`);
+    output.log(`  AI base URL: ${config.aiBaseUrl ? "✅ Set" : "Not set"}`);
+
+    const isApiKeyRequired = config.aiProvider === "claude-agent-sdk" || !!config.aiBaseUrl;
+    const hasAiApiKey = !!(config.aiApiKey || env.get("ANTHROPIC_API_KEY"));
+    output.log(
+      `  AI API key: ${hasAiApiKey ? "✅ Set" : isApiKeyRequired ? "❌ Not set" : "Not set"}`
+    );
     output.log(`  Git backend: ${config.gitBackend}`);
     output.log(`  Temp path: ${config.tempPath}`);
     output.log("");

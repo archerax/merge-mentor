@@ -10,6 +10,7 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
   const mockClient = {
     createSession: vi.fn().mockResolvedValue(mockSession),
     stop: vi.fn().mockResolvedValue([]),
+    getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
   };
   // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
   const MockCopilotClient = vi.fn().mockImplementation(function () {
@@ -92,6 +93,7 @@ describe("CopilotSdkProvider", () => {
     mockSession.disconnect.mockResolvedValue(undefined);
     mockClient.createSession.mockResolvedValue(mockSession);
     mockClient.stop.mockResolvedValue([]);
+    mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
   });
 
   afterEach(() => {
@@ -508,6 +510,81 @@ describe("CopilotSdkProvider", () => {
       const result = await resultPromise;
 
       expect(result.tokenUsage).toBeUndefined();
+    });
+
+    it("verifies auth status successfully on the first execution and caches it", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
+
+      // First run: should call getAuthStatus
+      const resultPromise1 = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise1;
+
+      expect(mockClient.getAuthStatus).toHaveBeenCalledTimes(1);
+
+      // Second run: should NOT call getAuthStatus again
+      const resultPromise2 = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise2;
+
+      expect(mockClient.getAuthStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws AIProviderError immediately and without retries when user is unauthenticated", async () => {
+      // Provider configured with 3 retries
+      const provider = createProvider(3);
+      mockClient.getAuthStatus.mockResolvedValue({
+        isAuthenticated: false,
+        statusMessage: "No login info",
+      });
+
+      const promise = provider.executePrompt("Review the following file test.ts");
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      const error = await rejection;
+
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect(error.message).toContain("Copilot authentication failed: No login info");
+      // Should not have attempted to create a session or send any prompts
+      expect(mockClient.createSession).not.toHaveBeenCalled();
+      expect(mockClient.getAuthStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws AIProviderError wrapping the error when getAuthStatus throws", async () => {
+      const provider = createProvider(2);
+      mockClient.getAuthStatus.mockRejectedValue(new Error("Connection refused"));
+
+      const promise = provider.executePrompt("Review the following file test.ts");
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      const error = await rejection;
+
+      expect(error).toBeInstanceOf(AIProviderError);
+      expect(error.message).toContain(
+        "Failed to retrieve Copilot authentication status: Connection refused"
+      );
+      expect(mockClient.createSession).not.toHaveBeenCalled();
+    });
+
+    it("does not call getAuthStatus when BYOK mode is configured", async () => {
+      // BYOK mode with aiBaseUrl
+      const provider = createProvider(
+        1,
+        5000,
+        undefined,
+        undefined,
+        "https://my-openai-compat.com"
+      );
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.getAuthStatus).not.toHaveBeenCalled();
+      expect(mockClient.createSession).toHaveBeenCalled();
     });
   });
 

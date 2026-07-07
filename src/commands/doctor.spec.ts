@@ -21,6 +21,28 @@ vi.mock("node:child_process", async (importOriginal) => {
   };
 });
 
+const { mockClient, MockCopilotClient } = vi.hoisted(() => {
+  const mockClient = {
+    start: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue([]),
+    getAuthStatus: vi
+      .fn()
+      .mockResolvedValue({ isAuthenticated: true, login: "mock-user", authType: "token" }),
+  };
+  // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
+  const MockCopilotClient = vi.fn().mockImplementation(function () {
+    return mockClient;
+  });
+  return { mockClient, MockCopilotClient };
+});
+
+vi.mock("@github/copilot-sdk", () => ({
+  CopilotClient: MockCopilotClient,
+  RuntimeConnection: {
+    forStdio: vi.fn((options) => ({ kind: "stdio", ...options })),
+  },
+}));
+
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   const {
     longContext = false,
@@ -71,6 +93,14 @@ describe("doctor command", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClient.start.mockReset().mockResolvedValue(undefined);
+    mockClient.stop.mockReset().mockResolvedValue([]);
+    mockClient.getAuthStatus.mockReset().mockResolvedValue({
+      isAuthenticated: true,
+      login: "mock-user",
+      authType: "token",
+      statusMessage: "Authenticated successfully",
+    });
     exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     vi.mocked(loadConfig).mockReturnValue(createMockConfig());
@@ -208,9 +238,10 @@ describe("doctor command", () => {
     expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining("bedrock-key"));
   });
 
-  it("shows token not set when tokens are empty", async () => {
+  it("shows token not set when tokens are empty (GitHub default)", async () => {
     vi.mocked(loadConfig).mockReturnValue(
       createMockConfig({
+        defaultPlatform: "github",
         github: { token: "", owner: "o", repo: "r" },
         azure: { token: "", org: "o", project: "p", repo: "r" },
       })
@@ -219,7 +250,37 @@ describe("doctor command", () => {
     await program.parseAsync(["node", "test", "doctor"]);
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("GitHub token: ❌ Not set"));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Azure token: Not set"));
+  });
+
+  it("shows token not set when tokens are empty (Azure default)", async () => {
+    vi.mocked(loadConfig).mockReturnValue(
+      createMockConfig({
+        defaultPlatform: "azure",
+        github: { token: "", owner: "o", repo: "r" },
+        azure: { token: "", org: "o", project: "p", repo: "r" },
+      })
+    );
+
+    await program.parseAsync(["node", "test", "doctor"]);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("GitHub token: Not set"));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Azure token: ❌ Not set"));
+  });
+
+  it("diagnoses Claude provider API key status", async () => {
+    const env = processEnvironment;
+    const envSpy = vi.spyOn(env, "get").mockImplementation((key: string) => {
+      if (key === "ANTHROPIC_API_KEY") return "sk-ant-12345";
+      return undefined;
+    });
+
+    await program.parseAsync(["node", "test", "doctor", "--provider", "claude"]);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking claude:"));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("API Key: ✅ Configured"));
+
+    envSpy.mockRestore();
   });
 
   it("handles config loading failure gracefully", async () => {
@@ -273,5 +334,68 @@ describe("doctor command", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Temp path writability: ✅ Writable")
     );
+  });
+
+  describe("Copilot authentication status checks", () => {
+    it("reports successful auth status details", async () => {
+      mockClient.getAuthStatus.mockResolvedValue({
+        isAuthenticated: true,
+        login: "archerax",
+        authType: "gh-cli",
+        statusMessage: "Authenticated via gh CLI",
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Checking Copilot authentication status:")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Authenticated: user=archerax, type=gh-cli")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Status: Authenticated via gh CLI")
+      );
+    });
+
+    it("reports unauthenticated status details", async () => {
+      mockClient.getAuthStatus.mockResolvedValue({
+        isAuthenticated: false,
+        statusMessage: "No token found",
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Checking Copilot authentication status:")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Not Authenticated"));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Status: No token found"));
+    });
+
+    it("handles errors during auth status check gracefully", async () => {
+      mockClient.getAuthStatus.mockRejectedValue(new Error("Daemon not running"));
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to check auth status: Daemon not running")
+      );
+    });
+
+    it("skips auth check when BYOK mode is active", async () => {
+      vi.mocked(loadConfig).mockReturnValue(
+        createMockConfig({
+          aiBaseUrl: "https://my-custom-openai.com/v1",
+        })
+      );
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Skipped: BYOK mode is active")
+      );
+      expect(mockClient.getAuthStatus).not.toHaveBeenCalled();
+    });
   });
 });
