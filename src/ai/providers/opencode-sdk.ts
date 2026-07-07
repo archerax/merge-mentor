@@ -192,6 +192,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly enableWriteTools: boolean;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "OpenCodeSdkProvider" });
 
@@ -206,6 +207,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.enableWriteTools = options?.enableWriteTools ?? false;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
     this.clock = options?.clock ?? systemClock;
@@ -317,12 +319,11 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       opencodeConfig.model = this.model;
     }
 
-    // Restrict the agent to read-only access. Deny shell execution, file edits,
-    // web fetches, and external-directory access so that attacker-controlled PR
-    // content cannot trigger destructive side effects.
+    // Restrict the agent to read-only access by default. Allow file edits and bash
+    // command execution when enableWriteTools is true.
     opencodeConfig.permission = {
-      edit: "deny",
-      bash: "deny",
+      edit: this.enableWriteTools ? "allow" : "deny",
+      bash: this.enableWriteTools ? "allow" : "deny",
       webfetch: "deny",
       doom_loop: "deny",
       external_directory: "deny",

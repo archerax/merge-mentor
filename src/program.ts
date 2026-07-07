@@ -3,6 +3,7 @@ import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { displayDescribeResults, executeDescribe } from "./commands/describe.js";
 import { executeDoctorCommand } from "./commands/doctor.js";
+import { executeFixCommand } from "./commands/fix.js";
 import { executePBIReview } from "./commands/pbi.js";
 import { executeProjectReview } from "./commands/project.js";
 import { executeReposCommand } from "./commands/repos.js";
@@ -21,6 +22,7 @@ export * from "./commands/types.js";
 // Import types for CLI option annotations
 import type {
   DescribeOptions,
+  FixOptions,
   PBIOptions,
   ProjectOptions,
   ReviewOptions,
@@ -424,6 +426,116 @@ program
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Fix command
+program
+  .command("fix")
+  .description("Interactively fix active review comments on a PR using an AI provider")
+  .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
+  .option(
+    "--pr-url <url>",
+    "PR URL. Sets platform, org/project, repo, and PR number automatically."
+  )
+  .option(
+    "--ci",
+    "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
+    false
+  )
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
+  .option(
+    "--allow-dirty",
+    "Allow execution even if the local Git workspace has uncommitted changes",
+    false
+  )
+  .option(
+    "--no-interactive",
+    "Disable interactive prompts and automatically apply all fixes",
+    false
+  )
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .option(
+    "--provider <provider>",
+    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk). Env: MM_AI_PROVIDER"
+  )
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option("--ai-base-url <url>", "OpenAI-compatible API base URL for BYOK. Env: MM_AI_BASE_URL")
+  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
+  .action(async (options: FixOptions) => {
+    try {
+      if (options.prUrl) {
+        const conflicting: string[] = [];
+        if (options.pr !== undefined) conflicting.push("--pr");
+        if (options.ci) conflicting.push("--ci");
+        if (options.platform !== undefined) conflicting.push("--platform");
+        if (options.githubRepoOwner !== undefined) conflicting.push("--github-repo-owner");
+        if (options.githubRepoName !== undefined) conflicting.push("--github-repo-name");
+        if (options.azureOrg !== undefined) conflicting.push("--azure-org");
+        if (options.azureProject !== undefined) conflicting.push("--azure-project");
+        if (options.azureRepo !== undefined) conflicting.push("--azure-repo");
+
+        if (conflicting.length > 0) {
+          consoleOutputWriter.error(
+            `\n❌ Error: --pr-url cannot be combined with ${conflicting.join(", ")}.\n`
+          );
+          process.exit(1);
+        }
+
+        const parsed = parsePRUrl(options.prUrl);
+        options.pr = parsed.prNumber;
+        options.platform = parsed.platform;
+        if (parsed.platform === "github") {
+          options.githubRepoOwner = parsed.owner;
+          options.githubRepoName = parsed.repo;
+        } else {
+          options.azureOrg = parsed.org;
+          options.azureProject = parsed.project;
+          options.azureRepo = parsed.azureRepo;
+        }
+      }
+
+      if (!options.ci && options.pr === undefined) {
+        consoleOutputWriter.error(
+          "\n❌ Error: --pr <number> or --pr-url <url> is required, or use --ci to auto-detect in a CI environment.\n"
+        );
+        process.exit(1);
+      }
+
+      await executeFixCommand(options);
+      process.exit(0);
+    } catch (error) {
+      const err = error as Error;
+      logger.error(
+        {
+          error: err.message,
+          stack: err.stack,
+          pr: options.pr,
+        },
+        "Fix command failed"
+      );
+      consoleOutputWriter.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }
   });

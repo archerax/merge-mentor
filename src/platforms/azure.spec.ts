@@ -744,6 +744,102 @@ describe("AzureDevOpsAdapter", () => {
     });
   });
 
+  describe("getUnresolvedCommentThreads", () => {
+    it("fetches, filters, and maps unresolved threads correctly", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockResolvedValue([
+        {
+          id: 1,
+          status: 1,
+          threadContext: {
+            filePath: "/src/test.ts",
+            rightFileStart: { line: 10 },
+          },
+          comments: [
+            {
+              id: 101,
+              content: "Fix this typo",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
+        {
+          id: 2,
+          status: 2,
+          threadContext: {
+            filePath: "/src/test.ts",
+            rightFileStart: { line: 20 },
+          },
+          comments: [
+            {
+              id: 102,
+              content: "Fixed comment",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
+        {
+          id: 3,
+          status: 4,
+          threadContext: {
+            filePath: "/src/test.ts",
+            rightFileStart: { line: 30 },
+          },
+          comments: [
+            {
+              id: 103,
+              content: "Closed comment",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
+        {
+          id: 4,
+          status: 1,
+          threadContext: {
+            filePath: "/src/other.ts",
+            rightFileStart: { line: 5 },
+          },
+          comments: [
+            {
+              id: 104,
+              content: "Another issue",
+              isDeleted: false,
+              author: { displayName: "User Two" },
+            },
+            { id: 105, content: "Deleted reply", isDeleted: true, author: { uniqueName: "user1" } },
+          ],
+        },
+      ]);
+
+      const result = await adapter.getUnresolvedCommentThreads(123);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        id: "1",
+        path: "/src/test.ts",
+        line: 10,
+        comments: [{ author: "user1", body: "Fix this typo" }],
+      });
+      expect(result[1]).toEqual({
+        id: "4",
+        path: "/src/other.ts",
+        line: 5,
+        comments: [{ author: "User Two", body: "Another issue" }],
+      });
+    });
+
+    it("handles errors and throws", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockRejectedValue(new Error("Azure API error"));
+
+      await expect(adapter.getUnresolvedCommentThreads(123)).rejects.toThrow("Azure API error");
+    });
+  });
+
   describe("postInlineComment", () => {
     it("posts inline comment successfully", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());

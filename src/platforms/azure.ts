@@ -23,6 +23,8 @@ import type {
   ProjectDetails,
   ProjectWorkItem,
   RepoInfo,
+  UnresolvedComment,
+  UnresolvedCommentThread,
   WorkItemState,
 } from "./types.js";
 
@@ -30,6 +32,7 @@ import type {
 const AzureThreadStatus = {
   ACTIVE: 1,
   FIXED: 2,
+  CLOSED: 4,
 } as const;
 
 /** Azure DevOps comment type values. */
@@ -598,6 +601,47 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         undefined,
         "failure",
         (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      const unresolved: UnresolvedCommentThread[] = [];
+      for (const thread of threads || []) {
+        const isUnresolved =
+          thread.status !== AzureThreadStatus.FIXED && thread.status !== AzureThreadStatus.CLOSED;
+        const path = thread.threadContext?.filePath;
+        const line = thread.threadContext?.rightFileStart?.line;
+
+        if (isUnresolved && path && line && thread.comments && thread.comments.length > 0) {
+          unresolved.push({
+            id: thread.id?.toString() || "",
+            path,
+            line,
+            comments: thread.comments
+              .filter((c) => !c.isDeleted)
+              .map(
+                (c): UnresolvedComment => ({
+                  author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+                  body: c.content || "",
+                })
+              ),
+          });
+        }
+      }
+
+      return unresolved;
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to fetch unresolved comment threads"
       );
       throw error;
     }

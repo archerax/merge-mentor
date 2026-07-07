@@ -14,6 +14,8 @@ import type {
   PRFile,
   ProjectDetails,
   RepoInfo,
+  UnresolvedComment,
+  UnresolvedCommentThread,
 } from "./types.js";
 
 /**
@@ -171,6 +173,89 @@ export class GitHubAdapter implements PlatformAdapter {
         undefined,
         "failure",
         (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
+    try {
+      const query = `
+        query FetchUnresolvedThreads($owner: String!, $repo: String!, $pr: Int!) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $pr) {
+              reviewThreads(first: 100) {
+                nodes {
+                  id
+                  isResolved
+                  path
+                  line
+                  comments(first: 50) {
+                    nodes {
+                      author {
+                        login
+                      }
+                      body
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface GraphQLResponse {
+        repository?: {
+          pullRequest?: {
+            reviewThreads?: {
+              nodes?: Array<{
+                id: string | number;
+                isResolved: boolean;
+                path: string;
+                line: number;
+                comments?: {
+                  nodes?: Array<{
+                    author?: {
+                      login?: string;
+                    };
+                    body?: string;
+                  }>;
+                };
+              }>;
+            };
+          };
+        };
+      }
+
+      const response = (await withRateLimitHandling(() =>
+        this.octokit.graphql(query, {
+          owner: this.owner,
+          repo: this.repo,
+          pr: prNumber,
+        })
+      )) as GraphQLResponse;
+
+      const threads = response?.repository?.pullRequest?.reviewThreads?.nodes || [];
+
+      return threads
+        .filter((t) => !t.isResolved && t.path && t.line)
+        .map((t) => ({
+          id: t.id,
+          path: t.path,
+          line: t.line,
+          comments:
+            t.comments?.nodes?.map(
+              (c): UnresolvedComment => ({
+                author: c.author?.login ?? "unknown",
+                body: c.body || "",
+              })
+            ) ?? [],
+        }));
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to fetch unresolved comment threads"
       );
       throw error;
     }

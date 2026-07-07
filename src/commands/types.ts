@@ -63,6 +63,11 @@ export interface DescribeOptions extends ReviewOptions {
   suggestTitle?: boolean;
 }
 
+export interface FixOptions extends ReviewOptions {
+  allowDirty?: boolean;
+  interactive?: boolean;
+}
+
 export interface DescribeExecutionResult {
   title?: string;
   body: string;

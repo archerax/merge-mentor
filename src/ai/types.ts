@@ -63,6 +63,8 @@ export interface AIProviderOptions {
   readonly longContext?: boolean;
   /** Reasoning effort level for models that support it. */
   readonly reasoningEffort?: ReasoningEffort;
+  /** Enable write and execution tools for agentic tasks. */
+  readonly enableWriteTools?: boolean;
 }
 
 /** Options for executing a prompt with additional context. */

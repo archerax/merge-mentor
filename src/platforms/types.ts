@@ -91,6 +91,19 @@ export interface ExistingComment {
   readonly isResolved?: boolean;
 }
 
+/** An unresolved comment thread on a file line. */
+export interface UnresolvedComment {
+  readonly author: string;
+  readonly body: string;
+}
+
+export interface UnresolvedCommentThread {
+  readonly id: string | number;
+  readonly path: string;
+  readonly line: number;
+  readonly comments: readonly UnresolvedComment[];
+}
+
 /** Action types for comment management. */
 type CommentActionType = "create";
 
@@ -157,6 +170,12 @@ export interface PlatformAdapter {
    * @param prNumber - The PR number
    */
   getExistingBotComments(prNumber: number): Promise<ExistingComment[]>;
+
+  /**
+   * Retrieves all unresolved/active PR comment threads.
+   * @param prNumber - The PR number
+   */
+  getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]>;
 
   /**
    * Posts an inline comment on a specific file line.

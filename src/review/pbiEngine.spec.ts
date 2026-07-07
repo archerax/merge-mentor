@@ -58,6 +58,7 @@ describe("PBIReviewEngine", () => {
     getPRDetails: vi.fn(),
     getPRFiles: vi.fn(),
     getExistingBotComments: vi.fn(),
+    getUnresolvedCommentThreads: vi.fn(),
     postInlineComment: vi.fn(),
     postGeneralComment: vi.fn(),
     getLinkedPBIIds: vi.fn(),

@@ -357,6 +357,75 @@ describe("GitHubAdapter", () => {
     });
   });
 
+  describe("getUnresolvedCommentThreads", () => {
+    it("fetches, filters, and maps unresolved review threads via GraphQL", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce({
+        repository: {
+          pullRequest: {
+            reviewThreads: {
+              nodes: [
+                {
+                  id: "thread-1",
+                  isResolved: false,
+                  path: "src/file1.ts",
+                  line: 15,
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: "user-1" },
+                        body: "Please fix this typo.",
+                      },
+                      {
+                        author: { login: "user-2" },
+                        body: "Agreed, typo should be fixed.",
+                      },
+                    ],
+                  },
+                },
+                {
+                  id: "thread-2",
+                  isResolved: true,
+                  path: "src/file2.ts",
+                  line: 30,
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: "user-1" },
+                        body: "Some resolved comment",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      });
+
+      const result = await adapter.getUnresolvedCommentThreads(123);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        id: "thread-1",
+        path: "src/file1.ts",
+        line: 15,
+        comments: [
+          { author: "user-1", body: "Please fix this typo." },
+          { author: "user-2", body: "Agreed, typo should be fixed." },
+        ],
+      });
+      expect(mockOctokitInstance.graphql).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles errors and throws", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockRejectedValueOnce(new Error("GraphQL error"));
+
+      await expect(adapter.getUnresolvedCommentThreads(123)).rejects.toThrow("GraphQL error");
+    });
+  });
+
   describe("postInlineComment", () => {
     it("posts inline comment successfully", async () => {
       const adapter = new GitHubAdapter(createTestConfig());

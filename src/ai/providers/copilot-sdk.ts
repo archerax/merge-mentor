@@ -1,6 +1,4 @@
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type {
   GetAuthStatusResponse,
   PermissionHandler,
@@ -88,10 +86,16 @@ const READ_ONLY_REVIEW_TOOLS = ["grep", "glob"] as const;
  * @param logger - Child logger used to emit warn-level entries for denied requests.
  */
 export function createReviewPermissionHandler(
-  logger: ReturnType<typeof createChildLogger>
+  logger: ReturnType<typeof createChildLogger>,
+  enableWriteTools = false
 ): PermissionHandler {
   return (request) => {
-    if (DENIED_PERMISSION_KINDS.has(request.kind)) {
+    const blockedKinds = new Set(DENIED_PERMISSION_KINDS);
+    if (enableWriteTools) {
+      blockedKinds.delete("write");
+      blockedKinds.delete("shell");
+    }
+    if (blockedKinds.has(request.kind)) {
       logger.warn(
         { permissionKind: request.kind, toolCallId: request.toolCallId },
         "Blocked tool request during review (tool allowlist)"
@@ -121,6 +125,7 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly experimentalTools: boolean;
   private readonly longContext: boolean;
   private readonly reasoningEffort?: ReasoningEffort;
+  private readonly enableWriteTools: boolean;
   private readonly findingsCollector = new FindingsCollector();
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "CopilotSdkProvider" });
@@ -142,6 +147,7 @@ export class CopilotSdkProvider implements AIProviderClient {
     this.experimentalTools = options?.experimentalTools ?? false;
     this.longContext = options?.longContext ?? false;
     this.reasoningEffort = options?.reasoningEffort;
+    this.enableWriteTools = options?.enableWriteTools ?? false;
     this.output = options?.output ?? consoleOutputWriter;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
@@ -346,11 +352,13 @@ export class CopilotSdkProvider implements AIProviderClient {
       workingDirectory: options?.workingDirectory,
       streaming: true,
       includeSubAgentStreamingEvents: false,
-      availableTools: this.experimentalTools
-        ? [...READ_ONLY_REVIEW_TOOLS, "postComment"]
-        : [...READ_ONLY_REVIEW_TOOLS],
+      availableTools: [
+        ...READ_ONLY_REVIEW_TOOLS,
+        ...(this.experimentalTools ? ["postComment" as const] : []),
+        ...(this.enableWriteTools ? ["write" as const, "shell" as const, "edit" as const] : []),
+      ],
       tools: this.experimentalTools ? [postCommentTool] : undefined,
-      onPermissionRequest: createReviewPermissionHandler(this.logger),
+      onPermissionRequest: createReviewPermissionHandler(this.logger, this.enableWriteTools),
       contextTier: this.longContext ? "long_context" : undefined,
       reasoningEffort: this.reasoningEffort,
       ...(provider ? { provider } : {}),

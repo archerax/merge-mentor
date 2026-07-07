@@ -1,7 +1,6 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
 import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
