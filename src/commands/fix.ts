@@ -175,115 +175,82 @@ export async function executeFixCommand(
     reasoningEffort: config.reasoningEffort,
   });
 
-  // Use a FIFO queue to support retry logic seamlessly
-  const queue = [...unresolvedThreads];
+  const selectedThreads: typeof unresolvedThreads = [];
 
-  while (queue.length > 0) {
-    const thread = queue.shift();
-    if (!thread) {
-      continue;
-    }
-
-    outputWriter.log(
-      `\n💬 Comment thread on [${thread.path}:${thread.line}](file://${process.cwd()}/${thread.path}#L${thread.line}):`
-    );
-    for (const comment of thread.comments) {
-      outputWriter.log(`  * ${comment.author}: ${comment.body}`);
-    }
-
-    if (interactive) {
-      const rl = readline.createInterface({ input, output });
-      try {
-        const answer = await rl.question(`\nDo you want to fix this issue? (y/n/q) `);
+  if (interactive) {
+    outputWriter.log("📋 Please select which issues you want to fix:\n");
+    const rl = readline.createInterface({ input, output });
+    try {
+      for (let i = 0; i < unresolvedThreads.length; i++) {
+        const thread = unresolvedThreads[i];
+        outputWriter.log(
+          `💬 [Issue ${i + 1}/${unresolvedThreads.length}] on [${thread.path}:${thread.line}](file://${process.cwd()}/${thread.path}#L${thread.line}):`
+        );
+        for (const comment of thread.comments) {
+          outputWriter.log(`  * ${comment.author}: ${comment.body}`);
+        }
+        const answer = await rl.question("Do you want to fix this issue? (y/n/q) ");
         const choice = answer.trim().toLowerCase();
         if (choice === "q") {
-          outputWriter.log("👋 Exiting fix mode.");
+          outputWriter.log("👋 Exiting selection. Proceeding with currently selected issues.");
           break;
         }
-        if (choice !== "y") {
-          outputWriter.log("⏭️ Skipping thread.");
-          continue;
+        if (choice === "y") {
+          selectedThreads.push(thread);
+          outputWriter.log("➕ Selected.\n");
+        } else {
+          outputWriter.log("⏭️ Skipped.\n");
         }
-      } finally {
-        rl.close();
       }
+    } finally {
+      rl.close();
     }
+  } else {
+    selectedThreads.push(...unresolvedThreads);
+  }
 
-    outputWriter.log("🤖 Running AI agent to resolve the comments...");
+  if (selectedThreads.length === 0) {
+    outputWriter.log("⏭️ No issues selected for fixing.");
+    return;
+  }
 
-    const commentsStr = thread.comments.map((c) => `${c.author}: ${c.body}`).join("\n");
+  outputWriter.log(
+    `🤖 Running AI agent to resolve the ${selectedThreads.length} selected issue(s)...`
+  );
 
-    const prompt = `You are an expert AI code repair assistant.
-You are tasked with fixing an issue raised by code review comments.
-
+  const issuesList = selectedThreads
+    .map((thread, index) => {
+      const commentsStr = thread.comments.map((c) => `${c.author}: ${c.body}`).join("\n");
+      return `Issue #${index + 1}:
 FILE TO EDIT: ${thread.path}
 LINE NUMBER: ${thread.line}
-
 REVIEW DISCUSSION:
-${commentsStr}
+${commentsStr}`;
+    })
+    .join("\n\n---\n\n");
+
+  const prompt = `You are an expert AI code repair assistant.
+You are tasked with fixing multiple issues raised by code review comments in the codebase.
+
+Here is the list of issues to fix:
+
+${issuesList}
 
 INSTRUCTIONS:
-1. Locate the file ${thread.path} around line ${thread.line}.
-2. Read the surrounding file content to understand the context.
-3. Edit the file to fix the issue described in the review discussion.
-4. Run validation/test commands in your shell/bash workspace to verify your fix compiles and passes tests.
+1. For each issue, locate the corresponding file and line number.
+2. Read the surrounding file contents to understand the context.
+3. Edit the files to fix all of the issues described in the review discussions.
+4. Run validation/test commands in your shell/bash workspace to verify your changes compile and pass tests.
 5. Do not make any unrelated modifications.
-6. Once the issue is resolved and validated, summarize what changes you made.`;
+6. Once all issues are resolved and validated, summarize what changes you made.`;
 
-    try {
-      await aiClient.executePrompt(prompt, {
-        workingDirectory: process.cwd(),
-      });
-
-      let diff = "";
-      try {
-        diff = execSync(`git diff --color=always -- ${thread.path}`, {
-          encoding: "utf-8",
-        }).trim();
-      } catch (_diffErr) {
-        outputWriter.log("⚠️ Failed to generate git diff.");
-      }
-
-      if (diff) {
-        outputWriter.log(`\n📄 Generated Diff:\n${diff}\n`);
-      } else {
-        outputWriter.log(
-          "\n⚠️ No diff generated (no files modified, or modifications reverted by agent).\n"
-        );
-      }
-
-      if (interactive) {
-        const rl = readline.createInterface({ input, output });
-        try {
-          const action = await rl.question("Accept fix, retry, or discard changes? (a/r/d) ");
-          const choice = action.trim().toLowerCase();
-          if (choice === "d") {
-            outputWriter.log("🗑️ Discarding changes.");
-            try {
-              execSync(`git checkout -- ${thread.path}`);
-            } catch (_revertErr) {
-              outputWriter.log("⚠️ Failed to discard changes via git checkout.");
-            }
-          } else if (choice === "r") {
-            outputWriter.log("🔄 Retrying fix loop...");
-            try {
-              execSync(`git checkout -- ${thread.path}`);
-            } catch (_revertErr) {
-              outputWriter.log("⚠️ Failed to discard changes before retry.");
-            }
-            queue.push(thread);
-          } else {
-            outputWriter.log("✅ Fix kept! (Unstaged for your review)");
-          }
-        } finally {
-          rl.close();
-        }
-      } else {
-        outputWriter.log("✅ Fix accepted automatically.");
-      }
-    } catch (err) {
-      outputWriter.log(`❌ AI execution failed: ${(err as Error).message}`);
-    }
+  try {
+    await aiClient.executePrompt(prompt, {
+      workingDirectory: process.cwd(),
+    });
+    outputWriter.log("\n✅ AI execution completed. Please review the changes in your IDE.");
+  } catch (err) {
+    outputWriter.log(`❌ AI execution failed: ${(err as Error).message}`);
   }
 
   outputWriter.log("\n🏁 Fix session complete.");

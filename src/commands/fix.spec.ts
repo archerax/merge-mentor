@@ -191,8 +191,7 @@ describe("executeFixCommand", () => {
     vi.mocked(execSync)
       .mockReturnValueOnce("" as unknown as MockExecSync) // git rev-parse inside work tree
       .mockReturnValueOnce("main" as unknown as MockExecSync) // git branch --show-current
-      .mockReturnValueOnce("" as unknown as MockExecSync) // git status --porcelain
-      .mockReturnValueOnce("diff content" as unknown as MockExecSync); // git diff
+      .mockReturnValueOnce("" as unknown as MockExecSync); // git status --porcelain
 
     mockExecutePrompt.mockResolvedValueOnce({});
 
@@ -208,13 +207,12 @@ describe("executeFixCommand", () => {
       expect.stringContaining("FILE TO EDIT: src/file.ts"),
       expect.objectContaining({ workingDirectory: expect.any(String) })
     );
-    expect(mockOutput.log).toHaveBeenCalledWith(expect.stringContaining("Generated Diff"));
     expect(mockOutput.log).toHaveBeenCalledWith(
-      expect.stringContaining("Fix accepted automatically.")
+      expect.stringContaining("AI execution completed. Please review the changes in your IDE.")
     );
   });
 
-  it("handles interactive selections (accept, retry, discard)", async () => {
+  it("handles interactive selections up-front and runs AI on selected issues", async () => {
     mockAdapter.getPRDetails.mockResolvedValue({ headBranch: "main" });
     mockAdapter.getUnresolvedCommentThreads.mockResolvedValue([
       {
@@ -227,20 +225,47 @@ describe("executeFixCommand", () => {
     vi.mocked(execSync)
       .mockReturnValueOnce("" as unknown as MockExecSync) // git rev-parse inside work tree
       .mockReturnValueOnce("main" as unknown as MockExecSync) // git branch --show-current
-      .mockReturnValueOnce("" as unknown as MockExecSync) // git status --porcelain
-      .mockReturnValueOnce("diff content" as unknown as MockExecSync); // git diff
+      .mockReturnValueOnce("" as unknown as MockExecSync); // git status --porcelain
 
     mockExecutePrompt.mockResolvedValue({});
 
     // Question answers:
     // 1. "Do you want to fix this issue? (y/n/q) " -> "y"
-    // 2. "Accept fix, retry, or discard changes? (a/r/d) " -> "a"
-    mockQuestion.mockResolvedValueOnce("y").mockResolvedValueOnce("a");
+    mockQuestion.mockResolvedValueOnce("y");
 
     await executeFixCommand({ pr: 123, ci: false, interactive: true }, { output: mockOutput });
 
+    expect(mockExecutePrompt).toHaveBeenCalledWith(
+      expect.stringContaining("FILE TO EDIT: src/file.ts"),
+      expect.objectContaining({ workingDirectory: expect.any(String) })
+    );
     expect(mockOutput.log).toHaveBeenCalledWith(
-      expect.stringContaining("Fix kept! (Unstaged for your review)")
+      expect.stringContaining("AI execution completed. Please review the changes in your IDE.")
+    );
+  });
+
+  it("skips execution if user rejects all issues in interactive selection", async () => {
+    mockAdapter.getPRDetails.mockResolvedValue({ headBranch: "main" });
+    mockAdapter.getUnresolvedCommentThreads.mockResolvedValue([
+      {
+        id: "thread-1",
+        path: "src/file.ts",
+        line: 10,
+        comments: [{ author: "reviewer", body: "Fix this." }],
+      },
+    ]);
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync) // git rev-parse inside work tree
+      .mockReturnValueOnce("main" as unknown as MockExecSync) // git branch --show-current
+      .mockReturnValueOnce("" as unknown as MockExecSync); // git status --porcelain
+
+    mockQuestion.mockResolvedValueOnce("n");
+
+    await executeFixCommand({ pr: 123, ci: false, interactive: true }, { output: mockOutput });
+
+    expect(mockExecutePrompt).not.toHaveBeenCalled();
+    expect(mockOutput.log).toHaveBeenCalledWith(
+      expect.stringContaining("No issues selected for fixing.")
     );
   });
 });

@@ -13,23 +13,13 @@ graph TD
     A[Start: merge-mentor fix] --> B[Validate Git Repo & Clean Workspace]
     B --> C[Validate Branch Alignment with PR Head Branch]
     C --> D[Fetch Unresolved Comments via PlatformAdapter]
-    D --> E{For each unresolved comment...}
-    E -->|No more comments| F[End: Display Summary]
-    E -->|Next comment| G[Display comment detail & Prompt User]
-    G -->|Skip| E
-    G -->|Quit| F
-    G -->|Fix| H[Run AI Iterative Fix Loop]
-    H --> I[LLM proposes code modification]
-    I --> J[Apply changes to local file]
-    J --> K[Run Validation Command e.g. pnpm check]
-    K -->|Passes| L[Display Git Diff]
-    K -->|Fails & Retries Left| M[Feed Error Logs back to LLM]
-    M --> I
-    K -->|Fails & Max Retries Reached| L
-    L --> N{User Approval}
-    N -->|Accept| E
-    N -->|Discard| O[Revert file changes] --> E
-    N -->|Retry| P[Revert file changes] --> H
+    D --> E[Prompt User for each comment up-front to select issues to fix]
+    E --> F{Any selected issues?}
+    F -->|No| G[End: No issues selected]
+    F -->|Yes| H[Construct unified prompt with all selected issues]
+    H --> I[Run AI Agent once to fix all issues together]
+    I --> J[AI internal edit & validation command retry loop]
+    J --> K[End: Instruct user to review changes in IDE]
 ```
 
 ---
@@ -266,60 +256,51 @@ export async function executeFixCommand(
     `🔍 Found ${unresolvedThreads.length} unresolved thread(s). Starting fixes...\n`,
   );
 
-  for (const thread of unresolvedThreads) {
-    output.log(
-      `\n💬 Comment thread on [${thread.path}:${thread.line}](file://${process.cwd()}/${thread.path}#L${thread.line}):`,
-    );
-    for (const comment of thread.comments) {
-      output.log(`  * ${comment.author}: ${comment.body}`);
-    }
+  const selectedThreads: typeof unresolvedThreads = [];
 
-    // User Prompt: Proceed, Skip, or Quit
-    if (options.interactive) {
+  if (options.interactive) {
+    output.log("📋 Please select which issues you want to fix:\n");
+    for (let i = 0; i < unresolvedThreads.length; i++) {
+      const thread = unresolvedThreads[i];
+      output.log(
+        `💬 [Issue ${i + 1}/${unresolvedThreads.length}] on [${thread.path}:${thread.line}]:`,
+      );
+      for (const comment of thread.comments) {
+        output.log(`  * ${comment.author}: ${comment.body}`);
+      }
       const answer = await promptUser(
-        `Do you want to fix this issue? (y/n/q) `,
+        "Do you want to fix this issue? (y/n/q) ",
       );
       if (answer.toLowerCase() === "q") {
-        output.log("👋 Exiting fix mode.");
+        output.log(
+          "👋 Exiting selection. Proceeding with currently selected issues.",
+        );
         break;
       }
-      if (answer.toLowerCase() !== "y") {
-        output.log("⏭️ Skipping thread.");
-        continue;
+      if (answer.toLowerCase() === "y") {
+        selectedThreads.push(thread);
       }
     }
-
-    // Run AI Fix Loop for the thread
-    const success = await runAIFixLoop(thread, options, output);
-    if (!success) {
-      output.log(
-        `❌ Failed to resolve comment on ${thread.path}:${thread.line} within max retries.`,
-      );
-      continue;
-    }
-
-    // Show git diff
-    const diff = execSync(`git diff ${thread.path}`, { encoding: "utf-8" });
-    output.log(`\n📄 Generated Diff:\n${diff}\n`);
-
-    // Prompt user to accept, retry or discard
-    if (options.interactive) {
-      const action = await promptUser(
-        `Accept fix, retry, or discard changes? (a/r/d) `,
-      );
-      if (action.toLowerCase() === "d") {
-        output.log("🗑️ Discarding changes.");
-        execSync(`git checkout -- ${thread.path}`);
-      } else if (action.toLowerCase() === "r") {
-        output.log("🔄 Retrying fix loop...");
-        execSync(`git checkout -- ${thread.path}`);
-        // Decrement loop or re-run fix loop
-        // ...
-      } else {
-        output.log("✅ Fix kept! (Unstaged for your review)");
-      }
-    }
+  } else {
+    selectedThreads.push(...unresolvedThreads);
   }
+
+  if (selectedThreads.length === 0) {
+    output.log("⏭️ No issues selected for fixing.");
+    return;
+  }
+
+  output.log(
+    `🤖 Running AI agent to resolve the ${selectedThreads.length} selected issue(s)...`,
+  );
+
+  // Construct batch prompt and execute AI agent once
+  const prompt = constructBatchPrompt(selectedThreads);
+  await aiClient.executePrompt(prompt);
+
+  output.log(
+    "\n✅ AI execution completed. Please review the changes in your IDE.",
+  );
 }
 ```
 
