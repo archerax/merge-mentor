@@ -188,8 +188,10 @@ export class CopilotSdkProvider implements AIProviderClient {
     const promptType: PromptType = options?.promptType ?? this.inferPromptType(prompt);
     let lastError: Error | null = null;
     let accumulatedUsage: TokenUsage | undefined;
+    let actualAttempts = 0;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+      actualAttempts++;
       try {
         const { raw, parsed } = await this.runSdk(
           prompt,
@@ -231,9 +233,26 @@ export class CopilotSdkProvider implements AIProviderClient {
       "failure",
       lastError?.message
     );
+
+    if (
+      lastError instanceof AIProviderError &&
+      (lastError.message.includes("Copilot authentication failed") ||
+        lastError.message.includes("Failed to retrieve Copilot authentication status"))
+    ) {
+      throw lastError;
+    }
+
+    let errorMessage = lastError?.message ?? "Unknown error";
+    if (lastError instanceof AIProviderError) {
+      const prefix = `${lastError.provider} error: `;
+      if (errorMessage.startsWith(prefix)) {
+        errorMessage = errorMessage.slice(prefix.length);
+      }
+    }
+
     throw new AIProviderError(
       "copilot-sdk",
-      `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
+      `Failed after ${actualAttempts} ${actualAttempts === 1 ? "attempt" : "attempts"}: ${errorMessage}`,
       { cause: lastError ?? undefined }
     );
   }
@@ -326,20 +345,31 @@ export class CopilotSdkProvider implements AIProviderClient {
       this.logger.debug("Verifying Copilot authentication status...");
       let authStatus: GetAuthStatusResponse;
       try {
+        await client.start();
         authStatus = await client.getAuthStatus();
       } catch (error) {
-        throw new AIProviderError(
-          "copilot-sdk",
-          `Failed to retrieve Copilot authentication status: ${(error as Error).message}`,
-          { cause: error as Error }
-        );
+        const originalMessage = (error as Error).message;
+        let msg = `Failed to retrieve Copilot authentication status: ${originalMessage}`;
+        if (originalMessage.includes("Client not connected")) {
+          msg +=
+            "\n\nTroubleshooting:\n" +
+            "  1. Ensure you have a valid GitHub Copilot subscription.\n" +
+            "  2. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
+            "  3. If you want to use local credentials (e.g. GitHub CLI), make sure you are logged in to the GitHub CLI with Copilot:\n" +
+            "     run 'gh auth login' and 'gh copilot auth'";
+        }
+        throw new AIProviderError("copilot-sdk", msg, { cause: error as Error });
       }
 
       if (!authStatus.isAuthenticated) {
-        throw new AIProviderError(
-          "copilot-sdk",
-          `Copilot authentication failed: ${authStatus.statusMessage || "User is not logged in."}`
-        );
+        let msg = `Copilot authentication failed: ${authStatus.statusMessage || "User is not logged in."}`;
+        msg +=
+          "\n\nTroubleshooting:\n" +
+          "  1. Ensure you have a valid GitHub Copilot subscription.\n" +
+          "  2. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
+          "  3. If you want to use local credentials (e.g. GitHub CLI), make sure you are logged in to the GitHub CLI with Copilot:\n" +
+          "     run 'gh auth login' and 'gh copilot auth'";
+        throw new AIProviderError("copilot-sdk", msg);
       }
       this.isAuthVerified = true;
       this.logger.debug("Copilot authentication verified successfully.");

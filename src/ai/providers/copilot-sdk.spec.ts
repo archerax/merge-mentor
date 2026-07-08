@@ -8,6 +8,7 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     disconnect: vi.fn(),
   };
   const mockClient = {
+    start: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(mockSession),
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
@@ -91,6 +92,7 @@ describe("CopilotSdkProvider", () => {
     vi.useFakeTimers();
     mockSession.on.mockReturnValue(() => {});
     mockSession.disconnect.mockResolvedValue(undefined);
+    mockClient.start.mockResolvedValue(undefined);
     mockClient.createSession.mockResolvedValue(mockSession);
     mockClient.stop.mockResolvedValue([]);
     mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
@@ -401,7 +403,7 @@ describe("CopilotSdkProvider", () => {
 
       expect(error).toBeInstanceOf(AIProviderError);
       expect((error as AIProviderError).provider).toBe("copilot-sdk");
-      expect(error.message).toContain("Failed after 1 attempts");
+      expect(error.message).toContain("Failed after 1 attempt");
     });
 
     it("captures token usage from assistant.usage event", async () => {
@@ -517,18 +519,20 @@ describe("CopilotSdkProvider", () => {
       mockSuccessfulPrompt();
       mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
 
-      // First run: should call getAuthStatus
+      // First run: should call getAuthStatus and start
       const resultPromise1 = provider.executePrompt("Review the following file test.ts");
       await vi.runAllTimersAsync();
       await resultPromise1;
 
+      expect(mockClient.start).toHaveBeenCalledTimes(1);
       expect(mockClient.getAuthStatus).toHaveBeenCalledTimes(1);
 
-      // Second run: should NOT call getAuthStatus again
+      // Second run: should NOT call getAuthStatus or start again
       const resultPromise2 = provider.executePrompt("Review the following file test.ts");
       await vi.runAllTimersAsync();
       await resultPromise2;
 
+      expect(mockClient.start).toHaveBeenCalledTimes(1);
       expect(mockClient.getAuthStatus).toHaveBeenCalledTimes(1);
     });
 
