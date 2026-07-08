@@ -6,9 +6,11 @@ This plan details how to implement a reply CLI command and trigger it within CI/
 
 ## 🛠️ Step 1: Thread Data Types & Adapter Extension
 
-We will modify [src/platforms/types.ts](file:///root/merge-mentor/src/platforms/types.ts) to define comments and thread structures.
+We will modify [src/platforms/types.ts](file:///root/merge-mentor/src/platforms/types.ts) to define comment and thread structures, ensuring we align/reuse existing concepts to avoid duplicate model overhead.
 
 ### 1. Types
+
+We will introduce a unified set of types representing thread comments and thread context, which can represent both inline file-level comments and general PR conversation timeline comments:
 
 ```typescript
 export interface ThreadComment {
@@ -20,8 +22,8 @@ export interface ThreadComment {
 
 export interface CommentThreadContext {
   readonly threadId: string | number;
-  readonly path?: string;
-  readonly line?: number;
+  readonly path?: string; // Undefined if it's a general PR timeline comment
+  readonly line?: number; // Undefined if it's a general PR timeline comment
   readonly comments: readonly ThreadComment[];
 }
 ```
@@ -44,17 +46,26 @@ postCommentReply(prNumber: number, threadId: string | number, body: string): Pro
 
 ### 3. [GitHubAdapter Implementation](file:///root/merge-mentor/src/platforms/github.ts)
 
+Because GitHub separates inline diff comments (**Review Comments**) from main timeline comments (**Issue Comments**), our adapter must support both contexts to prevent `404` errors when a developer triggers the bot from the main timeline.
+
 - **`getCommentThread` logic:**
-  1. Fetch the target comment using `octokit.pulls.getReviewComment`.
-  2. Determine the thread ID:
-     If the comment has `in_reply_to_id`, use that as the root/thread ID. Otherwise, use its own `id`.
-  3. List all review comments in the PR using `octokit.pulls.listReviewComments`.
-  4. Filter for comments where `in_reply_to_id` matches the thread ID, or `id` matches the thread ID.
+  1. Try fetching the comment using `octokit.pulls.getReviewComment`.
+  2. If that fails (e.g., throwing a `404`), fall back to fetching via `octokit.issues.getComment`.
+  3. Determine the thread ID:
+     - **For Review Comments:** If the comment has `in_reply_to_id`, use that as the root thread ID. Otherwise, use its own `id`.
+     - **For Issue Comments:** On GitHub, issue comments do not support nested threads natively. The initial comment ID acts as the thread ID, and subsequent replies on the timeline reference it.
+  4. List and filter comments:
+     - **For Review Comments:** List all review comments in the PR using `octokit.pulls.listReviewComments`, and filter for comments where `in_reply_to_id` or `id` matches the thread ID.
+     - **For Issue Comments:** List all timeline comments using `octokit.issues.listComments` and filter/sort.
   5. Sort chronologically and format as `ThreadComment[]`.
 - **`postCommentReply` logic:**
-  1. Call `octokit.pulls.createReplyForReviewComment` using the root `threadId`.
+  1. Determine if the target `threadId` belongs to a review comment or an issue comment.
+  2. **For Review Comments:** Call `octokit.pulls.createReplyForReviewComment` using the root `threadId`.
+  3. **For Issue Comments:** Call `octokit.issues.createComment` with a quoted block or mention to simulate a reply thread.
 
 ### 4. [AzureDevOpsAdapter Implementation](file:///root/merge-mentor/src/platforms/azure.ts)
+
+Azure DevOps handles all comments (both file-specific and general) under unified thread APIs, making the implementation straightforward:
 
 - **`getCommentThread` logic:**
   1. Fetch the thread via `gitApi.getPullRequestThread(repositoryId, prNumber, threadId, project)`.

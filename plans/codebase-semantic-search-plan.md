@@ -12,7 +12,7 @@ Standard vector search architectures fail on large monorepos because indexing 10
 
 To avoid cloud API token costs, the system supports generating embeddings locally:
 
-- **Local ONNX Model:** Use a lightweight, pure JavaScript library (such as `@xenova/transformers`) to run models like `all-MiniLM-L6-v2` or `bge-small-en-v1.5` directly on the developer's CPU. The model is downloaded once (~100MB) and runs locally with **$0.00** API fees.
+- **Local ONNX Model:** Use a lightweight, pure JavaScript library (such as `@huggingface/transformers`, the official successor to `@xenova/transformers`) to run models like `all-MiniLM-L6-v2` or `bge-small-en-v1.5` directly on the developer's CPU. The model is downloaded once (~100MB) and runs locally with **$0.00** API fees.
 - **Local Ollama Integration:** Support local nomic-embed-text models running via Ollama.
 
 ### 2. PR-Scoped Indexing (Workspace Segmenting)
@@ -27,7 +27,7 @@ Instead of building a single 100,000-file index, we partition the database:
 
 Instead of storing embeddings in giant flat JSON files—which cause high memory usage and block the Node.js event loop during parsing—we store them in a single, local SQLite database at `.mergementor/embeddings.db`.
 
-- **Native Node.js 22 Support:** We leverage Node 22's native `node:sqlite` module, requiring **zero external dependencies** and no native binary compilations in CI.
+- **Native Node.js 22 Support:** We leverage Node 22's native `node:sqlite` module, requiring **zero external dependencies** and no native binary compilations in CI. Since it is marked as experimental, we suppress experimental warning noise to `stderr` to avoid breaking strict CI pipelines.
 - **Efficient Binary Vectors:** Vectors are serialized as raw binary `Float32Array` buffers (BLOBs), reducing storage size by 75% compared to stringified JSON arrays.
 - **Indexed Queries:** SQL indexes allow us to fetch embeddings for specific directories or workspace segments in microseconds without loading the entire 100K-file database into memory.
 
@@ -67,42 +67,39 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_path);
 ### 3. Binary Vector Serialization Helper
 
 ```typescript
-export function vectorToBlob(vector: readonly number[]): Buffer {
-  const floatArray = new Float32Array(vector);
-  return Buffer.from(floatArray.buffer);
+export function vectorToBlob(vector: Float32Array): Buffer {
+  return Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength);
 }
 
-export function blobToVector(blob: Buffer): number[] {
-  const floatArray = new Float32Array(
-    blob.buffer,
-    blob.byteOffset,
-    blob.byteLength / 4,
+export function blobToVector(blob: Buffer): Float32Array {
+  // Slice to avoid potential alignment issues or memory leaks
+  return new Float32Array(
+    blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength),
   );
-  return Array.from(floatArray);
 }
 ```
 
 ---
 
-## 🛠️ Step 2: Embedding Generation via BYOK / Local Client
+## 🛠️ Step 2: Standalone Embedding Client Definition
 
-We will extend the AI provider abstraction to support embedding generation, allowing users to toggle between local ONNX running on CPU or BYOK cloud clients.
+To enforce the Interface Segregation Principle, we will introduce a separate `EmbeddingClient` interface. This allows developers to configure different providers for LLM chat/reviews (e.g. Claude) and embedding generation (e.g. OpenAI or a local model), since some models/services do not support embeddings.
 
-### 1. Provider Extension ([src/ai/types.ts](file:///root/merge-mentor/src/ai/types.ts))
+### 1. New Interface Definition ([src/ai/embeddings.ts](file:///root/merge-mentor/src/ai/embeddings.ts))
 
 ```typescript
-export interface AiProvider {
-  // ... existing methods
-  generateEmbedding(text: string): Promise<readonly number[]>;
+export interface EmbeddingClient {
+  generateEmbedding(text: string): Promise<Float32Array>;
 }
 ```
 
 ### 2. Local ONNX Provider Example
 
 ```typescript
-import { pipeline } from "@xenova/transformers";
+import { pipeline } from "@huggingface/transformers";
+import type { EmbeddingClient } from "./embeddings.js";
 
-export class LocalEmbeddingProvider {
+export class LocalEmbeddingProvider implements EmbeddingClient {
   private extractor: any;
 
   async init() {
@@ -112,12 +109,12 @@ export class LocalEmbeddingProvider {
     );
   }
 
-  async generateEmbedding(text: string): Promise<readonly number[]> {
+  async generateEmbedding(text: string): Promise<Float32Array> {
     const output = await this.extractor(text, {
       pooling: "mean",
       normalize: true,
     });
-    return Array.from(output.data);
+    return new Float32Array(output.data);
   }
 }
 ```
@@ -171,7 +168,7 @@ export async function indexWorkspace(filesToScope: string[]) {
     insertFileStmt.run(filePath, currentHash, getSegment(filePath), Date.now());
 
     for (let i = 0; i < chunks.length; i++) {
-      const vector = await provider.generateEmbedding(chunks[i]);
+      const vector = await embeddingClient.generateEmbedding(chunks[i]);
       insertEmbeddingStmt.run(filePath, i, chunks[i], vectorToBlob(vector));
     }
   }
@@ -209,14 +206,28 @@ When the AI invokes `semanticSearch`, query only the active workspace segments:
 
 ```typescript
 import { DatabaseSync } from "node:sqlite";
+import type { EmbeddingClient } from "../embeddings.js";
+
+export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 export async function handleSemanticSearch(
   query: string,
   activeSegments: string[],
   limit: number,
+  embeddingClient: EmbeddingClient,
 ) {
   const db = new DatabaseSync(".mergementor/embeddings.db");
-  const queryVector = await provider.generateEmbedding(query);
+  const queryVector = await embeddingClient.generateEmbedding(query);
 
   // Generate placeholder parameters for workspace segments
   const placeholders = activeSegments.map(() => "?").join(",");
@@ -234,7 +245,7 @@ export async function handleSemanticSearch(
     vector: Buffer;
   }>;
 
-  // Calculate cosine similarity locally in memory
+  // Calculate cosine similarity locally in memory using TypedArrays
   const results = rows.map((row) => {
     const docVector = blobToVector(row.vector);
     const score = cosineSimilarity(queryVector, docVector);
