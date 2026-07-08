@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-07-08
+
+### Changed
+
+- **Instant Execution Support**: Updated installation and usage documentation to recommend running the CLI tool via `npx merge-mentor@latest` rather than global installation (`npm i -g merge-mentor`).
+
+### Fixed
+
+- **Copilot Provider Error Handling**: Improved the authentication verification process and error reporting in `CopilotSdkProvider`. If the Copilot client is not connected, it now provides specific, actionable troubleshooting steps to assist with configuration.
+- **Retry Attempt Formatting**: Corrected the retry attempt count display in `AIProviderError` messages to handle singular/plural formatting correctly (e.g., "1 attempt" instead of "1 attempts").
+
 ## [2.9.0] - 2026-07-06
 
 ### Added
@@ -610,7 +621,7 @@ export MM_RUNS=3
 
 ### Added
 
-- **Global installation support**: Use merge-mentor anywhere with `npm install -g merge-mentor` or run instantly with `npx merge-mentor`. Configuration and logs now use your current directory instead of the installation location.
+- **Instant execution support**: Run instantly with `npx merge-mentor@latest`. Configuration and logs now use your current directory instead of the installation location.
 
 ### Changed
 
@@ -671,27 +682,23 @@ Welcome to merge-mentor, your automated code review assistant powered by GitHub 
 
 **Easy Integration**
 
-- Global CLI tool: `npm install -g merge-mentor`
-- Instant run: `npx merge-mentor review --pr 123`
+- Instant run: `npx merge-mentor@latest review --pr 123`
 - CI/CD ready with GitHub Actions and Azure Pipelines examples
 - Environment-based configuration
 
 **Getting Started**
 
 ```bash
-# Install globally
-npm install -g merge-mentor
-
 # Configure (one-time setup)
 export MM_GITHUB_TOKEN=your_token
 export MM_GITHUB_OWNER=your_username
 export MM_GITHUB_REPO=your_repo
 
-# Review a PR (dry-run)
-merge-mentor review --pr 123
+# Review a PR (dry-run) using npx
+npx merge-mentor@latest review --pr 123
 
 # Post comments
-merge-mentor review --pr 123 --write
+npx merge-mentor@latest review --pr 123 --write
 ```
 
 See the README for complete setup and configuration instructions.

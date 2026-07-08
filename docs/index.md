@@ -18,14 +18,11 @@ Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports m
 ## ⚡ Quick Start
 
 ```bash
-# Install globally
-npm install -g merge-mentor
-
-# Run a review (dry-run mode) - using environment variables
+# Run a review (dry-run mode) instantly with npx - using environment variables
 MM_GITHUB_TOKEN=your_token \
 MM_GITHUB_REPO_OWNER=owner \
 MM_GITHUB_REPO_NAME=repo \
-merge-mentor review --pr 123
+npx merge-mentor@latest review --pr 123
 ```
 
 For more detailed setup, see the [Configuration Guide](./configuration.md) and [CI/CD Integration](./ci-cd.md).

@@ -43,7 +43,7 @@ jobs:
             ${{ runner.os }}-merge-mentor-
 
       - name: Run Review
-        run: npx merge-mentor review --ci
+        run: npx merge-mentor@latest review --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -80,7 +80,7 @@ steps:
       cacheHitVar: CACHE_RESTORED
     displayName: Cache Merge Mentor State
 
-  - script: npx merge-mentor review --ci
+  - script: npx merge-mentor@latest review --ci
     displayName: Run Review
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -93,7 +93,7 @@ By default, the Azure Pipelines build service account has Reader-only access and
 1. **System Access Token**: Grant the Project Collection Build Service account "Contribute" permissions on the repository and "Manage Threads" on pull requests, then map `SYSTEM_ACCESSTOKEN` as shown above.
 2. **Personal Access Token (PAT)**: Create a PAT with `Code (Read)` and `Pull Request Threads (Read & Write)` scopes, add it as a secret variable named `MERGE_MENTOR_PAT`, and map it to `MM_AZURE_TOKEN`:
    ```yaml
-   - script: npx merge-mentor review --ci
+   - script: npx merge-mentor@latest review --ci
      displayName: Run Review
      env:
        MM_AZURE_TOKEN: $(MERGE_MENTOR_PAT)
@@ -116,13 +116,13 @@ Explicit command-line flags always take priority over values detected from the C
 
 ```bash
 # Use a different AI provider, but let CI handle the PR details
-npx merge-mentor review --ci --provider copilot-sdk
+npx merge-mentor@latest review --ci --provider copilot-sdk
 
 # Override the PR number (e.g. for testing)
-npx merge-mentor review --ci --pr 42
+npx merge-mentor@latest review --ci --pr 42
 
 # Dry-run in CI (generates report, previews comments, but does NOT post them)
-npx merge-mentor review --ci --no-write
+npx merge-mentor@latest review --ci --no-write
 ```
 
 ---
@@ -134,7 +134,7 @@ If you choose not to use the automated `--ci` flag, you must provide all values 
 ### GitHub Actions (Manual)
 
 ```bash
-npx merge-mentor review \
+npx merge-mentor@latest review \
   --pr ${{ github.event.pull_request.number }} \
   --write
 # Requires env variables: MM_GITHUB_TOKEN, MM_GITHUB_REPO_OWNER, MM_GITHUB_REPO_NAME
@@ -143,7 +143,7 @@ npx merge-mentor review \
 ### Azure Pipelines (Manual)
 
 ```bash
-npx merge-mentor review \
+npx merge-mentor@latest review \
   --pr $(System.PullRequest.PullRequestId) \
   --platform azure \
   --write
