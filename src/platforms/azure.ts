@@ -32,7 +32,10 @@ import type {
 const AzureThreadStatus = {
   ACTIVE: 1,
   FIXED: 2,
+  WONT_FIX: 3,
   CLOSED: 4,
+  BY_DESIGN: 5,
+  PENDING: 6,
 } as const;
 
 /** Azure DevOps comment type values. */
@@ -587,7 +590,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             body: firstComment.content || "",
             path: thread.threadContext?.filePath,
             line: thread.threadContext?.rightFileStart?.line,
-            isResolved: thread.status === AzureThreadStatus.FIXED,
+            isResolved:
+              thread.status !== AzureThreadStatus.ACTIVE &&
+              thread.status !== AzureThreadStatus.PENDING,
           });
         }
       }
@@ -616,7 +621,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const unresolved: UnresolvedCommentThread[] = [];
       for (const thread of threads || []) {
         const isUnresolved =
-          thread.status !== AzureThreadStatus.FIXED && thread.status !== AzureThreadStatus.CLOSED;
+          thread.status === AzureThreadStatus.ACTIVE || thread.status === AzureThreadStatus.PENDING;
         const path = thread.threadContext?.filePath;
         const line = thread.threadContext?.rightFileStart?.line;
 

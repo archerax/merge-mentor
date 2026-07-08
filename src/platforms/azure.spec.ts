@@ -813,11 +813,59 @@ describe("AzureDevOpsAdapter", () => {
             { id: 105, content: "Deleted reply", isDeleted: true, author: { uniqueName: "user1" } },
           ],
         },
+        {
+          id: 5,
+          status: 3, // WONT_FIX
+          threadContext: {
+            filePath: "/src/test.ts",
+            rightFileStart: { line: 40 },
+          },
+          comments: [
+            {
+              id: 106,
+              content: "Won't fix comment",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
+        {
+          id: 6,
+          status: 5, // BY_DESIGN
+          threadContext: {
+            filePath: "/src/test.ts",
+            rightFileStart: { line: 50 },
+          },
+          comments: [
+            {
+              id: 107,
+              content: "By design comment",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
+        {
+          id: 7,
+          status: 6, // PENDING
+          threadContext: {
+            filePath: "/src/pending.ts",
+            rightFileStart: { line: 15 },
+          },
+          comments: [
+            {
+              id: 108,
+              content: "Pending issue comment",
+              isDeleted: false,
+              author: { uniqueName: "user1" },
+            },
+          ],
+        },
       ]);
 
       const result = await adapter.getUnresolvedCommentThreads(123);
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0]).toEqual({
         id: "1",
         path: "/src/test.ts",
@@ -829,6 +877,12 @@ describe("AzureDevOpsAdapter", () => {
         path: "/src/other.ts",
         line: 5,
         comments: [{ author: "User Two", body: "Another issue" }],
+      });
+      expect(result[2]).toEqual({
+        id: "7",
+        path: "/src/pending.ts",
+        line: 15,
+        comments: [{ author: "user1", body: "Pending issue comment" }],
       });
     });
 
