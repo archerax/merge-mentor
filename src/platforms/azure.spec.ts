@@ -29,6 +29,8 @@ const mockGitApiInstance = {
   getBlobContent: vi.fn(),
   getItem: vi.fn(),
   getPullRequestWorkItemRefs: vi.fn(),
+  createComment: vi.fn(),
+  updateThread: vi.fn(),
 };
 
 vi.mock("azure-devops-node-api", () => ({
@@ -1751,6 +1753,82 @@ describe("AzureDevOpsAdapter", () => {
         expect(itemIds).toContain("202");
         expect(itemIds).toContain("203");
         expect(itemIds).not.toContain("204");
+      });
+    });
+  });
+
+  describe("comment thread operations", () => {
+    describe("getCommentThread", () => {
+      it("fetches comment thread containing comment ID successfully", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getThreads.mockResolvedValue([
+          {
+            id: 123,
+            threadContext: {
+              filePath: "/src/main.ts",
+              rightFileStart: { line: 10 },
+            },
+            comments: [
+              {
+                id: 456,
+                content: "Hello",
+                isDeleted: false,
+                commentType: 1,
+                publishedDate: new Date("2026-07-09T00:00:00Z"),
+              },
+              {
+                id: 789,
+                content: "World",
+                isDeleted: false,
+                commentType: 1,
+                publishedDate: new Date("2026-07-09T00:01:00Z"),
+              },
+            ],
+          },
+        ]);
+
+        const result = await adapter.getCommentThread(1, 456);
+        expect(result.threadId).toBe(123);
+        expect(result.path).toBe("src/main.ts");
+        expect(result.line).toBe(10);
+        expect(result.comments).toHaveLength(2);
+        expect(result.comments[0].body).toBe("Hello");
+      });
+
+      it("throws ValidationError if comment thread is not found", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getThreads.mockResolvedValue([]);
+        await expect(adapter.getCommentThread(1, 456)).rejects.toThrow("No comment thread found");
+      });
+    });
+
+    describe("postCommentReply", () => {
+      it("posts a reply comment successfully", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getPullRequestById.mockResolvedValue({
+          pullRequestId: 1,
+          repository: { id: "repo-uuid" },
+        });
+        await adapter.postCommentReply(1, 123, "Reply message");
+        expect(mockGitApiInstance.createComment).toHaveBeenCalled();
+      });
+    });
+
+    describe("resolveCommentThread", () => {
+      it("updates the thread status to CLOSED", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockGitApiInstance.getPullRequestById.mockResolvedValue({
+          pullRequestId: 1,
+          repository: { id: "repo-uuid" },
+        });
+        await adapter.resolveCommentThread(1, 123);
+        expect(mockGitApiInstance.updateThread).toHaveBeenCalledWith(
+          { status: 4 }, // CLOSED
+          "repo-uuid",
+          1,
+          123,
+          "test-project"
+        );
       });
     });
   });

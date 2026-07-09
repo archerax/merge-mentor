@@ -104,6 +104,20 @@ export interface UnresolvedCommentThread {
   readonly comments: readonly UnresolvedComment[];
 }
 
+export interface ThreadComment {
+  readonly id: string | number;
+  readonly author: string;
+  readonly body: string;
+  readonly createdAt?: string;
+}
+
+export interface CommentThreadContext {
+  readonly threadId: string | number;
+  readonly path: string;
+  readonly line: number;
+  readonly comments: readonly ThreadComment[];
+}
+
 /** Action types for comment management. */
 type CommentActionType = "create";
 
@@ -228,6 +242,29 @@ export interface PlatformAdapter {
     prNumber: number,
     details: { readonly title?: string; readonly body?: string }
   ): Promise<void>;
+
+  /**
+   * Fetches the entire comment thread for a specific comment ID.
+   * @param prNumber - The PR number
+   * @param commentId - The individual comment ID (or thread ID if known)
+   * @returns The resolved inline comment thread context
+   */
+  getCommentThread(prNumber: number, commentId: string | number): Promise<CommentThreadContext>;
+
+  /**
+   * Posts a reply to an existing comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The root comment thread ID
+   * @param body - The response message body
+   */
+  postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void>;
+
+  /**
+   * Resolves/closes an active comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The root comment thread ID
+   */
+  resolveCommentThread(prNumber: number, threadId: string | number): Promise<void>;
 }
 
 /** A comment on a Product Backlog Item / User Story / Issue. */

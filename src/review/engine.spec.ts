@@ -148,6 +148,9 @@ function createMockPlatform(): PlatformAdapter {
     getProjectDetails: vi.fn(),
     postPBIComment: vi.fn(),
     updatePRDetails: vi.fn(),
+    getCommentThread: vi.fn(),
+    postCommentReply: vi.fn(),
+    resolveCommentThread: vi.fn(),
   };
 }
 

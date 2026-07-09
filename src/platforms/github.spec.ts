@@ -10,6 +10,7 @@ const mockOctokitInstance = {
     listReviewComments: vi.fn(),
     createReviewComment: vi.fn(),
     getReviewComment: vi.fn(),
+    createReplyForReviewComment: vi.fn(),
   },
   issues: {
     get: vi.fn(),
@@ -676,6 +677,135 @@ describe("GitHubAdapter", () => {
 
         const result = await adapter.getLinkedPBIIds(10);
         expect([...result].sort()).toEqual(["111", "555", "888", "999"].sort());
+      });
+    });
+  });
+
+  describe("comment thread operations", () => {
+    describe("getCommentThread", () => {
+      it("fetches comment thread by numeric ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.pulls.getReviewComment.mockResolvedValue({
+          data: {
+            id: 456,
+            in_reply_to_id: 123,
+            path: "src/file.ts",
+            line: 10,
+          },
+        });
+        mockOctokitInstance.graphql.mockResolvedValue({
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: "gql-thread-123",
+                    comments: {
+                      nodes: [{ databaseId: 123 }],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+        mockOctokitInstance.paginate.mockResolvedValue([
+          { id: 123, user: { login: "bot" }, body: "Hello", created_at: "2026-07-09T00:00:00Z" },
+          {
+            id: 456,
+            in_reply_to_id: 123,
+            user: { login: "user" },
+            body: "Hi",
+            created_at: "2026-07-09T00:01:00Z",
+          },
+        ]);
+
+        const result = await adapter.getCommentThread(1, 456);
+        expect(result.threadId).toBe("gql-thread-123");
+        expect(result.path).toBe("src/file.ts");
+        expect(result.line).toBe(10);
+        expect(result.comments).toHaveLength(2);
+        expect(result.comments[0].author).toBe("bot");
+      });
+
+      it("fetches comment thread by GraphQL string ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.graphql.mockResolvedValue({
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: "gql-thread-123",
+                    path: "src/file.ts",
+                    line: 10,
+                    comments: {
+                      nodes: [
+                        {
+                          databaseId: 123,
+                          author: { login: "bot" },
+                          body: "Hello",
+                          createdAt: "2026-07-09T00:00:00Z",
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+
+        const result = await adapter.getCommentThread(1, "gql-thread-123");
+        expect(result.threadId).toBe("gql-thread-123");
+        expect(result.path).toBe("src/file.ts");
+        expect(result.line).toBe(10);
+        expect(result.comments).toHaveLength(1);
+        expect(result.comments[0].author).toBe("bot");
+      });
+    });
+
+    describe("postCommentReply", () => {
+      it("creates a reply via REST for numeric ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        await adapter.postCommentReply(1, 123, "Reply body");
+        expect(mockOctokitInstance.pulls.createReplyForReviewComment).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          pull_number: 1,
+          comment_id: 123,
+          body: "Reply body",
+        });
+      });
+
+      it("creates a reply via GraphQL for string ID", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        await adapter.postCommentReply(1, "gql-thread-123", "Reply body");
+        expect(mockOctokitInstance.graphql).toHaveBeenCalled();
+      });
+    });
+
+    describe("resolveCommentThread", () => {
+      it("resolves a review thread via GraphQL", async () => {
+        const adapter = new GitHubAdapter(createTestConfig());
+        mockOctokitInstance.graphql.mockResolvedValueOnce({
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: "gql-thread-123",
+                    comments: {
+                      nodes: [{ databaseId: 123 }],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+        await adapter.resolveCommentThread(1, 123);
+        expect(mockOctokitInstance.graphql).toHaveBeenCalled();
       });
     });
   });

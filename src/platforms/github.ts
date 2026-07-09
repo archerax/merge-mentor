@@ -6,6 +6,7 @@ import { createChildLogger } from "../logger.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
+  CommentThreadContext,
   ExistingComment,
   FileStatus,
   PBIDetails,
@@ -14,9 +15,51 @@ import type {
   PRFile,
   ProjectDetails,
   RepoInfo,
+  ThreadComment,
   UnresolvedComment,
   UnresolvedCommentThread,
 } from "./types.js";
+
+interface GraphQLFindThreadNodeResponse {
+  repository?: {
+    pullRequest?: {
+      reviewThreads?: {
+        nodes?: Array<{
+          id: string;
+          comments?: {
+            nodes?: Array<{
+              databaseId: number;
+            }>;
+          };
+        }>;
+      };
+    };
+  };
+}
+
+interface GraphQLFetchThreadResponse {
+  repository?: {
+    pullRequest?: {
+      reviewThreads?: {
+        nodes?: Array<{
+          id: string;
+          path: string;
+          line: number;
+          comments?: {
+            nodes?: Array<{
+              databaseId: number;
+              author?: {
+                login?: string;
+              };
+              body?: string;
+              createdAt?: string;
+            }>;
+          };
+        }>;
+      };
+    };
+  };
+}
 
 /**
  * Platform adapter for GitHub pull requests.
@@ -488,6 +531,245 @@ export class GitHubAdapter implements PlatformAdapter {
       this.auditLogger.logPRDetailsUpdate(prNumber, "github", "success");
     } catch (error) {
       this.auditLogger.logPRDetailsUpdate(prNumber, "github", "failure", (error as Error).message);
+      throw error;
+    }
+  }
+
+  private async getGraphQLThreadId(prNumber: number, threadId: string | number): Promise<string> {
+    if (!/^\d+$/.test(String(threadId))) {
+      return String(threadId);
+    }
+    const rootDatabaseId = Number(threadId);
+    const gqlResponse = await withRateLimitHandling(() =>
+      this.octokit.graphql<GraphQLFindThreadNodeResponse>(
+        `
+        query FindThreadNode($owner: String!, $repo: String!, $pr: Int!) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $pr) {
+              reviewThreads(first: 100) {
+                nodes {
+                  id
+                  comments(first: 1) {
+                    nodes {
+                      databaseId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+        {
+          owner: this.owner,
+          repo: this.repo,
+          pr: prNumber,
+        }
+      )
+    );
+    const threadNode = gqlResponse?.repository?.pullRequest?.reviewThreads?.nodes?.find(
+      (node) => node.comments?.nodes?.[0]?.databaseId === rootDatabaseId
+    );
+    if (!threadNode) {
+      throw new Error(`Could not find GraphQL thread ID for database ID: ${rootDatabaseId}`);
+    }
+    return threadNode.id;
+  }
+
+  async getCommentThread(
+    prNumber: number,
+    commentId: string | number
+  ): Promise<CommentThreadContext> {
+    this.logger.debug({ prNumber, commentId }, "Fetching comment thread");
+    try {
+      const isNumeric = /^\d+$/.test(String(commentId));
+
+      if (isNumeric) {
+        const { data: comment } = await withRateLimitHandling(() =>
+          this.octokit.pulls.getReviewComment({
+            owner: this.owner,
+            repo: this.repo,
+            comment_id: Number(commentId),
+          })
+        );
+
+        const rootDatabaseId = comment.in_reply_to_id ?? comment.id;
+
+        // Try to get GraphQL Thread ID
+        let threadId = String(rootDatabaseId);
+        try {
+          threadId = await this.getGraphQLThreadId(prNumber, rootDatabaseId);
+        } catch (error) {
+          this.logger.warn(
+            { rootDatabaseId, error: (error as Error).message },
+            "Failed to resolve GraphQL thread ID, using database ID as fallback"
+          );
+        }
+
+        const allComments = await withRateLimitHandling(() =>
+          this.octokit.paginate(this.octokit.pulls.listReviewComments, {
+            owner: this.owner,
+            repo: this.repo,
+            pull_number: prNumber,
+            per_page: DEFAULT_PAGE_SIZE,
+          })
+        );
+
+        const threadComments = allComments.filter(
+          (c) => c.in_reply_to_id === rootDatabaseId || c.id === rootDatabaseId
+        );
+
+        threadComments.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+
+        const comments: ThreadComment[] = threadComments.map((c) => ({
+          id: c.id,
+          author: c.user?.login || "unknown",
+          body: c.body,
+          createdAt: c.created_at,
+        }));
+
+        return {
+          threadId,
+          path: comment.path,
+          line: comment.line ?? comment.original_line ?? 0,
+          comments,
+        };
+      }
+
+      // If it is already a GraphQL Thread ID
+      const gqlResponse = await withRateLimitHandling(() =>
+        this.octokit.graphql<GraphQLFetchThreadResponse>(
+          `
+          query FetchThread($owner: String!, $repo: String!, $pr: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $pr) {
+                reviewThreads(first: 100) {
+                  nodes {
+                    id
+                    path
+                    line
+                    comments(first: 100) {
+                      nodes {
+                        databaseId
+                        author {
+                          login
+                        }
+                        body
+                        createdAt
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `,
+          {
+            owner: this.owner,
+            repo: this.repo,
+            pr: prNumber,
+          }
+        )
+      );
+
+      const threadNode = gqlResponse?.repository?.pullRequest?.reviewThreads?.nodes?.find(
+        (node) => String(node.id) === String(commentId)
+      );
+
+      if (!threadNode) {
+        throw new Error(`Comment thread not found for ID: ${commentId}`);
+      }
+
+      const comments: ThreadComment[] = (threadNode.comments?.nodes || []).map((c) => ({
+        id: c.databaseId,
+        author: c.author?.login || "unknown",
+        body: c.body || "",
+        createdAt: c.createdAt,
+      }));
+
+      return {
+        threadId: String(threadNode.id),
+        path: threadNode.path,
+        line: threadNode.line,
+        comments,
+      };
+    } catch (error) {
+      this.logger.error(
+        { prNumber, commentId, error: (error as Error).message },
+        "Failed to fetch comment thread"
+      );
+      throw error;
+    }
+  }
+
+  async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
+    this.logger.debug({ prNumber, threadId }, "Posting comment reply");
+    try {
+      const isNumeric = /^\d+$/.test(String(threadId));
+      if (isNumeric) {
+        await withRateLimitHandling(() =>
+          this.octokit.pulls.createReplyForReviewComment({
+            owner: this.owner,
+            repo: this.repo,
+            pull_number: prNumber,
+            comment_id: Number(threadId),
+            body,
+          })
+        );
+      } else {
+        const mutation = `
+          mutation AddReply($threadId: ID!, $body: String!) {
+            addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+              comment {
+                id
+              }
+            }
+          }
+        `;
+        await withRateLimitHandling(() =>
+          this.octokit.graphql(mutation, {
+            threadId: String(threadId),
+            body,
+          })
+        );
+      }
+      this.logger.info({ prNumber, threadId }, "Posted comment reply successfully");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to post comment reply"
+      );
+      throw error;
+    }
+  }
+
+  async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
+    this.logger.debug({ prNumber, threadId }, "Resolving comment thread");
+    try {
+      const gqlThreadId = await this.getGraphQLThreadId(prNumber, threadId);
+      const mutation = `
+        mutation ResolveThread($threadId: ID!) {
+          resolveReviewThread(input: { threadId: $threadId }) {
+            thread {
+              id
+              isResolved
+            }
+          }
+        }
+      `;
+      await withRateLimitHandling(() =>
+        this.octokit.graphql(mutation, {
+          threadId: gqlThreadId,
+        })
+      );
+      this.logger.info({ prNumber, threadId }, "Resolved comment thread successfully");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to resolve comment thread"
+      );
       throw error;
     }
   }

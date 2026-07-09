@@ -104,6 +104,9 @@ describe("ProjectReviewEngine", () => {
       getProjectDetails: vi.fn().mockResolvedValue(details),
       postPBIComment: vi.fn(),
       updatePRDetails: vi.fn(),
+      getCommentThread: vi.fn(),
+      postCommentReply: vi.fn(),
+      resolveCommentThread: vi.fn(),
     };
   };
 

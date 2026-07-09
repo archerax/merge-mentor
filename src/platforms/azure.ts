@@ -7,11 +7,12 @@ import * as Diff from "diff";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
-import { PlatformApiError } from "../errors/index.js";
+import { PlatformApiError, ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
+  CommentThreadContext,
   ExistingComment,
   FileStatus,
   PBIComment,
@@ -23,6 +24,7 @@ import type {
   ProjectDetails,
   ProjectWorkItem,
   RepoInfo,
+  ThreadComment,
   UnresolvedComment,
   UnresolvedCommentThread,
   WorkItemState,
@@ -1208,6 +1210,160 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         "Failed to fetch Azure DevOps project details"
       );
       throw error;
+    }
+  }
+
+  async getCommentThread(
+    prNumber: number,
+    commentId: string | number
+  ): Promise<CommentThreadContext> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      let foundThread: GitPullRequestCommentThread | undefined;
+      for (const thread of threads || []) {
+        if (String(thread.id) === String(commentId)) {
+          foundThread = thread;
+          break;
+        }
+        const hasComment = thread.comments?.some((c) => String(c.id) === String(commentId));
+        if (hasComment) {
+          foundThread = thread;
+          break;
+        }
+      }
+
+      if (!foundThread) {
+        throw new ValidationError(
+          "commentId",
+          `No comment thread found containing comment ID or thread ID: ${commentId}`
+        );
+      }
+
+      const path = foundThread.threadContext?.filePath;
+      const line = foundThread.threadContext?.rightFileStart?.line;
+
+      if (!path || !line) {
+        throw new ValidationError("commentId", "Only inline file/line comments are supported.");
+      }
+
+      // Filter out deleted or system-generated comments from the thread.
+      const threadComments = (foundThread.comments || []).filter(
+        (c) => !c.isDeleted && c.commentType === AzureCommentType.TEXT
+      );
+
+      // Sort comments chronologically.
+      threadComments.sort((a, b) => {
+        const aTime = a.publishedDate ? new Date(a.publishedDate).getTime() : 0;
+        const bTime = b.publishedDate ? new Date(b.publishedDate).getTime() : 0;
+        return aTime - bTime;
+      });
+
+      const comments: ThreadComment[] = threadComments.map((c) => ({
+        id: c.id ?? "",
+        author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+        body: c.content || "",
+        createdAt: c.publishedDate ? new Date(c.publishedDate).toISOString() : undefined,
+      }));
+
+      // In Azure DevOps threadContext.filePath might have leading slash
+      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+      return {
+        threadId: foundThread.id ?? "",
+        path: cleanPath,
+        line,
+        comments,
+      };
+    } catch (error) {
+      this.logger.error(
+        { prNumber, commentId, error: (error as Error).message },
+        "Failed to fetch comment thread"
+      );
+      throw new PlatformApiError(
+        "azure",
+        "get-comment-thread",
+        (error as Error).message,
+        error as Error
+      );
+    }
+  }
+
+  async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
+    this.logger.debug({ prNumber, threadId }, "Posting comment reply to Azure DevOps");
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        throw new Error(`Could not find repository ID for PR ${prNumber}`);
+      }
+
+      const comment: Comment = {
+        content: body,
+        commentType: AzureCommentType.TEXT,
+      } as Comment;
+
+      await withRateLimitHandling(() =>
+        gitApi.createComment(comment, repositoryId, prNumber, Number(threadId), this.project)
+      );
+      this.logger.info({ prNumber, threadId }, "Posted comment reply successfully to Azure DevOps");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to post comment reply to Azure DevOps"
+      );
+      throw new PlatformApiError(
+        "azure",
+        "post-comment-reply",
+        (error as Error).message,
+        error as Error
+      );
+    }
+  }
+
+  async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
+    this.logger.debug({ prNumber, threadId }, "Resolving comment thread on Azure DevOps");
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        throw new Error(`Could not find repository ID for PR ${prNumber}`);
+      }
+
+      // Update the thread status to CLOSED = 4
+      await withRateLimitHandling(() =>
+        gitApi.updateThread(
+          { status: AzureThreadStatus.CLOSED },
+          repositoryId,
+          prNumber,
+          Number(threadId),
+          this.project
+        )
+      );
+      this.logger.info(
+        { prNumber, threadId },
+        "Resolved comment thread successfully on Azure DevOps"
+      );
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to resolve comment thread on Azure DevOps"
+      );
+      throw new PlatformApiError(
+        "azure",
+        "resolve-comment-thread",
+        (error as Error).message,
+        error as Error
+      );
     }
   }
 }
