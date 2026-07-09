@@ -64,7 +64,7 @@ GitHub review comments (inline comments) are distinct from timeline comments. Si
 - **`getCommentThread` logic:**
   1. Fetch the comment details using `octokit.pulls.getReviewComment({ owner, repo, comment_id: Number(commentId) })`.
   2. Determine the root thread ID: If the comment has `in_reply_to_id` set, use that as the root `threadId`. Otherwise, use the comment's own `id` as the root `threadId`.
-     - *Note:* Since thread resolution uses the GraphQL mutation `resolveReviewThread` which requires the GraphQL thread node ID, we must resolve the GraphQL thread ID. We can do this by querying the PR review threads via GraphQL and finding the one whose first comment's `databaseId` matches the root thread ID.
+     - _Note:_ Since thread resolution uses the GraphQL mutation `resolveReviewThread` which requires the GraphQL thread node ID, we must resolve the GraphQL thread ID. We can do this by querying the PR review threads via GraphQL and finding the one whose first comment's `databaseId` matches the root thread ID.
   3. Fetch all review comments in the PR using `octokit.pulls.listReviewComments` (paginated).
   4. Filter comments to keep only those belonging to the same thread (i.e. those whose `in_reply_to_id` matches the root `threadId`, or whose `id` is the root `threadId`).
   5. Sort comments chronologically by creation date.
@@ -80,7 +80,10 @@ GitHub review comments (inline comments) are distinct from timeline comments. Si
     ```graphql
     mutation ResolveThread($threadId: ID!) {
       resolveReviewThread(input: { threadId: $threadId }) {
-        thread { id isResolved }
+        thread {
+          id
+          isResolved
+        }
       }
     }
     ```
@@ -119,6 +122,7 @@ merge-mentor reply --pr <prNumber> [--comment-id <commentId>] [--dry-run]
 ```
 
 Options:
+
 - `--pr <number>`: The pull request number.
 - `--comment-id <id>`: (Optional) The ID of the specific comment that triggered the workflow. If not specified, the command will reply to all active threads started by `merge-mentor` where the latest comment is not by `merge-mentor`.
 - `--dry-run`: Prints the AI's generated response and resolution decision to stdout instead of posting it back to the PR.
