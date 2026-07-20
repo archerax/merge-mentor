@@ -1,16 +1,24 @@
 pre-commit:
   commands:
-    typecheck:
-      run: pnpm typecheck
+    biome:
+      run: pnpm exec biome check --write --no-errors-on-unmatched
       skip:
         - merge
-    lint:
-      run: pnpm lint
+    prettier:
+      run: pnpm exec prettier --write "**/*.{md,yml}"
       skip:
         - merge
 
 pre-push:
   commands:
+    typecheck:
+      run: pnpm typecheck
+      skip:
+        - merge
+    knip:
+      run: pnpm exec knip
+      skip:
+        - merge
     build:
       run: pnpm build
       skip:
