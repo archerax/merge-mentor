@@ -1,6 +1,18 @@
 pre-push:
   commands:
-    check:
-      run: pnpm check
+    typecheck:
+      run: pnpm typecheck
+      skip:
+        - merge
+    lint:
+      run: pnpm lint
+      skip:
+        - merge
+    build:
+      run: pnpm build
+      skip:
+        - merge
+    test:
+      run: pnpm test
       skip:
         - merge
