@@ -1,4 +1,4 @@
-pre-push:
+pre-commit:
   commands:
     typecheck:
       run: pnpm typecheck
@@ -8,6 +8,9 @@ pre-push:
       run: pnpm lint
       skip:
         - merge
+
+pre-push:
+  commands:
     build:
       run: pnpm build
       skip:
