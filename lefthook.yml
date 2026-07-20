@@ -1,0 +1,6 @@
+pre-push:
+  commands:
+    check:
+      run: pnpm check
+      skip:
+        - merge
