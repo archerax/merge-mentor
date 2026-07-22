@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`fix` Command: Prompt Injection → RCE Vector Closed**: The `fix` command embedded raw PR review comment bodies into the AI prompt with no injection defenses and auto-approved shell execution — a remote-code-execution vector on the developer's workstation or CI runner. The fix prompt now prepends the shared security preamble and wraps every comment body in `<untrusted-review-comment>` delimiters, and the AI agent no longer receives shell/terminal access on any provider (file read/edit tools only; validation commands are left to the user). Shell and write tool permissions are now controlled separately via the new `enableShellTools` provider option (default: disabled).
+- **`fix` Command: Platform Token Leak Closed**: The GitHub/Azure DevOps PAT was passed to every AI provider, and the `claude-agent-sdk` provider forwarded it to `api.anthropic.com` as `ANTHROPIC_API_KEY`. The platform token is now only passed to the `copilot-sdk` provider, mirroring the review engine.
+
 ### Added
 
 - **Q3 2026 Product Roadmap**: Added `plans/roadmap-q3-2026.md` ("Harden the Core", 2026-07-22 → 2026-10-22) covering the trust-foundation security work, comment deduplication, the interactive `reply` comment loop, and the v3.0 secure-by-default release.

@@ -193,6 +193,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private readonly timeoutMs: number;
   private readonly model?: string;
   private readonly enableWriteTools: boolean;
+  private readonly enableShellTools: boolean;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "OpenCodeSdkProvider" });
 
@@ -208,6 +209,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
     this.enableWriteTools = options?.enableWriteTools ?? false;
+    this.enableShellTools = options?.enableShellTools ?? false;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
     this.clock = options?.clock ?? systemClock;
@@ -319,11 +321,13 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       opencodeConfig.model = this.model;
     }
 
-    // Restrict the agent to read-only access by default. Allow file edits and bash
-    // command execution when enableWriteTools is true.
+    // Restrict the agent to read-only access by default. File edits are allowed
+    // when enableWriteTools is true; bash execution only when enableShellTools
+    // is explicitly enabled — never for flows whose prompts contain untrusted
+    // input (e.g. PR review comments in the fix command).
     opencodeConfig.permission = {
       edit: this.enableWriteTools ? "allow" : "deny",
-      bash: this.enableWriteTools ? "allow" : "deny",
+      bash: this.enableShellTools ? "allow" : "deny",
       webfetch: "deny",
       doom_loop: "deny",
       external_directory: "deny",

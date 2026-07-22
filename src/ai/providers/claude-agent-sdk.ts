@@ -190,6 +190,7 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
   private readonly reasoningEffort?: ReasoningEffort;
   private readonly longContext: boolean;
   private readonly enableWriteTools: boolean;
+  private readonly enableShellTools: boolean;
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "ClaudeAgentSdkProvider" });
 
@@ -209,6 +210,7 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
     this.reasoningEffort = options?.reasoningEffort;
     this.longContext = options?.longContext ?? false;
     this.enableWriteTools = options?.enableWriteTools ?? false;
+    this.enableShellTools = options?.enableShellTools ?? false;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
     this.clock = options?.clock ?? systemClock;
@@ -343,9 +345,15 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
       environment.ANTHROPIC_BASE_URL = this.aiBaseUrl;
     }
 
-    const defaultTools = ["Read", "Glob", "Grep"];
-    const fixTools = ["Read", "Glob", "Grep", "Write", "Edit", "Bash"];
-    const toolsList = this.enableWriteTools ? fixTools : defaultTools;
+    // Read-only tools are always available. Write/Edit are enabled for agentic
+    // flows (e.g. fix); Bash only when shell execution is explicitly enabled —
+    // never for flows whose prompts contain untrusted input (PR comments).
+    const readOnlyTools = ["Read", "Glob", "Grep"];
+    const toolsList = [
+      ...readOnlyTools,
+      ...(this.enableWriteTools ? ["Write", "Edit"] : []),
+      ...(this.enableShellTools ? ["Bash"] : []),
+    ];
 
     const agentOptions: Record<string, unknown> = {
       tools: toolsList,

@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
+import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import { createAIProvider } from "../ai/providerFactory.js";
 import type { AIProviderType } from "../ai/types.js";
 import { detectCIEnvironment } from "../ci/index.js";
@@ -165,11 +166,25 @@ export async function executeFixCommand(
 
   const aiClient = createAIProvider(aiProvider, {
     model: config.aiModel,
-    token: platform === "github" ? config.github.token : config.azure.token,
+    // The platform token is only ever passed to copilot-sdk (as the Copilot CLI
+    // GitHub token). Other providers must never receive it: claude-agent-sdk
+    // would forward it to api.anthropic.com as ANTHROPIC_API_KEY — a
+    // cross-service credential leak.
+    token:
+      aiProvider === "copilot-sdk"
+        ? platform === "github"
+          ? config.github.token
+          : config.azure.token
+        : undefined,
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     tempPath: config.tempPath,
     enableWriteTools: true,
+    // Shell execution is never enabled for fix. PR review comments are
+    // untrusted input; auto-approved shell access combined with a prompt
+    // injection is a remote-code-execution vector. The agent edits files only —
+    // validation commands are left to the user (see docs/fix.md).
+    enableShellTools: false,
     experimentalTools: resolvedOptions.experimentalTools ?? config.experimentalTools,
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
@@ -218,9 +233,14 @@ export async function executeFixCommand(
     `🤖 Running AI agent to resolve the ${selectedThreads.length} selected issue(s)...`
   );
 
+  // Review comment bodies are untrusted, attacker-controllable input: wrap each
+  // one in explicit delimiters and prepend the shared security preamble so the
+  // model treats them as data to act on, never as instructions to follow.
   const issuesList = selectedThreads
     .map((thread, index) => {
-      const commentsStr = thread.comments.map((c) => `${c.author}: ${c.body}`).join("\n");
+      const commentsStr = thread.comments
+        .map((c) => `${c.author}:\n${wrapUntrustedContent("untrusted-review-comment", c.body)}`)
+        .join("\n");
       return `Issue #${index + 1}:
 FILE TO EDIT: ${thread.path}
 LINE NUMBER: ${thread.line}
@@ -229,7 +249,7 @@ ${commentsStr}`;
     })
     .join("\n\n---\n\n");
 
-  const prompt = `You are an expert AI code repair assistant.
+  const prompt = `${buildSecurityPreamble()}You are an expert AI code repair assistant.
 You are tasked with fixing multiple issues raised by code review comments in the codebase.
 
 Here is the list of issues to fix:
@@ -240,9 +260,9 @@ INSTRUCTIONS:
 1. For each issue, locate the corresponding file and line number.
 2. Read the surrounding file contents to understand the context.
 3. Edit the files to fix all of the issues described in the review discussions.
-4. Run validation/test commands in your shell/bash workspace to verify your changes compile and pass tests.
+4. You do NOT have shell or terminal access — never attempt to run commands, scripts, or package managers. Make code edits only.
 5. Do not make any unrelated modifications.
-6. Once all issues are resolved and validated, summarize what changes you made.`;
+6. Once all issues are resolved, summarize what changes you made and list the validation/test commands the user should run themselves.`;
 
   try {
     await aiClient.executePrompt(prompt, {

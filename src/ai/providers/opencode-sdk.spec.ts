@@ -507,6 +507,49 @@ describe("OpenCodeSdkProvider", () => {
         })
       );
     });
+
+    it("allows edit but keeps bash denied when only write tools are enabled", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+      });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            permission: expect.objectContaining({ edit: "allow", bash: "deny" }),
+          }),
+        })
+      );
+    });
+
+    it("allows bash only when shell tools are explicitly enabled", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+        enableShellTools: true,
+      });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            permission: expect.objectContaining({ edit: "allow", bash: "allow" }),
+          }),
+        })
+      );
+    });
   });
 
   describe("explicit promptType hint", () => {

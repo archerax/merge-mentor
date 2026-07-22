@@ -1431,6 +1431,30 @@ describe("createReviewPermissionHandler", () => {
     expect(result).toEqual({ kind: "reject" });
   });
 
+  it("approves write but still denies shell when only write tools are enabled", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger, true);
+
+    const writeResult = handler({ kind: "write" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
+    const shellResult = handler({ kind: "shell" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
+
+    expect(writeResult).toEqual({ kind: "approve-once" });
+    expect(shellResult).toEqual({ kind: "reject" });
+  });
+
+  it("approves shell only when shell tools are explicitly enabled", () => {
+    const logger = createStubLogger();
+    const handler = createReviewPermissionHandler(logger, true, true);
+
+    const result = handler({ kind: "shell" } as unknown as PermissionRequest, { sessionId: "s1" });
+
+    expect(result).toEqual({ kind: "approve-once" });
+  });
+
   it("logs a warning when a request is denied", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
@@ -1450,6 +1474,52 @@ describe("createReviewPermissionHandler", () => {
     const handler = createReviewPermissionHandler(logger);
 
     handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
+  });
+
+  describe("write/shell tool availability", () => {
+    it("exposes write/edit but not shell when only write tools are enabled", async () => {
+      const provider = new CopilotSdkProvider({ enableWriteTools: true });
+      mockSuccessfulPrompt();
+
+      await provider.executePrompt("Test prompt");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          availableTools: expect.arrayContaining(["write", "edit"]),
+        })
+      );
+      const sessionConfig = mockClient.createSession.mock.calls[0][0] as {
+        availableTools: string[];
+      };
+      expect(sessionConfig.availableTools).not.toContain("shell");
+    });
+
+    it("exposes shell only when shell tools are explicitly enabled", async () => {
+      const provider = new CopilotSdkProvider({ enableWriteTools: true, enableShellTools: true });
+      mockSuccessfulPrompt();
+
+      await provider.executePrompt("Test prompt");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          availableTools: expect.arrayContaining(["write", "edit", "shell"]),
+        })
+      );
+    });
+
+    it("exposes neither write nor shell by default", async () => {
+      const provider = new CopilotSdkProvider();
+      mockSuccessfulPrompt();
+
+      await provider.executePrompt("Test prompt");
+
+      const sessionConfig = mockClient.createSession.mock.calls[0][0] as {
+        availableTools: string[];
+      };
+      expect(sessionConfig.availableTools).not.toContain("write");
+      expect(sessionConfig.availableTools).not.toContain("edit");
+      expect(sessionConfig.availableTools).not.toContain("shell");
+    });
   });
 
   describe("experimentalTools custom tool integration", () => {

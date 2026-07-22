@@ -78,6 +78,70 @@ describe("ClaudeAgentSdkProvider", () => {
     });
   });
 
+  describe("tool permissions", () => {
+    function mockSuccessStream(): void {
+      mockQueryStream.mockReturnValue(
+        createMockStream([
+          { session_id: "session-123", type: "system" },
+          {
+            type: "result",
+            subtype: "success",
+            session_id: "session-123",
+            result: JSON.stringify({ findings: [] }),
+            structured_output: { findings: [] },
+          },
+        ])
+      );
+    }
+
+    function lastCallTools(): string[] {
+      const call = mockQueryStream.mock.calls[0][0] as { options: { tools: string[] } };
+      return call.options.tools;
+    }
+
+    it("exposes read-only tools by default", async () => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(lastCallTools()).toEqual(["Read", "Glob", "Grep"]);
+    });
+
+    it("exposes Write/Edit but not Bash when only write tools are enabled", async () => {
+      const provider = new ClaudeAgentSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+      });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(lastCallTools()).toEqual(["Read", "Glob", "Grep", "Write", "Edit"]);
+    });
+
+    it("exposes Bash only when shell tools are explicitly enabled", async () => {
+      const provider = new ClaudeAgentSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+        enableShellTools: true,
+      });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(lastCallTools()).toEqual(["Read", "Glob", "Grep", "Write", "Edit", "Bash"]);
+    });
+  });
+
   describe("executePrompt", () => {
     it("should throw ValidationError when prompt is empty", async () => {
       const provider = createProvider();

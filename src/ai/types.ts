@@ -65,6 +65,13 @@ export interface AIProviderOptions {
   readonly reasoningEffort?: ReasoningEffort;
   /** Enable write and execution tools for agentic tasks. */
   readonly enableWriteTools?: boolean;
+  /**
+   * Enable shell/bash execution tools for agentic tasks. Defaults to false.
+   * Must never be enabled when the prompt contains untrusted input (e.g. PR
+   * review comments in the fix flow): auto-approved shell execution combined
+   * with prompt injection is a remote-code-execution vector.
+   */
+  readonly enableShellTools?: boolean;
 }
 
 /** Options for executing a prompt with additional context. */
