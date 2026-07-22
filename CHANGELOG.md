@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Q3 2026 Product Roadmap**: Added `plans/roadmap-q3-2026.md` ("Harden the Core", 2026-07-22 → 2026-10-22) covering the trust-foundation security work, comment deduplication, the interactive `reply` comment loop, and the v3.0 secure-by-default release.
+
+### Changed
+
+- **Semantic Search Plan Parked**: Marked `plans/codebase-semantic-search-plan.md` as parked pending user evidence that provider-native codebase context is insufficient.
+
 ## [2.10.0] - 2026-07-08
 
 ### Changed

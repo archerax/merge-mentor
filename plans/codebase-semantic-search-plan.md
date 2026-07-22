@@ -1,5 +1,7 @@
 # 🔍 Codebase-Wide Semantic Search Implementation Plan
 
+> **Status: Parked (2026-07-22).** Cut from the Q3 2026 roadmap ("Harden the Core") by product decision. Rationale: full-codebase context is table stakes among competitors (Greptile, CodeRabbit, Copilot) and partially duplicates provider-native capabilities (Copilot SDK repo context; agent SDK read tools); the maintenance surface is too heavy for the current team. **Revisit only with user evidence** that provider-native context is insufficient (e.g., self-hosted small models via Ollama/vLLM). See [`plans/roadmap-q3-2026.md`](./roadmap-q3-2026.md#parking-lot).
+
 This plan details how to implement codebase-wide semantic search capabilities in Merge Mentor, optimized specifically for **large monorepos (>100K files)** and **minimal API costs**.
 
 ---
