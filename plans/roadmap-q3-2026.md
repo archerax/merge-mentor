@@ -80,6 +80,22 @@
 - **Codebase semantic search** ([plan](./codebase-semantic-search-plan.md)): cut 2026-07-22. Rationale: full-codebase context is table stakes among competitors (Greptile, CodeRabbit, Copilot) rather than a differentiator; it partially duplicates provider-native capabilities (Copilot SDK repo context; agent SDK read tools); and the maintenance surface (local ONNX embeddings, SQLite vector store, index freshness) is wrong for a solo team right now. **Revisit only with user evidence** that provider-native context is insufficient (e.g., self-hosted small models via Ollama/vLLM).
 - **Interactive comment loop** was the runner-up that replaced it as the Month 3 headline.
 
+## Next quarter candidates (Q4 2026)
+
+- **Estimated developer time saved** — report a rough, locally-computed estimate of developer time saved per review (review summary output + a field on the `review.complete` audit event; consistent with the no-telemetry decision). Formula:
+
+  ```
+  estimatedMinutesSaved =
+      filesReviewed   × minutesPerFile     (default 1)
+    + linesChanged    × minutesPerLine     (default 0.2 — ≈300 LOC/hour manual review rate)
+    + commentsCreated × minutesPerComment  (default 5)
+  ```
+
+  - Constants configurable via `MM_`-prefixed settings; defaults derived from commonly cited review benchmarks (200–400 LOC/hour effective human review rate; ~5–10 minutes to author a substantive inline comment).
+  - `filesReviewed` and `commentsCreated` are already recorded by `AuditLogger.logReviewComplete`; `linesChanged` (additions + deletions) must be plumbed from the platform diff data into the audit stats.
+  - CLI output and documentation must label the figure as a **rough estimate**, with the formula and defaults documented in `docs/configuration.md`.
+  - Later refinement: weight the per-comment term by actionability (replies/reactions/threads resolved as fixed), pending platform adapter support.
+
 ## Top risks
 
 1. **Solo capacity / AI-assisted velocity variance** — Month 3 polish flexes first; headlines don't.

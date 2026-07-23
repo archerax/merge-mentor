@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Security Policy**: Added `SECURITY.md` with a private vulnerability reporting channel (GitHub Security Advisories), supported-versions policy, in/out-of-scope definitions, and a coordinated disclosure policy.
 - **Q3 2026 Product Roadmap**: Added `plans/roadmap-q3-2026.md` ("Harden the Core", 2026-07-22 → 2026-10-22) covering the trust-foundation security work, comment deduplication, the interactive `reply` comment loop, and the v3.0 secure-by-default release.
+- **Roadmap: Estimated Developer Time Saved**: Added a Q4 2026 candidate to `plans/roadmap-q3-2026.md` for reporting a rough, locally-computed estimate of developer time saved per review, calculated from files reviewed, lines changed, and comments created, with the formula documented as an estimate.
 
 ### Changed
 
