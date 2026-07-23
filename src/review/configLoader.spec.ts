@@ -58,7 +58,7 @@ describe("ConfigLoader", () => {
   });
 
   it("throws error for malformed JSON", async () => {
-    fileStore.set("/workspace/.mergementor.json", "invalid-json");
+    fileStore.set(path.join("/workspace", ".mergementor.json"), "invalid-json");
 
     await expect(loader.loadProjectConfig("/workspace")).rejects.toThrow(
       "Failed to parse .mergementor.json"
