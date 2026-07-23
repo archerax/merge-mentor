@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 import type { FileSystem } from "../ports/fileSystem.js";
 import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
@@ -36,7 +37,7 @@ describe("ConfigLoader", () => {
       testFilePatterns: ["**/*.spec.ts"],
       testMapping: { "src/a.ts": "src/a.spec.ts" },
     });
-    fileStore.set("/workspace/.mergementor.json", configJson);
+    fileStore.set(path.join("/workspace", ".mergementor.json"), configJson);
 
     const config = await loader.loadProjectConfig("/workspace");
     expect(config).toEqual({
@@ -50,7 +51,7 @@ describe("ConfigLoader", () => {
       testFilePatterns: ["**/*.spec.ts"],
       unknownField: "value",
     });
-    fileStore.set("/workspace/.mergementor.json", configJson);
+    fileStore.set(path.join("/workspace", ".mergementor.json"), configJson);
 
     const config = await loader.loadProjectConfig("/workspace");
     expect(config).toEqual({});
