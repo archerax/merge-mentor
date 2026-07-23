@@ -99,6 +99,18 @@ describe("ClaudeAgentSdkProvider", () => {
       return call.options.tools;
     }
 
+    function lastCallOptions(): {
+      tools: string[];
+      allowedTools: string[];
+      canUseTool: (
+        toolName: string,
+        input: Record<string, unknown>
+      ) => Promise<{ behavior: "allow" } | { behavior: "deny"; message: string }>;
+    } {
+      const call = mockQueryStream.mock.calls[0][0] as { options: never };
+      return call.options;
+    }
+
     it("exposes read-only tools by default", async () => {
       const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
       mockSuccessStream();
@@ -139,6 +151,120 @@ describe("ClaudeAgentSdkProvider", () => {
       await resultPromise;
 
       expect(lastCallTools()).toEqual(["Read", "Glob", "Grep", "Write", "Edit", "Bash"]);
+    });
+
+    it("scopes pre-approved Read access to the workspace by default", async () => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(lastCallOptions().allowedTools).toEqual(["Read(./**)", "Glob", "Grep"]);
+    });
+
+    it("scopes Write/Edit to the workspace when write tools are enabled", async () => {
+      const provider = new ClaudeAgentSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+      });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(lastCallOptions().allowedTools).toEqual([
+        "Read(./**)",
+        "Glob",
+        "Grep",
+        "Write(./**)",
+        "Edit(./**)",
+      ]);
+    });
+
+    it("denies Read access to absolute paths outside the workspace", async () => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        workingDirectory: "/repo",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const result = await lastCallOptions().canUseTool("Read", { file_path: "/etc/passwd" });
+      expect(result.behavior).toBe("deny");
+    });
+
+    it("denies Read access to relative paths escaping the workspace", async () => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        workingDirectory: "/repo",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const result = await lastCallOptions().canUseTool("Read", {
+        file_path: "../../etc/passwd",
+      });
+      expect(result.behavior).toBe("deny");
+    });
+
+    it("denies Write access outside the workspace when write tools are enabled", async () => {
+      const provider = new ClaudeAgentSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        enableWriteTools: true,
+      });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Fix the issue", {
+        workingDirectory: "/repo",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const result = await lastCallOptions().canUseTool("Write", {
+        file_path: "/home/user/.bashrc",
+      });
+      expect(result.behavior).toBe("deny");
+    });
+
+    it.each([
+      ["relative path inside workspace", { file_path: "src/index.ts" }],
+      ["absolute path inside workspace", { file_path: "/repo/src/index.ts" }],
+      ["workspace root itself", { file_path: "/repo" }],
+    ])("allows Read access to %s", async (_label, input) => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        workingDirectory: "/repo",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const result = await lastCallOptions().canUseTool("Read", input);
+      expect(result.behavior).toBe("allow");
+    });
+
+    it("allows tool calls without a path input", async () => {
+      const provider = new ClaudeAgentSdkProvider({ maxRetries: 1, timeoutMs: 5000 });
+      mockSuccessStream();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        workingDirectory: "/repo",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const result = await lastCallOptions().canUseTool("Glob", { pattern: "**/*.ts" });
+      expect(result.behavior).toBe("allow");
     });
   });
 

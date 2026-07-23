@@ -355,10 +355,56 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
       ...(this.enableShellTools ? ["Bash"] : []),
     ];
 
+    // Confine file access to the review workspace: a successful prompt injection
+    // embedded in PR content must not be able to read sensitive files elsewhere
+    // on disk (e.g. ~/.aws/credentials) and exfiltrate them into posted comments.
+    // Enforced twice: rule-scoped allowedTools (evaluated by the SDK permission
+    // engine, which denies anything not pre-approved under "dontAsk") and a
+    // canUseTool path-containment check.
+    const workspaceRoot = path.resolve(options?.workingDirectory ?? process.cwd());
+    const workspacePattern = "./**";
+    const allowedTools = [
+      `Read(${workspacePattern})`,
+      "Glob",
+      "Grep",
+      ...(this.enableWriteTools ? [`Write(${workspacePattern})`, `Edit(${workspacePattern})`] : []),
+      ...(this.enableShellTools ? ["Bash"] : []),
+    ];
+
+    const pathInputFields: Record<string, string> = {
+      Read: "file_path",
+      Write: "file_path",
+      Edit: "file_path",
+      Glob: "path",
+      Grep: "path",
+    };
+
+    const canUseTool = async (toolName: string, input: Record<string, unknown>) => {
+      const field = pathInputFields[toolName];
+      const target = field ? input[field] : undefined;
+      if (typeof target !== "string" || target.length === 0) {
+        return { behavior: "allow" as const };
+      }
+      const resolved = path.resolve(workspaceRoot, target);
+      const relative = path.relative(workspaceRoot, resolved);
+      if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+        return { behavior: "allow" as const };
+      }
+      this.logger.warn(
+        { toolName, target, workspaceRoot },
+        "Denied tool access outside review workspace"
+      );
+      return {
+        behavior: "deny" as const,
+        message: `${toolName} is restricted to the review workspace; access outside ${workspaceRoot} is not permitted.`,
+      };
+    };
+
     const agentOptions: Record<string, unknown> = {
       tools: toolsList,
-      allowedTools: toolsList,
+      allowedTools,
       permissionMode: "dontAsk",
+      canUseTool,
       includePartialMessages: true,
       persistSession: true,
       cwd: options?.workingDirectory,
