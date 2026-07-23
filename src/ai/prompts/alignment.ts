@@ -1,4 +1,4 @@
-import { buildSecurityPreamble } from "./securityPreamble.js";
+import { buildSecurityPreamble, wrapUntrustedContent } from "./securityPreamble.js";
 
 /**
  * Builds the prompt for PBI alignment verification.
@@ -21,14 +21,17 @@ export function buildPBIAlignmentPrompt(
 
 # REQUIREMENTS
 
-- PBI ID: ${pbiId}
+${wrapUntrustedContent(
+  "untrusted-pbi-details",
+  `- PBI ID: ${pbiId}
 - Title: ${pbiTitle}
 - Description: ${pbiDescription}
-- Acceptance Criteria: ${pbiAcceptanceCriteria || "None specified"}
+- Acceptance Criteria: ${pbiAcceptanceCriteria || "None specified"}`
+)}
 
 # CODE CHANGES
 
-${prDiff}
+${wrapUntrustedContent("untrusted-pr-diff", prDiff)}
 
 Evaluate the changes and output a JSON object containing:
 

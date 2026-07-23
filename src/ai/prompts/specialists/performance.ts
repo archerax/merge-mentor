@@ -1,6 +1,10 @@
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
-import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
+import {
+  buildSecurityPreamble,
+  wrapUntrustedExistingComments,
+  wrapUntrustedPRMetadata,
+} from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import {
@@ -361,7 +365,7 @@ export function buildPerformanceCrossFilePrompt(
     .join("\n");
 
   const commentsSection = existingCommentsContext
-    ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW performance concerns not already covered.\n`
+    ? `\nEXISTING PR COMMENTS:\n${wrapUntrustedExistingComments(existingCommentsContext)}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW performance concerns not already covered.\n`
     : "";
 
   const workspaceSection = repoPath

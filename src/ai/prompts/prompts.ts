@@ -1,6 +1,10 @@
 import type { FileReviewResult, PRDetails } from "../../platforms/types.js";
 import type { DiffManifest } from "../../review/diffStorage.js";
-import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "./securityPreamble.js";
+import {
+  buildSecurityPreamble,
+  wrapUntrustedExistingComments,
+  wrapUntrustedPRMetadata,
+} from "./securityPreamble.js";
 import { buildSeverityContextSection } from "./severityContext.js";
 
 /**
@@ -28,7 +32,7 @@ export function buildCrossFilePrompt(
     .join("\n");
 
   const commentsSection = existingCommentsContext
-    ? `\nEXISTING PR COMMENTS:\n${existingCommentsContext}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
+    ? `\nEXISTING PR COMMENTS:\n${wrapUntrustedExistingComments(existingCommentsContext)}\n\nIMPORTANT: Be aware of issues already flagged. Focus on NEW system-level concerns not already covered.\n`
     : "";
 
   const repoContextSection = repoContext
@@ -207,7 +211,7 @@ export function buildBatchedFileReviewPrompt(
     .join("\n");
 
   const commentsSection = existingCommentsContext
-    ? `\n${existingCommentsContext}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
+    ? `\nEXISTING PR COMMENTS:\n${wrapUntrustedExistingComments(existingCommentsContext)}\n\nCRITICAL: Do NOT flag issues already mentioned above. Focus ONLY on NEW issues not yet covered.\n`
     : "";
 
   const repoContextSection = repoContext
@@ -262,7 +266,7 @@ Your working directory is set to the repository root.
 `
     : "";
 
-  return `# YOUR ROLE
+  return `${buildSecurityPreamble()}# YOUR ROLE
 Expert code reviewer analyzing changes. Be thorough and strict in catching issues.
 ${repoContextSection}${workspaceSection}
 # TASK

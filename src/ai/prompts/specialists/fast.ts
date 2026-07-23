@@ -1,7 +1,11 @@
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import type { ReviewPass } from "../../../review/reviewSelection.js";
-import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
+import {
+  buildSecurityPreamble,
+  wrapUntrustedExistingComments,
+  wrapUntrustedPRMetadata,
+} from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildSelectedPassesSection } from "../shared/passHelpers.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
@@ -75,7 +79,7 @@ export function buildFastReviewPrompt(
   const commentsSection = existingCommentsContext
     ? `
 # EXISTING PR COMMENTS
-${existingCommentsContext}
+${wrapUntrustedExistingComments(existingCommentsContext)}
 
 IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already covered.
 `
