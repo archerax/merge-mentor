@@ -61,6 +61,7 @@ import {
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
 import { getAuditLogger } from "../audit/index.js";
+import type { Platform } from "../config.js";
 import { ValidationError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import type {
@@ -75,7 +76,7 @@ import type {
 import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from "../ports/index.js";
 import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
-import { parsePRNumber } from "../utils/prIdentifier.js";
+import { generatePRIdentifier, parsePRNumber, sanitizeProjectName } from "../utils/prIdentifier.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import {
   findTestFileForProduction,
@@ -498,9 +499,12 @@ export class ReviewEngine {
       throw new ValidationError("prNumber", "Must be a positive integer");
     }
 
-    // Generate unique PR identifier
-    const projectId = this.platform.getProjectIdentifier();
-    const prIdentifier = `${this.platformName.charAt(0).toUpperCase() + this.platformName.slice(1)}-${projectId}-PR${prNumber}`;
+    // Generate unique PR identifier. Sanitize the project identifier first:
+    // Azure DevOps returns "org/project/repo", whose slashes would otherwise
+    // turn cache and diff paths into nested directories and silently break
+    // review-state persistence.
+    const projectId = sanitizeProjectName(this.platform.getProjectIdentifier());
+    const prIdentifier = generatePRIdentifier(this.platformName as Platform, projectId, prNumber);
 
     const reviewType = this.reviewProfile.reviewType;
     this.logger.info(

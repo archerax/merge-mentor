@@ -77,6 +77,9 @@ vi.mock("./repoManager.js", () => ({
 }));
 
 // Mock ReviewStateCache with an in-memory store so caching tests work without disk I/O
+const mockCacheGetState = vi.fn();
+const mockCacheSaveState = vi.fn();
+
 vi.mock("./reviewStateCache.js", () => ({
   ReviewStateCache: class MockReviewStateCache {
     private stateMap = new Map<
@@ -90,6 +93,7 @@ vi.mock("./reviewStateCache.js", () => ({
     >();
 
     async getState(prIdentifier: string) {
+      mockCacheGetState(prIdentifier);
       return this.stateMap.get(prIdentifier);
     }
 
@@ -99,6 +103,7 @@ vi.mock("./reviewStateCache.js", () => ({
       fileShaMap: Map<string, string>,
       crossFileResult?: unknown
     ) {
+      mockCacheSaveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
       const files: Record<string, { sha: string; result: unknown }> = {};
       for (const result of fileResults) {
         const sha = fileShaMap.get(result.filename);
@@ -985,6 +990,41 @@ describe("ReviewEngine", () => {
 
       // Should have called batched review for the changed file
       expect(mockParseBatchedFileReview).toHaveBeenCalledTimes(1);
+    });
+
+    it("sanitizes slash-containing Azure project identifiers for cache keys", async () => {
+      // Regression test: Azure DevOps returns "org/project/repo" from
+      // getProjectIdentifier(). The raw slashes turned the cache file path
+      // into nested directories, so the write silently failed and every
+      // Azure run re-reviewed every file.
+      vi.mocked(mockPlatform.getPlatformName).mockReturnValue("azure");
+      vi.mocked(mockPlatform.getProjectIdentifier).mockReturnValue("my-org/my-project/my-repo");
+
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", sha: "sha-1" })];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockReturnValue({ filename: "test.ts", findings: [] });
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Good",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // The identifier handed to the cache must be filesystem-safe (no path
+      // separators) so the cache file actually persists.
+      const expectedIdentifier = "Azure-my-org_my-project_my-repo-PR123";
+      expect(mockCacheGetState).toHaveBeenCalledWith(expectedIdentifier);
+      expect(mockCacheSaveState).toHaveBeenCalled();
+      expect(mockCacheSaveState.mock.calls[0][0]).toBe(expectedIdentifier);
     });
 
     it("handles action with no body for create", async () => {

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Semantic Search Plan Parked**: Marked `plans/codebase-semantic-search-plan.md` as parked pending user evidence that provider-native codebase context is insufficient.
 
+### Fixed
+
+- **Azure DevOps Review-State Cache Never Persisted**: The Azure project identifier (`org/project/repo`) contains slashes, which turned the review-state cache file path into nested directories; the write then failed with the error only logged, so every Azure run silently re-reviewed every file (multiplied AI cost and latency). The review engine now builds the cache key from the sanitized project identifier via the shared `sanitizeProjectName`/`generatePRIdentifier` utilities (consistent with report filenames), with a regression test covering slash-containing Azure identifiers.
+
 ## [2.10.0] - 2026-07-08
 
 ### Changed
