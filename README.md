@@ -48,15 +48,15 @@ npx merge-mentor@latest review --pr 123 --write
 
 Merge Mentor offers a set of subcommands to support reviews, plan checks, and automatic fixes:
 
-- **[review](./pages/review.md)**: Reviews a pull request and identifies potential bugs, security issues, and quality problems.
-- **[fix](./pages/fix.md)**: Interactively fixes active review comments on a PR using an AI provider.
-- **[describe](./pages/describe.md)**: Generates a title, summary, and changelog for a pull request.
-- **[doctor](./pages/doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
-- **[repos](./pages/repos.md)**: Manages local cloned repositories used for context loading.
-- **[pbi](./pages/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue against the INVEST model.
-- **[project](./pages/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
+- **[review](./docs/review.md)**: Reviews a pull request and identifies potential bugs, security issues, and quality problems.
+- **[fix](./docs/fix.md)**: Interactively fixes active review comments on a PR using an AI provider.
+- **[describe](./docs/describe.md)**: Generates a title, summary, and changelog for a pull request.
+- **[doctor](./docs/doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
+- **[repos](./docs/repos.md)**: Manages local cloned repositories used for context loading.
+- **[pbi](./docs/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue against the INVEST model.
+- **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 
-For full configuration settings and options, refer to the **[Configuration Guide](./pages/configuration.md)**.
+For full configuration settings and options, refer to the **[Configuration Guide](./docs/configuration.md)**.
 
 ---
 
@@ -64,9 +64,9 @@ For full configuration settings and options, refer to the **[Configuration Guide
 
 Merge Mentor can be run automatically in your workflows using the `--ci` flag, which auto-detects pull request details and platform tokens.
 
-- **[GitHub Actions Integration](./pages/ci-cd.md#github-actions)**
-- **[Azure Pipelines Integration](./pages/ci-cd.md#azure-pipelines)**
-- **[CI/CD State Caching](./pages/ci-cd.md#cicd-caching-highly-recommended)**
+- **[GitHub Actions Integration](./docs/ci-cd.md#github-actions)**
+- **[Azure Pipelines Integration](./docs/ci-cd.md#azure-pipelines)**
+- **[CI/CD State Caching](./docs/ci-cd.md#cicd-caching-highly-recommended)**
 
 ---
 
