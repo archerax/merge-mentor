@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- **Claude Agent SDK (`claude-agent-sdk`) provider**: The `claude-agent-sdk` AI provider is now deprecated and will be **removed in the next major version**. A deprecation warning is shown at startup and in the `doctor` output when the provider is used. Users should migrate to `copilot-sdk` or `opencode-sdk`.
+
 ### Security
 
 - **`fix` Command: Prompt Injection → RCE Vector Closed**: The `fix` command embedded raw PR review comment bodies into the AI prompt with no injection defenses and auto-approved shell execution — a remote-code-execution vector on the developer's workstation or CI runner. The fix prompt now prepends the shared security preamble and wraps every comment body in `<untrusted-review-comment>` delimiters, and the AI agent no longer receives shell/terminal access on any provider (file read/edit tools only; validation commands are left to the user). Shell and write tool permissions are now controlled separately via the new `enableShellTools` provider option (default: disabled).

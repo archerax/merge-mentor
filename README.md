@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK, OpenCode SDK, and Claude Agent SDK.
+  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK. (Claude Agent SDK is deprecated.)
 </p>
 
 <br>

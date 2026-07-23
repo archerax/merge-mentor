@@ -1,4 +1,5 @@
 import { ConfigurationError, ValidationError } from "../errors/index.js";
+import { logger } from "../logger.js";
 import { ClaudeAgentSdkProvider } from "./providers/claude-agent-sdk.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
@@ -20,6 +21,9 @@ import type { AIProviderClient, AIProviderOptions, AIProviderType } from "./type
  * // Create an OpenCode SDK provider
  * const opencodeSdk = createAIProvider("opencode-sdk", { model: "claude-sonnet-4.6" });
  * ```
+ *
+ * @deprecated "claude-agent-sdk" is deprecated and will be removed in the next
+ *   major version. Migrate to "copilot-sdk" or "opencode-sdk".
  */
 export function createAIProvider(
   type: AIProviderType,
@@ -38,11 +42,15 @@ export function createAIProvider(
     case "opencode-sdk":
       return new OpenCodeSdkProvider(options);
     case "claude-agent-sdk":
+      logger.warn(
+        { provider: "claude-agent-sdk" },
+        'The "claude-agent-sdk" AI provider is deprecated and will be removed in the next major version. Migrate to "copilot-sdk" or "opencode-sdk".'
+      );
       return new ClaudeAgentSdkProvider(options);
     default:
       throw new ConfigurationError(
         "AI_PROVIDER",
-        `Unsupported AI provider: ${type as string}. Valid options are: copilot-sdk, opencode-sdk, claude-agent-sdk`
+        `Unsupported AI provider: ${type as string}. Valid options are: copilot-sdk, opencode-sdk. Note: claude-agent-sdk is deprecated.`
       );
   }
 }

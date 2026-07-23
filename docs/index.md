@@ -11,7 +11,7 @@ title: Home
 
 Merge Mentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them.
 
-Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK, OpenCode SDK, and Claude Agent SDK.
+Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK. (Claude Agent SDK is deprecated.)
 
 ---
 

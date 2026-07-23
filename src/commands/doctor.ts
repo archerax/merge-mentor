@@ -78,6 +78,11 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
     if (sdkUrl) claudeStatus = "Available";
   } catch {}
   output.log(`  Claude: ${claudeStatus === "Available" ? "✅ Available" : "❌ Not Installed"}`);
+  if (claudeStatus === "Available") {
+    output.log(
+      "    ⚠️  Deprecated: claude-agent-sdk will be removed in the next major version. Migrate to copilot-sdk or opencode-sdk."
+    );
+  }
   output.log("");
 
   let activeProvider = "copilot-sdk";

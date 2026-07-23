@@ -14,7 +14,7 @@ Merge Mentor can be configured using environment variables, command-line paramet
 - **AI Provider Prerequisites**:
   - **Copilot SDK** (`copilot-sdk`): Requires a valid Copilot token set via `MM_COPILOT_TOKEN` or `--copilot-token`.
   - **OpenCode SDK** (`opencode-sdk`): Follow the official OpenCode installation instructions at [https://opencode.dev](https://opencode.dev).
-  - **Claude Agent SDK** (`claude-agent-sdk`): Requires the `@anthropic-ai/claude-agent-sdk` package to be installed, plus a valid Anthropic API key configured via `ANTHROPIC_API_KEY` or `MM_AI_API_KEY`.
+  - **Claude Agent SDK** (`claude-agent-sdk`) **[DEPRECATED]**: Requires the `@anthropic-ai/claude-agent-sdk` package to be installed, plus a valid Anthropic API key configured via `ANTHROPIC_API_KEY` or `MM_AI_API_KEY`. This provider will be removed in the next major version. Migrate to `copilot-sdk` or `opencode-sdk`.
 - **Platform Access**: Personal access token for GitHub or Azure DevOps.
 
 ---
@@ -60,7 +60,7 @@ export MM_AZURE_REPO=repository_name
 **Default Provider**: GitHub Copilot SDK (`copilot-sdk`)
 
 ```bash
-# Select AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk)
+# Select AI provider (copilot-sdk, opencode-sdk). Note: claude-agent-sdk is deprecated.
 export MM_AI_PROVIDER=copilot-sdk
 
 # Shared AI timeout (default: 3600000 ms / 1 hour)
@@ -72,12 +72,14 @@ export MM_AI_MODEL=gpt-4o
 
 ### Available Models
 
-Configure the active provider model via `MM_AI_MODEL` or `--ai-model`. Examples for Copilot/Claude SDKs:
+Configure the active provider model via `MM_AI_MODEL` or `--ai-model`. Examples:
 
+- `gpt-4o`
 - `claude-sonnet-4.6`
 - `claude-haiku-4.5`
 - `claude-opus-4.8`
-- `gpt-4o`
+
+> **Note:** Claude models are only available with the deprecated `claude-agent-sdk` provider.
 
 Check provider documentation for all supported models.
 

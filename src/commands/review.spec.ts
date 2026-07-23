@@ -594,7 +594,7 @@ describe("executeReview", () => {
     });
 
     await expect(executeReview(options)).rejects.toThrow(
-      'Invalid AI provider "invalid". Must be "copilot-sdk", "opencode-sdk", or "claude-agent-sdk".'
+      'Invalid AI provider "invalid". Must be "copilot-sdk" or "opencode-sdk". Note: "claude-agent-sdk" is deprecated.'
     );
   });
 

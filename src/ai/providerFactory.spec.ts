@@ -70,7 +70,7 @@ describe("createAIProvider", () => {
       ConfigurationError
     );
     expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
-      "Unsupported AI provider: invalid. Valid options are: copilot-sdk, opencode-sdk, claude-agent-sdk"
+      "Unsupported AI provider: invalid. Valid options are: copilot-sdk, opencode-sdk. Note: claude-agent-sdk is deprecated."
     );
   });
 

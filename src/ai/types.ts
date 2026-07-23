@@ -11,7 +11,12 @@ export interface FastReviewResult {
   readonly crossFileResult: CrossFileReviewResult;
 }
 
-/** Supported AI provider types. */
+/**
+ * Supported AI provider types.
+ *
+ * @deprecated "claude-agent-sdk" is deprecated and will be removed in the next
+ *   major version. Migrate to "copilot-sdk" or "opencode-sdk".
+ */
 export type AIProviderType = "copilot-sdk" | "opencode-sdk" | "claude-agent-sdk";
 
 /** Valid reasoning effort levels for models that support it. */

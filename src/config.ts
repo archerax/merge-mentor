@@ -80,6 +80,7 @@ export interface Config {
   readonly verifyPbi: boolean;
 }
 
+// "claude-agent-sdk" is deprecated and will be removed in the next major version.
 const AIProviderSchema = z
   .enum(["copilot-sdk", "opencode-sdk", "claude-agent-sdk"])
   .catch("copilot-sdk");
@@ -238,6 +239,9 @@ interface CliOverrides {
  * Validates the AI provider type.
  * Supported providers are: copilot-sdk, opencode-sdk.
  * Unknown values default to copilot-sdk.
+ *
+ * @deprecated "claude-agent-sdk" is deprecated and will be removed in the next
+ *   major version. Migrate to "copilot-sdk" or "opencode-sdk".
  *
  * @param value - AI provider name as string or undefined
  * @returns Validated provider type, or 'copilot-sdk' if invalid

@@ -47,12 +47,12 @@ merge-mentor project 5432 --platform azure --write
 
 ### AI Provider Configuration
 
-| Option                  | Description                                                     | Env Variable     | Default       |
-| ----------------------- | --------------------------------------------------------------- | ---------------- | ------------- |
-| `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`, `claude-agent-sdk`) | `MM_AI_PROVIDER` | `copilot-sdk` |
-| `--ai-model <model>`    | Model name for the active AI provider                           | `MM_AI_MODEL`    | -             |
-| `--ai-base-url <url>`   | OpenAI-compatible API base URL for BYOK                         | `MM_AI_BASE_URL` | -             |
-| `--ai-api-key <key>`    | API key for BYOK                                                | `MM_AI_API_KEY`  | -             |
+| Option                  | Description                                                                          | Env Variable     | Default       |
+| ----------------------- | ------------------------------------------------------------------------------------ | ---------------- | ------------- |
+| `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`). Note: `claude-agent-sdk` is deprecated. | `MM_AI_PROVIDER` | `copilot-sdk` |
+| `--ai-model <model>`    | Model name for the active AI provider                                                | `MM_AI_MODEL`    | -             |
+| `--ai-base-url <url>`   | OpenAI-compatible API base URL for BYOK                                              | `MM_AI_BASE_URL` | -             |
+| `--ai-api-key <key>`    | API key for BYOK                                                                     | `MM_AI_API_KEY`  | -             |
 
 ---
 

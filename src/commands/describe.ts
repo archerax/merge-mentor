@@ -93,7 +93,7 @@ export async function executeDescribe(
   if (!["copilot-sdk", "opencode-sdk", "claude-agent-sdk"].includes(aiProvider)) {
     logger.error({ provider: aiProvider }, "Invalid AI provider specified");
     throw new Error(
-      `Invalid AI provider "${aiProvider}". Must be "copilot-sdk", "opencode-sdk", or "claude-agent-sdk".`
+      `Invalid AI provider "${aiProvider}". Must be "copilot-sdk" or "opencode-sdk". Note: "claude-agent-sdk" is deprecated.`
     );
   }
 
@@ -130,6 +130,11 @@ export async function executeDescribe(
   );
   output.log(`  Platform: ${platform}`);
   output.log(`  Provider: ${aiProvider}`);
+  if (aiProvider === "claude-agent-sdk") {
+    output.log(
+      "  ⚠️  Deprecated: claude-agent-sdk will be removed in the next major version. Migrate to copilot-sdk or opencode-sdk."
+    );
+  }
   if (aiModel) {
     output.log(`  Model:    ${aiModel}`);
   }

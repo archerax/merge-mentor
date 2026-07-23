@@ -179,6 +179,9 @@ const FAST_REVIEW_SCHEMA = {
 
 /**
  * AI provider implementation using the @anthropic-ai/claude-agent-sdk package.
+ *
+ * @deprecated The "claude-agent-sdk" provider is deprecated and will be removed
+ *   in the next major version. Migrate to "copilot-sdk" or "opencode-sdk".
  */
 export class ClaudeAgentSdkProvider implements AIProviderClient {
   private readonly maxRetries: number;
