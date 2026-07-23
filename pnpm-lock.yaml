@@ -13,7 +13,7 @@ importers:
         version: 1.0.73
       '@github/copilot-sdk':
         specifier: ^1.0.7
-        version: 1.0.7
+        version: 1.0.8
       '@octokit/rest':
         specifier: ^22.0.1
         version: 22.0.1
@@ -454,8 +454,8 @@ packages:
     libc: [musl]
     hasBin: true
 
-  '@github/copilot-sdk@1.0.7':
-    resolution: {integrity: sha512-dgCFCPfxWUkrgclQbrm7WCFzTf5RnJHsK1Lqsc3KjPBbDLPutJT0qIGg3xJ0ZELLyX0icg3TOmVczhR4HdwHxw==}
+  '@github/copilot-sdk@1.0.8':
+    resolution: {integrity: sha512-dbahVsyt2aX8qqtOOtmYNe40MnvzSvOSHYFFgoFK7gHZSTNz9QgOht8b1sCCJlcXaFAn/w+5qNc7CwWoCjpQ0g==}
     engines: {node: ^20.19.0 || >=22.12.0}
 
   '@github/copilot-win32-arm64@1.0.73':
@@ -2363,7 +2363,7 @@ snapshots:
   '@github/copilot-linuxmusl-x64@1.0.73':
     optional: true
 
-  '@github/copilot-sdk@1.0.7':
+  '@github/copilot-sdk@1.0.8':
     dependencies:
       '@github/copilot': 1.0.73
       koffi: 3.1.2
