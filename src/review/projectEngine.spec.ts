@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
 import type { PlatformAdapter, ProjectDetails } from "../platforms/types.js";
 import { ProjectReviewEngine } from "./projectEngine.js";
@@ -10,15 +13,22 @@ vi.mock("node:fs", async (importOriginal) => {
     writeFileSync: vi
       .fn()
       .mockImplementation((...args: Parameters<typeof actual.writeFileSync>) => {
-        if ((globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError) {
-          throw new Error("Write failed");
-        }
         return actual.writeFileSync(...args);
       }),
   };
 });
 
 describe("ProjectReviewEngine", () => {
+  let tempPath: string;
+
+  beforeEach(() => {
+    tempPath = mkdtempSync(join(tmpdir(), "project-engine-spec-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempPath, { recursive: true, force: true });
+  });
+
   const mockProjectDetails: ProjectDetails = {
     rootId: "100",
     rootTitle: "Test Feature",
@@ -118,7 +128,7 @@ describe("ProjectReviewEngine", () => {
   it("should retrieve project, run AI review, and write comment (new comment)", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     const result = await engine.reviewProject("100");
 
@@ -142,7 +152,7 @@ describe("ProjectReviewEngine", () => {
     ];
     const adapter = createMockAdapter(existingComments);
     const aiClient = createMockAiClient();
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     await engine.reviewProject("100");
 
@@ -157,23 +167,21 @@ describe("ProjectReviewEngine", () => {
   it("should skip writing comment when dryRun option is set", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     await engine.reviewProject("100");
 
     expect(adapter.postPBIComment).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = false;
-  });
-
   it("should handle writeFileSync failure when saving report", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
-    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = true;
+    vi.mocked(writeFileSync).mockImplementationOnce(() => {
+      throw new Error("Write failed");
+    });
 
     // Should not throw, should handle error gracefully in catch block
     await expect(engine.reviewProject("100")).resolves.toBeDefined();
@@ -191,7 +199,7 @@ describe("ProjectReviewEngine", () => {
       parsed: malformedOutput,
     };
     const aiClient = createMockAiClient(malformedResponse);
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewProject("100");
 
@@ -207,7 +215,7 @@ describe("ProjectReviewEngine", () => {
       parsed: { invalid: true },
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewProject("100");
 
@@ -235,7 +243,7 @@ describe("ProjectReviewEngine", () => {
 
     const adapter = createMockAdapter([], detailsOverride);
     const aiClient = createMockAiClient();
-    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     await engine.reviewProject("100");
 

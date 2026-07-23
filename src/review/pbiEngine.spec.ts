@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
 import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { PBIReviewEngine } from "./pbiEngine.js";
@@ -10,15 +13,22 @@ vi.mock("node:fs", async (importOriginal) => {
     writeFileSync: vi
       .fn()
       .mockImplementation((...args: Parameters<typeof actual.writeFileSync>) => {
-        if ((globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError) {
-          throw new Error("Write failed");
-        }
         return actual.writeFileSync(...args);
       }),
   };
 });
 
 describe("PBIReviewEngine", () => {
+  let tempPath: string;
+
+  beforeEach(() => {
+    tempPath = mkdtempSync(join(tmpdir(), "pbi-engine-spec-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempPath, { recursive: true, force: true });
+  });
+
   const mockPbiDetails: PBIDetails = {
     id: "12345",
     platform: "github",
@@ -81,7 +91,7 @@ describe("PBIReviewEngine", () => {
   it("should retrieve PBI, run AI review, and write comment (new comment)", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -105,7 +115,7 @@ describe("PBIReviewEngine", () => {
     ];
     const adapter = createMockAdapter(existingComments);
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     await engine.reviewPBI("12345");
 
@@ -123,6 +133,7 @@ describe("PBIReviewEngine", () => {
     const engine = new PBIReviewEngine(adapter, aiClient, {
       dryRun: false,
       aiModel: "custom-test-model",
+      tempPath,
     });
 
     await engine.reviewPBI("12345");
@@ -140,7 +151,7 @@ describe("PBIReviewEngine", () => {
   it("defaults to 'AI model' in the footer if no aiModel option is specified", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     await engine.reviewPBI("12345");
 
@@ -153,23 +164,21 @@ describe("PBIReviewEngine", () => {
   it("should skip writing comment when dryRun option is set", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     await engine.reviewPBI("12345");
 
     expect(adapter.postPBIComment).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = false;
-  });
-
   it("should handle writeFileSync failure when saving report", async () => {
     const adapter = createMockAdapter();
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
-    (globalThis as { __throwWriteFileError?: boolean }).__throwWriteFileError = true;
+    vi.mocked(writeFileSync).mockImplementationOnce(() => {
+      throw new Error("Write failed");
+    });
 
     // Should not throw, should handle error gracefully in catch block
     await expect(engine.reviewPBI("12345")).resolves.toBeDefined();
@@ -188,7 +197,7 @@ describe("PBIReviewEngine", () => {
       parsed: malformedOutput,
     };
     const aiClient = createMockAiClient(malformedResponse);
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -206,7 +215,7 @@ describe("PBIReviewEngine", () => {
       parsed: { invalid: true }, // Will fail zod validation
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -224,7 +233,7 @@ describe("PBIReviewEngine", () => {
       parsed: { invalid: true }, // Will fail zod validation
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -240,7 +249,7 @@ describe("PBIReviewEngine", () => {
       parsed: { invalid: true },
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -258,7 +267,7 @@ describe("PBIReviewEngine", () => {
       parsed: { invalid: true },
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
     const result = await engine.reviewPBI("12345");
 
@@ -272,7 +281,7 @@ describe("PBIReviewEngine", () => {
       backlogPriority: 10,
     });
     const aiClient = createMockAiClient();
-    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false });
+    const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
 
     await engine.reviewPBI("12345");
 
