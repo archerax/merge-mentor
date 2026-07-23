@@ -53,36 +53,36 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "@github/copilot": "^1.0.65",
-    "@github/copilot-sdk": "^1.0.4",
+    "@github/copilot": "^1.0.73",
+    "@github/copilot-sdk": "^1.0.7",
     "@octokit/rest": "^22.0.1",
-    "@opencode-ai/sdk": "^1.17.11",
+    "@opencode-ai/sdk": "^1.18.4",
     "azure-devops-node-api": "^15.1.2",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
     "dotenv": "^17.4.2",
-    "isomorphic-git": "^1.38.5",
+    "isomorphic-git": "^1.38.10",
     "micromatch": "^4.0.8",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
-    "@types/node": "^25.9.4",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@biomejs/biome": "^2.5.5",
+    "@types/node": "^25.9.5",
+    "@vitest/coverage-v8": "^4.1.10",
     "cross-env": "^10.1.0",
     "esbuild": "^0.28.1",
     "husky": "^9.1.7",
-    "knip": "^6.23.0",
-    "prettier": "^3.9.3",
-    "typedoc": "^0.28.19",
+    "knip": "^6.29.0",
+    "prettier": "^3.9.6",
+    "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0",
     "typescript": "^6.0.3",
     "vite": "8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "optionalDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.195"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.218"
   },
   "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }
