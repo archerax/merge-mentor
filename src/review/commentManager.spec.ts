@@ -736,4 +736,183 @@ describe("CommentManager", () => {
       expect(result).not.toContain("<!-- finding-id:");
     });
   });
+
+  describe("line-shifted deduplication", () => {
+    it("matches a finding to an existing comment with line shift via remapping", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 16,
+        category: "bug",
+        message: "Test message",
+        isPreExisting: false,
+      });
+
+      // Generate the comment at the original line (15) as if from a previous review
+      const originalFinding = createFileFinding({
+        line: 15,
+        category: "bug",
+        message: "Test message",
+        isPreExisting: false,
+      });
+      const existingBody = manager.formatInlineComment(originalFinding, "test.ts");
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: existingBody, path: "test.ts", line: 15 },
+      ];
+
+      // The patch shows line 15 shifted to 16 (one addition before it)
+      const patch = `@@ -10,7 +10,8 @@
+ context
++added line
+ context
+ context
+ context
+ context
+ context
+ context`;
+
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [finding] }];
+
+      const filePatches = new Map([["test.ts", patch]]);
+      const actions = manager.determineActions(
+        existingComments,
+        fileResults,
+        createCrossFileResult(),
+        filePatches
+      );
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0);
+    });
+
+    it("does not match if remapped line is too far from the finding line", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 25,
+        category: "bug",
+        message: "Test message",
+        isPreExisting: false,
+      });
+
+      const originalFinding = createFileFinding({
+        line: 15,
+        category: "bug",
+        message: "Test message",
+        isPreExisting: false,
+      });
+      const existingBody = manager.formatInlineComment(originalFinding, "test.ts");
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: existingBody, path: "test.ts", line: 15 },
+      ];
+
+      const patch = `@@ -10,7 +10,8 @@
+ context
++added line
+ context
+ context
+ context
+ context
+ context
+ context`;
+
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [finding] }];
+
+      const filePatches = new Map([["test.ts", patch]]);
+      const actions = manager.determineActions(
+        existingComments,
+        fileResults,
+        createCrossFileResult(),
+        filePatches
+      );
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(1);
+    });
+  });
+
+  describe("reworded finding deduplication via text similarity", () => {
+    it("matches a reworded finding to a legacy comment without finding ID", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 10,
+        category: "bug",
+        message: "The variable name x is not descriptive enough",
+        isPreExisting: false,
+      });
+
+      // Legacy comment without finding-id marker
+      const legacyBody =
+        "### 🐛 Bug Issue\n\n**Severity**: 🟠 High\n\n**Issue**: Variable 'x' is not descriptive enough\n\n**Suggestion**: Use a more descriptive name\n\n---\nMerge Mentor v1.0.0, Standard review\n<!-- [AI Code Review Bot] -->";
+
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: legacyBody, path: "test.ts", line: 10 },
+      ];
+
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [finding] }];
+
+      const actions = manager.determineActions(
+        existingComments,
+        fileResults,
+        createCrossFileResult()
+      );
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0);
+    });
+
+    it("matches a reworded finding within proximity window", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 13,
+        category: "quality",
+        message: "This function could be simplified",
+        isPreExisting: false,
+      });
+
+      const legacyBody =
+        "### 📝 Quality Issue\n\n**Severity**: 🟠 High\n\n**Issue**: Consider simplifying this function for better readability\n\n**Suggestion**: Extract helper methods\n\n---\nMerge Mentor v1.0.0, Standard review\n<!-- [AI Code Review Bot] -->";
+
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: legacyBody, path: "test.ts", line: 10 },
+      ];
+
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [finding] }];
+
+      const actions = manager.determineActions(
+        existingComments,
+        fileResults,
+        createCrossFileResult()
+      );
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(0);
+    });
+
+    it("does not match if text similarity is too low", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 10,
+        category: "documentation",
+        message: "Memory leak in the event emitter",
+        isPreExisting: false,
+      });
+
+      const legacyBody =
+        "### 🐛 Bug Issue\n\n**Severity**: 🟠 High\n\n**Issue**: Use consistent indentation\n\n**Suggestion**: Fix indentation\n\n---\nMerge Mentor v1.0.0, Standard review\n<!-- [AI Code Review Bot] -->";
+
+      const existingComments: ExistingComment[] = [
+        { id: 1, body: legacyBody, path: "test.ts", line: 10 },
+      ];
+
+      const fileResults: FileReviewResult[] = [{ filename: "test.ts", findings: [finding] }];
+
+      const actions = manager.determineActions(
+        existingComments,
+        fileResults,
+        createCrossFileResult()
+      );
+
+      const createActions = actions.filter((a) => a.type === "create" && a.path);
+      expect(createActions).toHaveLength(1);
+    });
+  });
 });

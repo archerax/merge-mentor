@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hybrid Zero-Dependency Comment Deduplication**: Added two-stage deduplication that survives line shifts and rewording. Stage 1 decodes existing finding IDs and remaps lines through git diff hunk offset analysis (`remapLineNumber`). Stage 2 uses Sørensen-Dice bigram similarity (`calculateTextSimilarity`, threshold ≥ 0.78) within a ±5 line proximity window for legacy comments without finding IDs. Both utilities are pure TypeScript with zero external dependencies.
+
+## [2.10.1] - 2026-07-23
+
 ### Deprecated
 
 - **Claude Agent SDK (`claude-agent-sdk`) provider**: The `claude-agent-sdk` AI provider is now deprecated and will be **removed in the next major version**. A deprecation warning is shown at startup and in the `doctor` output when the provider is used. Users should migrate to `copilot-sdk` or `opencode-sdk`.

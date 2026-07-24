@@ -636,10 +636,17 @@ export class ReviewEngine {
       );
     }
 
+    const filePatches = new Map<string, string>(
+      files
+        .map((f): [string, string] => [f.filename, f.patch ?? ""])
+        .filter(([_, p]) => p.length > 0)
+    );
+
     const actions = this.commentManager.determineActions(
       existingComments,
       fileResults,
-      crossFileResult
+      crossFileResult,
+      filePatches
     );
 
     const commentStats = await this.executeCommentActions(prNumber, actions);

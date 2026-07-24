@@ -45,6 +45,8 @@ import type {
   FileReviewResult,
   FindingSeverity,
 } from "../platforms/types.js";
+import { remapLineNumber } from "../utils/hunkRemapper.js";
+import { calculateTextSimilarity } from "../utils/textSimilarity.js";
 import { formatReviewTypeLabel, type ReviewPass, type ReviewStrategy } from "./reviewSelection.js";
 
 /**
@@ -174,7 +176,8 @@ export class CommentManager {
   determineActions(
     existingComments: readonly ExistingComment[],
     fileResults: readonly FileReviewResult[],
-    crossFileResult: CrossFileReviewResult
+    crossFileResult: CrossFileReviewResult,
+    filePatches?: ReadonlyMap<string, string>
   ): CommentAction[] {
     const actions: CommentAction[] = [];
     const matchedExistingIds = new Set<number | string>();
@@ -191,7 +194,8 @@ export class CommentManager {
           existingComments,
           fileResult.filename,
           finding,
-          matchedExistingIds
+          matchedExistingIds,
+          filePatches?.get(fileResult.filename)
         );
 
         if (existingComment) {
@@ -229,27 +233,65 @@ export class CommentManager {
     existingComments: readonly ExistingComment[],
     filename: string,
     finding: FileFinding,
-    alreadyMatched: Set<number | string>
+    alreadyMatched: Set<number | string>,
+    filePatch?: string
   ): ExistingComment | undefined {
-    const findingId = this.generateFindingId(filename, finding);
+    // Stage 1: Match by finding ID with line remapping
+    const matchById = existingComments.find((c) => {
+      if (alreadyMatched.has(c.id)) return false;
+      const cid = this.extractFindingId(c.body);
+      if (!cid) return false;
 
-    // First, try to match by finding ID (most reliable)
-    const matchById = existingComments.find(
-      (c) => !alreadyMatched.has(c.id) && this.extractFindingId(c.body) === findingId
-    );
+      const decoded = this.decodeFindingId(cid);
+      if (!decoded) return false;
+      if (decoded.filename !== filename || decoded.category !== finding.category) return false;
+
+      const remappedLine = remapLineNumber(decoded.line, filePatch);
+
+      if (remappedLine === finding.line) return true;
+      if (Math.abs(remappedLine - finding.line) <= 2) return true;
+
+      return false;
+    });
 
     if (matchById) {
       return matchById;
     }
 
-    // Fallback to legacy matching for old comments without IDs
-    return existingComments.find(
-      (c) =>
-        !alreadyMatched.has(c.id) &&
-        c.path === filename &&
-        c.line === finding.line &&
-        c.body.toLowerCase().includes(finding.category.toLowerCase())
-    );
+    // Stage 2: Text-similarity proximity matching + legacy fallback
+    return existingComments.find((c) => {
+      if (alreadyMatched.has(c.id)) return false;
+      if (c.path !== filename) return false;
+
+      const hasFindingId = this.extractFindingId(c.body) !== null;
+
+      // Skip non-inline comments
+      if (c.line === undefined) return false;
+
+      // Remap existing comment's line if patch is available
+      let effectiveLine = c.line;
+      if (filePatch) {
+        effectiveLine = remapLineNumber(c.line, filePatch);
+      }
+
+      const lineMatch =
+        effectiveLine === finding.line || Math.abs(effectiveLine - finding.line) <= 5;
+
+      if (!lineMatch) return false;
+
+      // Skip comments with finding IDs (already checked in Stage 1)
+      if (hasFindingId) return false;
+
+      // Legacy: category substring match
+      if (c.body.toLowerCase().includes(finding.category.toLowerCase())) return true;
+
+      // Text similarity on the finding message
+      if (calculateTextSimilarity(this.extractMessageFromBody(c.body), finding.message) >= 0.78) {
+        return true;
+      }
+
+      return false;
+    });
   }
 
   private findExistingSummaryComment(
@@ -293,6 +335,38 @@ export class CommentManager {
   private extractFindingId(commentBody: string): string | null {
     const match = commentBody.match(/<!-- finding-id: ([A-Za-z0-9+/=]+) -->/);
     return match ? match[1] : null;
+  }
+
+  /**
+   * Decodes a base64 finding ID back into its components.
+   */
+  private decodeFindingId(
+    findingId: string
+  ): { filename: string; line: number; category: string } | null {
+    try {
+      const decoded = Buffer.from(findingId, "base64").toString("utf-8");
+      const parts = decoded.split(":");
+      if (parts.length >= 3) {
+        const line = Number.parseInt(parts[1], 10);
+        if (Number.isNaN(line)) return null;
+        return {
+          filename: parts[0],
+          line,
+          category: parts.slice(2).join(":"),
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Extracts the issue message from a formatted comment body.
+   */
+  private extractMessageFromBody(body: string): string {
+    const match = body.match(/\*\*Issue\*\*:\s*(.+)/);
+    return match ? match[1].trim() : body;
   }
 
   /**
