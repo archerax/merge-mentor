@@ -7,6 +7,7 @@ import type { CrossFileReviewResult, FileReviewResult } from "../../platforms/ty
 import { type Clock, type FileSystem, nodeFs, systemClock } from "../../ports/index.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import { delay } from "../shared/delay.js";
+import { getJsonSchema } from "../shared/jsonSchemas.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";
 import { inferPromptType, type PromptType } from "../shared/promptType.js";
 import {
@@ -24,149 +25,6 @@ import type {
   ReasoningEffort,
   TokenUsage,
 } from "../types.js";
-
-/** JSON schema for file review structured output. */
-const FILE_REVIEW_SCHEMA = {
-  type: "object",
-  properties: {
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          line: { type: "number", description: "Line number in the file" },
-          severity: {
-            type: "string",
-            description: "Finding severity: critical, high, medium, or low",
-          },
-          confidence: { type: "string", description: "Confidence level: high, medium, or low" },
-          category: {
-            type: "string",
-            description: "Finding category: bug, security, performance, quality, or documentation",
-          },
-          message: { type: "string", description: "Description of the finding" },
-          suggestion: { type: "string", description: "Suggested fix or improvement" },
-          reasoning: {
-            type: "string",
-            description: "Concise rationale citing code evidence, checked context, and impact",
-          },
-          isPreExisting: {
-            type: "boolean",
-            description: "Whether this issue existed before the PR changes",
-          },
-        },
-        required: ["line", "severity", "category", "message"],
-      },
-    },
-  },
-  required: ["findings"],
-} as const;
-
-/** JSON schema for cross-file review structured output. */
-const CROSS_FILE_REVIEW_SCHEMA = {
-  type: "object",
-  properties: {
-    overall_assessment: { type: "string", description: "Overall assessment of the PR" },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          severity: {
-            type: "string",
-            description: "Finding severity: critical, high, medium, or low",
-          },
-          confidence: { type: "string", description: "Confidence level: high, medium, or low" },
-          category: {
-            type: "string",
-            description:
-              "Category: architecture, design, testing, documentation, bug, security, performance, or quality",
-          },
-          message: { type: "string", description: "Description of the finding" },
-          reasoning: {
-            type: "string",
-            description:
-              "Concise rationale citing cross-file evidence, checked context, and impact",
-          },
-          affected_files: {
-            type: "array",
-            items: { type: "string" },
-            description: "List of affected file paths",
-          },
-        },
-        required: ["severity", "category", "message"],
-      },
-    },
-    recommendations: {
-      type: "array",
-      items: { type: "string" },
-      description: "Actionable recommendations",
-    },
-  },
-  required: ["findings"],
-} as const;
-
-/** JSON schema for batched file review structured output. */
-const BATCHED_FILE_REVIEW_SCHEMA = {
-  type: "object",
-  properties: {
-    file_results: {
-      type: "object",
-      description: "Map of filename to review results",
-      additionalProperties: {
-        type: "object",
-        properties: {
-          findings: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                line: { type: "number" },
-                severity: { type: "string" },
-                confidence: { type: "string" },
-                category: { type: "string" },
-                message: { type: "string" },
-                suggestion: { type: "string" },
-                reasoning: { type: "string" },
-                isPreExisting: { type: "boolean" },
-              },
-              required: ["line", "severity", "category", "message"],
-            },
-          },
-        },
-        required: ["findings"],
-      },
-    },
-  },
-  required: ["file_results"],
-} as const;
-
-/** JSON schema for fast review structured output. */
-const FAST_REVIEW_SCHEMA = {
-  type: "object",
-  properties: {
-    summary: { type: "string", description: "Brief summary of the review" },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          file: { type: "string", description: "File path (omit for cross-file findings)" },
-          line: { type: "number", description: "Line number in the file" },
-          severity: { type: "string" },
-          confidence: { type: "string" },
-          category: { type: "string" },
-          message: { type: "string" },
-          suggestion: { type: "string" },
-          reasoning: { type: "string" },
-          isPreExisting: { type: "boolean" },
-        },
-        required: ["severity", "category", "message"],
-      },
-    },
-  },
-  required: ["findings"],
-} as const;
 
 /**
  * AI provider implementation using the @anthropic-ai/claude-agent-sdk package.
@@ -230,7 +88,7 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
     }
 
     const promptType: PromptType = options?.promptType ?? inferPromptType(prompt);
-    const schema = this.getJsonSchema(promptType);
+    const schema = getJsonSchema(promptType);
     let lastError: Error | null = null;
     let accumulatedUsage: TokenUsage | undefined;
 
@@ -276,21 +134,6 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
       { cause: lastError ?? undefined }
     );
-  }
-
-  private getJsonSchema(promptType: PromptType): Record<string, unknown> | undefined {
-    switch (promptType) {
-      case "file-review":
-        return FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
-      case "cross-file-review":
-        return CROSS_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
-      case "batched-file-review":
-        return BATCHED_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
-      case "fast-review":
-        return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
-      default:
-        return undefined;
-    }
   }
 
   private async getQueryFn() {
