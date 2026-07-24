@@ -1,5 +1,4 @@
 import type { AIProviderType } from "../ai/types.js";
-import { detectCIEnvironment } from "../ci/index.js";
 import { loadConfig, type Platform, validateConfig } from "../config.js";
 import { initLogger, logger } from "../logger.js";
 import { AzureDevOpsAdapter } from "../platforms/azure.js";
@@ -7,7 +6,7 @@ import { GitHubAdapter } from "../platforms/github.js";
 import type { PlatformAdapter } from "../platforms/types.js";
 import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
 import { ReviewEngine } from "../review/engine.js";
-import { mergeCIContext } from "./review.js";
+import { ensureCIContext } from "./shared/ci.js";
 import type { DescribeExecutionResult, DescribeOptions, ProgramDeps } from "./types.js";
 
 export async function executeDescribe(
@@ -18,27 +17,7 @@ export async function executeDescribe(
   const env = deps.env ?? processEnvironment;
 
   // Resolve CI context when --ci flag is set
-  let resolvedOptions = options;
-  if (options.ci) {
-    const ciContext = detectCIEnvironment(env);
-    if (!ciContext) {
-      throw new Error(
-        "--ci flag was set but no supported CI environment was detected. " +
-          "Expected GITHUB_ACTIONS=true (GitHub Actions) or TF_BUILD=True (Azure Pipelines)."
-      );
-    }
-    output.log(`\n🤖 CI mode: detected ${ciContext.ciSystem}\n`);
-
-    // Pre-load MM_* token overrides from env so they take priority over
-    // CI-detected tokens (e.g. SYSTEM_ACCESSTOKEN may lack permission to
-    // post PR comments; users can supply a PAT via MM_AZURE_TOKEN instead).
-    const optionsWithEnvTokens: DescribeOptions = {
-      ...options,
-      azureToken: options.azureToken ?? (env.get("MM_AZURE_TOKEN") || undefined),
-      githubToken: options.githubToken ?? (env.get("MM_GITHUB_TOKEN") || undefined),
-    };
-    resolvedOptions = mergeCIContext(optionsWithEnvTokens, ciContext) as DescribeOptions;
-  }
+  const resolvedOptions = ensureCIContext(options, { output, env });
 
   if (resolvedOptions.pr === undefined) {
     throw new Error(

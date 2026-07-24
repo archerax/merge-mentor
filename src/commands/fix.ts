@@ -4,14 +4,13 @@ import readline from "node:readline/promises";
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import { createAIProvider } from "../ai/providerFactory.js";
 import type { AIProviderType } from "../ai/types.js";
-import { detectCIEnvironment } from "../ci/index.js";
 import { loadConfig, type Platform, validateConfig } from "../config.js";
 import { initLogger } from "../logger.js";
 import { AzureDevOpsAdapter } from "../platforms/azure.js";
 import { GitHubAdapter } from "../platforms/github.js";
 import type { PlatformAdapter } from "../platforms/types.js";
 import { consoleOutputWriter, type OutputWriter, processEnvironment } from "../ports/index.js";
-import { mergeCIContext } from "./review.js";
+import { ensureCIContext } from "./shared/ci.js";
 import type { FixOptions, ProgramDeps } from "./types.js";
 
 /**
@@ -91,15 +90,7 @@ export async function executeFixCommand(
   const outputWriter = deps.output ?? consoleOutputWriter;
   const env = deps.env ?? processEnvironment;
 
-  let resolvedOptions = options;
-  if (options.ci) {
-    const ciContext = detectCIEnvironment(env);
-    if (!ciContext) {
-      throw new Error("--ci flag was set but no supported CI environment was detected.");
-    }
-    outputWriter.log(`\n🤖 CI mode: detected ${ciContext.ciSystem}\n`);
-    resolvedOptions = mergeCIContext(options, ciContext);
-  }
+  const resolvedOptions = ensureCIContext(options, { output: outputWriter, env });
 
   if (resolvedOptions.pr === undefined) {
     throw new Error(

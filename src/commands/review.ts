@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AIProviderType } from "../ai/types.js";
-import { type CIContext, detectCIEnvironment } from "../ci/index.js";
 import {
   loadConfig,
   type Platform,
@@ -19,29 +18,8 @@ import { ReviewEngine, type ReviewResult } from "../review/engine.js";
 import { formatReviewPasses, formatReviewTypeLabel } from "../review/reviewSelection.js";
 import { generatePRIdentifier, sanitizeProjectName } from "../utils/prIdentifier.js";
 import { formatTokenUsage } from "../utils/tokenUsage.js";
+import { ensureCIContext } from "./shared/ci.js";
 import type { ProgramDeps, ReviewExecutionResult, ReviewOptions } from "./types.js";
-
-/**
- * Merges a resolved CI context into review options.
- * Explicit CLI flags always take priority over CI-detected values.
- * In CI mode, `write` defaults to `true` (post comments) unless explicitly overridden.
- */
-export function mergeCIContext(options: ReviewOptions, ci: CIContext): ReviewOptions {
-  return {
-    ...options,
-    pr: options.pr ?? ci.prNumber,
-    platform: options.platform ?? ci.platform,
-    write: options.write ?? true,
-    localWorkspacePath: options.localWorkspacePath ?? ci.workspacePath,
-    githubToken: options.githubToken ?? ci.githubToken,
-    githubRepoOwner: options.githubRepoOwner ?? ci.githubOwner,
-    githubRepoName: options.githubRepoName ?? ci.githubRepo,
-    azureToken: options.azureToken ?? ci.azureToken,
-    azureOrg: options.azureOrg ?? ci.azureOrg,
-    azureProject: options.azureProject ?? ci.azureProject,
-    azureRepo: options.azureRepo ?? ci.azureRepo,
-  };
-}
 
 /**
  * Execute the review command logic.
@@ -55,27 +33,7 @@ export async function executeReview(
   const env = deps.env ?? processEnvironment;
 
   // Resolve CI context when --ci flag is set
-  let resolvedOptions = options;
-  if (options.ci) {
-    const ciContext = detectCIEnvironment(env);
-    if (!ciContext) {
-      throw new Error(
-        "--ci flag was set but no supported CI environment was detected. " +
-          "Expected GITHUB_ACTIONS=true (GitHub Actions) or TF_BUILD=True (Azure Pipelines)."
-      );
-    }
-    output.log(`\n🤖 CI mode: detected ${ciContext.ciSystem}\n`);
-
-    // Pre-load MM_* token overrides from env so they take priority over
-    // CI-detected tokens (e.g. SYSTEM_ACCESSTOKEN may lack permission to
-    // post PR comments; users can supply a PAT via MM_AZURE_TOKEN instead).
-    const optionsWithEnvTokens: ReviewOptions = {
-      ...options,
-      azureToken: options.azureToken ?? (env.get("MM_AZURE_TOKEN") || undefined),
-      githubToken: options.githubToken ?? (env.get("MM_GITHUB_TOKEN") || undefined),
-    };
-    resolvedOptions = mergeCIContext(optionsWithEnvTokens, ciContext);
-  }
+  const resolvedOptions = ensureCIContext(options, { output, env });
 
   if (resolvedOptions.pr === undefined) {
     throw new Error(
