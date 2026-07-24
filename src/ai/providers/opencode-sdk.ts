@@ -2,7 +2,7 @@ import path from "node:path";
 import { createOpencode } from "@opencode-ai/sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
-import { AIProviderError, JsonParseError, ValidationError } from "../../errors/index.js";
+import { AIProviderError, ValidationError } from "../../errors/index.js";
 import { createChildLogger } from "../../logger.js";
 import type {
   CrossFileFinding,
@@ -17,6 +17,10 @@ import {
   FastReviewResponseSchema,
   FileReviewResponseSchema,
 } from "../schemas.js";
+import { delay } from "../shared/delay.js";
+import { parseJsonResponse } from "../shared/parseJsonResponse.js";
+import { inferPromptType, type PromptType } from "../shared/promptType.js";
+import { validateReasoning } from "../shared/validateReasoning.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -24,14 +28,6 @@ import type {
   ExecutePromptOptions,
   FastReviewResult,
 } from "../types.js";
-
-/** Detected prompt type used for schema selection and audit logging. */
-type PromptType =
-  | "file-review"
-  | "cross-file-review"
-  | "batched-file-review"
-  | "fast-review"
-  | "unknown";
 
 /** JSON schema for file review structured output. */
 const FILE_REVIEW_SCHEMA = {
@@ -245,7 +241,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       throw new ValidationError("prompt", "Prompt cannot be empty.");
     }
 
-    const promptType: PromptType = options?.promptType ?? this.inferPromptType(prompt);
+    const promptType: PromptType = options?.promptType ?? inferPromptType(prompt);
     const schema = this.getJsonSchema(promptType);
     let lastError: Error | null = null;
 
@@ -266,7 +262,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           "OpenCode SDK execution attempt failed"
         );
         if (attempt < this.maxRetries - 1) {
-          await this.delay(RETRY_DELAY_BASE_MS * (attempt + 1));
+          await delay(RETRY_DELAY_BASE_MS * (attempt + 1));
         }
       }
     }
@@ -283,14 +279,6 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       `Failed after ${this.maxRetries} attempts: ${lastError?.message}`,
       { cause: lastError ?? undefined }
     );
-  }
-
-  private inferPromptType(prompt: string): PromptType {
-    if (prompt.includes("file_results")) return "batched-file-review";
-    if (prompt.includes("cross-file")) return "cross-file-review";
-    if (prompt.includes("Review the following file")) return "file-review";
-    if (prompt.includes("fast") && prompt.includes("review")) return "fast-review";
-    return "unknown";
   }
 
   private getJsonSchema(promptType: PromptType): Record<string, unknown> | undefined {
@@ -458,7 +446,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         throw new AIProviderError("opencode-sdk", "No content in response from OpenCode SDK");
       }
 
-      const parsed = this.parseJsonResponse(rawText);
+      const parsed = parseJsonResponse(rawText);
 
       await this.saveTranscript({
         prompt,
@@ -562,69 +550,6 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     }
   }
 
-  private parseJsonResponse(raw: string): unknown {
-    const markdownMatch = raw.match(/```json\n([\s\S]*?)\n```/);
-    if (markdownMatch) {
-      try {
-        return JSON.parse(markdownMatch[1]);
-      } catch {
-        // Fall through to regex extraction
-      }
-    }
-
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new JsonParseError("No JSON object found in response", raw);
-    }
-
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (error) {
-      throw new JsonParseError((error as Error).message, raw);
-    }
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private validateReasoning(
-    reasoning: string,
-    filename: string,
-    lineOrLocation: string | number
-  ): void {
-    const minLength = 20;
-    const location = typeof lineOrLocation === "number" ? `line ${lineOrLocation}` : lineOrLocation;
-
-    if (reasoning.length < minLength) {
-      this.logger.warn(
-        {
-          filename,
-          location,
-          reasoningLength: reasoning.length,
-          reasoning: reasoning.substring(0, 100),
-        },
-        `Reasoning too short (need ${minLength}+ chars) - finding may lack enough evidence`
-      );
-    }
-
-    const evidencePattern =
-      /line|lines|context|call|query|input|output|state|branch|path|file|diff|import|return|value|guard|validation|check|middleware|parameter|request|response|token|cache|loop|dependency|array|object|function/i;
-    const impactPattern =
-      /crash|error|fail|incorrect|wrong|stale|leak|latency|slow|outage|risk|vulnerab|expos|bypass|break|corrupt|deadlock|race|allow|cause|impact|inconsistent|timeout/i;
-
-    if (!evidencePattern.test(reasoning) || !impactPattern.test(reasoning)) {
-      this.logger.warn(
-        {
-          filename,
-          location,
-          reasoning: reasoning.substring(0, 150),
-        },
-        "Reasoning should briefly cite the code evidence and the concrete impact"
-      );
-    }
-  }
-
   /**
    * Parses an OpenCode SDK response into a file review result.
    */
@@ -639,7 +564,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
     const data = result.success ? result.data : { findings: [] };
     const findings: FileFinding[] = data.findings.map((finding) => {
-      this.validateReasoning(finding.reasoning, filename, finding.line);
+      validateReasoning(this.logger, finding.reasoning, filename, finding.line);
       return {
         line: finding.line,
         severity: finding.severity,
@@ -670,7 +595,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
     const findings: CrossFileFinding[] = data.findings.map((finding) => {
       const affectedFilesStr = finding.affected_files.join(", ") || "unknown";
-      this.validateReasoning(finding.reasoning, "cross-file", affectedFilesStr);
+      validateReasoning(this.logger, finding.reasoning, "cross-file", affectedFilesStr);
       return {
         severity: finding.severity,
         confidence: finding.confidence,
@@ -705,7 +630,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
     for (const [filename, fileData] of Object.entries(data.file_results)) {
       const findings: FileFinding[] = fileData.findings.map((finding) => {
-        this.validateReasoning(finding.reasoning, filename, finding.line);
+        validateReasoning(this.logger, finding.reasoning, filename, finding.line);
         return {
           line: finding.line,
           severity: finding.severity,
@@ -741,7 +666,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       const file = finding.file;
       const line = finding.line;
       const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
-      this.validateReasoning(finding.reasoning, context, line || "general");
+      validateReasoning(this.logger, finding.reasoning, context, line || "general");
 
       if (file) {
         if (!fileFindings.has(file)) {
