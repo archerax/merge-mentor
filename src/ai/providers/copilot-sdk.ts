@@ -34,6 +34,7 @@ import {
   parseFastReview as parseFastReviewShared,
   parseFileReview as parseFileReviewShared,
 } from "../shared/responseParsers.js";
+import { saveTranscript } from "../shared/saveTranscript.js";
 import {
   createPostCommentTool,
   FindingsCollector,
@@ -574,6 +575,51 @@ export class CopilotSdkProvider implements AIProviderClient {
     }
   }
 
+  private formatSessionTimeline(events: SessionEvent[]): string[] {
+    const lines: string[] = [];
+    for (const event of events) {
+      const timeStr = event.timestamp ? `[${event.timestamp}]` : "";
+      switch (event.type) {
+        case "assistant.reasoning":
+          lines.push(`${timeStr} [REASONING]: ${event.data.content}`);
+          break;
+        case "assistant.reasoning_delta":
+          lines.push(`${timeStr} [REASONING DELTA]: ${event.data.deltaContent}`);
+          break;
+        case "assistant.message":
+          lines.push(`${timeStr} [MESSAGE]: ${event.data.content}`);
+          break;
+        case "assistant.message_delta":
+          lines.push(`${timeStr} [MESSAGE DELTA]: ${event.data.deltaContent}`);
+          break;
+        case "tool.execution_start":
+          lines.push(
+            `${timeStr} [TOOL CALL START] ${event.data.toolName} (Call ID: ${event.data.toolCallId})`,
+            `  Arguments: ${JSON.stringify(event.data.arguments || {}, null, 2)}`
+          );
+          break;
+        case "tool.execution_complete":
+          lines.push(
+            `${timeStr} [TOOL CALL COMPLETE] (Call ID: ${event.data.toolCallId})`,
+            `  Success: ${event.data.success}`,
+            `  Result: ${JSON.stringify(event.data.result || {}, null, 2)}`,
+            event.data.error ? `  Error: ${JSON.stringify(event.data.error)}` : ""
+          );
+          break;
+        case "session.error":
+          lines.push(
+            `${timeStr} [SESSION ERROR] Type: ${event.data.errorType} - Message: ${event.data.message}`,
+            event.data.stack ? `  Stack: ${event.data.stack}` : ""
+          );
+          break;
+        default:
+          lines.push(`${timeStr} [EVENT: ${event.type}]`);
+          break;
+      }
+    }
+    return lines;
+  }
+
   private async saveTranscript(data: {
     prompt: string;
     events: SessionEvent[];
@@ -584,108 +630,22 @@ export class CopilotSdkProvider implements AIProviderClient {
     error?: string;
     attempt: number;
   }): Promise<void> {
-    try {
-      const transcriptDir = path.join(this.tempPath, "transcripts");
-      await this.fileSystem.mkdir(transcriptDir, { recursive: true });
-
-      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
-      const status = data.success ? "success" : "failure";
-      const filename = `transcript-sdk-${timestamp}-attempt-${data.attempt}-${status}.txt`;
-      const filepath = path.join(transcriptDir, filename);
-
-      const transcriptLines: string[] = [
-        "=".repeat(80),
-        "COPILOT SDK PROVIDER TRANSCRIPT",
-        "=".repeat(80),
-        `Timestamp: ${this.clock.timestamp()}`,
-        `Status: ${status}`,
-        `Model: ${this.model || "default"}`,
-        `Attempt: ${data.attempt}`,
-        data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
-        "",
-        "=".repeat(80),
-        "INPUT PROMPT",
-        "=".repeat(80),
-        data.prompt,
-        "",
-        "=".repeat(80),
-        "SESSION TIMELINE",
-        "=".repeat(80),
-      ];
-
-      for (const event of data.events) {
-        const timeStr = event.timestamp ? `[${event.timestamp}]` : "";
-        switch (event.type) {
-          case "assistant.reasoning":
-            transcriptLines.push(`${timeStr} [REASONING]: ${event.data.content}`);
-            break;
-          case "assistant.reasoning_delta":
-            transcriptLines.push(`${timeStr} [REASONING DELTA]: ${event.data.deltaContent}`);
-            break;
-          case "assistant.message":
-            transcriptLines.push(`${timeStr} [MESSAGE]: ${event.data.content}`);
-            break;
-          case "assistant.message_delta":
-            transcriptLines.push(`${timeStr} [MESSAGE DELTA]: ${event.data.deltaContent}`);
-            break;
-          case "tool.execution_start":
-            transcriptLines.push(
-              `${timeStr} [TOOL CALL START] ${event.data.toolName} (Call ID: ${event.data.toolCallId})`,
-              `  Arguments: ${JSON.stringify(event.data.arguments || {}, null, 2)}`
-            );
-            break;
-          case "tool.execution_complete":
-            transcriptLines.push(
-              `${timeStr} [TOOL CALL COMPLETE] (Call ID: ${event.data.toolCallId})`,
-              `  Success: ${event.data.success}`,
-              `  Result: ${JSON.stringify(event.data.result || {}, null, 2)}`,
-              event.data.error ? `  Error: ${JSON.stringify(event.data.error)}` : ""
-            );
-            break;
-          case "session.error":
-            transcriptLines.push(
-              `${timeStr} [SESSION ERROR] Type: ${event.data.errorType} - Message: ${event.data.message}`,
-              event.data.stack ? `  Stack: ${event.data.stack}` : ""
-            );
-            break;
-          default:
-            transcriptLines.push(`${timeStr} [EVENT: ${event.type}]`);
-            break;
-        }
+    return saveTranscript(
+      {
+        fileSystem: this.fileSystem,
+        clock: this.clock,
+        logger: this.logger,
+        tempPath: this.tempPath,
+        providerLabel: "COPILOT SDK PROVIDER TRANSCRIPT",
+        filePrefix: "transcript-sdk",
+        displayName: "Copilot SDK",
+        model: this.model,
+      },
+      {
+        ...data,
+        timeline: this.formatSessionTimeline(data.events),
       }
-
-      transcriptLines.push(
-        "",
-        "=".repeat(80),
-        "RAW RESPONSE",
-        "=".repeat(80),
-        data.rawResponse || "(empty)",
-        "",
-        "=".repeat(80),
-        "JSON OUTPUT",
-        "=".repeat(80),
-        data.jsonOutput || "(empty)"
-      );
-
-      if (data.error) {
-        transcriptLines.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
-      }
-
-      transcriptLines.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
-
-      await this.fileSystem.writeFile(
-        filepath,
-        transcriptLines.filter((line) => line !== undefined).join("\n"),
-        "utf-8"
-      );
-
-      this.logger.debug(
-        { filepath, success: data.success, attempt: data.attempt },
-        "Saved Copilot SDK transcript for debugging"
-      );
-    } catch (err) {
-      this.logger.warn({ error: (err as Error).message }, "Failed to save SDK transcript");
-    }
+    );
   }
 
   private isSessionIdleTimeout(error: unknown): boolean {

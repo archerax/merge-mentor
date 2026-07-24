@@ -16,6 +16,7 @@ import {
   parseFastReview as parseFastReviewShared,
   parseFileReview as parseFileReviewShared,
 } from "../shared/responseParsers.js";
+import { saveTranscript } from "../shared/saveTranscript.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -321,55 +322,19 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     error?: string;
     attempt: number;
   }): Promise<void> {
-    try {
-      const transcriptDir = path.join(this.tempPath, "transcripts");
-      await this.fileSystem.mkdir(transcriptDir, { recursive: true });
-
-      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
-      const status = data.success ? "success" : "failure";
-      const filename = `transcript-opencode-${timestamp}-attempt-${data.attempt}-${status}.txt`;
-      const filepath = path.join(transcriptDir, filename);
-
-      const transcriptLines: string[] = [
-        "=".repeat(80),
-        "OPENCODE SDK PROVIDER TRANSCRIPT",
-        "=".repeat(80),
-        `Timestamp: ${this.clock.timestamp()}`,
-        `Status: ${status}`,
-        `Model: ${this.model || "default"}`,
-        `Attempt: ${data.attempt}`,
-        "",
-        "=".repeat(80),
-        "INPUT PROMPT",
-        "=".repeat(80),
-        data.prompt,
-        "",
-        "=".repeat(80),
-        "RAW API RESPONSE",
-        "=".repeat(80),
-        data.rawResponse || "(empty)",
-        "",
-        "=".repeat(80),
-        "JSON OUTPUT",
-        "=".repeat(80),
-        data.jsonOutput || "(empty)",
-      ];
-
-      if (data.error) {
-        transcriptLines.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
-      }
-
-      transcriptLines.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
-
-      await this.fileSystem.writeFile(filepath, transcriptLines.join("\n"), "utf-8");
-
-      this.logger.debug(
-        { filepath, success: data.success, attempt: data.attempt },
-        "Saved OpenCode SDK transcript for debugging"
-      );
-    } catch (err) {
-      this.logger.warn({ error: (err as Error).message }, "Failed to save OpenCode SDK transcript");
-    }
+    return saveTranscript(
+      {
+        fileSystem: this.fileSystem,
+        clock: this.clock,
+        logger: this.logger,
+        tempPath: this.tempPath,
+        providerLabel: "OPENCODE SDK PROVIDER TRANSCRIPT",
+        filePrefix: "transcript-opencode",
+        displayName: "OpenCode SDK",
+        model: this.model,
+      },
+      data
+    );
   }
 
   private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

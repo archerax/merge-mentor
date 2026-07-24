@@ -16,6 +16,7 @@ import {
   parseFastReview as parseFastReviewShared,
   parseFileReview as parseFileReviewShared,
 } from "../shared/responseParsers.js";
+import { saveTranscript } from "../shared/saveTranscript.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -425,6 +426,44 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
     }
   }
 
+  private formatSessionTimeline(events: unknown[]): string[] {
+    const lines: string[] = [];
+    for (const event of events) {
+      const ev = event as Record<string, unknown>;
+      const timeStr = typeof ev.timestamp === "string" ? `[${ev.timestamp}]` : "";
+      if (ev.type === "stream_event") {
+        const streamEvent = ev.event as Record<string, unknown> | undefined;
+        if (streamEvent && streamEvent.type === "content_block_delta") {
+          const delta = streamEvent.delta as Record<string, unknown> | undefined;
+          if (delta && typeof delta.text === "string") {
+            lines.push(`${timeStr} [STREAM DELTA]: ${delta.text}`);
+          }
+        } else if (streamEvent && streamEvent.type === "content_block_start") {
+          const contentBlock = streamEvent.content_block as Record<string, unknown> | undefined;
+          const blockType = (contentBlock?.type as string) ?? "unknown";
+          lines.push(`${timeStr} [STREAM START]: block type ${blockType}`);
+        } else if (streamEvent) {
+          lines.push(`${timeStr} [STREAM EVENT]: ${streamEvent.type as string}`);
+        }
+      } else if (ev.type === "result") {
+        lines.push(`${timeStr} [RESULT]: subtype=${(ev.subtype as string) ?? "unknown"}`);
+      } else if (ev.type === "tool_use") {
+        lines.push(
+          `${timeStr} [TOOL USE] ${(ev.name as string) ?? "unknown"} (Call ID: ${(ev.id as string) ?? "unknown"})`,
+          `  Arguments: ${JSON.stringify((ev.input as Record<string, unknown>) || {}, null, 2)}`
+        );
+      } else if (ev.type === "tool_result") {
+        lines.push(
+          `${timeStr} [TOOL RESULT] (Call ID: ${(ev.tool_use_id as string) ?? "unknown"})`,
+          `  Output: ${JSON.stringify(ev.output || {}, null, 2)}`
+        );
+      } else {
+        lines.push(`${timeStr} [MESSAGE: ${ev.type as string}] ${JSON.stringify(ev)}`);
+      }
+    }
+    return lines;
+  }
+
   private async saveTranscript(data: {
     prompt: string;
     events?: unknown[];
@@ -435,103 +474,22 @@ export class ClaudeAgentSdkProvider implements AIProviderClient {
     error?: string;
     attempt: number;
   }): Promise<void> {
-    try {
-      const transcriptDir = path.join(this.tempPath, "transcripts");
-      await this.fileSystem.mkdir(transcriptDir, { recursive: true });
-
-      const timestamp = this.clock.timestamp().replace(/[:.]/g, "-");
-      const status = data.success ? "success" : "failure";
-      const filename = `transcript-claude-agent-${timestamp}-attempt-${data.attempt}-${status}.txt`;
-      const filepath = path.join(transcriptDir, filename);
-
-      const transcriptLines: string[] = [
-        "=".repeat(80),
-        "CLAUDE AGENT SDK PROVIDER TRANSCRIPT",
-        "=".repeat(80),
-        `Timestamp: ${this.clock.timestamp()}`,
-        `Status: ${status}`,
-        `Model: ${this.model || "default"}`,
-        `Attempt: ${data.attempt}`,
-        data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
-        "",
-        "=".repeat(80),
-        "INPUT PROMPT",
-        "=".repeat(80),
-        data.prompt,
-      ];
-
-      if (data.events && data.events.length > 0) {
-        transcriptLines.push("", "=".repeat(80), "SESSION TIMELINE", "=".repeat(80));
-        for (const event of data.events) {
-          const ev = event as Record<string, unknown>;
-          const timeStr = typeof ev.timestamp === "string" ? `[${ev.timestamp}]` : "";
-          if (ev.type === "stream_event") {
-            const streamEvent = ev.event as Record<string, unknown> | undefined;
-            if (streamEvent && streamEvent.type === "content_block_delta") {
-              const delta = streamEvent.delta as Record<string, unknown> | undefined;
-              if (delta && typeof delta.text === "string") {
-                transcriptLines.push(`${timeStr} [STREAM DELTA]: ${delta.text}`);
-              }
-            } else if (streamEvent && streamEvent.type === "content_block_start") {
-              const contentBlock = streamEvent.content_block as Record<string, unknown> | undefined;
-              const blockType = (contentBlock?.type as string) ?? "unknown";
-              transcriptLines.push(`${timeStr} [STREAM START]: block type ${blockType}`);
-            } else if (streamEvent) {
-              transcriptLines.push(`${timeStr} [STREAM EVENT]: ${streamEvent.type as string}`);
-            }
-          } else if (ev.type === "result") {
-            transcriptLines.push(
-              `${timeStr} [RESULT]: subtype=${(ev.subtype as string) ?? "unknown"}`
-            );
-          } else if (ev.type === "tool_use") {
-            transcriptLines.push(
-              `${timeStr} [TOOL USE] ${(ev.name as string) ?? "unknown"} (Call ID: ${(ev.id as string) ?? "unknown"})`,
-              `  Arguments: ${JSON.stringify((ev.input as Record<string, unknown>) || {}, null, 2)}`
-            );
-          } else if (ev.type === "tool_result") {
-            transcriptLines.push(
-              `${timeStr} [TOOL RESULT] (Call ID: ${(ev.tool_use_id as string) ?? "unknown"})`,
-              `  Output: ${JSON.stringify(ev.output || {}, null, 2)}`
-            );
-          } else {
-            transcriptLines.push(
-              `${timeStr} [MESSAGE: ${ev.type as string}] ${JSON.stringify(ev)}`
-            );
-          }
-        }
+    return saveTranscript(
+      {
+        fileSystem: this.fileSystem,
+        clock: this.clock,
+        logger: this.logger,
+        tempPath: this.tempPath,
+        providerLabel: "CLAUDE AGENT SDK PROVIDER TRANSCRIPT",
+        filePrefix: "transcript-claude-agent",
+        displayName: "Claude Agent SDK",
+        model: this.model,
+      },
+      {
+        ...data,
+        timeline: data.events ? this.formatSessionTimeline(data.events) : undefined,
       }
-
-      transcriptLines.push(
-        "",
-        "=".repeat(80),
-        "RAW API RESPONSE",
-        "=".repeat(80),
-        data.rawResponse || "(empty)",
-        "",
-        "=".repeat(80),
-        "JSON OUTPUT",
-        "=".repeat(80),
-        data.jsonOutput || "(empty)"
-      );
-
-      if (data.error) {
-        transcriptLines.push("", "=".repeat(80), "ERROR", "=".repeat(80), data.error);
-      }
-
-      transcriptLines.push("", "=".repeat(80), "END OF TRANSCRIPT", "=".repeat(80));
-
-      await this.fileSystem.writeFile(filepath, transcriptLines.join("\n"), "utf-8");
-
-      this.logger.debug(
-        { filepath, success: data.success, attempt: data.attempt },
-        "Saved Claude Agent SDK transcript for debugging"
-      );
-    } catch (err) {
-      this.logger.warn(
-        { error: (err as Error).message },
-        "Failed to save Claude Agent SDK transcript"
-      );
-    }
+    );
   }
 
   /**
