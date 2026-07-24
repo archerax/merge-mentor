@@ -20,11 +20,11 @@
 
 ## Quarter overview
 
-| Month   | Theme                        | Release                  | Headline outcome                                                         |
-| ------- | ---------------------------- | ------------------------ | ------------------------------------------------------------------------ |
-| Jul–Aug | Trust Foundation             | `2.10.1` (wk 1) → `2.11` | Critical RCE patched ≤ 7 days; all Critical+High audit findings closed   |
-| Sep     | Reliability & Signal Quality | `2.12`                   | Comment dedup shipped; structural debt burned down; eval corpus started  |
-| Oct     | Conversation & Confidence    | **`3.0`**                | `reply` command; secure-by-default becomes the only mode; eval gate live |
+| Month   | Theme                        | Release                  | Headline outcome                                                       |
+| ------- | ---------------------------- | ------------------------ | ---------------------------------------------------------------------- |
+| Jul–Aug | Trust Foundation             | `2.10.1` (wk 1) → `2.11` | Critical RCE patched ≤ 7 days; all Critical+High audit findings closed |
+| Sep     | Reliability & Signal Quality | `2.12`                   | Comment dedup shipped; structural debt burned down                     |
+| Oct     | Conversation & Confidence    | **`3.0`**                | `reply` command; secure-by-default becomes the only mode               |
 
 ## Month 1 — Trust Foundation (2026-07-22 → 2026-08-31)
 
@@ -47,7 +47,6 @@
 - Ship [hybrid zero-dependency comment deduplication](./hybrid-zero-dependency-deduplication-plan.md) (line-shift + rewording resilient) — the top perceived-quality win.
 - Burn down structural debt incrementally (no big-bang refactor): staged split of the `ReviewEngine` god object, de-duplicate the three-way CLI/provider copy-paste, bring the CLI layer to test parity.
 - False-positive tuning pass on review prompts.
-- Start the golden-PR eval corpus (known-issue PRs used to measure review quality locally).
 - Deprecation warnings for anything v3.0 will remove.
 
 **Exit criteria:** dedup shipped; branch coverage ≥ 85%; no release-blocking refactor in flight.
@@ -57,19 +56,19 @@
 - Ship the [interactive comment loop](./interactive-comment-loop-plan.md) (`reply` command): respond to PR comment threads on both GitHub and Azure DevOps, auto-resolve threads when fixed.
   - **Security gate:** `reply` ingests the same untrusted-input class as `fix` (PR comments) and must be built on Month 1's security framework; a threat-model review is required before merge.
 - v3.0 removes the insecure auto-approve path entirely — secure-by-default becomes the only mode. Migration guide in the release notes.
-- Eval harness becomes a CI regression gate on all prompt/engine changes.
 - Community flywheel: good-first-issues labeled, issue templates, first external-contributor push.
 
-**Exit criteria:** `reply` shipped on both platforms; eval gate blocking; v3.0 migration guide published.
+**Exit criteria:** `reply` shipped on both platforms; v3.0 migration guide published.
 
 ## Metrics (local/public only — no telemetry)
 
 - **Security:** 0 open Critical/High findings, sustained all quarter.
-- **Quality:** eval-corpus false-positive and duplicate-comment rates (measured before/after dedup); branch coverage ≥ 85%.
+- **Quality:** duplicate-comment rate (measured before/after dedup); branch coverage ≥ 85%.
 - **Adoption proxies (public data):** npm weekly downloads +30% vs. July baseline, upgrade velocity to latest version, median issue time-to-close < 7 days, first external contributor PR merged.
 
 ## Explicitly cut this quarter
 
+- Golden-PR eval corpus & CI harness (deferred to future milestone — see [plan](./golden-pr-eval-corpus-plan.md))
 - Codebase semantic search (parked — see below)
 - GitLab platform adapter
 - Any monetization surface (hosted dashboard, paid tiers)
@@ -77,6 +76,7 @@
 
 ## Parking lot
 
+- **Golden-PR eval corpus & harness** ([plan](./golden-pr-eval-corpus-plan.md)): deferred/parked to focus on immediate signal quality (deduplication) and threat-model safety. Architectural plan retained for future scheduling.
 - **Codebase semantic search** ([plan](./codebase-semantic-search-plan.md)): cut 2026-07-22. Rationale: full-codebase context is table stakes among competitors (Greptile, CodeRabbit, Copilot) rather than a differentiator; it partially duplicates provider-native capabilities (Copilot SDK repo context; agent SDK read tools); and the maintenance surface (local ONNX embeddings, SQLite vector store, index freshness) is wrong for a solo team right now. **Revisit only with user evidence** that provider-native context is insufficient (e.g., self-hosted small models via Ollama/vLLM).
 - **Interactive comment loop** was the runner-up that replaced it as the Month 3 headline.
 
