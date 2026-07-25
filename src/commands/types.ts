@@ -108,3 +108,10 @@ export interface ProjectOptions {
   aiApiKey?: string;
   tempPath?: string;
 }
+
+export interface ReplyOptions extends ReviewOptions {
+  commentId?: string;
+  resolve?: boolean;
+  interactive?: boolean;
+  dryRun?: boolean;
+}

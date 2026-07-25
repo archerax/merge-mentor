@@ -611,6 +611,59 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  async getCommentThread(
+    prNumber: number,
+    commentId: string | number
+  ): Promise<UnresolvedCommentThread> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      const targetId = commentId.toString();
+      const thread = (threads || []).find(
+        (t) =>
+          t.id?.toString() === targetId || t.comments?.some((c) => c.id?.toString() === targetId)
+      );
+
+      if (!thread) {
+        throw new Error(`Comment thread "${commentId}" not found on PR #${prNumber}`);
+      }
+
+      const rawPath = thread.threadContext?.filePath || "";
+      const line = thread.threadContext?.rightFileStart?.line || 1;
+      const validComments = (thread.comments || []).filter((c) => !c.isDeleted);
+      const firstComment = validComments[0];
+
+      return {
+        id: thread.id?.toString() || "",
+        path: rawPath.startsWith("/") ? rawPath.slice(1) : rawPath,
+        line,
+        status:
+          thread.status === AzureThreadStatus.ACTIVE || thread.status === AzureThreadStatus.PENDING
+            ? "active"
+            : "resolved",
+        botInitiated: (firstComment?.content || "").includes(this.botIdentifier),
+        comments: validComments.map(
+          (c): UnresolvedComment => ({
+            id: c.id,
+            author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+            body: c.content || "",
+            createdAt: c.publishedDate ? c.publishedDate.toISOString() : undefined,
+            isBot: (c.content || "").includes(this.botIdentifier),
+          })
+        ),
+      };
+    } catch (error) {
+      this.logger.error(
+        { prNumber, commentId, error: (error as Error).message },
+        "Failed to fetch comment thread"
+      );
+      throw error;
+    }
+  }
+
   async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
     try {
       const gitApi = await this.connection.getGitApi();
@@ -626,18 +679,26 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         const line = thread.threadContext?.rightFileStart?.line;
 
         if (isUnresolved && path && line && thread.comments && thread.comments.length > 0) {
+          const validComments = thread.comments.filter((c) => !c.isDeleted);
+          const mappedComments: UnresolvedComment[] = validComments.map((c): UnresolvedComment => {
+            const isBot = (c.content || "").includes(this.botIdentifier);
+            return {
+              author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+              body: c.content || "",
+              ...(c.publishedDate ? { createdAt: c.publishedDate.toISOString() } : {}),
+              ...(isBot ? { isBot: true } : {}),
+            };
+          });
+
+          const firstComment = mappedComments[0];
+          const botInitiated = firstComment ? Boolean(firstComment.isBot) : false;
+
           unresolved.push({
             id: thread.id?.toString() || "",
             path,
             line,
-            comments: thread.comments
-              .filter((c) => !c.isDeleted)
-              .map(
-                (c): UnresolvedComment => ({
-                  author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
-                  body: c.content || "",
-                })
-              ),
+            comments: mappedComments,
+            ...(botInitiated ? { botInitiated: true } : {}),
           });
         }
       }
@@ -647,6 +708,72 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       this.logger.error(
         { prNumber, error: (error as Error).message },
         "Failed to fetch unresolved comment threads"
+      );
+      throw error;
+    }
+  }
+
+  async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const numericThreadId =
+        typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
+
+      if (Number.isNaN(numericThreadId)) {
+        throw new Error(`Invalid thread ID for Azure DevOps: "${threadId}"`);
+      }
+
+      const comment: Comment = {
+        content: body,
+        commentType: AzureCommentType.TEXT,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.createComment(comment, this.repoName, prNumber, numericThreadId, this.project)
+      );
+
+      this.logger.info({ prNumber, threadId }, "Comment reply posted successfully");
+      this.auditLogger.logInlineCommentPost(prNumber, "thread", 0, "azure", "success");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to post comment reply"
+      );
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        "thread",
+        0,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
+    try {
+      const gitApi = await this.connection.getGitApi();
+      const numericThreadId =
+        typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
+
+      if (Number.isNaN(numericThreadId)) {
+        throw new Error(`Invalid thread ID for Azure DevOps: "${threadId}"`);
+      }
+
+      const threadUpdate: GitPullRequestCommentThread = {
+        status: AzureThreadStatus.CLOSED,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.updateThread(threadUpdate, this.repoName, prNumber, numericThreadId, this.project)
+      );
+
+      this.logger.info({ prNumber, threadId }, "Comment thread resolved successfully");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to resolve comment thread"
       );
       throw error;
     }

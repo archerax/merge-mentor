@@ -95,6 +95,9 @@ export interface ExistingComment {
 export interface UnresolvedComment {
   readonly author: string;
   readonly body: string;
+  readonly id?: string | number;
+  readonly createdAt?: string;
+  readonly isBot?: boolean;
 }
 
 export interface UnresolvedCommentThread {
@@ -102,6 +105,8 @@ export interface UnresolvedCommentThread {
   readonly path: string;
   readonly line: number;
   readonly comments: readonly UnresolvedComment[];
+  readonly status?: "active" | "resolved";
+  readonly botInitiated?: boolean;
 }
 
 /** Action types for comment management. */
@@ -172,10 +177,32 @@ export interface PlatformAdapter {
   getExistingBotComments(prNumber: number): Promise<ExistingComment[]>;
 
   /**
+   * Retrieves a specific comment thread by comment or thread ID.
+   * @param prNumber - The PR number
+   * @param commentId - The comment or thread ID
+   */
+  getCommentThread(prNumber: number, commentId: string | number): Promise<UnresolvedCommentThread>;
+
+  /**
    * Retrieves all unresolved/active PR comment threads.
    * @param prNumber - The PR number
    */
   getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]>;
+
+  /**
+   * Posts a reply to an existing PR comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   * @param body - The reply message body
+   */
+  postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void>;
+
+  /**
+   * Resolves an unresolved PR comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   */
+  resolveCommentThread(prNumber: number, threadId: string | number): Promise<void>;
 
   /**
    * Posts an inline comment on a specific file line.
