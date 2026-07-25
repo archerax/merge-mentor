@@ -29,10 +29,10 @@ export function createAIProvider(
   type: AIProviderType,
   options?: AIProviderOptions
 ): AIProviderClient {
-  if (options?.experimentalTools && type !== "copilot-sdk") {
+  if (options?.experimentalTools && type !== "copilot-sdk" && type !== "opencode-sdk") {
     throw new ValidationError(
       "experimentalTools",
-      `Structured tool calling (--experimental-tools) is only supported by the "copilot-sdk" provider. Got: "${type}"`
+      `Structured tool calling (--experimental-tools) is only supported by "copilot-sdk" and "opencode-sdk". Got: "${type}"`
     );
   }
 

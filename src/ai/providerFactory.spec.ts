@@ -50,18 +50,25 @@ describe("createAIProvider", () => {
     expect(provider).toBeInstanceOf(ClaudeAgentSdkProvider);
   });
 
-  it("should throw ValidationError if experimentalTools is requested on non-copilot-sdk", () => {
+  it("should allow experimentalTools for opencode-sdk", () => {
+    const provider = createAIProvider("opencode-sdk", {
+      experimentalTools: true,
+    });
+    expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
+  });
+
+  it("should throw ValidationError if experimentalTools is requested on unsupported provider", () => {
     expect(() =>
-      createAIProvider("opencode-sdk", {
+      createAIProvider("claude-agent-sdk", {
         experimentalTools: true,
       })
     ).toThrow(ValidationError);
     expect(() =>
-      createAIProvider("opencode-sdk", {
+      createAIProvider("claude-agent-sdk", {
         experimentalTools: true,
       })
     ).toThrow(
-      'Structured tool calling (--experimental-tools) is only supported by the "copilot-sdk" provider. Got: "opencode-sdk"'
+      'Structured tool calling (--experimental-tools) is only supported by "copilot-sdk" and "opencode-sdk". Got: "claude-agent-sdk"'
     );
   });
 

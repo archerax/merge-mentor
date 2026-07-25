@@ -978,4 +978,125 @@ describe("OpenCodeSdkProvider", () => {
       expect(result.fileResults[0].findings[0].reasoning).toContain("unrelated things");
     });
   });
+
+  describe("experimentalTools tool calling", () => {
+    it("registers postComment tool in opencodeConfig when experimentalTools is true", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        experimentalTools: true,
+      });
+      mockSuccessfulPrompt({ findings: [] });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            tools: expect.objectContaining({
+              postComment: expect.objectContaining({
+                name: "postComment",
+              }),
+            }),
+          }),
+        })
+      );
+    });
+
+    it("captures tool findings during execution and combines with structured response", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        experimentalTools: true,
+      });
+
+      mockClient.session.prompt.mockImplementation(async () => {
+        const createCall = mockCreateOpencode.mock.calls[0][0];
+        const registeredTool = createCall.config.tools.postComment;
+        await registeredTool.handler({
+          file: "src/index.ts",
+          line: 42,
+          body: "Buffer overflow risk",
+          severity: "high",
+          category: "security",
+        });
+
+        return {
+          data: {
+            info: {
+              structured_output: {
+                findings: [
+                  {
+                    file: "src/other.ts",
+                    line: 1,
+                    severity: "low",
+                    category: "quality",
+                    message: "Unused var",
+                  },
+                ],
+              },
+            },
+            parts: [],
+          },
+        };
+      });
+
+      const resultPromise = provider.executePrompt("Review code");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      const parsed = result.parsed as { findings: Array<Record<string, unknown>> };
+      expect(parsed.findings).toHaveLength(2);
+      expect(parsed.findings[1]).toMatchObject({
+        file: "src/index.ts",
+        line: 42,
+        severity: "high",
+        category: "security",
+        message: "Buffer overflow risk",
+      });
+    });
+
+    it("converts tool findings on JSON parse failure when tool calls occurred", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        experimentalTools: true,
+      });
+
+      mockClient.session.prompt.mockImplementation(async () => {
+        const createCall = mockCreateOpencode.mock.calls[0][0];
+        const registeredTool = createCall.config.tools.postComment;
+        await registeredTool.handler({
+          file: "src/app.ts",
+          line: 10,
+          body: "Unhandled exception",
+          severity: "critical",
+          category: "bug",
+        });
+
+        return {
+          data: {
+            info: {},
+            parts: [{ type: "text", text: "Invalid non-json output" }],
+          },
+        };
+      });
+
+      const resultPromise = provider.executePrompt("Review code");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      const parsed = result.parsed as { summary: string; findings: Array<Record<string, unknown>> };
+      expect(parsed.summary).toContain("Collected 1 findings via tool calls");
+      expect(parsed.findings).toHaveLength(1);
+      expect(parsed.findings[0]).toMatchObject({
+        line: 10,
+        severity: "critical",
+        category: "bug",
+        message: "Unhandled exception",
+      });
+    });
+  });
 });

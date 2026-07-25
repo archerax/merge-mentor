@@ -1,6 +1,7 @@
 import type { ToolInvocation, ToolResultObject } from "@github/copilot-sdk";
 import { defineTool } from "@github/copilot-sdk";
 import { z } from "zod";
+import type { FileFinding } from "../../platforms/types.js";
 import { consoleOutputWriter, type OutputWriter } from "../../ports/index.js";
 
 export const PostCommentArgsSchema = z.object({
@@ -100,6 +101,49 @@ const postCommentSchema = {
   required: ["file", "line", "body", "severity", "category"],
 };
 
+export interface ExecutePostCommentResult {
+  message: string;
+  findingId: string;
+  isDuplicate: boolean;
+}
+
+/**
+ * Core handler logic for executing the postComment tool.
+ * Shared between Copilot SDK and OpenCode SDK tool adapters.
+ */
+export function executePostComment(
+  args: PostCommentArgs,
+  collector: FindingsCollector,
+  output: OutputWriter = consoleOutputWriter
+): ExecutePostCommentResult {
+  const findingId = generateFindingId(args);
+  const existing = collector.findExistingFinding(findingId);
+  if (existing) {
+    return {
+      message: `Finding already recorded: ${existing.findingId}`,
+      findingId: existing.findingId,
+      isDuplicate: true,
+    };
+  }
+
+  const finding: PostCommentFinding = {
+    ...args,
+    findingId,
+    timestamp: Date.now(),
+  };
+  collector.addFinding(finding);
+
+  output.log(
+    `[Experimental Tool] Finding recorded: ${args.file}:${args.line} [${args.severity.toUpperCase()}] (${args.category}): ${args.body}`
+  );
+
+  return {
+    message: `Finding recorded: ${findingId}`,
+    findingId,
+    isDuplicate: false,
+  };
+}
+
 /**
  * Dynamically creates a postComment tool bound to a specific FindingsCollector instance.
  */
@@ -117,33 +161,139 @@ export function createPostCommentTool(
       args: PostCommentArgs,
       _invocation: ToolInvocation
     ): Promise<ToolResultObject> => {
-      // Check for duplicate
-      const findingId = generateFindingId(args);
-      const existing = collector.findExistingFinding(findingId);
-      if (existing) {
-        return {
-          textResultForLlm: `Finding already recorded: ${existing.findingId}`,
-          resultType: "success",
-        };
-      }
-
-      // Add to findings collection
-      const finding: PostCommentFinding = {
-        ...args,
-        findingId,
-        timestamp: Date.now(),
-      };
-      collector.addFinding(finding);
-
-      // Print the finding details to the console/output writer for visibility in experimental mode
-      output.log(
-        `[Experimental Tool] Finding recorded: ${args.file}:${args.line} [${args.severity.toUpperCase()}] (${args.category}): ${args.body}`
-      );
-
+      const result = executePostComment(args, collector, output);
       return {
-        textResultForLlm: `Finding recorded: ${findingId}`,
+        textResultForLlm: result.message,
         resultType: "success",
       };
     },
   });
+}
+
+function groupFindingsByFile(
+  findings: PostCommentFinding[]
+): Record<string, { findings: FileFinding[] }> {
+  const fileResults: Record<string, { findings: FileFinding[] }> = {};
+  for (const f of findings) {
+    if (!fileResults[f.file]) {
+      fileResults[f.file] = { findings: [] };
+    }
+    fileResults[f.file].findings.push({
+      line: f.line,
+      severity: f.severity,
+      confidence: f.confidence ?? "high",
+      category: f.category,
+      message: f.body,
+      suggestion: f.suggestion ?? "",
+      reasoning: f.reasoning ?? "Recorded via tool call.",
+      isPreExisting: false,
+    });
+  }
+  return fileResults;
+}
+
+export function convertFindingsToParsedResponse(findings: PostCommentFinding[]): unknown {
+  return {
+    findings: findings.map((f) => ({
+      line: f.line,
+      severity: f.severity,
+      confidence: f.confidence ?? "high",
+      category: f.category,
+      message: f.body,
+      suggestion: f.suggestion ?? "",
+      reasoning: f.reasoning ?? "Recorded via tool call.",
+      isPreExisting: false,
+    })),
+    file_results: groupFindingsByFile(findings),
+    summary: `Review completed. Collected ${findings.length} findings via tool calls.`,
+    overall_assessment: `Review completed. Collected ${findings.length} findings via tool calls.`,
+    recommendations: [],
+  };
+}
+
+export function combineToolAndJsonFindings(
+  parsed: unknown,
+  toolFindings: PostCommentFinding[]
+): unknown {
+  if (!parsed || typeof parsed !== "object") {
+    return convertFindingsToParsedResponse(toolFindings);
+  }
+
+  const parsedObj = parsed as Record<string, unknown>;
+
+  if ("file_results" in parsedObj) {
+    const fileResults = { ...(parsedObj.file_results as Record<string, unknown>) };
+    for (const f of toolFindings) {
+      if (!fileResults[f.file]) {
+        fileResults[f.file] = { findings: [] };
+      }
+      const fileData = { ...(fileResults[f.file] as Record<string, unknown>) };
+      const findings = Array.isArray(fileData.findings) ? [...fileData.findings] : [];
+      findings.push({
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+      fileResults[f.file] = { ...fileData, findings };
+    }
+    return { ...parsedObj, file_results: fileResults };
+  }
+
+  if ("summary" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        file: f.file,
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  if ("overall_assessment" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        affected_files: [f.file],
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  if ("findings" in parsedObj) {
+    const findings = Array.isArray(parsedObj.findings) ? [...parsedObj.findings] : [];
+    for (const f of toolFindings) {
+      findings.push({
+        file: f.file,
+        line: f.line,
+        severity: f.severity,
+        confidence: f.confidence ?? "high",
+        category: f.category,
+        message: f.body,
+        suggestion: f.suggestion ?? "",
+        reasoning: f.reasoning ?? "Recorded via tool call.",
+        isPreExisting: false,
+      });
+    }
+    return { ...parsedObj, findings };
+  }
+
+  return parsedObj;
 }

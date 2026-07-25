@@ -5,7 +5,14 @@ import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "..
 import { AIProviderError, ValidationError } from "../../errors/index.js";
 import { createChildLogger } from "../../logger.js";
 import type { CrossFileReviewResult, FileReviewResult } from "../../platforms/types.js";
-import { type Clock, type FileSystem, nodeFs, systemClock } from "../../ports/index.js";
+import {
+  type Clock,
+  consoleOutputWriter,
+  type FileSystem,
+  nodeFs,
+  type OutputWriter,
+  systemClock,
+} from "../../ports/index.js";
 import { delay } from "../shared/delay.js";
 import { getJsonSchema } from "../shared/jsonSchemas.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";
@@ -17,6 +24,12 @@ import {
   parseFileReview as parseFileReviewShared,
 } from "../shared/responseParsers.js";
 import { saveTranscript } from "../shared/saveTranscript.js";
+import {
+  combineToolAndJsonFindings,
+  convertFindingsToParsedResponse,
+  createOpencodePostCommentTool,
+  FindingsCollector,
+} from "../tools/index.js";
 import type {
   AIProviderClient,
   AIProviderOptions,
@@ -41,10 +54,13 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly experimentalTools: boolean;
   private readonly enableWriteTools: boolean;
   private readonly enableShellTools: boolean;
+  private readonly findingsCollector = new FindingsCollector();
   private readonly auditLogger = getAuditLogger();
   private readonly logger = createChildLogger({ component: "OpenCodeSdkProvider" });
+  private readonly output: OutputWriter;
 
   private readonly tempPath: string;
   private readonly fileSystem: FileSystem;
@@ -57,8 +73,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.experimentalTools = options?.experimentalTools ?? false;
     this.enableWriteTools = options?.enableWriteTools ?? false;
     this.enableShellTools = options?.enableShellTools ?? false;
+    this.output = options?.output ?? consoleOutputWriter;
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
     this.clock = options?.clock ?? systemClock;
@@ -147,6 +165,15 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       opencodeConfig.model = this.model;
     }
 
+    if (this.experimentalTools) {
+      const postCommentTool = createOpencodePostCommentTool(this.findingsCollector, {
+        output: this.output,
+      });
+      opencodeConfig.tools = {
+        [postCommentTool.name]: postCommentTool,
+      };
+    }
+
     // Restrict the agent to read-only access by default. File edits are allowed
     // when enableWriteTools is true; bash execution only when enableShellTools
     // is explicitly enabled — never for flows whose prompts contain untrusted
@@ -182,6 +209,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       // Server may have died; reset cache and let the retry loop handle it
       this.destroy();
       throw error;
+    }
+
+    if (this.experimentalTools) {
+      this.findingsCollector.reset();
     }
 
     const directoryQuery = options?.workingDirectory
@@ -260,7 +291,15 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       }
 
       if (info?.structured_output != null) {
-        const structured = info.structured_output;
+        let structured: unknown = info.structured_output;
+        if (this.experimentalTools) {
+          const toolFindings = this.findingsCollector.getAllFindings();
+          this.logger.info(
+            { count: toolFindings.length },
+            "Combining findings from tool calls and structured output."
+          );
+          structured = combineToolAndJsonFindings(structured, toolFindings);
+        }
         const raw = typeof structured === "string" ? structured : JSON.stringify(structured);
 
         await this.saveTranscript({
@@ -281,10 +320,68 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         .join("");
 
       if (!rawText) {
+        if (this.experimentalTools) {
+          const toolFindings = this.findingsCollector.getAllFindings();
+          if (toolFindings.length > 0) {
+            const parsed = convertFindingsToParsedResponse(toolFindings);
+            await this.saveTranscript({
+              prompt,
+              rawResponse: JSON.stringify(result, null, 2),
+              jsonOutput: JSON.stringify(parsed, null, 2),
+              success: true,
+              attempt,
+            });
+            return { raw: "", parsed };
+          }
+        }
         throw new AIProviderError("opencode-sdk", "No content in response from OpenCode SDK");
       }
 
-      const parsed = parseJsonResponse(rawText);
+      let parsed: unknown;
+      let jsonParseError: unknown;
+      try {
+        parsed = parseJsonResponse(rawText);
+      } catch (error) {
+        jsonParseError = error;
+      }
+
+      if (this.experimentalTools) {
+        const toolFindings = this.findingsCollector.getAllFindings();
+        if (jsonParseError) {
+          if (toolFindings.length > 0) {
+            this.logger.info(
+              { count: toolFindings.length },
+              "JSON parse failed but tool calls were made. Returning tool findings."
+            );
+            parsed = convertFindingsToParsedResponse(toolFindings);
+          } else {
+            this.logger.info(
+              "JSON parse failed and no tool calls were made. Returning empty findings."
+            );
+            parsed = convertFindingsToParsedResponse([]);
+          }
+        } else {
+          this.logger.info(
+            { count: toolFindings.length },
+            "Combining findings from both tool calls and JSON response."
+          );
+          parsed = combineToolAndJsonFindings(parsed, toolFindings);
+        }
+
+        await this.saveTranscript({
+          prompt,
+          rawResponse: JSON.stringify(result, null, 2),
+          jsonOutput: JSON.stringify(parsed, null, 2),
+          success: true,
+          attempt,
+        });
+
+        return { raw: rawText, parsed };
+      }
+
+      if (jsonParseError) {
+        throw jsonParseError;
+      }
 
       await this.saveTranscript({
         prompt,
