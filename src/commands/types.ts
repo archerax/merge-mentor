@@ -115,3 +115,17 @@ export interface ReplyOptions extends ReviewOptions {
   interactive?: boolean;
   dryRun?: boolean;
 }
+
+export interface EvalCommandOptions {
+  corpusDir?: string;
+  provider?: string;
+  minRecall?: number;
+  minPrecision?: number;
+  json?: boolean;
+  outputFile?: string;
+}
+
+export interface EvalExecutionResult {
+  report: import("../eval/types.js").FullEvalReport;
+  summaryText: string;
+}

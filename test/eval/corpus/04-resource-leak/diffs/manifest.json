@@ -1,0 +1,12 @@
+{
+  "prIdentifier": "04-resource-leak",
+  "files": [
+    {
+      "filename": "src/db/connection.ts",
+      "status": "modified",
+      "diffPath": "src__db__connection.ts.diff",
+      "additions": 6,
+      "deletions": 2
+    }
+  ]
+}

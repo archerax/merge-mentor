@@ -1,0 +1,5 @@
+{
+  "scenarioId": "01-sql-injection-auth",
+  "title": "SQL Injection in User Authentication",
+  "description": "Evaluates detection of SQL injection vulnerabilities and ignoring benign logger refactors."
+}

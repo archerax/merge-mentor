@@ -1,0 +1,6 @@
+{
+  "scenarioId": "08-repo-rules-compliance",
+  "title": "Add analytics tracking helper",
+  "author": "dev-team",
+  "targetBranch": "main"
+}

@@ -3,6 +3,7 @@ import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { displayDescribeResults, executeDescribe } from "./commands/describe.js";
 import { executeDoctorCommand } from "./commands/doctor.js";
+import { executeEval } from "./commands/eval.js";
 import { executeFixCommand } from "./commands/fix.js";
 import { executePBIReview } from "./commands/pbi.js";
 import { executeProjectReview } from "./commands/project.js";
@@ -23,6 +24,7 @@ export * from "./commands/types.js";
 // Import types for CLI option annotations
 import type {
   DescribeOptions,
+  EvalCommandOptions,
   FixOptions,
   PBIOptions,
   ProjectOptions,
@@ -637,6 +639,37 @@ program
         "Reply command failed"
       );
       consoleOutputWriter.error(`\n❌ Error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Eval command
+program
+  .command("eval")
+  .description("Run Golden-PR evaluation harness against test corpus")
+  .option("--corpus-dir <path>", "Path to test corpus directory (default: './test/eval/corpus')")
+  .option("--provider <name>", "AI provider to use (mock, copilot-sdk, opencode-sdk)", "mock")
+  .option(
+    "--min-recall <number>",
+    "Minimum required recall threshold (0.0 - 1.0)",
+    (val: string) => Number.parseFloat(val),
+    0.9
+  )
+  .option(
+    "--min-precision <number>",
+    "Minimum required precision threshold (0.0 - 1.0)",
+    (val: string) => Number.parseFloat(val),
+    0.85
+  )
+  .option("--json", "Output raw JSON report to stdout", false)
+  .option("--output-file <path>", "Path to write JSON evaluation report")
+  .action(async (options: EvalCommandOptions) => {
+    try {
+      await executeEval(options);
+      process.exit(0);
+    } catch (error) {
+      const err = error as Error;
+      consoleOutputWriter.error(`\n❌ ${err.message}\n`);
       process.exit(1);
     }
   });

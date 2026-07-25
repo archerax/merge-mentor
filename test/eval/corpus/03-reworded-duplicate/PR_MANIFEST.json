@@ -1,0 +1,5 @@
+{
+  "scenarioId": "03-reworded-duplicate",
+  "title": "Reworded Duplicate Comment Suppression",
+  "description": "Evaluates deduplication and comment suppression when line numbers shift or comments are reworded across reviews."
+}

@@ -1,0 +1,22 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/services/userService.ts",
+      "findings": [
+        {
+          "line": 15,
+          "severity": "high",
+          "confidence": "high",
+          "category": "bug",
+          "message": "Potential type mismatch breaking change when constructing UserProfile",
+          "suggestion": "Update call site to include required 'tenantId' property introduced in UserProfile interface",
+          "reasoning": "UserProfile interface made tenantId non-optional, but service instantiation omitted it"
+        }
+      ]
+    },
+    {
+      "filename": "src/types/user.ts",
+      "findings": []
+    }
+  ]
+}

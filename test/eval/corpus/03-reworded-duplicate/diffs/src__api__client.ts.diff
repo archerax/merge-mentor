@@ -1,0 +1,8 @@
+--- a/src/api/client.ts
++++ b/src/api/client.ts
+@@ -33,2 +33,5 @@
+-while (retries < 5) { await fetch(url); retries++; }
++while (retries < 5) {
++  await fetch(url);
++  retries++;
++}

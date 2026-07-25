@@ -1,0 +1,6 @@
+{
+  "scenarioId": "10-hallucinated-line-exclusion",
+  "title": "Update math helper utilities",
+  "author": "dev-user",
+  "targetBranch": "main"
+}

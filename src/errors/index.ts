@@ -219,3 +219,21 @@ export class ValidationError extends MergeMentorError {
     this.name = "ValidationError";
   }
 }
+
+/**
+ * Error thrown during evaluation harness or corpus execution.
+ */
+export class CorpusEvalError extends MergeMentorError {
+  constructor(
+    /**
+     * Optional scenario ID related to the evaluation error.
+     */
+    public readonly scenarioId: string | undefined,
+    message: string
+  ) {
+    super(
+      scenarioId ? `Eval error in scenario "${scenarioId}": ${message}` : `Eval error: ${message}`
+    );
+    this.name = "CorpusEvalError";
+  }
+}

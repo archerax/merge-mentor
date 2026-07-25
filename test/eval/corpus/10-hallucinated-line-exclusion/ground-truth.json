@@ -1,0 +1,14 @@
+{
+  "scenarioId": "10-hallucinated-line-exclusion",
+  "name": "Hallucinated Finding & Out-of-Hunk Line Suppression",
+  "description": "Ensures clean diff changes produce no false positive findings or comments on unchanged code context outside diff hunks.",
+  "expectedFindings": [],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/helpers/math.ts",
+      "reason": "Unchanged helper functions outside diff hunk must not produce findings."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

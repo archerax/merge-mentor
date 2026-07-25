@@ -1,12 +1,59 @@
 import { JsonParseError } from "../../errors/index.js";
 
 export function parseJsonResponse(raw: string): unknown {
-  const markdownMatch = raw.match(/```json\n([\s\S]*?)\n```/);
-  if (markdownMatch) {
+  // 1. Try markdown code block with json tag
+  const markdownMatches = raw.matchAll(/```(?:json)?\s*\n([\s\S]*?)\n```/gi);
+  for (const match of markdownMatches) {
     try {
-      return JSON.parse(markdownMatch[1]);
+      return JSON.parse(match[1].trim());
     } catch {
-      // Fall through to regex extraction
+      // Continue to next block
+    }
+  }
+
+  // 2. Direct JSON parse (if raw is pure JSON)
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      // Continue to extracted JSON search
+    }
+  }
+
+  // 3. Search for JSON object substring from '{' to matching '}'
+  const braceIndices: number[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "{") braceIndices.push(i);
+  }
+
+  for (const startIdx of braceIndices) {
+    let endIdx = raw.lastIndexOf("}");
+    while (endIdx > startIdx) {
+      const candidate = raw.slice(startIdx, endIdx + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        endIdx = raw.lastIndexOf("}", endIdx - 1);
+      }
+    }
+  }
+
+  // 4. Search for JSON array substring from '[' to matching ']'
+  const bracketIndices: number[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "[") bracketIndices.push(i);
+  }
+
+  for (const startIdx of bracketIndices) {
+    let endIdx = raw.lastIndexOf("]");
+    while (endIdx > startIdx) {
+      const candidate = raw.slice(startIdx, endIdx + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        endIdx = raw.lastIndexOf("]", endIdx - 1);
+      }
     }
   }
 

@@ -35,4 +35,10 @@ describe("parseJsonResponse", () => {
   it("should throw JsonParseError for malformed JSON", () => {
     expect(() => parseJsonResponse('{"a": broken}')).toThrow(JsonParseError);
   });
+
+  it("should extract valid JSON when surrounded by non-JSON text with curly braces", () => {
+    const raw = 'Note {unquoted}:\n{"valid": true, "count": 42}\nOther {text}';
+    const result = parseJsonResponse(raw);
+    expect(result).toEqual({ valid: true, count: 42 });
+  });
 });

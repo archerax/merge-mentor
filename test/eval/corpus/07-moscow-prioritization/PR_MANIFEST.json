@@ -1,0 +1,5 @@
+{
+  "scenarioId": "07-moscow-prioritization",
+  "title": "MoSCoW Severity Prioritization & Noise Control",
+  "description": "Evaluates severity calibration between MUST-fix security flaws and COULD-fix style notes."
+}

@@ -1,0 +1,6 @@
+{
+  "scenarioId": "09-unhandled-async-error",
+  "title": "Add async message queue worker",
+  "author": "backend-team",
+  "targetBranch": "main"
+}

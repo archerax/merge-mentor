@@ -1,0 +1,6 @@
+@@ -8,4 +8,9 @@ export async function processQueue(items: string[]): Promise<void> {
+   for (const item of items) {
+-    await processItem(item);
++    processItemAsync(item);
+   }
+ }

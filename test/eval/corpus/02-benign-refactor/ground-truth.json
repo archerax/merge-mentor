@@ -1,0 +1,14 @@
+{
+  "scenarioId": "02-benign-refactor",
+  "name": "Benign Helper Refactoring",
+  "description": "Ensures no false positive findings are raised for benign utility refactors.",
+  "expectedFindings": [],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/utils/logger.ts",
+      "reason": "Utility formatting refactor should not generate high/critical severity flags."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

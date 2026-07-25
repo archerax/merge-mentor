@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "filename": "src/analytics/user.ts",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 2,
+      "changes": 10,
+      "patchFile": "src__analytics__user.ts.diff"
+    }
+  ]
+}

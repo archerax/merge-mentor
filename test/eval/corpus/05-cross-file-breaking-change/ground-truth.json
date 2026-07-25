@@ -1,0 +1,16 @@
+{
+  "scenarioId": "05-cross-file-breaking-change",
+  "name": "Cross-File Breaking Change in User API Interface",
+  "description": "Tests if breaking type changes in shared interfaces are flagged when updating consumer services.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/services/userService.ts",
+      "category": "bug|quality|architecture|design|style",
+      "minSeverity": "high",
+      "containsKeywords": ["type|contract|mismatch|required", "breaking|tenantid|userprofile"]
+    }
+  ],
+  "forbiddenFindings": [],
+  "maxAllowedDuplicates": 0
+}

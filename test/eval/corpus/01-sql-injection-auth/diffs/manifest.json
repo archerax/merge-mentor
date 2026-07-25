@@ -1,0 +1,12 @@
+{
+  "prIdentifier": "01-sql-injection-auth",
+  "files": [
+    {
+      "filename": "src/auth/login.ts",
+      "status": "modified",
+      "diffPath": "src__auth__login.ts.diff",
+      "additions": 5,
+      "deletions": 2
+    }
+  ]
+}

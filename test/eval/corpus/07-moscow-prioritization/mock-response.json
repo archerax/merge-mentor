@@ -1,0 +1,27 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/api/authMiddleware.ts",
+      "findings": [
+        {
+          "line": 18,
+          "severity": "critical",
+          "confidence": "high",
+          "category": "security",
+          "message": "Disabled JWT verification creates critical authentication bypass vulnerability",
+          "suggestion": "Re-enable jwt.verify() signature check before attaching req.user",
+          "reasoning": "Setting algorithm to 'none' or decoding without verification allows request forgery"
+        },
+        {
+          "line": 35,
+          "severity": "low",
+          "confidence": "low",
+          "category": "style",
+          "message": "Consider using optional chaining for header lookup",
+          "suggestion": "req.headers?.authorization",
+          "reasoning": "Minor code readability improvement"
+        }
+      ]
+    }
+  ]
+}

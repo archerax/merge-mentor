@@ -1,0 +1,19 @@
+{
+  "prIdentifier": "06-generated-file-exclusion",
+  "files": [
+    {
+      "filename": "pnpm-lock.yaml",
+      "status": "modified",
+      "diffPath": "pnpm-lock.yaml.diff",
+      "additions": 45,
+      "deletions": 12
+    },
+    {
+      "filename": "dist/bundle.js",
+      "status": "modified",
+      "diffPath": "dist__bundle.js.diff",
+      "additions": 150,
+      "deletions": 120
+    }
+  ]
+}

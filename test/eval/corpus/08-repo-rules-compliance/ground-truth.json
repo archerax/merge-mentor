@@ -1,0 +1,29 @@
+{
+  "scenarioId": "08-repo-rules-compliance",
+  "name": "Custom Project Rules Compliance",
+  "description": "Tests if repository coding standards (missing .js extensions in ESM imports and raw console.log usage) are properly flagged while valid utilities are ignored.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/analytics/user.ts",
+      "category": "style|quality|design|architecture",
+      "minSeverity": "medium",
+      "containsKeywords": ["import|unused", ".js|extension|logger"]
+    },
+    {
+      "id": "exp-02",
+      "filePath": "src/analytics/user.ts",
+      "category": "style|quality|design|security",
+      "minSeverity": "medium",
+      "containsKeywords": ["console|log|logging", "pii|logger|structured|raw"]
+    }
+  ],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/analytics/types.ts",
+      "reason": "Standard interface type definition file should not generate style or lint flags."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

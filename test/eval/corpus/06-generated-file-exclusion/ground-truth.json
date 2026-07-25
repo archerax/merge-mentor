@@ -1,0 +1,19 @@
+{
+  "scenarioId": "06-generated-file-exclusion",
+  "name": "Noise Reduction for Generated & Lockfiles",
+  "description": "Ensures generated files, minified bundles, and package lockfiles generate no findings.",
+  "expectedFindings": [],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "pnpm-lock.yaml",
+      "reason": "Lockfiles must be excluded from static analysis and produce no findings."
+    },
+    {
+      "id": "forbid-02",
+      "filePath": "dist/bundle.js",
+      "reason": "Compiled output in dist/ must not trigger linter or review comments."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

@@ -1,0 +1,12 @@
+{
+  "prIdentifier": "03-reworded-duplicate",
+  "files": [
+    {
+      "filename": "src/api/client.ts",
+      "status": "modified",
+      "diffPath": "src__api__client.ts.diff",
+      "additions": 4,
+      "deletions": 1
+    }
+  ]
+}

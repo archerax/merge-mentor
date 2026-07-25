@@ -1,0 +1,8 @@
+--- a/src/types/user.ts
++++ b/src/types/user.ts
+@@ -10,3 +10,4 @@
+ export interface UserProfile {
+   id: string;
+-  tenantId?: string;
++  tenantId: string;
+ }

@@ -1,0 +1,19 @@
+{
+  "prIdentifier": "05-cross-file-breaking-change",
+  "files": [
+    {
+      "filename": "src/types/user.ts",
+      "status": "modified",
+      "diffPath": "src__types__user.ts.diff",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "filename": "src/services/userService.ts",
+      "status": "modified",
+      "diffPath": "src__services__userService.ts.diff",
+      "additions": 3,
+      "deletions": 1
+    }
+  ]
+}

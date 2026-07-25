@@ -1,0 +1,25 @@
+{
+  "scenarioId": "09-unhandled-async-error",
+  "name": "Unhandled Async Promise Error",
+  "description": "Evaluates detection of unhandled floating promises and missing try-catch error handling in async message processing handlers.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/services/queueWorker.ts",
+      "category": "bug|quality|architecture|performance|style",
+      "minSeverity": "high",
+      "containsKeywords": [
+        "unhandled promise|unawaited promise|floating promise|unhandled|unawaited",
+        "async|promise"
+      ]
+    }
+  ],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/services/queueConfig.ts",
+      "reason": "Standard static queue configuration settings should not generate findings."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

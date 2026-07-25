@@ -1,0 +1,12 @@
+{
+  "prIdentifier": "07-moscow-prioritization",
+  "files": [
+    {
+      "filename": "src/api/authMiddleware.ts",
+      "status": "modified",
+      "diffPath": "src__api__authMiddleware.ts.diff",
+      "additions": 4,
+      "deletions": 2
+    }
+  ]
+}

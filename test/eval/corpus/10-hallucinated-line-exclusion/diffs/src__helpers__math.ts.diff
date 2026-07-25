@@ -1,0 +1,7 @@
+@@ -10,3 +10,6 @@ export function clamp(val: number, min: number, max: number): number {
+   return Math.min(Math.max(val, min), max);
+ }
++
++export function add(a: number, b: number): number {
++  return a + b;
++}

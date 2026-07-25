@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AIProviderError,
   ConfigurationError,
+  CorpusEvalError,
   JsonParseError,
   MergeMentorError,
   PlatformApiError,
@@ -97,6 +98,24 @@ describe("Error Classes", () => {
       expect(error.provider).toBe("opencode-sdk");
       expect(error.cause).toBe(cause);
       expect((error as Error & { cause?: unknown }).cause).toBe(cause);
+    });
+  });
+
+  describe("CorpusEvalError", () => {
+    it("creates error with scenario information", () => {
+      const error = new CorpusEvalError("scenario-01", "Ground truth missing");
+
+      expect(error.message).toBe('Eval error in scenario "scenario-01": Ground truth missing');
+      expect(error.name).toBe("CorpusEvalError");
+      expect(error.scenarioId).toBe("scenario-01");
+    });
+
+    it("creates error without scenario ID", () => {
+      const error = new CorpusEvalError(undefined, "Corpus directory not found");
+
+      expect(error.message).toBe("Eval error: Corpus directory not found");
+      expect(error.name).toBe("CorpusEvalError");
+      expect(error.scenarioId).toBeUndefined();
     });
   });
 });

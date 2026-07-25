@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "filename": "src/helpers/math.ts",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 1,
+      "changes": 5,
+      "patchFile": "src__helpers__math.ts.diff"
+    }
+  ]
+}

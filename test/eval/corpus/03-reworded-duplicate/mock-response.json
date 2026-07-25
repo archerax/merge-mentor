@@ -1,0 +1,18 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/api/client.ts",
+      "findings": [
+        {
+          "line": 35,
+          "severity": "medium",
+          "confidence": "high",
+          "category": "performance",
+          "message": "Unbounded retry loop missing exponential backoff delay",
+          "suggestion": "Add exponential backoff delay between retry attempts",
+          "reasoning": "Loop retries indefinitely on HTTP failure without throttling"
+        }
+      ]
+    }
+  ]
+}

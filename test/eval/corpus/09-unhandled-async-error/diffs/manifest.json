@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "filename": "src/services/queueWorker.ts",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 1,
+      "changes": 7,
+      "patchFile": "src__services__queueWorker.ts.diff"
+    }
+  ]
+}

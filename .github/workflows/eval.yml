@@ -1,0 +1,55 @@
+name: Golden-PR Evaluation Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "AI Provider for evaluation (mock, copilot-sdk, opencode-sdk)"
+        required: true
+        default: "mock"
+      min_recall:
+        description: "Minimum required recall threshold (0.0 - 1.0)"
+        required: false
+        default: "0.90"
+      min_precision:
+        description: "Minimum required precision threshold (0.0 - 1.0)"
+        required: false
+        default: "0.85"
+
+jobs:
+  eval-benchmark:
+    name: Run Golden-PR Corpus Evaluation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js & pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Evaluation Harness
+        run: |
+          pnpm build
+          pnpm eval \
+            --provider "${{ github.event.inputs.provider || 'mock' }}" \
+            --min-recall "${{ github.event.inputs.min_recall || '0.90' }}" \
+            --min-precision "${{ github.event.inputs.min_precision || '0.85' }}" \
+            --output-file "eval-report.json"
+
+      - name: Upload Evaluation Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-pr-eval-report
+          path: eval-report.json

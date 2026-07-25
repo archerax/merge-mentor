@@ -1,0 +1,27 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/analytics/user.ts",
+      "findings": [
+        {
+          "line": 1,
+          "severity": "medium",
+          "confidence": "high",
+          "category": "style",
+          "message": "Relative ESM import missing explicit .js extension",
+          "suggestion": "Update import to include .js extension: import { logger } from '../utils/logger.js'",
+          "reasoning": "Project rules require explicit .js extension on all relative imports in Node ES module environment."
+        },
+        {
+          "line": 6,
+          "severity": "medium",
+          "confidence": "high",
+          "category": "style",
+          "message": "Raw console.log call detected in production code",
+          "suggestion": "Use logger.info instead of console.log",
+          "reasoning": "Project rules prohibit console.log statements in favor of structured logger proxy."
+        }
+      ]
+    }
+  ]
+}

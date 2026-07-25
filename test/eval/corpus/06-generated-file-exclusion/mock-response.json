@@ -1,0 +1,12 @@
+{
+  "fileResults": [
+    {
+      "filename": "pnpm-lock.yaml",
+      "findings": []
+    },
+    {
+      "filename": "dist/bundle.js",
+      "findings": []
+    }
+  ]
+}

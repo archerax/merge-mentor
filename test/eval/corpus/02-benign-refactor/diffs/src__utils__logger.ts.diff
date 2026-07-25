@@ -1,0 +1,5 @@
+--- a/src/utils/logger.ts
++++ b/src/utils/logger.ts
+@@ -10,2 +10,2 @@
+-export function log(msg: string) { console.log(msg); }
++export function log(msg: string) { console.info(`[LOG] ${msg}`); }

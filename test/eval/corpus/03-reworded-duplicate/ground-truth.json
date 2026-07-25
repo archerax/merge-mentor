@@ -1,0 +1,27 @@
+{
+  "scenarioId": "03-reworded-duplicate",
+  "name": "Reworded Duplicate Comment Suppression",
+  "description": "Tests if re-review appropriately suppresses duplicate comments on shifted lines.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/api/client.ts",
+      "category": "performance|reliability|bug",
+      "minSeverity": "medium",
+      "containsKeywords": ["retry|retries|fetch", "backoff|delay|wait|error|abort"]
+    }
+  ],
+  "forbiddenFindings": [],
+  "maxAllowedDuplicates": 0,
+  "passes": [
+    {
+      "passIndex": 1,
+      "diffDir": "diffs"
+    },
+    {
+      "passIndex": 2,
+      "diffDir": "diffs",
+      "expectedSuppressedCount": 1
+    }
+  ]
+}

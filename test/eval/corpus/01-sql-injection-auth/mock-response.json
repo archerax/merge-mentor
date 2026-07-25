@@ -1,0 +1,22 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/auth/login.ts",
+      "findings": [
+        {
+          "line": 42,
+          "severity": "critical",
+          "confidence": "high",
+          "category": "security",
+          "message": "Potential SQL Injection vulnerability detected in query construction",
+          "suggestion": "Use a parameterized query instead of direct string interpolation",
+          "reasoning": "Unescaped user input passed directly into SQL query"
+        }
+      ]
+    },
+    {
+      "filename": "src/auth/logger.ts",
+      "findings": []
+    }
+  ]
+}

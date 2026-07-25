@@ -1,0 +1,5 @@
+{
+  "scenarioId": "02-benign-refactor",
+  "title": "Benign Helper Refactoring",
+  "description": "Evaluates false-positive reduction for clean code refactoring without security or bug issues."
+}

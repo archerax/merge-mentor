@@ -1,0 +1,23 @@
+{
+  "scenarioId": "07-moscow-prioritization",
+  "name": "MoSCoW Severity Prioritization & Noise Control",
+  "description": "Tests if critical security flaws are classified as high/critical severity MUST fix while nitpicks are appropriately categorized as low/COULD.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/api/authMiddleware.ts",
+      "category": "security",
+      "minSeverity": "critical",
+      "containsKeywords": ["jwt", "bypass"]
+    },
+    {
+      "id": "exp-02",
+      "filePath": "src/api/authMiddleware.ts",
+      "category": "style",
+      "minSeverity": "low",
+      "containsKeywords": ["optional chaining"]
+    }
+  ],
+  "forbiddenFindings": [],
+  "maxAllowedDuplicates": 0
+}

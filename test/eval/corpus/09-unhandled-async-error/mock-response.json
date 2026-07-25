@@ -1,0 +1,18 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/services/queueWorker.ts",
+      "findings": [
+        {
+          "line": 12,
+          "severity": "high",
+          "confidence": "high",
+          "category": "bug",
+          "message": "Unhandled promise rejection in async event handler",
+          "suggestion": "Wrap async operation in try/catch or append .catch() handler",
+          "reasoning": "Calling an async task without await or catch handler causes unhandled promise rejections on failure."
+        }
+      ]
+    }
+  ]
+}

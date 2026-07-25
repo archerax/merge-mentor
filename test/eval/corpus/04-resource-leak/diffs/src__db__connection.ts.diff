@@ -1,0 +1,9 @@
+--- a/src/db/connection.ts
++++ b/src/db/connection.ts
+@@ -25,4 +25,8 @@
+   const client = await pool.connect();
+-  const result = await client.query(queryStr);
+-  client.release();
++  const result = await client.query(queryStr);
++  // Missing try/finally block: if query throws, client connection leaks
++  return result.rows;

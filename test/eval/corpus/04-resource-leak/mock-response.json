@@ -1,0 +1,22 @@
+{
+  "fileResults": [
+    {
+      "filename": "src/db/connection.ts",
+      "findings": [
+        {
+          "line": 28,
+          "severity": "high",
+          "confidence": "high",
+          "category": "performance",
+          "message": "Potential database connection leak detected in error handler",
+          "suggestion": "Ensure client.release() or pool.close() is called in a finally block",
+          "reasoning": "Database client opened in try block is not released if an exception occurs"
+        }
+      ]
+    },
+    {
+      "filename": "src/utils/config.ts",
+      "findings": []
+    }
+  ]
+}

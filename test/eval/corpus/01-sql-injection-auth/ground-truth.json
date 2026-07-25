@@ -1,0 +1,22 @@
+{
+  "scenarioId": "01-sql-injection-auth",
+  "name": "SQL Injection in User Authentication",
+  "description": "Tests if critical SQL injection vulnerability is identified and benign logger refactor is ignored.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/auth/login.ts",
+      "category": "security",
+      "minSeverity": "critical",
+      "containsKeywords": ["sql injection", "parameterized|parameterization|escaping|prepared"]
+    }
+  ],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/auth/logger.ts",
+      "reason": "Standard console logger refactor should not trigger security or performance flags"
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

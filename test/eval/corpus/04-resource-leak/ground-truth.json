@@ -1,0 +1,22 @@
+{
+  "scenarioId": "04-resource-leak",
+  "name": "Resource Leak in Database Connection Pool",
+  "description": "Evaluates detection of unclosed database connections and unhandled stream/pool errors.",
+  "expectedFindings": [
+    {
+      "id": "exp-01",
+      "filePath": "src/db/connection.ts",
+      "category": "performance|reliability|bug|security",
+      "minSeverity": "high",
+      "containsKeywords": ["connection|client|pool", "leak|release|exhaustion|unclosed"]
+    }
+  ],
+  "forbiddenFindings": [
+    {
+      "id": "forbid-01",
+      "filePath": "src/utils/config.ts",
+      "reason": "Standard environment configuration helper refactor should not generate findings."
+    }
+  ],
+  "maxAllowedDuplicates": 0
+}

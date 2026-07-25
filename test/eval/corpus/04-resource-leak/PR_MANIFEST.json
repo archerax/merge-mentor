@@ -1,0 +1,5 @@
+{
+  "scenarioId": "04-resource-leak",
+  "title": "Resource Leak in Database Connection Pool",
+  "description": "Evaluates detection of unclosed database connections / missing error cleanup."
+}

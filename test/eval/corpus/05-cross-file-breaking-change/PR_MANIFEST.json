@@ -1,0 +1,5 @@
+{
+  "scenarioId": "05-cross-file-breaking-change",
+  "title": "Cross-File Breaking Change in User API Interface",
+  "description": "Evaluates detection of type signature modifications that break call sites across modules."
+}

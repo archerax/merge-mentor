@@ -1,0 +1,8 @@
+--- a/src/services/userService.ts
++++ b/src/services/userService.ts
+@@ -14,3 +14,5 @@
+ export function createGuestProfile(id: string): UserProfile {
+-  return { id };
++  // Missing required tenantId property from UserProfile update
++  return { id };
+ }

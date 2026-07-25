@@ -1,0 +1,5 @@
+{
+  "scenarioId": "06-generated-file-exclusion",
+  "title": "Noise Reduction for Generated & Lockfiles",
+  "description": "Evaluates that lockfiles and compiled output produce zero review noise."
+}

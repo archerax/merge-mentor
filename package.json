@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "eval": "node dist/cli.js eval",
     "typecheck": "tsc --noEmit",
     "lint": "prettier --check \"**/*.{md,yml}\" && biome check && knip",
     "lint:fix": "prettier --write \"**/*.{md,yml}\" && biome check --write && knip --fix",
