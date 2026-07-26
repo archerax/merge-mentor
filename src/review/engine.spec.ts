@@ -1303,6 +1303,168 @@ describe("ReviewEngine", () => {
       // No AI calls should be made
       expect(mockExecutePrompt).not.toHaveBeenCalled();
     });
+
+    it("fast review re-uses cached file and cross-file results when all files are unchanged", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewType: "fast",
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
+
+      // First review - perform fast analysis and save state
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFastReview.mockReturnValue({
+        fileResults: [
+          {
+            filename: "test.ts",
+            findings: [
+              {
+                line: 2,
+                severity: "medium",
+                category: "bug",
+                message: "Cached bug",
+                suggestion: "Fix",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ],
+        crossFileResult: {
+          overallAssessment: "Cached fast assessment",
+          findings: [],
+          recommendations: ["Cached rec"],
+        },
+      });
+
+      await engine.reviewPR(123);
+
+      // Reset mock AI calls
+      mockExecutePrompt.mockClear();
+      mockParseFastReview.mockClear();
+
+      // Second review - unchanged files
+      const result = await engine.reviewPR(123);
+
+      expect(result).toBeDefined();
+      expect(mockExecutePrompt).not.toHaveBeenCalled();
+      expect(mockParseFastReview).not.toHaveBeenCalled();
+      expect(result.filesSkipped).toBe(1);
+      expect(result.filesReviewed).toBe(0);
+      expect(result.fileResults).toHaveLength(1);
+      expect(result.fileResults[0].findings[0].message).toBe("Cached bug");
+      expect(result.crossFileResult.overallAssessment).toBe("Cached fast assessment");
+    });
+
+    it("fast review performs partial review on changed files and merges cached results", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewType: "fast",
+      });
+      const prDetails = createPRDetails();
+      const initialFiles = [
+        createPRFile({ filename: "file1.ts", sha: "sha-1" }),
+        createPRFile({ filename: "file2.ts", sha: "sha-2" }),
+      ];
+
+      // First review
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(initialFiles);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFastReview.mockReturnValue({
+        fileResults: [
+          {
+            filename: "file1.ts",
+            findings: [
+              {
+                line: 1,
+                severity: "low",
+                category: "style",
+                message: "Issue file 1",
+                suggestion: "Fix",
+                isPreExisting: false,
+              },
+            ],
+          },
+          {
+            filename: "file2.ts",
+            findings: [],
+          },
+        ],
+        crossFileResult: {
+          overallAssessment: "Pass 1 Assessment",
+          findings: [
+            {
+              severity: "medium",
+              confidence: "high",
+              category: "architecture",
+              message: "Arch Issue 1",
+              reasoning: "Desc",
+              affectedFiles: ["file1.ts"],
+            },
+          ],
+          recommendations: ["Rec 1"],
+        },
+      });
+
+      await engine.reviewPR(123);
+
+      mockExecutePrompt.mockClear();
+      mockParseFastReview.mockClear();
+
+      // Second review: file1.ts is unchanged (sha-1), file2.ts changed (sha-2-new)
+      const secondFiles = [
+        createPRFile({ filename: "file1.ts", sha: "sha-1" }),
+        createPRFile({ filename: "file2.ts", sha: "sha-2-new" }),
+      ];
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(secondFiles);
+
+      mockParseFastReview.mockReturnValue({
+        fileResults: [
+          {
+            filename: "file2.ts",
+            findings: [
+              {
+                line: 5,
+                severity: "high",
+                category: "bug",
+                message: "New issue file 2",
+                suggestion: "Fix 2",
+                isPreExisting: false,
+              },
+            ],
+          },
+        ],
+        crossFileResult: {
+          overallAssessment: "Pass 2 Assessment",
+          findings: [
+            {
+              severity: "high",
+              confidence: "high",
+              category: "architecture",
+              message: "Arch Issue 2",
+              reasoning: "Desc 2",
+              affectedFiles: ["file2.ts"],
+            },
+          ],
+          recommendations: ["Rec 2"],
+        },
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(mockExecutePrompt).toHaveBeenCalledTimes(1);
+      expect(result.filesSkipped).toBe(1);
+      expect(result.filesReviewed).toBe(1);
+      expect(result.fileResults).toHaveLength(2);
+      expect(result.crossFileResult.overallAssessment).toBe("Pass 2 Assessment");
+      expect(result.crossFileResult.findings).toHaveLength(2);
+      expect(result.crossFileResult.recommendations).toEqual(["Rec 2", "Rec 1"]);
+    });
   });
 
   describe("dry run and comment error handling", () => {

@@ -585,16 +585,14 @@ export class ReviewEngine {
         prDetails,
         files,
         existingComments,
+        cachedState,
         repoPath,
         onTokenUsage
       );
       fileResults = fastReviewData.fileResults;
       crossFileResult = fastReviewData.crossFileResult;
-      filesSkipped = 0; // Fast review doesn't use caching yet
+      filesSkipped = fastReviewData.filesSkipped;
       filesAnalyzed = fastReviewData.filesAnalyzed;
-
-      // Validate line numbers against actual diff content
-      fileResults = this.lineNumberValidator.validate(fileResults, files);
     } else {
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -1109,6 +1107,35 @@ During the database pass, pay extra attention to query correctness, transaction 
     }
   }
 
+  private combineCrossFileResults(
+    cached?: CrossFileReviewResult,
+    current?: CrossFileReviewResult
+  ): CrossFileReviewResult {
+    if (!cached) {
+      return (
+        current ?? {
+          overallAssessment: "No files to review",
+          findings: [],
+          recommendations: [],
+        }
+      );
+    }
+    if (!current) return cached;
+
+    const existingKeys = new Set(
+      cached.findings.map((f) => `${f.message}:${(f.affectedFiles ?? []).join(",")}`)
+    );
+    const uniqueNewFindings = current.findings.filter(
+      (f) => !existingKeys.has(`${f.message}:${(f.affectedFiles ?? []).join(",")}`)
+    );
+
+    return {
+      overallAssessment: current.overallAssessment,
+      findings: [...cached.findings, ...uniqueNewFindings],
+      recommendations: Array.from(new Set([...current.recommendations, ...cached.recommendations])),
+    };
+  }
+
   /**
    * Performs fast review (combined file + cross-file analysis in single pass).
    * This reduces AI calls by combining both passes into one, saving costs.
@@ -1118,11 +1145,13 @@ During the database pass, pay extra attention to query correctness, transaction 
     prDetails: PRDetails,
     files: PRFile[],
     existingComments: readonly ExistingComment[],
+    cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
     repoPath?: string,
     onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<{
     fileResults: FileReviewResult[];
     crossFileResult: CrossFileReviewResult;
+    filesSkipped: number;
     filesAnalyzed: number;
   }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
@@ -1130,17 +1159,56 @@ During the database pass, pay extra attention to query correctness, transaction 
     const prNumber = parsePRNumber(prIdentifier);
     this.auditLogger.logFileReviewStart("fast-review", prNumber);
 
-    // Filter files with patches
-    const filesWithPatches = files.filter((f) => !this.shouldSkipFile(f) && f.patch);
-    if (filesWithPatches.length === 0) {
+    // Filter unchanged files vs files requiring review
+    const filesToReview: PRFile[] = [];
+    const cachedResults: FileReviewResult[] = [];
+    let filesSkipped = 0;
+
+    for (const file of files) {
+      if (this.shouldSkipFile(file) || !file.patch) continue;
+
+      if (file.sha && cachedState) {
+        const cachedReview = this.stateCache.getCachedFileReview(
+          file.filename,
+          file.sha,
+          cachedState
+        );
+        if (cachedReview) {
+          this.log(`Using cached review for ${file.filename} (unchanged)`);
+          cachedResults.push(cachedReview);
+          filesSkipped++;
+          continue;
+        }
+      }
+
+      filesToReview.push(file);
+    }
+
+    // Full cache hit check
+    if (filesToReview.length === 0) {
+      if (cachedState?.crossFileResult) {
+        this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review in fast mode`);
+        return {
+          fileResults: cachedResults,
+          crossFileResult: cachedState.crossFileResult,
+          filesSkipped,
+          filesAnalyzed: cachedResults.length,
+        };
+      }
+      // Fallback: If cached crossFileResult is missing, process all files with patches to regenerate it
+      filesToReview.push(...files.filter((f) => !this.shouldSkipFile(f) && f.patch));
+    }
+
+    if (filesToReview.length === 0) {
       return {
-        fileResults: [],
-        crossFileResult: {
+        fileResults: cachedResults,
+        crossFileResult: cachedState?.crossFileResult ?? {
           overallAssessment: "No files to review",
           findings: [],
           recommendations: [],
         },
-        filesAnalyzed: 0,
+        filesSkipped,
+        filesAnalyzed: cachedResults.length,
       };
     }
 
@@ -1149,7 +1217,7 @@ During the database pass, pay extra attention to query correctness, transaction 
 
     try {
       // Store diffs to disk
-      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
+      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesToReview);
       this.logger.info(
         { prNumber, fileCount: manifest.files.length, diffDir },
         "Stored diffs for fast review"
@@ -1170,7 +1238,7 @@ During the database pass, pay extra attention to query correctness, transaction 
         commentsContext || undefined,
         repoPath,
         this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
+        this.buildAdditionalPassContextSections(filesToReview.map((file) => file.filename))
       );
 
       this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
@@ -1198,23 +1266,43 @@ During the database pass, pay extra attention to query correctness, transaction 
       // Parse combined response
       const result = this.provider.parseFastReview(response);
 
+      // Validate line numbers specifically on filesToReview
+      const validatedNewResults = this.lineNumberValidator.validate(
+        result.fileResults,
+        filesToReview
+      );
+      const mergedFileResults = [...cachedResults, ...validatedNewResults];
+      const combinedCrossFile = this.combineCrossFileResults(
+        cachedState?.crossFileResult,
+        result.crossFileResult
+      );
+
       // Log results
-      const totalFileFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
-      const crossFileFindings = result.crossFileResult.findings.length;
+      const totalFileFindings = mergedFileResults.reduce((sum, r) => sum + r.findings.length, 0);
+      const crossFileFindings = combinedCrossFile.findings.length;
       this.log(
         `  Fast review found ${totalFileFindings} file-level issues and ${crossFileFindings} architectural issues`
       );
 
-      for (const fileResult of result.fileResults) {
+      for (const fileResult of mergedFileResults) {
         if (fileResult.findings.length > 0) {
           this.log(`    ${fileResult.filename}: ${fileResult.findings.length} issues`);
         }
       }
 
+      if (filesSkipped > 0) {
+        this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review in fast mode`);
+      }
+
       this.auditLogger.logFileReviewComplete("fast-review", prNumber, totalFileFindings);
       this.auditLogger.logCrossFileReviewComplete(prNumber, crossFileFindings);
 
-      return { ...result, filesAnalyzed: filesWithPatches.length };
+      return {
+        fileResults: mergedFileResults,
+        crossFileResult: combinedCrossFile,
+        filesSkipped,
+        filesAnalyzed: mergedFileResults.length,
+      };
     } catch (error) {
       this.auditLogger.logFileReviewComplete(
         "fast-review",

@@ -18,24 +18,27 @@ This plan details the implementation to enable both **full** and **partial** cac
 
 ### A. Full Cache Hit (100% Files Unchanged)
 
-- If all files in the PR match their cached SHA in `cachedState`:
+- If all files in the PR match their cached SHA in `cachedState` AND `cachedState.crossFileResult` exists:
   - 0 AI calls are made.
   - Returns cached file review findings and cached cross-file architectural analysis.
-  - Sets `filesSkipped = totalFiles`.
+  - Sets `filesSkipped = totalFiles`, `filesAnalyzed = 0`.
+- If `cachedState.crossFileResult` is missing/undefined on a 100% file match:
+  - Fallback to running fast review AI execution to regenerate cross-file analysis.
 
 ### B. Partial Cache Hit (Some Files Changed, Some Unchanged)
 
 - Filters out unchanged files whose SHA matches `cachedState`.
-- Sends **only changed files** to `performFastReview` (diff storage, fast review prompt, AI execution).
-- Validates line numbers for newly generated file findings.
-- Merges cached file findings (for unchanged files) with new file findings (for changed files).
-- Uses the newly generated cross-file analysis for the overall PR context.
-- Accurately tracks `filesSkipped`.
+- Sends **only changed files** (`filesToReview`) to `performFastReview` (diff storage, fast review prompt, AI execution).
+- Validates line numbers for newly generated file findings against `filesToReview`.
+- Merges `cachedResults` (for unchanged files) with `validatedNewResults` (for changed files).
+- For cross-file findings: combines cached cross-file findings from `cachedState.crossFileResult.findings` with findings from the newly generated `crossFileResult` (with deduplication), while utilizing the newly generated `overallAssessment` and `recommendations`.
+- Accurately tracks `filesSkipped` and `filesAnalyzed`.
 
 ### C. Full Cache Miss (No Cached State or All Files Changed)
 
 - Processes all changed files through `performFastReview`.
-- Saves the complete review state to `ReviewStateCache`.
+- Validates line numbers for generated findings.
+- Saves the complete review state (`fileResults`, `fileShaMap`, `crossFileResult`) to `ReviewStateCache`.
 
 ---
 
@@ -52,20 +55,23 @@ This plan details the implementation to enable both **full** and **partial** cac
    - For each file, check if `file.sha` matches `cachedState.files[filename].sha`.
    - Separate files into `cachedResults: FileReviewResult[]` and `filesToReview: PRFile[]`.
 
-3. **Early Exit for Full Cache Hit**:
-   - If `filesToReview.length === 0` and `cachedState?.crossFileResult` exists:
-     - Return `{ fileResults: cachedResults, crossFileResult: cachedState.crossFileResult, filesSkipped: files.length, filesAnalyzed: 0 }`.
+3. **Full Cache Hit Exit & Fallback**:
+   - If `filesToReview.length === 0`:
+     - If `cachedState?.crossFileResult` exists, return `{ fileResults: cachedResults, crossFileResult: cachedState.crossFileResult, filesSkipped: files.length, filesAnalyzed: 0 }`.
+     - Otherwise, if `cachedState?.crossFileResult` is missing, proceed to run `files` through AI prompt execution to generate cross-file assessment.
 
 4. **Partial Review & Result Merging**:
    - Store diffs and build fast review prompt using `filesToReview`.
    - Execute AI prompt for `filesToReview`.
    - Parse fast review response.
-   - Validate line numbers on newly reviewed file results.
-   - Merge `cachedResults` with new `fileResults`.
-   - Return combined results, updated `crossFileResult`, and `filesSkipped` count.
+   - Validate line numbers specifically on `filesToReview` results using `lineNumberValidator.validate(result.fileResults, filesToReview)`.
+   - Merge `cachedResults` with new `validatedNewResults`.
+   - Combine cross-file findings: combine `cachedState.crossFileResult.findings` and `result.crossFileResult.findings` (deduplicating by title/file/line), retaining new `overallAssessment` and `recommendations`.
+   - Return combined `fileResults`, merged `crossFileResult`, `filesSkipped` count, and `filesAnalyzed` count (`filesToReview.length`).
 
-5. **Update Strategy Metrics**:
-   - In `review()`, assign `filesSkipped = fastReviewData.filesSkipped`.
+5. **Update Strategy Metrics in `review()`**:
+   - Assign `filesSkipped = fastReviewData.filesSkipped`.
+   - Assign `filesAnalyzed = fastReviewData.filesAnalyzed`.
 
 ---
 
@@ -74,6 +80,26 @@ This plan details the implementation to enable both **full** and **partial** cac
 ### `src/review/engine.ts`
 
 ```typescript
+// Helper function or method to combine cross-file results
+private combineCrossFileResults(
+  cached?: CrossFileReviewResult,
+  current?: CrossFileReviewResult
+): CrossFileReviewResult {
+  if (!cached) return current ?? { overallAssessment: "No files to review", findings: [], recommendations: [] };
+  if (!current) return cached;
+
+  const existingTitles = new Set(cached.findings.map((f) => `${f.title}:${f.filePath}:${f.lineNumber ?? ""}`));
+  const uniqueNewFindings = current.findings.filter(
+    (f) => !existingTitles.has(`${f.title}:${f.filePath}:${f.lineNumber ?? ""}`)
+  );
+
+  return {
+    overallAssessment: current.overallAssessment,
+    findings: [...cached.findings, ...uniqueNewFindings],
+    recommendations: Array.from(new Set([...current.recommendations, ...cached.recommendations])),
+  };
+}
+
 // In performFastReview:
 private async performFastReview(
   prIdentifier: string,
@@ -116,17 +142,17 @@ private async performFastReview(
 
   // 2. Full cache hit check
   if (filesToReview.length === 0) {
-    this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review in fast mode`);
-    return {
-      fileResults: cachedResults,
-      crossFileResult: cachedState?.crossFileResult ?? {
-        overallAssessment: "No files to review",
-        findings: [],
-        recommendations: [],
-      },
-      filesSkipped,
-      filesAnalyzed: 0,
-    };
+    if (cachedState?.crossFileResult) {
+      this.log(`Skipped ${filesSkipped} unchanged file(s) from previous review in fast mode`);
+      return {
+        fileResults: cachedResults,
+        crossFileResult: cachedState.crossFileResult,
+        filesSkipped,
+        filesAnalyzed: 0,
+      };
+    }
+    // Fallback: If crossFileResult is missing, process all files to generate it
+    filesToReview.push(...files.filter((f) => !this.shouldSkipFile(f) && f.patch));
   }
 
   // 3. Process remaining filesToReview with AI fast review prompt...
@@ -134,10 +160,11 @@ private async performFastReview(
   // 4. Validate line numbers on newly reviewed results & merge with cachedResults
   const validatedNewResults = this.lineNumberValidator.validate(result.fileResults, filesToReview);
   const mergedFileResults = [...cachedResults, ...validatedNewResults];
+  const combinedCrossFile = this.combineCrossFileResults(cachedState?.crossFileResult, result.crossFileResult);
 
   return {
     fileResults: mergedFileResults,
-    crossFileResult: result.crossFileResult,
+    crossFileResult: combinedCrossFile,
     filesSkipped,
     filesAnalyzed: filesToReview.length,
   };
@@ -153,16 +180,21 @@ private async performFastReview(
 Add test cases specifically for fast review mode caching:
 
 1. `fast review re-uses cached file and cross-file results when all files are unchanged`:
-   - Mock `getState` to return cached results.
+   - Mock `getState` to return cached results and cached `crossFileResult`.
    - Run `review()` with `strategy: "fast"`.
    - Verify `provider.executePrompt` is **not** called.
    - Verify returning cached findings and `filesSkipped === fileCount`.
 
-2. `fast review performs partial review on changed files and merges cached results`:
-   - Mock `getState` with 1 changed file SHA and 1 unchanged file SHA.
+2. `fast review performs partial review on changed files and merges cached results & cross-file findings`:
+   - Mock `getState` with 1 changed file SHA, 1 unchanged file SHA, and previous `crossFileResult`.
    - Run `review()` with `strategy: "fast"`.
    - Verify `provider.executePrompt` receives only the changed file diff.
-   - Verify merged output contains both cached file findings and new file findings.
+   - Verify merged output contains both cached file findings and new file findings, and combined cross-file findings.
+
+3. `fast review falls back to AI execution if 100% files are unchanged but cached crossFileResult is missing`:
+   - Mock `getState` with cached file results but `crossFileResult: undefined`.
+   - Run `review()` with `strategy: "fast"`.
+   - Verify AI prompt is executed to generate cross-file findings.
 
 ### Automated Checks
 
