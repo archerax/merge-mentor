@@ -14,8 +14,7 @@
 
 <br>
 
-> [!IMPORTANT]
-> **Full Documentation Site**: For detailed guides, advanced configurations, and CI/CD integration instructions, please visit our **[GitHub Pages Documentation Site](https://archerax.github.io/merge-mentor/pages/)**.
+> **Important**: For detailed guides, advanced configurations, and CI/CD integration instructions, please visit our **[GitHub Pages Documentation Site](https://archerax.github.io/merge-mentor/)**.
 
 ---
 

@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-07-26
+
 ### Added
 
+- **Unchanged File Caching for Fast Mode**: Fast review mode now caches file content hashes and skips re-analyzing unchanged files in pull requests, reducing review latency and AI token usage.
+- **Golden PR Evaluation Framework (`eval` command)**: Added the `eval` CLI command and benchmarking framework to evaluate PR review accuracy and performance against golden datasets.
+- **Interactive PR Comment Thread Reply (`reply` command)**: Added the `reply` CLI command to support interactive, context-aware AI responses directly within PR comment threads.
+- **Custom Tools Support in OpenCode SDK Provider**: Added support for custom tools execution within the `opencode-sdk` AI provider.
 - **Hybrid Zero-Dependency Comment Deduplication**: Added two-stage deduplication that survives line shifts and rewording. Stage 1 decodes existing finding IDs and remaps lines through git diff hunk offset analysis (`remapLineNumber`). Stage 2 uses Sørensen-Dice bigram similarity (`calculateTextSimilarity`, threshold ≥ 0.78) within a ±5 line proximity window for legacy comments without finding IDs. Both utilities are pure TypeScript with zero external dependencies.
 
 ## [2.10.1] - 2026-07-23

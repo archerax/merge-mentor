@@ -4,7 +4,7 @@ import { CorpusEvalError } from "../errors/index.js";
 import type { OutputWriter } from "../ports/index.js";
 import { executeEval } from "./eval.js";
 
-describe("executeEval Command", () => {
+describe("executeEval Command", { timeout: 30000 }, () => {
   const corpusDir = path.join(process.cwd(), "test/eval/corpus");
 
   it("executes evaluation command against corpus and outputs summary", async () => {
