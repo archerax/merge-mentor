@@ -35,11 +35,13 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 
 - **[review](./review.md)**: Reviews a pull request and identifies potential bugs, security issues, and quality problems.
 - **[fix](./fix.md)**: Interactively fixes active review comments on a PR using an AI provider.
+- **[reply](./reply.md)**: Generates responses to review comments and optionally resolves comment threads.
 - **[describe](./describe.md)**: Generates a title, summary, and changelog for a pull request.
 - **[doctor](./doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
 - **[repos](./repos.md)**: Manages local cloned repositories used for context loading.
 - **[pbi](./pbi.md)**: Reviews a Product Backlog Item / User Story / Issue against the INVEST model.
 - **[project](./project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
+- **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.
 
 ---
 

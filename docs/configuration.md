@@ -112,8 +112,20 @@ export MM_AI_MODEL=gpt-4o               # Your deployed model name
 ## Optional Settings
 
 ```bash
-# Review profile (fast or deep)
+# Review profile strategy (fast or deep)
 export MM_REVIEW_STRATEGY=fast
+
+# Reasoning effort level (low, medium, high, xhigh)
+export MM_REASONING=high
+
+# Pin Copilot session to long-context tier (true/false)
+export MM_LONG_CONTEXT=true
+
+# Enable experimental structured output via Copilot SDK tool calls (true/false)
+export MM_EXPERIMENTAL_TOOLS=true
+
+# Verify PR changes against linked Product Backlog Items or Issues (true/false)
+export MM_VERIFY_PBI=true
 
 # Git backend for cloning (cli or isomorphic)
 export MM_GIT_BACKEND=cli

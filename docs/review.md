@@ -48,6 +48,33 @@ merge-mentor review --pr 123 --provider opencode-sdk --write
 | `--strategy <strategy>`   | Execution strategy (`deep` or `fast`)                                                                                  | `MM_REVIEW_STRATEGY` | `fast`    |
 | `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                                                               | `MM_GIT_BACKEND`     | `cli`     |
 
+### Platform Credentials
+
+| Option                        | Description                  | Env Variable           |
+| ----------------------------- | ---------------------------- | ---------------------- |
+| `--github-token <token>`      | GitHub personal access token | `MM_GITHUB_TOKEN`      |
+| `--github-repo-owner <owner>` | GitHub repository owner      | `MM_GITHUB_REPO_OWNER` |
+| `--github-repo-name <name>`   | GitHub repository name       | `MM_GITHUB_REPO_NAME`  |
+| `--azure-token <token>`       | Azure DevOps PAT             | `MM_AZURE_TOKEN`       |
+| `--azure-org <org>`           | Azure DevOps organization    | `MM_AZURE_ORG`         |
+| `--azure-project <project>`   | Azure DevOps project         | `MM_AZURE_PROJECT`     |
+| `--azure-repo <repo>`         | Azure DevOps repository      | `MM_AZURE_REPO`        |
+
+### AI Provider & Model Options
+
+| Option                    | Description                                                                          | Env Variable            | Default        |
+| ------------------------- | ------------------------------------------------------------------------------------ | ----------------------- | -------------- |
+| `--provider <provider>`   | AI provider (`copilot-sdk`, `opencode-sdk`). Note: `claude-agent-sdk` is deprecated. | `MM_AI_PROVIDER`        | `copilot-sdk`  |
+| `--copilot-token <token>` | Copilot GitHub token                                                                 | `MM_COPILOT_TOKEN`      | -              |
+| `--ai-timeout <ms>`       | Timeout in ms for all AI providers                                                   | `MM_AI_TIMEOUT`         | `3600000` (1h) |
+| `--ai-model <model>`      | Model name for the active AI provider                                                | `MM_AI_MODEL`           | -              |
+| `--ai-base-url <url>`     | OpenAI-compatible API base URL for BYOK                                              | `MM_AI_BASE_URL`        | -              |
+| `--ai-api-key <key>`      | API key for BYOK                                                                     | `MM_AI_API_KEY`         | -              |
+| `--reasoning <level>`     | Reasoning effort level (`low`, `medium`, `high`, `xhigh`) for supporting models      | `MM_REASONING`          | -              |
+| `--experimental-tools`    | Enable experimental structured output via Copilot SDK tool calls                     | `MM_EXPERIMENTAL_TOOLS` | `false`        |
+| `--long-context`          | Pin the session to the long-context tier                                             | `MM_LONG_CONTEXT`       | `false`        |
+| `--verify-pbi`            | Verify PR changes against linked Product Backlog Items or Issues                     | `MM_VERIFY_PBI`         | `false`        |
+
 ### File Filtering
 
 | Option               | Description                                   | Default           |
