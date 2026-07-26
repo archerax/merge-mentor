@@ -330,10 +330,35 @@ describe("doctor command", () => {
   });
 
   it("diagnoses tempPath writability successfully", async () => {
+    const mkdirSpy = vi
+      .spyOn(fs, "mkdirSync")
+      .mockImplementation(() => undefined as unknown as string);
+    const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+    const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation(() => {});
+
     await program.parseAsync(["node", "test", "doctor"]);
+
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Temp path writability: ✅ Writable")
     );
+
+    mkdirSpy.mockRestore();
+    writeSpy.mockRestore();
+    unlinkSpy.mockRestore();
+  });
+
+  it("diagnoses tempPath writability failure when write throws", async () => {
+    const mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation(() => {
+      throw new Error("Permission denied");
+    });
+
+    await program.parseAsync(["node", "test", "doctor"]);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Temp path writability: ❌ Not writable")
+    );
+
+    mkdirSpy.mockRestore();
   });
 
   describe("Copilot authentication status checks", () => {

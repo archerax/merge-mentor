@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
 import { AzureDevOpsAdapter } from "../platforms/azure.js";
@@ -103,9 +103,14 @@ describe("pbi command", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.MM_PLATFORM;
     exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(loadConfig).mockReturnValue(createMockConfig());
+  });
+
+  afterEach(() => {
+    delete process.env.MM_PLATFORM;
   });
 
   it("successfully reviews PBI in dry-run mode", async () => {
@@ -120,23 +125,25 @@ describe("pbi command", () => {
     vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
     process.env.MM_PLATFORM = "azure";
 
-    vi.mocked(loadConfig).mockImplementationOnce((cliOverrides) => {
-      const overrides = cliOverrides as { platform?: string } | undefined;
-      return createMockConfig({
-        defaultPlatform: (overrides?.platform ?? "github") as "github" | "azure",
+    try {
+      vi.mocked(loadConfig).mockImplementationOnce((cliOverrides) => {
+        const overrides = cliOverrides as { platform?: string } | undefined;
+        return createMockConfig({
+          defaultPlatform: (overrides?.platform ?? "github") as "github" | "azure",
+        });
       });
-    });
 
-    await program.parseAsync(["node", "test", "pbi", "12345"]);
+      await program.parseAsync(["node", "test", "pbi", "12345"]);
 
-    expect(loadConfig).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platform: "azure",
-      })
-    );
-    expect(AzureDevOpsAdapter).toHaveBeenCalled();
-
-    delete process.env.MM_PLATFORM;
+      expect(loadConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "azure",
+        })
+      );
+      expect(AzureDevOpsAdapter).toHaveBeenCalled();
+    } finally {
+      delete process.env.MM_PLATFORM;
+    }
   });
 
   it("errors and exits when executePBIReview throws", async () => {

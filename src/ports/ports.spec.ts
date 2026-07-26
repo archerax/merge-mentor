@@ -1,11 +1,45 @@
-import { randomUUID } from "node:crypto";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { systemClock } from "./clock.js";
+import { processEnvironment } from "./environment.js";
 import { createSystemExecutableFinder } from "./executableFinder.js";
 import { nodeFs } from "./fileSystem.js";
 import { consoleOutputWriter } from "./outputWriter.js";
+import { nodeProcessRunner } from "./processRunner.js";
 import { createStubProcessRunner } from "./processRunner.test-helper.js";
+
+// Mock node:fs/promises so nodeFs does not touch real system disk
+vi.mock("node:fs/promises", () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    mkdir: vi.fn(),
+    rm: vi.fn(),
+    access: vi.fn(),
+    readdir: vi.fn(),
+    stat: vi.fn(),
+    unlink: vi.fn(),
+  },
+}));
+
+// Mock node:child_process for nodeProcessRunner unit tests
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    exec: vi.fn((_cmd, opts, cb) => {
+      const callback = typeof opts === "function" ? opts : cb;
+      if (callback) callback(null, { stdout: "mock stdout", stderr: "mock stderr" });
+    }),
+    execFile: vi.fn((_file, _args, opts, cb) => {
+      const callback = typeof opts === "function" ? opts : cb;
+      if (callback) callback(null, { stdout: "mock file stdout", stderr: "" });
+    }),
+    execSync: vi.fn().mockReturnValue("mock sync output"),
+    spawn: vi.fn().mockReturnValue({ pid: 9999 }),
+  };
+});
+
+import fs from "node:fs/promises";
 
 // ---------------------------------------------------------------------------
 // executableFinder
@@ -146,93 +180,103 @@ describe("createSystemExecutableFinder", () => {
 // fileSystem (nodeFs)
 // ---------------------------------------------------------------------------
 describe("nodeFs", () => {
-  let tempDir: string;
+  test("readFile delegates to fs.readFile", async () => {
+    vi.mocked(fs.readFile).mockResolvedValue("content");
 
-  beforeEach(async () => {
-    tempDir = path.join(os.tmpdir(), `merge-mentor-test-${randomUUID()}`);
-    await nodeFs.mkdir(tempDir, { recursive: true });
+    const content = await nodeFs.readFile("/tmp/test.txt", "utf-8");
+
+    expect(content).toBe("content");
+    expect(fs.readFile).toHaveBeenCalledWith("/tmp/test.txt", "utf-8");
   });
 
-  afterEach(async () => {
-    await nodeFs.rm(tempDir, { recursive: true, force: true });
+  test("writeFile delegates to fs.writeFile", async () => {
+    vi.mocked(fs.writeFile).mockResolvedValue();
+
+    await nodeFs.writeFile("/tmp/test.txt", "hello", "utf-8");
+
+    expect(fs.writeFile).toHaveBeenCalledWith("/tmp/test.txt", "hello", "utf-8");
   });
 
-  test("writeFile and readFile round-trip", async () => {
-    const filePath = path.join(tempDir, "test.txt");
+  test("mkdir delegates to fs.mkdir", async () => {
+    vi.mocked(fs.mkdir).mockResolvedValue("/tmp/a/b");
 
-    await nodeFs.writeFile(filePath, "hello world", "utf-8");
-    const content = await nodeFs.readFile(filePath, "utf-8");
+    const res = await nodeFs.mkdir("/tmp/a/b", { recursive: true });
 
-    expect(content).toBe("hello world");
+    expect(res).toBe("/tmp/a/b");
+    expect(fs.mkdir).toHaveBeenCalledWith("/tmp/a/b", { recursive: true });
   });
 
-  test("mkdir creates nested directories", async () => {
-    const nested = path.join(tempDir, "a", "b", "c");
+  test("rm delegates to fs.rm", async () => {
+    vi.mocked(fs.rm).mockResolvedValue();
 
-    await nodeFs.mkdir(nested, { recursive: true });
-    await nodeFs.access(nested);
+    await nodeFs.rm("/tmp/dir", { recursive: true, force: true });
+
+    expect(fs.rm).toHaveBeenCalledWith("/tmp/dir", { recursive: true, force: true });
   });
 
-  test("rm removes directory recursively", async () => {
-    const nested = path.join(tempDir, "to-remove", "child");
-    await nodeFs.mkdir(nested, { recursive: true });
-    const filePath = path.join(nested, "file.txt");
-    await nodeFs.writeFile(filePath, "data", "utf-8");
+  test("access delegates to fs.access", async () => {
+    vi.mocked(fs.access).mockResolvedValue();
 
-    await nodeFs.rm(path.join(tempDir, "to-remove"), {
-      recursive: true,
-      force: true,
-    });
+    await nodeFs.access("/tmp/file.txt");
 
-    await expect(nodeFs.access(path.join(tempDir, "to-remove"))).rejects.toThrow();
+    expect(fs.access).toHaveBeenCalledWith("/tmp/file.txt");
   });
 
-  test("access resolves for existing file", async () => {
-    const filePath = path.join(tempDir, "exists.txt");
-    await nodeFs.writeFile(filePath, "", "utf-8");
+  test("readdir delegates to fs.readdir", async () => {
+    const mockEntries = [{ name: "a.txt", isFile: () => true, isDirectory: () => false }];
+    vi.mocked(fs.readdir).mockResolvedValue(mockEntries as never);
 
-    await expect(nodeFs.access(filePath)).resolves.toBeUndefined();
+    const entries = await nodeFs.readdir("/tmp/dir", { withFileTypes: true });
+
+    expect(entries).toBe(mockEntries);
+    expect(fs.readdir).toHaveBeenCalledWith("/tmp/dir", { withFileTypes: true });
   });
 
-  test("access rejects for non-existing file", async () => {
-    const filePath = path.join(tempDir, "nope.txt");
+  test("stat delegates to fs.stat", async () => {
+    const mockStats = { isFile: () => true, size: 100 };
+    vi.mocked(fs.stat).mockResolvedValue(mockStats as never);
 
-    await expect(nodeFs.access(filePath)).rejects.toThrow();
+    const stats = await nodeFs.stat("/tmp/file.txt");
+
+    expect(stats).toBe(mockStats);
+    expect(fs.stat).toHaveBeenCalledWith("/tmp/file.txt");
   });
 
-  test("readdir returns entries with withFileTypes", async () => {
-    await nodeFs.writeFile(path.join(tempDir, "a.txt"), "", "utf-8");
-    await nodeFs.mkdir(path.join(tempDir, "subdir"));
+  test("unlink delegates to fs.unlink", async () => {
+    vi.mocked(fs.unlink).mockResolvedValue();
 
-    const entries = await nodeFs.readdir(tempDir, { withFileTypes: true });
+    await nodeFs.unlink("/tmp/file.txt");
 
-    const names = entries.map((e) => e.name).sort();
-    expect(names).toEqual(["a.txt", "subdir"]);
+    expect(fs.unlink).toHaveBeenCalledWith("/tmp/file.txt");
+  });
+});
 
-    const fileEntry = entries.find((e) => e.name === "a.txt");
-    expect(fileEntry?.isFile()).toBe(true);
+// ---------------------------------------------------------------------------
+// processRunner (nodeProcessRunner)
+// ---------------------------------------------------------------------------
+describe("nodeProcessRunner", () => {
+  test("exec delegates to child_process exec", async () => {
+    const result = await nodeProcessRunner.exec("echo hello");
 
-    const dirEntry = entries.find((e) => e.name === "subdir");
-    expect(dirEntry?.isDirectory()).toBe(true);
+    expect(result).toEqual({ stdout: "mock stdout", stderr: "mock stderr" });
   });
 
-  test("stat returns a Stats object", async () => {
-    const filePath = path.join(tempDir, "stat-test.txt");
-    await nodeFs.writeFile(filePath, "content", "utf-8");
+  test("execFile delegates to child_process execFile", async () => {
+    const result = await nodeProcessRunner.execFile("git", ["status"]);
 
-    const stats = await nodeFs.stat(filePath);
-
-    expect(stats.isFile()).toBe(true);
-    expect(stats.size).toBeGreaterThan(0);
+    expect(result).toEqual({ stdout: "mock file stdout", stderr: "" });
   });
 
-  test("unlink removes a file", async () => {
-    const filePath = path.join(tempDir, "to-delete.txt");
-    await nodeFs.writeFile(filePath, "bye", "utf-8");
+  test("execSync delegates to child_process execSync", () => {
+    const output = nodeProcessRunner.execSync("whoami", { encoding: "utf-8" });
 
-    await nodeFs.unlink(filePath);
+    expect(output).toBe("mock sync output");
+  });
 
-    await expect(nodeFs.access(filePath)).rejects.toThrow();
+  test("spawn delegates to child_process spawn", () => {
+    const proc = nodeProcessRunner.spawn("node", ["script.js"]);
+
+    expect(proc).toEqual({ pid: 9999 });
   });
 });
 
@@ -266,5 +310,57 @@ describe("consoleOutputWriter", () => {
     expect(spy).toHaveBeenCalledWith("raw data");
     expect(result).toBe(true);
     spy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// systemClock
+// ---------------------------------------------------------------------------
+describe("systemClock", () => {
+  test("now returns a valid Date instance", () => {
+    const before = Date.now();
+    const date = systemClock.now();
+    const after = Date.now();
+
+    expect(date).toBeInstanceOf(Date);
+    expect(date.getTime()).toBeGreaterThanOrEqual(before);
+    expect(date.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  test("timestamp returns ISO 8601 string", () => {
+    const ts = systemClock.timestamp();
+
+    expect(typeof ts).toBe("string");
+    expect(Number.isNaN(Date.parse(ts))).toBe(false);
+  });
+
+  test("epochMs returns current epoch milliseconds", () => {
+    const before = Date.now();
+    const ms = systemClock.epochMs();
+    const after = Date.now();
+
+    expect(typeof ms).toBe("number");
+    expect(ms).toBeGreaterThanOrEqual(before);
+    expect(ms).toBeLessThanOrEqual(after);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processEnvironment
+// ---------------------------------------------------------------------------
+describe("processEnvironment", () => {
+  test("get returns process.env value when defined", () => {
+    const key = "MERGE_MENTOR_TEST_ENV_VAR";
+    process.env[key] = "test-val";
+
+    try {
+      expect(processEnvironment.get(key)).toBe("test-val");
+    } finally {
+      delete process.env[key];
+    }
+  });
+
+  test("get returns undefined when key is not set", () => {
+    expect(processEnvironment.get("UNSET_ENV_VAR_XYZ")).toBeUndefined();
   });
 });
