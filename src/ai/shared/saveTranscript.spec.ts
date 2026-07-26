@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { Clock, FileSystem } from "../../ports/index.js";
 import { type SaveTranscriptDeps, saveTranscript } from "./saveTranscript.js";
@@ -65,8 +66,11 @@ describe("saveTranscript", () => {
       attempt: 1,
     });
 
-    const expectedPath =
-      "/tmp/test/transcripts/transcript-test-2026-07-24T12-00-00-000Z-attempt-1-success.txt";
+    const expectedPath = path.join(
+      "/tmp/test",
+      "transcripts",
+      "transcript-test-2026-07-24T12-00-00-000Z-attempt-1-success.txt"
+    );
     expect(writtenFiles[expectedPath]).toBeDefined();
 
     const content = writtenFiles[expectedPath];
@@ -104,8 +108,11 @@ describe("saveTranscript", () => {
       attempt: 2,
     });
 
-    const expectedPath =
-      "/tmp/test/transcripts/transcript-test-2026-07-24T12-00-00-000Z-attempt-2-failure.txt";
+    const expectedPath = path.join(
+      "/tmp/test",
+      "transcripts",
+      "transcript-test-2026-07-24T12-00-00-000Z-attempt-2-failure.txt"
+    );
     expect(writtenFiles[expectedPath]).toBeDefined();
 
     const content = writtenFiles[expectedPath];
