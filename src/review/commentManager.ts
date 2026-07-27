@@ -35,7 +35,7 @@
  */
 
 import packageJson from "../../package.json" with { type: "json" };
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
+import { APP_NAME_LINK, CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import type {
   CommentAction,
@@ -431,7 +431,7 @@ ${this.footer}${idMarker}`;
     model?: string
   ): string {
     const footerParts = [
-      `Merge Mentor v${packageJson.version}`,
+      `${APP_NAME_LINK} v${packageJson.version}`,
       this.formatReviewType(reviewType, reviewPasses, reviewStrategy),
       this.formatModelName(model),
     ];

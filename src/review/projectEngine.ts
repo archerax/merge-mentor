@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import packageJson from "../../package.json" with { type: "json" };
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
+import { APP_NAME_LINK } from "../constants.js";
 import { createChildLogger } from "../logger.js";
 import type { PlatformAdapter, ProjectDetails } from "../platforms/types.js";
 import { consoleOutputWriter } from "../ports/outputWriter.js";
@@ -244,7 +245,7 @@ ${
 }
 
 ---
-Merge Mentor v${packageJson.version}, Project review, ${model}
+${APP_NAME_LINK} v${packageJson.version}, Project review, ${model}
 <!-- merge-mentor-project-review -->
 `;
   }

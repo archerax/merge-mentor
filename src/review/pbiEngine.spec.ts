@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
+import { APP_NAME_LINK } from "../constants.js";
 import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { PBIReviewEngine } from "./pbiEngine.js";
 
@@ -143,7 +144,7 @@ describe("PBIReviewEngine", () => {
 
     expect(adapter.postPBIComment).toHaveBeenCalledWith(
       "12345",
-      expect.stringContaining("Merge Mentor v")
+      expect.stringContaining(`${APP_NAME_LINK} v`)
     );
     expect(adapter.postPBIComment).toHaveBeenCalledWith(
       "12345",

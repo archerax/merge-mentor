@@ -1,5 +1,6 @@
 import { describe, expect, it, test, vi } from "vitest";
 import packageJson from "../../package.json" with { type: "json" };
+import { APP_NAME_LINK } from "../constants.js";
 import type {
   CrossFileReviewResult,
   ExistingComment,
@@ -19,7 +20,7 @@ vi.mock("../logger.js", () => ({
   }),
 }));
 
-const DEFAULT_FOOTER = `Merge Mentor v${packageJson.version}, Standard review, AI model`;
+const DEFAULT_FOOTER = `${APP_NAME_LINK} v${packageJson.version}, Standard review, AI model`;
 
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
@@ -157,7 +158,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Standard review, claude-sonnet-4.6`
+        `${APP_NAME_LINK} v${packageJson.version}, Standard review, claude-sonnet-4.6`
       );
     });
 
@@ -170,7 +171,7 @@ describe("CommentManager", () => {
       const result = manager.formatInlineComment(createFileFinding());
 
       expect(result).toContain(
-        `Merge Mentor v${packageJson.version}, Standard review + scan → logic, AI model`
+        `${APP_NAME_LINK} v${packageJson.version}, Standard review + scan → logic, AI model`
       );
     });
   });

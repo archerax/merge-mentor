@@ -1,14 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_NAME_LINK,
   CATEGORY_EMOJI,
   DEFAULT_MAX_RETRIES,
   DEFAULT_PAGE_SIZE,
   DEFAULT_TIMEOUT_MS,
+  DOCS_URL,
   RETRY_DELAY_BASE_MS,
   SEVERITY_EMOJI,
 } from "./constants.js";
 
 describe("Constants", () => {
+  describe("documentation links and metadata", () => {
+    it("should define DOCS_URL", () => {
+      expect(DOCS_URL).toBe("https://archerax.github.io/merge-mentor/");
+    });
+
+    it("should define APP_NAME_LINK", () => {
+      expect(APP_NAME_LINK).toBe("[Merge Mentor](https://archerax.github.io/merge-mentor/)");
+    });
+  });
+
   describe("pagination and retry constants", () => {
     it("should define DEFAULT_PAGE_SIZE", () => {
       expect(DEFAULT_PAGE_SIZE).toBe(100);

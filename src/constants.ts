@@ -5,6 +5,12 @@
 
 import type { FindingCategory } from "./platforms/types.js";
 
+/** Documentation website URL for Merge Mentor. */
+export const DOCS_URL = "https://archerax.github.io/merge-mentor/";
+
+/** Application display name formatted as Markdown link to documentation. */
+export const APP_NAME_LINK = `[Merge Mentor](${DOCS_URL})`;
+
 /** Default page size for API pagination. */
 export const DEFAULT_PAGE_SIZE = 100;
 
