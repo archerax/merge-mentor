@@ -301,6 +301,26 @@ describe("CLI Options & Parsing", () => {
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
 
+    it("parses platform credentials and repository options", async () => {
+      vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
+
+      await program.parseAsync([
+        "node",
+        "test",
+        "describe",
+        "--pr",
+        "42",
+        "--github-token",
+        "my-gh-token",
+        "--github-repo-owner",
+        "my-owner",
+        "--github-repo-name",
+        "my-repo",
+      ]);
+
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
     it("errors and exits when executeDescribe throws", async () => {
       mockDescribePR.mockRejectedValueOnce(new Error("Describe Failed"));
 

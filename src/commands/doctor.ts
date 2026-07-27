@@ -327,7 +327,7 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
     output.log(`  AI base URL: ${config.aiBaseUrl ? "✅ Set" : "Not set"}`);
 
     const isApiKeyRequired = !!config.aiBaseUrl;
-    const hasAiApiKey = !!(config.aiApiKey || env.get("ANTHROPIC_API_KEY"));
+    const hasAiApiKey = !!config.aiApiKey;
     output.log(
       `  AI API key: ${hasAiApiKey ? "✅ Set" : isApiKeyRequired ? "❌ Not set" : "Not set"}`
     );

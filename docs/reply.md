@@ -10,11 +10,14 @@ The `reply` command generates intelligent responses to open review comments on a
 ## Usage
 
 ```bash
-# Reply to unresolved bot-initiated threads awaiting a reply (dry-run mode)
-merge-mentor reply --pr 123 --dry-run
+# Reply to unresolved bot-initiated threads awaiting a reply (dry-run mode by default)
+merge-mentor reply --pr 123
+
+# Post replies to remote platform
+merge-mentor reply --pr 123 --write
 
 # Reply and automatically resolve threads where the defect is fixed
-merge-mentor reply --pr 123 --resolve
+merge-mentor reply --pr 123 --write --resolve
 
 # Interactively prompt before replying to each thread
 merge-mentor reply --pr 123 --interactive
@@ -37,7 +40,7 @@ merge-mentor reply --pr 123 --comment-id 987654321
 | `--comment-id <id>`       | Specific comment or thread ID to reply to                                 | -                | -                |
 | `--resolve`               | Automatically resolve the thread if AI confirms defect is fixed           | -                | `false`          |
 | `--interactive`           | Interactively prompt before replying to each thread                       | -                | `false`          |
-| `--dry-run`               | Simulate response without posting to platform                             | -                | `false`          |
+| `--write`                 | Post replies and resolve threads on platform (default is dry-run mode)    | -                | `false`          |
 | `--platform <platform>`   | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `github`         |
 | `--temp-path <path>`      | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH`   | `./.mergementor` |
 | `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                  | `MM_GIT_BACKEND` | `cli`            |
@@ -72,4 +75,4 @@ merge-mentor reply --pr 123 --comment-id 987654321
 1. **Thread Selection**: By default, `reply` finds unresolved comment threads initiated by Merge Mentor where the latest comment is from a human user. You can also target a specific thread using `--comment-id`.
 2. **Context Gathering**: The tool loads the surrounding code snippet (15 lines above/below the comment line, or full file if under 100 lines) from the workspace.
 3. **AI Generation**: The AI provider analyzes the conversation history and local code snippet to generate a relevant reply and evaluate whether the issue has been resolved.
-4. **Posting & Resolution**: If `--dry-run` is omitted, the reply is posted to the PR. If `--resolve` is set and the AI confirms the defect is resolved, the comment thread is automatically marked as resolved.
+4. **Posting & Resolution**: When `--write` is specified, the reply is posted to the PR. If `--resolve` is set and the AI confirms the defect is resolved, the comment thread is automatically marked as resolved. In dry-run mode (without `--write`), proposed replies and resolve decisions are logged to the console without updating the platform.

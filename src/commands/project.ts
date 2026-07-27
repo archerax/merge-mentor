@@ -48,10 +48,13 @@ export async function executeProjectReview(id: string, options: ProjectOptions):
     azureProject: options.azureProject ?? detectedAzureProject,
     azureRepo: options.azureRepo ?? detectedAzureRepo,
     aiProvider: options.provider,
+    copilotToken: options.copilotToken,
+    aiTimeout: options.aiTimeout,
     aiModel: options.aiModel,
     aiBaseUrl: options.aiBaseUrl,
     aiApiKey: options.aiApiKey,
     tempPath: options.tempPath,
+    gitBackend: options.gitBackend,
   });
 
   const platform = config.defaultPlatform;

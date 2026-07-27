@@ -172,7 +172,7 @@ describe("reply command", () => {
       });
 
       await executeReplyCommand(
-        { pr: 42, ci: false, commentId: "123", resolve: true, dryRun: false },
+        { pr: 42, ci: false, commentId: "123", resolve: true, write: true },
         { output: mockOutput }
       );
 
@@ -185,7 +185,7 @@ describe("reply command", () => {
       expect(mockAdapter.resolveCommentThread).toHaveBeenCalledWith(42, "123");
     });
 
-    it("logs proposed reply in dry run mode without posting", async () => {
+    it("logs proposed reply in dry run mode without posting when write is omitted or false", async () => {
       mockAdapter.getUnresolvedCommentThreads.mockResolvedValueOnce([
         {
           id: "99",
@@ -207,10 +207,7 @@ describe("reply command", () => {
         }),
       });
 
-      await executeReplyCommand(
-        { pr: 10, ci: false, dryRun: true, resolve: true },
-        { output: mockOutput }
-      );
+      await executeReplyCommand({ pr: 10, ci: false, resolve: true }, { output: mockOutput });
 
       expect(mockAdapter.postCommentReply).not.toHaveBeenCalled();
       expect(mockAdapter.resolveCommentThread).not.toHaveBeenCalled();

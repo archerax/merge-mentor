@@ -95,6 +95,7 @@ export async function executeReplyCommand(
     azureRepo: resolvedOptions.azureRepo,
     tempPath: resolvedOptions.tempPath,
     aiProvider: resolvedOptions.provider,
+    copilotToken: resolvedOptions.copilotToken,
     aiModel: resolvedOptions.aiModel,
     aiTimeout: resolvedOptions.aiTimeout,
     aiBaseUrl: resolvedOptions.aiBaseUrl,
@@ -219,7 +220,8 @@ export async function executeReplyCommand(
     const aiResult = await aiClient.executePrompt(prompt);
     const response = parseReplyResponse(aiResult.raw);
 
-    if (resolvedOptions.dryRun) {
+    const isDryRun = resolvedOptions.dryRun ?? !resolvedOptions.write;
+    if (isDryRun) {
       outputWriter.log(`\n[DRY RUN] Proposed Reply for Thread ${thread.id}:`);
       outputWriter.log(response.reply);
       outputWriter.log(

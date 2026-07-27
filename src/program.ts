@@ -245,15 +245,16 @@ program
   .description("Generate title, summary, and changelog for a pull request")
   .optionsGroup("General Options")
   .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
-  .option("--pr-url <url>", "PR URL to auto-detect platform, owner/repo, and PR number.")
+  .option(
+    "--pr-url <url>",
+    "PR URL (e.g. https://github.com/owner/repo/pull/123 or https://dev.azure.com/org/project/_git/repo/pullrequest/456). Sets platform, org/project, repo, and PR number automatically."
+  )
   .option(
     "--ci",
     "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
     false
   )
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
-  .option("--suggest-title", "Suggest a Conventional Commit style title for the PR", false)
-  .option("--write", "Update the PR description and/or title on the remote platform", false)
   .option(
     "--temp-path <path>",
     "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
@@ -262,13 +263,32 @@ program
     "--local-workspace-path <path>",
     "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
   )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .optionsGroup("Describe Configuration")
+  .option("--suggest-title", "Suggest a Conventional Commit style title for the PR", false)
+  .option("--write", "Update the PR description and/or title on the remote platform", false)
+  .optionsGroup("GitHub Configuration")
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
   .optionsGroup("AI Provider Configuration")
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option("--ai-base-url <url>", "OpenAI-compatible API base URL for BYOK. Env: MM_AI_BASE_URL")
-  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
   .optionsGroup("File Filtering")
   .option(
     "--ignore <pattern>",
@@ -344,10 +364,14 @@ program
 program
   .command("repos")
   .description("Manage cloned repositories for context loading")
+  .optionsGroup("General Options")
   .option("--list", "List all cloned repositories", false)
   .option("--clean", "Remove all cloned repositories", false)
   .option("--clean-repo <name>", "Remove a specific cloned repository")
-  .option("--temp-path <path>", "Base path for temporary files. Env: MM_TEMP_PATH")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
   .action((options: { list?: boolean; clean?: boolean; cleanRepo?: string; tempPath?: string }) => {
     executeReposCommand(options);
   });
@@ -356,7 +380,8 @@ program
 program
   .command("doctor")
   .description("Check AI provider CLI installations and configuration")
-  .option("--provider <provider>", "Check specific provider (copilot, opencode)")
+  .optionsGroup("General Options")
+  .option("--provider <provider>", "Check specific provider (copilot-sdk, opencode-sdk)")
   .action(async (options: { provider?: string }) => {
     await executeDoctorCommand(options);
     process.exit(0);
@@ -366,20 +391,40 @@ program
 program
   .command("pbi <id>")
   .description("Review a Product Backlog Item / User Story / Issue against the INVEST model")
+  .optionsGroup("General Options")
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option("--write", "Post comments back to the PBI/Issue (default is dry-run mode)", false)
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
   .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
   .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .optionsGroup("AI Provider Configuration")
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option("--ai-base-url <url>", "API base URL for BYOK. Env: MM_AI_BASE_URL")
-  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
-  .option("--temp-path <path>", "Base path for temporary files. Env: MM_TEMP_PATH")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
   .action(async (id: string, options: PBIOptions) => {
     try {
       await executePBIReview(id, options);
@@ -394,57 +439,11 @@ program
 program
   .command("project <id>")
   .description("Review a project/feature plan hierarchy against planning guidelines")
+  .optionsGroup("General Options")
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--write",
     "Post comments back to the root Project/Epic/Feature (default is dry-run mode)",
-    false
-  )
-  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
-  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
-  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
-  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
-  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
-  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
-  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
-  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option("--ai-base-url <url>", "API base URL for BYOK. Env: MM_AI_BASE_URL")
-  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
-  .option("--temp-path <path>", "Base path for temporary files. Env: MM_TEMP_PATH")
-  .action(async (id: string, options: ProjectOptions) => {
-    try {
-      await executeProjectReview(id, options);
-      process.exit(0);
-    } catch (error) {
-      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
-      process.exit(1);
-    }
-  });
-
-// Fix command
-program
-  .command("fix")
-  .description("Interactively fix active review comments on a PR using an AI provider")
-  .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
-  .option(
-    "--pr-url <url>",
-    "PR URL. Sets platform, org/project, repo, and PR number automatically."
-  )
-  .option(
-    "--ci",
-    "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
-    false
-  )
-  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
-  .option(
-    "--allow-dirty",
-    "Allow execution even if the local Git workspace has uncommitted changes",
-    false
-  )
-  .option(
-    "--no-interactive",
-    "Disable interactive prompts and automatically apply all fixes",
     false
   )
   .option(
@@ -459,19 +458,89 @@ program
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
+  .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
   .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
   .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .optionsGroup("AI Provider Configuration")
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option("--ai-base-url <url>", "OpenAI-compatible API base URL for BYOK. Env: MM_AI_BASE_URL")
-  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .action(async (id: string, options: ProjectOptions) => {
+    try {
+      await executeProjectReview(id, options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Fix command
+program
+  .command("fix")
+  .description("Interactively fix active review comments on a PR using an AI provider")
+  .optionsGroup("General Options")
+  .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
+  .option(
+    "--pr-url <url>",
+    "PR URL (e.g. https://github.com/owner/repo/pull/123 or https://dev.azure.com/org/project/_git/repo/pullrequest/456). Sets platform, org/project, repo, and PR number automatically."
+  )
+  .option(
+    "--ci",
+    "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
+    false
+  )
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .optionsGroup("Fix Configuration")
+  .option(
+    "--allow-dirty",
+    "Allow execution even if the local Git workspace has uncommitted changes",
+    false
+  )
+  .option("--interactive", "Interactively prompt before applying fixes", false)
+  .optionsGroup("GitHub Configuration")
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
   .action(async (options: FixOptions) => {
     try {
       if (options.prUrl) {
@@ -535,34 +604,56 @@ program
   .description("PR comment reply and optional thread auto-resolution")
   .optionsGroup("General Options")
   .option("--pr <number>", "Pull request number (auto-detected in CI mode)", parseInt)
-  .option("--pr-url <url>", "PR URL to auto-detect platform, owner/repo, and PR number.")
-  .option("--ci", "CI mode: auto-detect platform and PR from the CI environment", false)
-  .option("--comment-id <id>", "Specific comment or thread ID to reply to")
-  .option("--resolve", "Automatically resolve the thread if AI confirms defect is fixed", false)
-  .option("--interactive", "Interactively prompt before replying to each thread", false)
-  .option("--dry-run", "Simulate response without posting to platform", false)
+  .option(
+    "--pr-url <url>",
+    "PR URL (e.g. https://github.com/owner/repo/pull/123 or https://dev.azure.com/org/project/_git/repo/pullrequest/456). Sets platform, org/project, repo, and PR number automatically."
+  )
+  .option(
+    "--ci",
+    "CI mode: auto-detect platform and PR from the CI environment (GitHub Actions or Azure Pipelines)",
+    false
+  )
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--temp-path <path>",
     "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
   )
   .option(
+    "--local-workspace-path <path>",
+    "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
+  )
+  .option(
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
+  .optionsGroup("Reply Configuration")
+  .option("--comment-id <id>", "Specific comment or thread ID to reply to")
+  .option("--resolve", "Automatically resolve the thread if AI confirms defect is fixed", false)
+  .option("--interactive", "Interactively prompt before replying to each thread", false)
+  .option(
+    "--write",
+    "Post replies and resolve threads on platform (default is dry-run mode)",
+    false
+  )
+  .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
   .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
   .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .optionsGroup("AI Provider Configuration")
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
-  .option("--ai-base-url <url>", "OpenAI-compatible API base URL for BYOK. Env: MM_AI_BASE_URL")
-  .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
   .action(async (options: ReplyOptions) => {
     try {
       if (options.prUrl) {
@@ -624,8 +715,13 @@ program
 program
   .command("eval")
   .description("Run Golden-PR evaluation harness against test corpus")
+  .optionsGroup("General Options")
   .option("--corpus-dir <path>", "Path to test corpus directory (default: './test/eval/corpus')")
-  .option("--provider <name>", "AI provider to use (mock, copilot-sdk, opencode-sdk)", "mock")
+  .option(
+    "--provider <provider>",
+    "AI provider to use (mock, copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER",
+    "mock"
+  )
   .option(
     "--min-recall <number>",
     "Minimum required recall threshold (0.0 - 1.0)",
@@ -638,6 +734,7 @@ program
     (val: string) => Number.parseFloat(val),
     0.85
   )
+  .optionsGroup("Console Output Options")
   .option("--json", "Output raw JSON report to stdout", false)
   .option("--output-file <path>", "Path to write JSON evaluation report")
   .action(async (options: EvalCommandOptions) => {

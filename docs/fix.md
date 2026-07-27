@@ -21,14 +21,14 @@ The `fix` command interactively addresses active review comments on a pull reque
 ## Usage
 
 ```bash
-# Interactively fix review comments on a PR (using env variables for credentials)
+# Fix review comments on a PR non-interactively (using env variables for credentials)
 merge-mentor fix --pr 123
+
+# Interactively prompt before applying fixes for each review comment
+merge-mentor fix --pr 123 --interactive
 
 # Allow running even if you have uncommitted changes in your local branch
 merge-mentor fix --pr 123 --allow-dirty
-
-# Run non-interactively (automatically apply all proposed fixes without prompting)
-merge-mentor fix --pr 123 --no-interactive
 ```
 
 ---
@@ -44,7 +44,7 @@ merge-mentor fix --pr 123 --no-interactive
 | `--ci`                          | CI mode: auto-detect platform and PR from environment variables           | -                | `false`          |
 | `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `github`         |
 | `--allow-dirty`                 | Allow execution even if the local Git workspace has uncommitted changes   | -                | `false`          |
-| `--no-interactive`              | Disable interactive prompts and automatically apply all fixes             | -                | `false`          |
+| `--interactive`                 | Interactively prompt before applying fixes for each review comment        | -                | `false`          |
 | `--temp-path <path>`            | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH`   | `./.mergementor` |
 | `--local-workspace-path <path>` | Path to a pre-existing local repository checkout                          | -                | -                |
 | `--git-backend <backend>`       | Git backend for cloning/fetching (`cli` or `isomorphic`)                  | `MM_GIT_BACKEND` | `cli`            |
@@ -80,6 +80,6 @@ merge-mentor fix --pr 123 --no-interactive
 2. **Checkout**: It checks out your pull request branch. By default, it requires a clean Git working directory unless `--allow-dirty` is provided.
 3. **Iterative Refinement**:
    - For each active comment, the AI provider proposes a code fix.
-   - If interactive mode is enabled, the tool presents the diff of the fix and asks if you would like to apply it.
-   - If approved (or if `--no-interactive` is passed), the tool edits the files in your local workspace.
+   - If `--interactive` is enabled, the tool presents the diff of the fix and asks if you would like to apply it.
+   - By default (or when non-interactive), all fixes are automatically generated and applied.
 4. **Review**: The changes remain uncommitted in your local workspace so you can run tests and review the final diff before committing.

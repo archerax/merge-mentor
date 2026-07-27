@@ -136,7 +136,7 @@ export async function executeFixCommand(
 
   const prDetails = await adapter.getPRDetails(resolvedOptions.pr);
 
-  const interactive = resolvedOptions.interactive !== false;
+  const interactive = Boolean(resolvedOptions.interactive);
   await validateGitWorkspace(prDetails.headBranch, {
     allowDirty: resolvedOptions.allowDirty,
     interactive,

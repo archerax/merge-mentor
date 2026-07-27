@@ -86,10 +86,14 @@ export interface PBIOptions {
   azureProject?: string;
   azureRepo?: string;
   provider?: string;
+  copilotToken?: string;
+  aiTimeout?: number;
   aiModel?: string;
   aiBaseUrl?: string;
   aiApiKey?: string;
   tempPath?: string;
+  localWorkspacePath?: string;
+  gitBackend?: string;
 }
 
 export interface ProjectOptions {
@@ -103,10 +107,14 @@ export interface ProjectOptions {
   azureProject?: string;
   azureRepo?: string;
   provider?: string;
+  copilotToken?: string;
+  aiTimeout?: number;
   aiModel?: string;
   aiBaseUrl?: string;
   aiApiKey?: string;
   tempPath?: string;
+  localWorkspacePath?: string;
+  gitBackend?: string;
 }
 
 export interface ReplyOptions extends ReviewOptions {
