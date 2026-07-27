@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ConfigurationError, ValidationError } from "../errors/index.js";
+import { ConfigurationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
-import { ClaudeAgentSdkProvider } from "./providers/claude-agent-sdk.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
 import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
 import type { AIProviderType } from "./types.js";
@@ -15,11 +14,6 @@ describe("createAIProvider", () => {
   it("should create OpenCodeSdkProvider for 'opencode-sdk' type", () => {
     const provider = createAIProvider("opencode-sdk");
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
-  });
-
-  it("should create ClaudeAgentSdkProvider for 'claude-agent-sdk' type", () => {
-    const provider = createAIProvider("claude-agent-sdk");
-    expect(provider).toBeInstanceOf(ClaudeAgentSdkProvider);
   });
 
   it("should pass options to CopilotSdkProvider", () => {
@@ -41,15 +35,6 @@ describe("createAIProvider", () => {
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
   });
 
-  it("should pass options to ClaudeAgentSdkProvider", () => {
-    const provider = createAIProvider("claude-agent-sdk", {
-      model: "claude-3-5-sonnet",
-      timeoutMs: 90000,
-      maxRetries: 4,
-    });
-    expect(provider).toBeInstanceOf(ClaudeAgentSdkProvider);
-  });
-
   it("should allow experimentalTools for opencode-sdk", () => {
     const provider = createAIProvider("opencode-sdk", {
       experimentalTools: true,
@@ -57,27 +42,12 @@ describe("createAIProvider", () => {
     expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
   });
 
-  it("should throw ValidationError if experimentalTools is requested on unsupported provider", () => {
-    expect(() =>
-      createAIProvider("claude-agent-sdk", {
-        experimentalTools: true,
-      })
-    ).toThrow(ValidationError);
-    expect(() =>
-      createAIProvider("claude-agent-sdk", {
-        experimentalTools: true,
-      })
-    ).toThrow(
-      'Structured tool calling (--experimental-tools) is only supported by "copilot-sdk" and "opencode-sdk". Got: "claude-agent-sdk"'
-    );
-  });
-
   it("should throw ConfigurationError for unsupported provider type", () => {
     expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
       ConfigurationError
     );
     expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
-      "Unsupported AI provider: invalid. Valid options are: copilot-sdk, opencode-sdk. Note: claude-agent-sdk is deprecated."
+      "Unsupported AI provider: invalid. Valid options are: copilot-sdk, opencode-sdk."
     );
   });
 

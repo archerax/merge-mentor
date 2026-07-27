@@ -56,7 +56,7 @@ vi.mock("../config.js", () => ({
     defaultPlatform: "github",
     github: { token: "token", owner: "owner", repo: "repo" },
     botCommentIdentifier: "bot",
-    aiProvider: "claude-agent-sdk",
+    aiProvider: "opencode-sdk",
     aiModel: "model",
   })),
   validateConfig: vi.fn(),
@@ -198,7 +198,7 @@ describe("executeFixCommand", () => {
     await executeFixCommand({ pr: 123, ci: false, interactive: false }, { output: mockOutput });
 
     expect(createAIProvider).toHaveBeenCalledWith(
-      "claude-agent-sdk",
+      "opencode-sdk",
       expect.objectContaining({
         enableWriteTools: true,
         // Shell execution must never be enabled for untrusted PR comment input.

@@ -65,11 +65,8 @@ export class AIProviderError extends MergeMentorError {
   constructor(
     /**
      * The AI provider where the error occurred.
-     *
-     * @deprecated "claude-agent-sdk" is deprecated and will be removed in the
-     *   next major version. Migrate to "copilot-sdk" or "opencode-sdk".
      */
-    public readonly provider: "copilot-sdk" | "opencode-sdk" | "claude-agent-sdk",
+    public readonly provider: "copilot-sdk" | "opencode-sdk",
     message: string,
     options?: ErrorOptions
   ) {

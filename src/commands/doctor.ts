@@ -72,17 +72,6 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
   }
   output.log(`  OpenCode: ${opencodeStatus === "Available" ? "✅ Available" : "❌ Not Installed"}`);
 
-  let claudeStatus = "Not Installed";
-  try {
-    const sdkUrl = import.meta.resolve("@anthropic-ai/claude-agent-sdk");
-    if (sdkUrl) claudeStatus = "Available";
-  } catch {}
-  output.log(`  Claude: ${claudeStatus === "Available" ? "✅ Available" : "❌ Not Installed"}`);
-  if (claudeStatus === "Available") {
-    output.log(
-      "    ⚠️  Deprecated: claude-agent-sdk will be removed in the next major version. Migrate to copilot-sdk or opencode-sdk."
-    );
-  }
   output.log("");
 
   let activeProvider = "copilot-sdk";
@@ -96,28 +85,6 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
 
   if (providersToCheck.length > 0) {
     for (const provider of providersToCheck) {
-      if (provider === "claude-agent-sdk" || provider === "claude") {
-        output.log(`\n📦 Checking ${provider}:`);
-        try {
-          await import("@anthropic-ai/claude-agent-sdk");
-          output.log("  ✅ Installed: @anthropic-ai/claude-agent-sdk package is importable");
-        } catch (error) {
-          output.log(
-            "  ❌ Not found: @anthropic-ai/claude-agent-sdk is not installed or importable"
-          );
-          output.log(`     Error: ${(error as Error).message}`);
-        }
-        const hasKey = !!(
-          env.get("MM_AI_API_KEY") ||
-          env.get("ANTHROPIC_API_KEY") ||
-          loadedConfig?.aiApiKey
-        );
-        output.log(
-          `  API Key: ${hasKey ? "✅ Configured" : "❌ Not set (requires ANTHROPIC_API_KEY or MM_AI_API_KEY)"}`
-        );
-        continue;
-      }
-
       if (provider === "copilot" || provider === "copilot-sdk") {
         // Check COPILOT_CLI_PATH environment variable
         const envCliPath = env.get("COPILOT_CLI_PATH");
@@ -359,7 +326,7 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
     output.log(`  AI model: ${config.aiModel || "Default"}`);
     output.log(`  AI base URL: ${config.aiBaseUrl ? "✅ Set" : "Not set"}`);
 
-    const isApiKeyRequired = config.aiProvider === "claude-agent-sdk" || !!config.aiBaseUrl;
+    const isApiKeyRequired = !!config.aiBaseUrl;
     const hasAiApiKey = !!(config.aiApiKey || env.get("ANTHROPIC_API_KEY"));
     output.log(
       `  AI API key: ${hasAiApiKey ? "✅ Set" : isApiKeyRequired ? "❌ Not set" : "Not set"}`

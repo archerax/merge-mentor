@@ -268,21 +268,6 @@ describe("doctor command", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Azure token: ❌ Not set"));
   });
 
-  it("diagnoses Claude provider API key status", async () => {
-    const env = processEnvironment;
-    const envSpy = vi.spyOn(env, "get").mockImplementation((key: string) => {
-      if (key === "ANTHROPIC_API_KEY") return "sk-ant-12345";
-      return undefined;
-    });
-
-    await program.parseAsync(["node", "test", "doctor", "--provider", "claude"]);
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking claude:"));
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("API Key: ✅ Configured"));
-
-    envSpy.mockRestore();
-  });
-
   it("handles config loading failure gracefully", async () => {
     vi.mocked(loadConfig).mockImplementation(() => {
       throw new Error("Config file not found");

@@ -16,13 +16,12 @@ merge-mentor doctor
 # Check configuration for a specific provider
 merge-mentor doctor --provider copilot
 merge-mentor doctor --provider opencode
-merge-mentor doctor --provider claude-agent-sdk  # deprecated
 ```
 
 ---
 
 ## Options
 
-| Option                  | Description                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| `--provider <provider>` | Check a specific provider (`copilot`, `opencode`, or `claude-agent-sdk` (deprecated)). |
+| Option                  | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `--provider <provider>` | Check a specific provider (`copilot` or `opencode`). |

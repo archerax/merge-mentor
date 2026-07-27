@@ -15,7 +15,7 @@ Add the new provider name to the `AIProviderType` union in [src/ai/types.ts](fil
 
 ```typescript
 export type AIProviderType =
-  "copilot-sdk" | "opencode-sdk" | "claude-agent-sdk" | "your-new-provider";
+  "copilot-sdk" | "opencode-sdk" | "your-new-provider";
 ```
 
 ### 2. Implement the Provider Client

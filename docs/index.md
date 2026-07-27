@@ -11,7 +11,18 @@ title: Home
 
 Merge Mentor is an AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them.
 
-Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK. (Claude Agent SDK is deprecated.)
+Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple enterprise AI providers including GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, and OpenCode SDK.
+
+---
+
+## 🔒 Security, Privacy & AI Governance
+
+Merge Mentor is a **self-hosted CLI tool** that runs directly on your local workstation or CI runner.
+
+- **Your Approved AI Provider Only**: Merge Mentor does not route your code through any third-party SaaS server. It connects directly to **your enterprise-approved AI provider** (such as GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, or OpenCode SDK) using your own credentials.
+- **Zero Telemetry**: No usage tracking, analytics, or telemetry of any kind are collected.
+- **Local Data & Logs**: Audit logs, execution caches, and reports stay strictly on your local disk under `./.mergementor`.
+- **Dry-Run by Default**: Reviews run in preview mode by default. Comments are only published to your pull requests when you explicitly pass `--write`.
 
 ---
 
@@ -47,7 +58,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 
 ## 🚀 Key Features
 
-- **Multi-Provider Support**: Supports GitHub Copilot SDK, OpenCode SDK, and Claude Agent SDK. Also supports custom OpenAI-compatible endpoints (BYOK) such as locally-hosted models (Ollama, vLLM) and Azure OpenAI.
+- **Multi-Provider Support**: Supports GitHub Copilot SDK and OpenCode SDK. Also supports custom OpenAI-compatible endpoints (BYOK) such as locally-hosted models (Ollama, vLLM) and Azure OpenAI.
 - **Additive Review Passes**: Layers specialist attention on top of the baseline review (e.g. `testing`, `security`, `performance`, `database`, `monorepo`).
 - **Smart Deduplication**: Avoids posting comments on issues that already existed in the target branch prior to the PR.
 - **Real-time Streaming**: Displays the live output feedback from the AI model during execution.

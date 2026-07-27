@@ -68,6 +68,10 @@ We will keep you informed of progress and will tell you if we cannot meet the ti
 
 ## Using Merge Mentor Securely
 
+- **Self-Hosted Execution** — Merge Mentor runs entirely on your local developer workstation or CI runner. There is no central SaaS application, remote database, or backend proxy.
+- **Your Approved AI Provider Only** — API requests flow directly from your machine to your enterprise-approved AI provider (e.g., GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, OpenCode SDK) using your supplied credentials.
+- **Zero Telemetry** — Merge Mentor includes no tracking pixels, analytics, or external telemetry call-homes.
+- **Local Logs & Cache** — Audit logs and state caching stay local on disk in `./.mergementor` (or `MM_TEMP_PATH`).
 - **Dry-run is the default** — reviews only post comments when you pass `--write`.
 - **Use least-privilege tokens** — scope PATs to the repositories and permissions Merge Mentor actually needs.
 - **Pin versions in CI** — and review the CHANGELOG before upgrading.

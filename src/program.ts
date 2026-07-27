@@ -36,9 +36,7 @@ const program = new Command();
 
 program
   .name("merge-mentor")
-  .description(
-    "Automated code review bot using AI providers (Copilot SDK, OpenCode SDK). Note: claude-agent-sdk is deprecated."
-  )
+  .description("Automated code review bot using AI providers (Copilot SDK, OpenCode SDK).")
   .version(packageJson.version);
 
 // Review command
@@ -91,10 +89,7 @@ program
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
   .optionsGroup("AI Provider Configuration")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
@@ -268,10 +263,7 @@ program
     "Path to a pre-existing local repository checkout (overrides CI-detected workspace)"
   )
   .optionsGroup("AI Provider Configuration")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
@@ -364,10 +356,7 @@ program
 program
   .command("doctor")
   .description("Check AI provider CLI installations and configuration")
-  .option(
-    "--provider <provider>",
-    "Check specific provider (copilot, opencode, claude-agent-sdk (deprecated))"
-  )
+  .option("--provider <provider>", "Check specific provider (copilot, opencode)")
   .action(async (options: { provider?: string }) => {
     await executeDoctorCommand(options);
     process.exit(0);
@@ -386,10 +375,7 @@ program
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
   .option("--ai-base-url <url>", "API base URL for BYOK. Env: MM_AI_BASE_URL")
   .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
@@ -421,10 +407,7 @@ program
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
   .option("--ai-base-url <url>", "API base URL for BYOK. Env: MM_AI_BASE_URL")
   .option("--ai-api-key <key>", "API key for BYOK. Env: MM_AI_API_KEY")
@@ -483,10 +466,7 @@ program
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
@@ -577,10 +557,7 @@ program
   .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
   .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
   .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
-  .option(
-    "--provider <provider>",
-    "AI provider (copilot-sdk, opencode-sdk, claude-agent-sdk (deprecated)). Env: MM_AI_PROVIDER"
-  )
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")

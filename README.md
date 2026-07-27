@@ -9,12 +9,23 @@
 </p>
 
 <p align="center">
-  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple AI providers including GitHub Copilot SDK and OpenCode SDK. (Claude Agent SDK is deprecated.)
+  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple enterprise AI providers including GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, and OpenCode SDK.
 </p>
 
 <br>
 
 > **Important**: For detailed guides, advanced configurations, and CI/CD integration instructions, please visit our **[GitHub Pages Documentation Site](https://archerax.github.io/merge-mentor/)**.
+
+---
+
+## 🔒 Security, Privacy & AI Governance
+
+Merge Mentor is a **self-hosted CLI tool** that runs directly on your local workstation or CI runner.
+
+- **Your Approved AI Provider Only**: Merge Mentor does not route your code through any third-party SaaS server. It connects directly to **your enterprise-approved AI provider** (such as GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, or OpenCode SDK) using your own credentials.
+- **Zero Telemetry**: No usage tracking, analytics, or telemetry of any kind are collected.
+- **Local Data & Logs**: Audit logs, execution caches, and reports stay strictly on your local disk under `./.mergementor`.
+- **Dry-Run by Default**: Reviews run in preview mode by default. Comments are only published to your pull requests when you explicitly pass `--write`.
 
 ---
 
@@ -75,7 +86,7 @@ Merge Mentor can be run automatically in your workflows using the `--ci` flag, w
 
 - **Node.js 22+**
 - **Supported Platforms**: Windows, macOS, and Linux
-- **AI Providers**: Copilot SDK (requires `MM_COPILOT_TOKEN`), OpenCode SDK, or Claude Agent SDK (requires `ANTHROPIC_API_KEY`).
+- **AI Providers**: Copilot SDK (requires `MM_COPILOT_TOKEN`) or OpenCode SDK.
 
 ---
 

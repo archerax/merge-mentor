@@ -13,7 +13,7 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 ## Project Structure
 
-- `src/ai/` – AI provider abstraction (Copilot, OpenCode, Claude Sdk)
+- `src/ai/` – AI provider abstraction (Copilot, OpenCode)
 - `src/audit/` – Audit logging for security/compliance
 - `src/ci/` – Continuous Integration environment adapters
 - `src/commands/` – Command line interface orchestrations (via Commander)

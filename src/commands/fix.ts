@@ -158,9 +158,7 @@ export async function executeFixCommand(
   const aiClient = createAIProvider(aiProvider, {
     model: config.aiModel,
     // The platform token is only ever passed to copilot-sdk (as the Copilot CLI
-    // GitHub token). Other providers must never receive it: claude-agent-sdk
-    // would forward it to api.anthropic.com as ANTHROPIC_API_KEY — a
-    // cross-service credential leak.
+    // GitHub token). Other providers must never receive it.
     token:
       aiProvider === "copilot-sdk"
         ? platform === "github"
