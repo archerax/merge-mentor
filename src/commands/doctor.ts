@@ -158,17 +158,19 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
           output.log(`     Error: ${(error as Error).message}`);
         }
 
-        // Check if @github/copilot CLI package is locally resolved
+        // Check if Copilot CLI executable path is resolved
         const resolvedCliPath = resolveCopilotCliPath();
 
         if (resolvedCliPath) {
           if (fs.existsSync(resolvedCliPath)) {
-            output.log(`  ✅ CLI package resolved: @github/copilot is installed`);
-            output.log(`  📍 CLI location: ${resolvedCliPath}`);
+            output.log(`  ✅ Copilot CLI path resolved: ${resolvedCliPath}`);
 
             // Verify that the CLI executes successfully
             try {
-              const versionOutput = execSync(`node "${resolvedCliPath}" --version`, {
+              const execCmd = resolvedCliPath.endsWith(".js")
+                ? `node "${resolvedCliPath}" --version`
+                : `"${resolvedCliPath}" --version`;
+              const versionOutput = execSync(execCmd, {
                 encoding: "utf-8",
                 stdio: ["pipe", "pipe", "pipe"],
                 timeout: 5000,
@@ -184,6 +186,10 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
           } else {
             output.log(`  ❌ Not found: Resolved CLI path does not exist: ${resolvedCliPath}`);
           }
+        } else {
+          output.log(
+            "  ⚠️  Copilot CLI executable not resolved. Install Copilot CLI globally or set COPILOT_CLI_PATH"
+          );
         }
 
         // Check Copilot authentication status

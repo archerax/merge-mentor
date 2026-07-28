@@ -41,14 +41,14 @@ Both apps are thin shells: the majority of the functionality — review engines,
 
 Extract the existing `src/` modules into focused, app-agnostic packages:
 
-| Library                    | Extracted from  | Responsibility                                                          |
-| :------------------------- | :-------------- | :---------------------------------------------------------------------- |
-| `@merge-mentor/core`       | `src/review/`   | Review engines (PR, PBI, project), finding aggregation, diff handling.  |
-| `@merge-mentor/ai`         | `src/ai/`       | AI provider clients, provider factory, prompts, tool schemas.           |
-| `@merge-mentor/platforms`  | `src/platforms/`| GitHub & Azure DevOps adapters behind their existing port interfaces.   |
-| `@merge-mentor/config`     | `src/config.ts` | `.env` / `.mergementor` loading, validation (zod), defaults.            |
-| `@merge-mentor/audit`      | `src/audit/`    | Audit logging, review history, token-usage records.                     |
-| `@merge-mentor/shared`     | `src/utils/`, `src/logger.ts`, `src/errors/`, `src/constants.ts` | Logger, error types, utilities, constants. |
+| Library                   | Extracted from                                                   | Responsibility                                                         |
+| :------------------------ | :--------------------------------------------------------------- | :--------------------------------------------------------------------- |
+| `@merge-mentor/core`      | `src/review/`                                                    | Review engines (PR, PBI, project), finding aggregation, diff handling. |
+| `@merge-mentor/ai`        | `src/ai/`                                                        | AI provider clients, provider factory, prompts, tool schemas.          |
+| `@merge-mentor/platforms` | `src/platforms/`                                                 | GitHub & Azure DevOps adapters behind their existing port interfaces.  |
+| `@merge-mentor/config`    | `src/config.ts`                                                  | `.env` / `.mergementor` loading, validation (zod), defaults.           |
+| `@merge-mentor/audit`     | `src/audit/`                                                     | Audit logging, review history, token-usage records.                    |
+| `@merge-mentor/shared`    | `src/utils/`, `src/logger.ts`, `src/errors/`, `src/constants.ts` | Logger, error types, utilities, constants.                             |
 
 - All existing `.spec.ts` files move with their modules — no test is rewritten, only relocated.
 - Shared libraries start as **private workspace packages** (not published to npm), consumed via `workspace:*` dependencies.

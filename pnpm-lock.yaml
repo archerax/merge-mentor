@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@github/copilot':
-        specifier: ^1.0.73
-        version: 1.0.73
       '@github/copilot-sdk':
         specifier: ^1.0.7
         version: 1.0.7

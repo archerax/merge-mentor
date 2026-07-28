@@ -346,10 +346,10 @@ export class CopilotSdkProvider implements AIProviderClient {
         if (originalMessage.includes("Client not connected")) {
           msg +=
             "\n\nTroubleshooting:\n" +
-            "  1. Ensure you have a valid GitHub Copilot subscription.\n" +
-            "  2. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
-            "  3. If you want to use local credentials (e.g. GitHub CLI), make sure you are logged in to the GitHub CLI with Copilot:\n" +
-            "     run 'gh auth login' and 'gh copilot auth'";
+            "  1. Ensure Copilot CLI is installed globally (e.g., 'npm install -g @github/copilot') or configured via COPILOT_CLI_PATH.\n" +
+            "  2. Ensure you have an active GitHub Copilot subscription.\n" +
+            "  3. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
+            "  4. If using local credentials (e.g. GitHub CLI), make sure you are logged in: 'gh auth login' and 'gh copilot auth'";
         }
         throw new AIProviderError("copilot-sdk", msg, { cause: error as Error });
       }
@@ -358,10 +358,10 @@ export class CopilotSdkProvider implements AIProviderClient {
         let msg = `Copilot authentication failed: ${authStatus.statusMessage || "User is not logged in."}`;
         msg +=
           "\n\nTroubleshooting:\n" +
-          "  1. Ensure you have a valid GitHub Copilot subscription.\n" +
-          "  2. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
-          "  3. If you want to use local credentials (e.g. GitHub CLI), make sure you are logged in to the GitHub CLI with Copilot:\n" +
-          "     run 'gh auth login' and 'gh copilot auth'";
+          "  1. Ensure Copilot CLI is installed globally (e.g., 'npm install -g @github/copilot') or configured via COPILOT_CLI_PATH.\n" +
+          "  2. Ensure you have an active GitHub Copilot subscription.\n" +
+          "  3. If using a personal token, ensure MM_COPILOT_TOKEN starts with 'github_pat_' and is set correctly.\n" +
+          "  4. If using local credentials (e.g. GitHub CLI), make sure you are logged in: 'gh auth login' and 'gh copilot auth'";
         throw new AIProviderError("copilot-sdk", msg);
       }
       this.isAuthVerified = true;
