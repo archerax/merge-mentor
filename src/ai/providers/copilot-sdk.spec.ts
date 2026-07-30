@@ -693,6 +693,19 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
+    it("defaults model to 'Auto' when model is not explicitly provided", async () => {
+      const provider = new CopilotSdkProvider({});
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "Auto" })
+      );
+    });
+
     it("passes contextTier as long_context to createSession when longContext is true", async () => {
       const provider = new CopilotSdkProvider({ longContext: true });
       mockSuccessfulPrompt();

@@ -140,7 +140,7 @@ export class CopilotSdkProvider implements AIProviderClient {
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.model = options?.model;
+    this.model = options?.model ?? "Auto";
     this.token = options?.token;
     this.byokBaseUrl = this.normalizeOptionalString(options?.aiBaseUrl);
     this.byokApiKey = this.normalizeOptionalString(options?.aiApiKey);
