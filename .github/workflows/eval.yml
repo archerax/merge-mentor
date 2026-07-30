@@ -49,7 +49,7 @@ jobs:
 
       - name: Upload Evaluation Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-pr-eval-report
           path: eval-report.json
