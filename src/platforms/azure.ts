@@ -9,6 +9,7 @@ import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
 import { PlatformApiError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
+import { getIgnorePatterns, shouldIgnoreFile } from "../utils/ignoreFilter.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
@@ -27,6 +28,9 @@ import type {
   UnresolvedCommentThread,
   WorkItemState,
 } from "./types.js";
+
+/** Maximum file size in bytes for diff generation (1MB). */
+const MAX_FILE_SIZE_BYTES = 1 * 1024 * 1024;
 
 /** Azure DevOps thread status values. */
 const AzureThreadStatus = {
@@ -98,7 +102,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getPRDetails(prNumber: number): Promise<PRDetails> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const pr = await withRateLimitHandling(() =>
         gitApi.getPullRequestById(prNumber, this.project)
       );
@@ -120,9 +124,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
-  async getPRFiles(prNumber: number): Promise<PRFile[]> {
+  async getPRFiles(prNumber: number, ignorePatterns?: string[]): Promise<PRFile[]> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
 
       // Get PR details to find repository ID
       const pr = await withRateLimitHandling(() =>
@@ -188,7 +192,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         prNumber,
         iterationId,
         baseCommitId,
-        headCommitId
+        headCommitId,
+        ignorePatterns
       );
 
       this.auditLogger.logPRFilesFetch(prNumber, "azure", diffs.length);
@@ -220,7 +225,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     prNumber: number,
     iterationId: number,
     baseCommitId: string,
-    headCommitId: string
+    headCommitId: string,
+    ignorePatterns?: string[]
   ): Promise<PRFile[]> {
     // Fetch all changes with pagination
     const allChanges = await this.fetchAllIterationChanges(repositoryId, prNumber, iterationId);
@@ -235,6 +241,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       "Total changes fetched from PR Iteration Changes API"
     );
 
+    const mergedIgnorePatterns = getIgnorePatterns(ignorePatterns);
+
     // Filter out folder changes and process files
     const files: PRFile[] = [];
     for (const change of allChanges) {
@@ -246,13 +254,21 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const status = this.mapIterationChangeTypeToStatus(change.changeType);
       const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
 
+      // Early check: ignore pattern matching before downloading blobs
+      if (shouldIgnoreFile(path, mergedIgnorePatterns)) {
+        this.logger.info({ filePath: path }, "Skipping ignored file early in AzureDevOpsAdapter");
+        this.auditLogger.logFileSkipped(path, prNumber, "ignored_pattern");
+        continue;
+      }
+
       // Fetch file content at both commits and generate diff
       const { patch, additions, deletions } = await this.generateDiffFromBlobs(
         repositoryId,
         path,
         baseCommitId,
         headCommitId,
-        status
+        status,
+        prNumber
       );
 
       files.push({
@@ -383,7 +399,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     filePath: string,
     baseCommitId: string,
     targetCommitId: string,
-    status: FileStatus
+    status: FileStatus,
+    prNumber?: number
   ): Promise<{ patch: string; additions: number; deletions: number }> {
     try {
       let baseContent = "";
@@ -392,9 +409,17 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       // Fetch base version content (if not added)
       if (status !== "added") {
         try {
-          baseContent = await this.fetchFileContentAtCommit(repositoryId, filePath, baseCommitId);
+          baseContent = await this.fetchFileContentAtCommit(
+            repositoryId,
+            filePath,
+            baseCommitId,
+            prNumber
+          );
         } catch (error) {
           if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as Error).message.includes("File size exceeds 1MB limit")) {
             throw error;
           }
           if (error instanceof PlatformApiError && error.status === 404) {
@@ -414,10 +439,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           targetContent = await this.fetchFileContentAtCommit(
             repositoryId,
             filePath,
-            targetCommitId
+            targetCommitId,
+            prNumber
           );
         } catch (error) {
           if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as Error).message.includes("File size exceeds 1MB limit")) {
             throw error;
           }
           if (error instanceof PlatformApiError && error.status === 404) {
@@ -498,6 +527,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           deletions: 0,
         };
       }
+      if ((error as Error).message.includes("File size exceeds 1MB limit")) {
+        this.logger.info({ filePath }, "Skipping large file (>1MB) in diff generation");
+        return {
+          patch: "",
+          additions: 0,
+          deletions: 0,
+        };
+      }
       if (error instanceof PlatformApiError && error.status === 404) {
         this.logger.warn(
           { filePath, error: (error as Error).message },
@@ -523,7 +560,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   private async fetchFileContentAtCommit(
     repositoryId: string,
     filePath: string,
-    commitId: string
+    commitId: string,
+    prNumber?: number
   ): Promise<string> {
     const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(`/${filePath}`)}&versionType=commit&version=${commitId}&includeContent=true&api-version=7.0`;
 
@@ -564,6 +602,18 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       return "";
     }
 
+    const contentBytes = Buffer.byteLength(data.content, "utf8");
+    if (contentBytes > MAX_FILE_SIZE_BYTES) {
+      this.logger.warn(
+        { filePath, commitId, sizeBytes: contentBytes },
+        "File size exceeds 1MB limit, skipping file content"
+      );
+      this.auditLogger.logFileSkipped(filePath, prNumber, "max_size_exceeded", {
+        sizeBytes: contentBytes,
+      });
+      throw new Error(`File size exceeds 1MB limit (${contentBytes} bytes) for ${filePath}`);
+    }
+
     return data.content;
   }
 
@@ -576,7 +626,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const threads = await withRateLimitHandling(() =>
         gitApi.getThreads(this.repoName, prNumber, this.project)
       );
@@ -616,7 +666,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     commentId: string | number
   ): Promise<UnresolvedCommentThread> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const threads = await withRateLimitHandling(() =>
         gitApi.getThreads(this.repoName, prNumber, this.project)
       );
@@ -666,7 +716,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const threads = await withRateLimitHandling(() =>
         gitApi.getThreads(this.repoName, prNumber, this.project)
       );
@@ -715,7 +765,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const numericThreadId =
         typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
 
@@ -753,7 +803,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const numericThreadId =
         typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
 
@@ -786,7 +836,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     body: string
   ): Promise<void> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
 
       const thread: GitPullRequestCommentThread = {
         comments: [
@@ -822,7 +872,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
 
       const thread: GitPullRequestCommentThread = {
         comments: [
@@ -856,7 +906,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
 
     try {
-      const witApi = await this.connection.getWorkItemTrackingApi();
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
       const workItem = await withRateLimitHandling(
         () => witApi.getWorkItem(workItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
       );
@@ -995,7 +1045,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
 
     try {
-      const witApi = await this.connection.getWorkItemTrackingApi();
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
       if (commentId !== undefined) {
         const numericCommentId =
           typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
@@ -1089,7 +1139,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
   async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const pr = await withRateLimitHandling(() =>
         gitApi.getPullRequestById(prNumber, this.project)
       );
@@ -1128,7 +1178,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     details: { readonly title?: string; readonly body?: string }
   ): Promise<void> {
     try {
-      const gitApi = await this.connection.getGitApi();
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
       const pr = await withRateLimitHandling(() =>
         gitApi.getPullRequestById(prNumber, this.project)
       );
@@ -1158,7 +1208,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
     const rootId = id;
     try {
-      const witApi = await this.connection.getWorkItemTrackingApi();
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
 
       const workItemsMap = new Map<string, ProjectWorkItem>();
       const dependenciesList: ProjectDependency[] = [];

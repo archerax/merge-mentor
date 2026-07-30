@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   extractRetryAfter,
   isRateLimitError,
+  isTransientError,
   withRateLimit,
   withRateLimitHandling,
 } from "./rateLimitHandler.js";
@@ -63,6 +64,32 @@ describe("rateLimitHandler", () => {
       expect(isRateLimitError({ status: 404 })).toBe(false);
       expect(isRateLimitError({ status: 500 })).toBe(false);
       expect(isRateLimitError({ statusCode: 401 })).toBe(false);
+    });
+  });
+
+  describe("isTransientError", () => {
+    it("returns true for rate limit errors", () => {
+      expect(isTransientError({ status: 429 })).toBe(true);
+    });
+
+    it("returns true for server errors (500, 502, 503, 504)", () => {
+      expect(isTransientError({ status: 500 })).toBe(true);
+      expect(isTransientError({ status: 502 })).toBe(true);
+      expect(isTransientError({ statusCode: 503 })).toBe(true);
+      expect(isTransientError({ status: 504 })).toBe(true);
+    });
+
+    it("returns true for timeout errors (408, ETIMEDOUT, message)", () => {
+      expect(isTransientError({ status: 408 })).toBe(true);
+      expect(isTransientError({ code: "ETIMEDOUT" })).toBe(true);
+      expect(isTransientError({ message: "socket hang up" })).toBe(true);
+      expect(isTransientError({ message: "Network error occurred" })).toBe(true);
+    });
+
+    it("returns false for non-transient errors (400, 401, 404)", () => {
+      expect(isTransientError({ status: 400 })).toBe(false);
+      expect(isTransientError({ status: 401 })).toBe(false);
+      expect(isTransientError({ status: 404 })).toBe(false);
     });
   });
 
@@ -190,10 +217,10 @@ describe("rateLimitHandler", () => {
     });
 
     it("throws immediately for non-rate-limit errors", async () => {
-      const error = new Error("Network error");
+      const error = new Error("Validation error");
       const fn = vi.fn().mockRejectedValue(error);
 
-      await expect(withRateLimitHandling(fn)).rejects.toThrow("Network error");
+      await expect(withRateLimitHandling(fn)).rejects.toThrow("Validation error");
       expect(fn).toHaveBeenCalledTimes(1);
     });
 

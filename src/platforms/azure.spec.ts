@@ -1112,7 +1112,7 @@ describe("AzureDevOpsAdapter", () => {
         createMockResponse(true, 200, {
           changeEntries: [
             {
-              item: { path: "/image.png", gitObjectType: "blob" },
+              item: { path: "/file.bin", gitObjectType: "blob" },
               changeType: 2, // Edit
             },
           ],
@@ -1752,6 +1752,90 @@ describe("AzureDevOpsAdapter", () => {
         expect(itemIds).toContain("203");
         expect(itemIds).not.toContain("204");
       });
+    });
+  });
+
+  describe("getPRFiles filtering and size limits", () => {
+    it("skips ignored files early without fetching their content", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          commonRefCommit: { commitId: "base123" },
+          sourceRefCommit: { commitId: "head123" },
+        },
+      ]);
+
+      // Return a change entries list containing normal file + pnpm-lock.yaml
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.includes("/iterations/1/changes")) {
+          return createMockResponse(true, 200, {
+            changeEntries: [
+              { item: { path: "/src/index.ts", objectId: "sha1" }, changeType: 2 },
+              { item: { path: "/pnpm-lock.yaml", objectId: "sha2" }, changeType: 2 },
+            ],
+          });
+        }
+        if (url.includes("/items?path=%2Fsrc%2Findex.ts")) {
+          return createMockResponse(true, 200, { content: "const x = 1;" });
+        }
+        return createMockResponse(false, 404, {});
+      });
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(files[0].filename).toBe("src/index.ts");
+      // Verify pnpm-lock.yaml content URL was NEVER fetched
+      expect(mockFetch).not.toHaveBeenCalledWith(
+        expect.stringContaining("pnpm-lock.yaml"),
+        expect.anything()
+      );
+    });
+
+    it("skips files > 1MB cleanly in diff generation", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { id: "repo-123" },
+      });
+
+      mockGitApiInstance.getPullRequestIterations.mockResolvedValue([
+        {
+          id: 1,
+          commonRefCommit: { commitId: "base123" },
+          sourceRefCommit: { commitId: "head123" },
+        },
+      ]);
+
+      const largeContent = "a".repeat(1024 * 1024 + 10); // > 1MB
+
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.includes("/iterations/1/changes")) {
+          return createMockResponse(true, 200, {
+            changeEntries: [{ item: { path: "/src/huge.ts", objectId: "sha1" }, changeType: 2 }],
+          });
+        }
+        if (url.includes("/items?path=%2Fsrc%2Fhuge.ts")) {
+          return createMockResponse(true, 200, { content: largeContent });
+        }
+        return createMockResponse(false, 404, {});
+      });
+
+      const files = await adapter.getPRFiles(123);
+
+      expect(files).toHaveLength(1);
+      expect(files[0].filename).toBe("src/huge.ts");
+      expect(files[0].patch).toBe("");
+      expect(files[0].additions).toBe(0);
+      expect(files[0].deletions).toBe(0);
     });
   });
 });

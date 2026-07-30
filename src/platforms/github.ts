@@ -86,7 +86,7 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
-  async getPRFiles(prNumber: number): Promise<PRFile[]> {
+  async getPRFiles(prNumber: number, _ignorePatterns?: string[]): Promise<PRFile[]> {
     try {
       const data = await withRateLimitHandling(() =>
         this.octokit.paginate(this.octokit.pulls.listFiles, {

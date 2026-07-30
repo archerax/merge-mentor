@@ -243,6 +243,34 @@ describe("AuditLogger", () => {
     });
   });
 
+  describe("logFileSkipped", () => {
+    it("logs skipped file event with reason", () => {
+      const logger = new AuditLogger();
+      const logEventSpy = vi.spyOn(logger, "logEvent");
+
+      logger.logFileSkipped("pnpm-lock.yaml", 123, "ignored_pattern", {
+        pattern: "**/pnpm-lock.yaml",
+      });
+
+      expect(logEventSpy).toHaveBeenCalledWith(
+        "file.skipped",
+        {
+          type: "file",
+          id: "pnpm-lock.yaml",
+          details: { prNumber: 123, reason: "ignored_pattern", pattern: "**/pnpm-lock.yaml" },
+        },
+        "Skipped file: pnpm-lock.yaml (ignored_pattern)",
+        "success",
+        {
+          filename: "pnpm-lock.yaml",
+          prNumber: 123,
+          reason: "ignored_pattern",
+          pattern: "**/pnpm-lock.yaml",
+        }
+      );
+    });
+  });
+
   describe("getAuditLogger", () => {
     it("returns singleton instance", () => {
       const logger1 = getAuditLogger();

@@ -65,6 +65,7 @@ type AuditEventType =
   | "describe.complete"
   | "file.review.start"
   | "file.review.complete"
+  | "file.skipped"
   | "crossfile.review.start"
   | "crossfile.review.complete";
 
@@ -548,6 +549,29 @@ export class AuditLogger {
       result,
       { filename, prNumber, findingsCount },
       error
+    );
+  }
+
+  /**
+   * Logs a file skipped event (e.g. ignored pattern or exceeded max file size).
+   *
+   * @param filename - File path skipped
+   * @param prNumber - PR number/ID (optional)
+   * @param reason - Reason for skipping (e.g. "ignored_pattern" | "max_size_exceeded")
+   * @param details - Additional metadata (e.g. file size in bytes)
+   */
+  logFileSkipped(
+    filename: string,
+    prNumber?: number,
+    reason: string = "ignored_pattern",
+    details?: Record<string, unknown>
+  ): void {
+    this.logEvent(
+      "file.skipped",
+      { type: "file", id: filename, details: { prNumber, reason, ...details } },
+      `Skipped file: ${filename} (${reason})`,
+      "success",
+      { filename, prNumber, reason, ...details }
     );
   }
 

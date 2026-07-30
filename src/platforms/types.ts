@@ -167,8 +167,9 @@ export interface PlatformAdapter {
   /**
    * Retrieves files changed in a pull request.
    * @param prNumber - The PR number
+   * @param ignorePatterns - Optional glob patterns to skip fetching file content/diffs early
    */
-  getPRFiles(prNumber: number): Promise<PRFile[]>;
+  getPRFiles(prNumber: number, ignorePatterns?: string[]): Promise<PRFile[]>;
 
   /**
    * Gets existing bot comments on a PR.

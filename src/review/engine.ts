@@ -710,7 +710,7 @@ export class ReviewEngine {
     this.log("Fetching PR details...");
     this.logger.debug({ prNumber }, "Fetching PR data");
     const prDetails = await this.platform.getPRDetails(prNumber);
-    const allFiles = await this.platform.getPRFiles(prNumber);
+    const allFiles = await this.platform.getPRFiles(prNumber, this.options.ignorePatterns);
 
     // Filter files based on ignore patterns
     const ignorePatterns = getIgnorePatterns(this.options.ignorePatterns);

@@ -101,6 +101,83 @@ export function isRateLimitError(error: unknown): boolean {
 }
 
 /**
+ * Checks if an error is a transient error (rate limits, HTTP server/timeout errors, or network errors).
+ *
+ * Detects:
+ * - Rate limit errors (HTTP 429 or 403 rate limit)
+ * - Server & timeout status codes: HTTP 408, 500, 502, 503, 504
+ * - Node network errors: ETIMEDOUT, ECONNRESET, ECONNREFUSED, ENOTFOUND, EPIPE, EAI_AGAIN, etc.
+ * - Timeouts & network failure error messages
+ *
+ * @param error - The error object to check
+ * @returns True if the error is transient and safe to retry, false otherwise
+ */
+export function isTransientError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  if (isRateLimitError(error)) {
+    return true;
+  }
+
+  const err = error as Record<string, unknown>;
+
+  // Check HTTP status code
+  const status =
+    typeof err.status === "number"
+      ? err.status
+      : typeof err.statusCode === "number"
+        ? err.statusCode
+        : typeof (err.response as Record<string, unknown> | undefined)?.status === "number"
+          ? ((err.response as Record<string, unknown>).status as number)
+          : undefined;
+
+  if (status !== undefined) {
+    if (status === 408 || status === 500 || status === 502 || status === 503 || status === 504) {
+      return true;
+    }
+  }
+
+  // Check Node error code
+  const code = typeof err.code === "string" ? err.code : undefined;
+  if (code) {
+    const transientCodes = [
+      "ETIMEDOUT",
+      "ECONNRESET",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EPIPE",
+      "EAI_AGAIN",
+      "FetchError",
+      "AbortError",
+      "UND_ERR_CONNECT_TIMEOUT",
+      "UND_ERR_SOCKET",
+    ];
+    if (transientCodes.includes(code)) {
+      return true;
+    }
+  }
+
+  // Check error message or name
+  const message = typeof err.message === "string" ? err.message.toLowerCase() : "";
+  const name = typeof err.name === "string" ? err.name.toLowerCase() : "";
+
+  if (
+    message.includes("timeout") ||
+    message.includes("econnreset") ||
+    message.includes("socket hang up") ||
+    message.includes("network error") ||
+    message.includes("fetch failed") ||
+    message.includes("eai_again") ||
+    name.includes("timeout") ||
+    name.includes("networkerror")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Extracts retry-after delay from error response headers.
  *
  * Supports multiple retry strategies:
@@ -165,9 +242,9 @@ export function extractRetryAfter(error: unknown, clock: Clock = systemClock): n
 }
 
 /**
- * Analyzes an error to extract rate limit information.
+ * Analyzes an error to extract rate limit / transient error information.
  *
- * Determines if an error is rate limit related and extracts the retry delay
+ * Determines if an error is transient or rate limit related and extracts the retry delay
  * from either server headers or defaults to exponential backoff calculation.
  *
  * @param error - The error to analyze
@@ -175,7 +252,7 @@ export function extractRetryAfter(error: unknown, clock: Clock = systemClock): n
  * @returns Object with isRateLimit flag and retryAfterMs delay
  */
 function getRateLimitInfo(error: unknown, options: RateLimitOptions): RateLimitInfo {
-  const checkRateLimit = options.isRateLimitError || isRateLimitError;
+  const checkRateLimit = options.isRateLimitError || isTransientError;
   const clock = options.clock ?? systemClock;
   const extractRetry = options.extractRetryAfter || ((e: unknown) => extractRetryAfter(e, clock));
 
