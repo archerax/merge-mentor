@@ -54,20 +54,20 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.7",
+    "@github/copilot-sdk": "^1.0.8",
     "@octokit/rest": "^22.0.1",
-    "@opencode-ai/sdk": "^1.18.4",
+    "@opencode-ai/sdk": "^1.18.9",
     "azure-devops-node-api": "^15.1.2",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
     "dotenv": "^17.4.2",
-    "isomorphic-git": "^1.38.10",
+    "isomorphic-git": "^1.40.0",
     "micromatch": "^4.0.8",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
+    "@biomejs/biome": "^2.5.6",
     "@types/node": "^25.9.5",
     "@vitest/coverage-v8": "^4.1.10",
     "cross-env": "^10.1.0",
@@ -78,7 +78,7 @@
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0",
     "typescript": "^6.0.3",
-    "vite": "8.0.16",
+    "vite": "8.1.5",
     "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c"
