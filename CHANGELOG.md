@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.11.1] - 2026-07-26
+## [3.0.0] - 2026-07-31
+
+### Removed
+
+- **Claude Agent SDK Provider**: Removed the deprecated `claude-agent-sdk` AI provider in favor of `copilot-sdk` and `opencode-sdk`.
+
+### Added
+
+- **Azure DevOps Enhancements**: Added transient error retries, early file filtering, and a 1MB file size cap for Azure DevOps platform adapter.
+- **CLI Options Standardization**: Standardized CLI command options, help grouping, and reply dry-run defaults.
+- **Documentation Links in Comments**: Updated comment footers to link Merge Mentor name directly to the documentation site.
+
+### Changed
+
+- **Copilot Provider Dynamic CLI Resolution**: Unbundled `@github/copilot` dependency to resolve the Copilot CLI dynamically.
+
+### Fixed
+
+- **Copilot CLI Path Override**: Fixed CLI path resolution to honor explicit `COPILOT_CLI_PATH` environment variable.
+- **Copilot SDK Model Default**: Default Copilot SDK model to `Auto` when not explicitly specified.
+
 
 ### Fixed
 
