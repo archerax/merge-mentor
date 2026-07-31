@@ -66,14 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Security Policy**: Added `SECURITY.md` with a private vulnerability reporting channel (GitHub Security Advisories), supported-versions policy, in/out-of-scope definitions, and a coordinated disclosure policy.
-- **Q3 2026 Product Roadmap**: Added `plans/roadmap-q3-2026.md` ("Harden the Core", 2026-07-22 → 2026-10-22) covering the trust-foundation security work, comment deduplication, the interactive `reply` comment loop, and the v3.0 secure-by-default release.
-- **Roadmap: Estimated Developer Time Saved**: Added a Q4 2026 candidate to `plans/roadmap-q3-2026.md` for reporting a rough, locally-computed estimate of developer time saved per review, calculated from files reviewed, lines changed, and comments created, with the formula documented as an estimate.
+- **Q3 2026 Product Roadmap**: Added the "Harden the Core" roadmap (2026-07-22 → 2026-10-22) covering the trust-foundation security work, comment deduplication, the interactive `reply` comment loop, and the v3.0 secure-by-default release.
+- **Roadmap: Estimated Developer Time Saved**: Added a Q4 2026 candidate for reporting a rough, locally-computed estimate of developer time saved per review, calculated from files reviewed, lines changed, and comments created, with the formula documented as an estimate.
 - **CI: OS/Node Test Matrix & CLI Smoke Tests**: The CI test job now runs across `ubuntu-latest`, `windows-latest`, and `macos-latest` on Node 22 and 24 — closing the gap between the documented cross-platform support and what CI actually exercised. After the build, the compiled CLI is smoke-tested (`--help` for the root, `review`, `fix`, and `doctor` commands) so a broken build can no longer pass CI.
 - **Governance Files**: Added `CONTRIBUTING.md` (development workflow, code style, and security/testing conventions) and `.github/CODEOWNERS`.
 
 ### Changed
 
-- **Semantic Search Plan Parked**: Marked `plans/codebase-semantic-search-plan.md` as parked pending user evidence that provider-native codebase context is insufficient.
+- **Semantic Search Plan Parked**: Parked codebase semantic search pending user evidence that provider-native codebase context is insufficient.
 - **CI Workflow Hardening**: The main CI workflow now declares least-privilege `permissions: contents: read`, cancels redundant in-progress runs via `concurrency`, and sets `timeout-minutes` on all jobs — matching the hardening the self-review workflow already had. Lint, coverage thresholds, and the Codecov upload run once (ubuntu/Node 24 leg) instead of on every matrix leg.
 
 ### Fixed

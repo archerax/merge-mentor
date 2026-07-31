@@ -72,7 +72,7 @@ Examples: `feat(fix): support resolving threads on Azure DevOps`, `fix(security)
 
 ## Project Direction
 
-The current quarter's priorities and explicitly-out-of-scope work are in [`plans/roadmap-q3-2026.md`](./plans/roadmap-q3-2026.md). If you want to work on something large, open an issue first to check it fits the roadmap before investing time.
+If you want to work on something large, open an issue first to discuss scope before investing time.
 
 ## Questions?
 
