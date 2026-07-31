@@ -41,11 +41,17 @@ type FindingConfidence = "high" | "medium" | "low";
 /** A finding from reviewing a specific file. */
 export interface FileFinding {
   readonly line: number;
+  /** Optional first line of a native replacement suggestion. */
+  readonly startLine?: number;
+  /** Optional last line of a native replacement suggestion. */
+  readonly endLine?: number;
   readonly severity: FindingSeverity;
   readonly confidence: FindingConfidence;
   readonly category: FindingCategory;
   readonly message: string;
   readonly suggestion: string;
+  /** Replacement code for a native platform suggestion comment. */
+  readonly replacement?: string;
   /**
    * Concise evidence-based rationale explaining why this is an issue.
    * Should cite the changed code or checked context and the concrete impact.
@@ -118,6 +124,7 @@ export interface CommentAction {
   readonly existingCommentId?: number | string;
   readonly path?: string;
   readonly line?: number;
+  readonly startLine?: number;
   readonly body?: string;
 }
 
@@ -212,7 +219,13 @@ export interface PlatformAdapter {
    * @param line - Line number
    * @param body - Comment body
    */
-  postInlineComment(prNumber: number, path: string, line: number, body: string): Promise<void>;
+  postInlineComment(
+    prNumber: number,
+    path: string,
+    line: number,
+    body: string,
+    startLine?: number
+  ): Promise<void>;
 
   /**
    * Posts a general comment on the PR.

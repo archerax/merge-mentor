@@ -19,7 +19,22 @@ interface CrossFileOutputFormatOptions {
   readonly footer: string;
 }
 
-function buildOutputFormatSection(intro: string, schema: string, footer: string): string {
+function buildOutputFormatSection(
+  intro: string,
+  schema: string,
+  footer: string,
+  includeNativeSuggestionRules = false
+): string {
+  const nativeSuggestionRules = includeNativeSuggestionRules
+    ? `
+
+Native suggestion rules:
+- Include \`replacement\`, \`start_line\`, and \`end_line\` only for a safe, localized fix.
+- The confidence must be \`high\`.
+- Both the replaced range and replacement must contain fewer than 10 lines.
+- Omit \`replacement\` when the fix is uncertain, spans files, needs a new import outside the range, or cannot be represented as an exact replacement.`
+    : "";
+
   return `# OUTPUT FORMAT
 
 ${intro}
@@ -28,7 +43,7 @@ ${intro}
 ${schema}
 \`\`\`
 
-${footer}`;
+${footer}${nativeSuggestionRules}`;
 }
 
 export function buildBatchedFileResultsOutputFormat(
@@ -52,11 +67,14 @@ export function buildBatchedFileResultsOutputFormat(
       "findings": [
         {
           "line": 45,
+          "start_line": 45,
+          "end_line": 45,
           "severity": "${severityExample}",
           "confidence": "high",
           "category": "${categoryExample}",
           "message": "${messageExample}",
           "suggestion": "${suggestionExample}",
+          "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
           "reasoning": "${reasoningExample}",
           "isPreExisting": false
         }
@@ -111,11 +129,14 @@ export function buildFastReviewOutputFormat(): string {
     {
       "file": "path/to/file.ts",
       "line": 45,
+      "start_line": 45,
+      "end_line": 45,
       "severity": "high",
       "confidence": "high",
       "category": "bug",
       "message": "Clear description of the problem",
       "suggestion": "Specific fix with code example",
+      "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
       "reasoning": "Complete verification including data flow, impact, and severity justification",
       "isPreExisting": false
     },
@@ -146,6 +167,7 @@ export function buildFastReviewOutputFormat(): string {
 REMEMBER:
 - Consider BOTH file-level AND architectural concerns in your analysis
 - Use appropriate attribution for each finding type
-- The summary should cover both individual code quality and overall architecture`
+- The summary should cover both individual code quality and overall architecture`,
+    true
   );
 }

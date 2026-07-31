@@ -529,7 +529,8 @@ export class GitHubAdapter implements PlatformAdapter {
     prNumber: number,
     path: string,
     line: number,
-    body: string
+    body: string,
+    startLine?: number
   ): Promise<void> {
     this.logger.debug({ prNumber, path, line }, "Posting inline comment");
 
@@ -551,6 +552,10 @@ export class GitHubAdapter implements PlatformAdapter {
           commit_id: pr.head.sha,
           path,
           line,
+          side: "RIGHT",
+          ...(startLine !== undefined && startLine !== line
+            ? { start_line: startLine, start_side: "RIGHT" }
+            : {}),
         })
       );
       this.logger.info({ prNumber, path, line }, "Inline comment posted successfully");

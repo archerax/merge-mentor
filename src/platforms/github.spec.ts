@@ -444,7 +444,25 @@ describe("GitHubAdapter", () => {
         commit_id: "abc123",
         path: "src/test.ts",
         line: 10,
+        side: "RIGHT",
       });
+    });
+
+    it("posts a multiline inline comment with a start line", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({ data: { head: { sha: "abc123" } } });
+      mockOctokitInstance.pulls.createReviewComment.mockResolvedValue({});
+
+      await adapter.postInlineComment(123, "src/test.ts", 12, "Apply this", 10);
+
+      expect(mockOctokitInstance.pulls.createReviewComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line: 12,
+          side: "RIGHT",
+          start_line: 10,
+          start_side: "RIGHT",
+        })
+      );
     });
   });
 

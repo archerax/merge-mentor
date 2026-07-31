@@ -25,11 +25,14 @@ const CrossFileFindingCategorySchema = z
 // File-Level Finding Schema
 const FileFindingSchema = z.object({
   line: z.coerce.number().int().nonnegative().default(0),
+  start_line: z.coerce.number().int().positive().optional(),
+  end_line: z.coerce.number().int().positive().optional(),
   severity: FindingSeveritySchema,
   confidence: FindingConfidenceSchema,
   category: FileFindingCategorySchema,
   message: z.coerce.string().default(""),
   suggestion: z.coerce.string().default(""),
+  replacement: z.coerce.string().optional(),
   reasoning: z.coerce.string().default("Reasoning not provided by the model."),
   isPreExisting: z.boolean().default(false),
 });

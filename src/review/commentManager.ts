@@ -46,6 +46,7 @@ import type {
   FindingSeverity,
 } from "../platforms/types.js";
 import { remapLineNumber } from "../utils/hunkRemapper.js";
+import { formatNativeSuggestion, validateNativeSuggestion } from "../utils/nativeSuggestion.js";
 import { calculateTextSimilarity } from "../utils/textSimilarity.js";
 import { formatReviewTypeLabel, type ReviewPass, type ReviewStrategy } from "./reviewSelection.js";
 
@@ -205,8 +206,13 @@ export class CommentManager {
           actions.push({
             type: "create",
             path: fileResult.filename,
-            line: finding.line,
-            body: this.formatInlineComment(finding, fileResult.filename),
+            line: this.getSuggestionEndLine(finding, filePatches?.get(fileResult.filename)),
+            startLine: this.getSuggestionStartLine(finding, filePatches?.get(fileResult.filename)),
+            body: this.formatInlineComment(
+              finding,
+              fileResult.filename,
+              filePatches?.get(fileResult.filename)
+            ),
           });
         }
       }
@@ -376,12 +382,15 @@ export class CommentManager {
    * @param filename - The file path for generating unique ID
    * @returns Formatted comment body with enhanced markdown formatting
    */
-  formatInlineComment(finding: FileFinding, filename?: string): string {
+  formatInlineComment(finding: FileFinding, filename?: string, filePatch?: string): string {
     const severityEmoji = this.getSeverityEmoji(finding.severity);
     const categoryEmoji = this.getCategoryEmoji(finding.category);
 
     const findingId = filename ? this.generateFindingId(filename, finding) : "";
     const idMarker = findingId ? `\n<!-- finding-id: ${findingId} -->` : "";
+
+    const nativeSuggestion = validateNativeSuggestion(finding, filePatch);
+    const suggestionBlock = nativeSuggestion ? formatNativeSuggestion(nativeSuggestion) : "";
 
     return `### ${categoryEmoji} ${finding.category.charAt(0).toUpperCase() + finding.category.slice(1)} Issue
 
@@ -390,10 +399,19 @@ export class CommentManager {
 **Issue**: ${finding.message}
 
 **Suggestion**:
-${finding.suggestion}
+${finding.suggestion}${suggestionBlock}
 
 ---
 ${this.footer}${idMarker}`;
+  }
+
+  private getSuggestionStartLine(finding: FileFinding, filePatch?: string): number | undefined {
+    const suggestion = validateNativeSuggestion(finding, filePatch);
+    return suggestion && suggestion.startLine !== finding.line ? suggestion.startLine : undefined;
+  }
+
+  private getSuggestionEndLine(finding: FileFinding, filePatch?: string): number {
+    return validateNativeSuggestion(finding, filePatch)?.endLine ?? finding.line;
   }
 
   /**

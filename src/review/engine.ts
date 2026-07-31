@@ -1376,7 +1376,17 @@ During the database pass, pay extra attention to query correctness, transaction 
           throw new Error("Create action requires body");
         }
         if (action.path && action.line) {
-          await this.platform.postInlineComment(prNumber, action.path, action.line, action.body);
+          if (action.startLine !== undefined) {
+            await this.platform.postInlineComment(
+              prNumber,
+              action.path,
+              action.line,
+              action.body,
+              action.startLine
+            );
+          } else {
+            await this.platform.postInlineComment(prNumber, action.path, action.line, action.body);
+          }
           this.logger.info(
             { prNumber, path: action.path, line: action.line },
             "Inline comment created"

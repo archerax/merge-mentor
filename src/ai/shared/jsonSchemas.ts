@@ -10,6 +10,14 @@ export const FILE_REVIEW_SCHEMA = {
         type: "object",
         properties: {
           line: { type: "number", description: "Line number in the file" },
+          start_line: {
+            type: "number",
+            description: "First changed file line replaced by a native suggestion (optional)",
+          },
+          end_line: {
+            type: "number",
+            description: "Last changed file line replaced by a native suggestion (optional)",
+          },
           severity: {
             type: "string",
             description: "Finding severity: critical, high, medium, or low",
@@ -21,6 +29,11 @@ export const FILE_REVIEW_SCHEMA = {
           },
           message: { type: "string", description: "Description of the finding" },
           suggestion: { type: "string", description: "Suggested fix or improvement" },
+          replacement: {
+            type: "string",
+            description:
+              "Exact replacement code for a native suggestion; omit when a safe localized replacement is not possible",
+          },
           reasoning: {
             type: "string",
             description: "Concise rationale citing code evidence, checked context, and impact",
@@ -97,11 +110,14 @@ export const BATCHED_FILE_REVIEW_SCHEMA = {
               type: "object",
               properties: {
                 line: { type: "number" },
+                start_line: { type: "number" },
+                end_line: { type: "number" },
                 severity: { type: "string" },
                 confidence: { type: "string" },
                 category: { type: "string" },
                 message: { type: "string" },
                 suggestion: { type: "string" },
+                replacement: { type: "string" },
                 reasoning: { type: "string" },
                 isPreExisting: { type: "boolean" },
               },
@@ -128,11 +144,14 @@ export const FAST_REVIEW_SCHEMA = {
         properties: {
           file: { type: "string", description: "File path (omit for cross-file findings)" },
           line: { type: "number", description: "Line number in the file" },
+          start_line: { type: "number" },
+          end_line: { type: "number" },
           severity: { type: "string" },
           confidence: { type: "string" },
           category: { type: "string" },
           message: { type: "string" },
           suggestion: { type: "string" },
+          replacement: { type: "string" },
           reasoning: { type: "string" },
           isPreExisting: { type: "boolean" },
         },

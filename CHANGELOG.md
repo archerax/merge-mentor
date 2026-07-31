@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Native Platform Suggestions**: High-confidence, localized review findings
+  can now include automatically validated native suggestion blocks on GitHub
+  and Azure DevOps. Suggestions are limited to fewer than 10 target and
+  replacement lines, with unsafe replacements falling back to explanatory
+  comments.
+
 ## [3.0.0] - 2026-07-31
 
 ### Removed

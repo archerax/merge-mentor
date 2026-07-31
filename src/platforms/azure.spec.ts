@@ -931,6 +931,17 @@ describe("AzureDevOpsAdapter", () => {
       const call = mockGitApiInstance.createThread.mock.calls[0][0];
       expect(call.threadContext.filePath).toBe("/src/test.ts");
     });
+
+    it("posts a multiline inline comment with a start line", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.createThread.mockResolvedValue({});
+
+      await adapter.postInlineComment(123, "src/test.ts", 12, "Apply this", 10);
+
+      const call = mockGitApiInstance.createThread.mock.calls[0][0];
+      expect(call.threadContext.rightFileStart).toEqual({ line: 10, offset: 1 });
+      expect(call.threadContext.rightFileEnd).toEqual({ line: 12, offset: 1 });
+    });
   });
 
   describe("postGeneralComment", () => {

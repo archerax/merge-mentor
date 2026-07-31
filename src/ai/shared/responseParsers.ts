@@ -35,11 +35,14 @@ export function parseFileReview(
     validateReasoning(logger, finding.reasoning, filename, finding.line);
     return {
       line: finding.line,
+      startLine: finding.start_line,
+      endLine: finding.end_line,
       severity: finding.severity,
       confidence: finding.confidence,
       category: finding.category,
       message: finding.message,
       suggestion: finding.suggestion,
+      replacement: finding.replacement,
       reasoning: finding.reasoning,
       isPreExisting: finding.isPreExisting,
     };
@@ -104,11 +107,14 @@ export function parseBatchedFileReview(
       validateReasoning(logger, finding.reasoning, filename, finding.line);
       return {
         line: finding.line,
+        startLine: finding.start_line,
+        endLine: finding.end_line,
         severity: finding.severity,
         confidence: finding.confidence,
         category: finding.category,
         message: finding.message,
         suggestion: finding.suggestion,
+        replacement: finding.replacement,
         reasoning: finding.reasoning,
         isPreExisting: finding.isPreExisting,
       };
@@ -146,11 +152,14 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
 
       fileFindings.get(file)?.push({
         line: finding.line,
+        startLine: finding.start_line,
+        endLine: finding.end_line,
         severity: finding.severity,
         confidence: finding.confidence,
         category: finding.category,
         message: finding.message,
         suggestion: finding.suggestion,
+        replacement: finding.replacement,
         reasoning: finding.reasoning,
         isPreExisting: finding.isPreExisting,
       });

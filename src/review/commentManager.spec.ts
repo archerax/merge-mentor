@@ -88,6 +88,29 @@ describe("CommentManager", () => {
       expect(result).toContain("<!-- [AI Code Review Bot] -->");
     });
 
+    it("includes a validated native suggestion block", () => {
+      const manager = createCommentManager();
+      const result = manager.formatInlineComment(
+        createFileFinding({ replacement: "return value;" }),
+        "test.ts",
+        "@@ -9,2 +9,2 @@\n+const value = getValue();\n+return value;"
+      );
+
+      expect(result).toContain("```suggestion\nreturn value;\n```");
+    });
+
+    it("falls back to prose for a medium-confidence replacement", () => {
+      const manager = createCommentManager();
+      const result = manager.formatInlineComment(
+        createFileFinding({ confidence: "medium", replacement: "return value;" }),
+        "test.ts",
+        "@@ -9,1 +9,1 @@\n+const value = getValue();"
+      );
+
+      expect(result).not.toContain("```suggestion");
+      expect(result).toContain("Test suggestion");
+    });
+
     test.each([
       ["critical", "🔴"],
       ["high", "🟠"],
@@ -368,6 +391,37 @@ describe("CommentManager", () => {
       expect(createActions).toHaveLength(2); // 1 inline + 1 summary
       expect(createActions[0].path).toBe("test.ts");
       expect(createActions[0].line).toBe(10);
+    });
+
+    it("uses the validated suggestion range for the inline action", () => {
+      const manager = createCommentManager();
+      const actions = manager.determineActions(
+        [],
+        [
+          {
+            filename: "test.ts",
+            findings: [
+              createFileFinding({
+                line: 12,
+                startLine: 10,
+                endLine: 12,
+                replacement: "const value = getValue();\nif (!value) return;\nreturn value;",
+              }),
+            ],
+          },
+        ],
+        createCrossFileResult(),
+        new Map([
+          [
+            "test.ts",
+            "@@ -9,4 +9,4 @@\n+const before = true;\n+const value = getValue();\n+if (!value) return;\n+return value;",
+          ],
+        ])
+      );
+
+      const inlineAction = actions.find((action) => action.path);
+      expect(inlineAction).toMatchObject({ path: "test.ts", line: 12, startLine: 10 });
+      expect(inlineAction?.body).toContain("```suggestion");
     });
 
     it("should create a summary comment when none exists", () => {

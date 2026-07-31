@@ -23,6 +23,15 @@ merge-mentor review --pr 456 --platform azure --write
 merge-mentor review --pr 123 --provider opencode-sdk --write
 ```
 
+Native code suggestions are included automatically when a finding is a
+high-confidence, localized replacement in the pull request diff. Suggestions
+are limited to fewer than 10 target lines and fewer than 10 replacement lines.
+Findings that fail validation remain ordinary explanatory comments.
+
+This works in dry-run mode and when posting with `--write` on both GitHub and
+Azure DevOps. Cross-file findings, low-confidence findings, deleted lines, and
+unsafe or malformed replacements do not produce native suggestions.
+
 ---
 
 ## Options

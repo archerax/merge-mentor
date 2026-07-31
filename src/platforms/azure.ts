@@ -833,7 +833,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     prNumber: number,
     path: string,
     line: number,
-    body: string
+    body: string,
+    startLine?: number
   ): Promise<void> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -847,7 +848,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         ],
         threadContext: {
           filePath: path.startsWith("/") ? path : `/${path}`,
-          rightFileStart: { line, offset: 1 },
+          rightFileStart: { line: startLine ?? line, offset: 1 },
           rightFileEnd: { line, offset: 1 },
         },
         status: AzureThreadStatus.ACTIVE,
