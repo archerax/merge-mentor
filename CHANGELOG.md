@@ -28,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copilot CLI Path Override**: Fixed CLI path resolution to honor explicit `COPILOT_CLI_PATH` environment variable.
 - **Copilot SDK Model Default**: Default Copilot SDK model to `Auto` when not explicitly specified.
 
-
 ### Fixed
 
 - **Cross-Platform Test Paths**: Updated `saveTranscript` unit test expectations to use `path.join` for cross-platform compatibility across Windows and POSIX environments.
