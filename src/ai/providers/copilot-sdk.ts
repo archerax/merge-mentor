@@ -261,8 +261,8 @@ export class CopilotSdkProvider implements AIProviderClient {
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
-    const resolvedCliPath = resolveCopilotCliPath();
-    if (!resolvedCliPath) {
+    const cliPath = process.env.COPILOT_CLI_PATH || resolveCopilotCliPath();
+    if (!cliPath) {
       this.logger.debug("Could not resolve @github/copilot path dynamically");
     }
 
@@ -270,10 +270,8 @@ export class CopilotSdkProvider implements AIProviderClient {
     if (this.token) {
       config.gitHubToken = this.token;
     }
-    if (process.env.COPILOT_CLI_PATH) {
-      config.connection = RuntimeConnection.forStdio({ path: process.env.COPILOT_CLI_PATH });
-    } else if (resolvedCliPath) {
-      config.connection = RuntimeConnection.forStdio({ path: resolvedCliPath });
+    if (cliPath) {
+      config.connection = RuntimeConnection.forStdio({ path: cliPath });
     }
 
     this.client = new CopilotClient(Object.keys(config).length > 0 ? config : undefined);

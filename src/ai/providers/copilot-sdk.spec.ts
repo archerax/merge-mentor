@@ -50,7 +50,7 @@ vi.mock("../../ports/index.js", async (importOriginal) => {
   };
 });
 
-import type { PermissionRequest } from "@github/copilot-sdk";
+import { type PermissionRequest, RuntimeConnection } from "@github/copilot-sdk";
 import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
@@ -121,6 +121,9 @@ describe("CopilotSdkProvider", () => {
         const provider = new CopilotSdkProvider();
         const client = (provider as unknown as { getClient: () => unknown }).getClient();
         expect(client).toBeDefined();
+        expect(RuntimeConnection.forStdio).toHaveBeenCalledWith({
+          path: "/dummy/path/to/copilot-cli",
+        });
       } finally {
         process.env.COPILOT_CLI_PATH = originalEnv;
       }
