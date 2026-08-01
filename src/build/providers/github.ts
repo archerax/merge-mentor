@@ -1,0 +1,81 @@
+import { PlatformApiError } from "../../errors/index.js";
+import type {
+  BuildAnalysisProvider,
+  BuildLogChunk,
+  BuildReference,
+  BuildSummary,
+} from "../types.js";
+
+export interface GithubBuildHttp {
+  get(url: string, init?: RequestInit): Promise<Response>;
+}
+
+export class GithubBuildProvider implements BuildAnalysisProvider {
+  constructor(
+    private readonly token: string,
+    private readonly http: GithubBuildHttp = { get: fetch }
+  ) {}
+  private url(reference: BuildReference, suffix: string): string {
+    return `https://api.github.com/repos/${reference.ownerOrOrg}/${reference.repository}${suffix}`;
+  }
+  private async request(reference: BuildReference, suffix: string): Promise<Response> {
+    const response = await this.http.get(this.url(reference, suffix), {
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/vnd.github+json" },
+    });
+    if (!response.ok)
+      throw new PlatformApiError(
+        "github",
+        "build-analysis",
+        `HTTP ${response.status} ${response.statusText}`,
+        undefined,
+        response.status
+      );
+    return response;
+  }
+  async getBuildSummary(reference: BuildReference): Promise<BuildSummary> {
+    const data = (await (
+      await this.request(reference, `/actions/runs/${reference.id}`)
+    ).json()) as Record<string, unknown>;
+    return {
+      id: String(data.id ?? reference.id),
+      name: String(data.name ?? "workflow run"),
+      status:
+        data.status === "completed"
+          ? "completed"
+          : data.status === "in_progress"
+            ? "inProgress"
+            : "unknown",
+      result:
+        data.conclusion === "failure"
+          ? "failed"
+          : data.conclusion === "success"
+            ? "succeeded"
+            : "unknown",
+      sourceBranch: typeof data.head_branch === "string" ? data.head_branch : undefined,
+      commitSha: typeof data.head_sha === "string" ? data.head_sha : undefined,
+      webUrl: typeof data.html_url === "string" ? data.html_url : undefined,
+      startedAt: typeof data.run_started_at === "string" ? data.run_started_at : undefined,
+      finishedAt: typeof data.updated_at === "string" ? data.updated_at : undefined,
+    };
+  }
+  async getFailedLogs(reference: BuildReference): Promise<BuildLogChunk[]> {
+    const jobs = (await (
+      await this.request(reference, `/actions/runs/${reference.id}/jobs?per_page=100`)
+    ).json()) as { jobs?: Array<Record<string, unknown>> };
+    const failed = (jobs.jobs ?? []).filter((job) =>
+      ["failure", "cancelled", "timed_out"].includes(String(job.conclusion))
+    );
+    const chunks: BuildLogChunk[] = [];
+    for (const job of failed) {
+      const response = await this.request(reference, `/actions/jobs/${job.id}/logs`);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("text") && !contentType.includes("json")) continue;
+      chunks.push({
+        jobName: typeof job.name === "string" ? job.name : undefined,
+        content: await response.text(),
+        isFailureCandidate: true,
+      });
+    }
+    return chunks;
+  }
+}

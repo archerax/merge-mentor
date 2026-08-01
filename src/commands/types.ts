@@ -133,6 +133,30 @@ export interface EvalCommandOptions {
   outputFile?: string;
 }
 
+export interface BuildAnalyzeOptions {
+  platform?: string;
+  runId?: string;
+  buildId?: string;
+  ci?: boolean;
+  output?: string;
+  format?: string;
+  maxLogBytes?: number;
+  write?: boolean;
+  provider?: string;
+  githubToken?: string;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  azureToken?: string;
+  azureOrg?: string;
+  azureProject?: string;
+  azureRepo?: string;
+  copilotToken?: string;
+  aiTimeout?: number;
+  aiModel?: string;
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+}
+
 export interface EvalExecutionResult {
   report: import("../eval/types.js").FullEvalReport;
   summaryText: string;

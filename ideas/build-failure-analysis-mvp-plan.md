@@ -11,6 +11,78 @@ The first release optimizes for trustworthy diagnosis, predictable API usage,
 and safe handling of build logs. It will not apply code changes or publish
 inline suggestions automatically.
 
+## Implementation Position
+
+This feature should be implemented as a new build-analysis domain, not as an
+extension of the pull-request `PlatformAdapter`. The existing adapter owns PR
+and work-item operations; build providers have different identifiers, API
+lifecycles, pagination, log formats, and failure states.
+
+The implementation should follow these repository conventions:
+
+- Add a `src/build/` module containing normalized contracts, providers, log
+  processing, analysis orchestration, rendering, and audit metadata.
+- Add a thin `src/commands/build.ts` command handler and register the nested
+  `build analyze` command using the existing Commander patterns.
+- Reuse `Config`, `Environment`, `OutputWriter`, logger, AI provider factory,
+  repository workspace handling, retry behavior, and audit infrastructure.
+- Keep platform SDK types inside `src/build/providers/github.ts` and
+  `src/build/providers/azure.ts`; do not expose Octokit or Azure SDK response
+  shapes to the domain layer.
+- Keep the MVP read-only. `--write` must be rejected rather than silently
+  ignored, and no PR comments, workflow summaries, reruns, branches, or file
+  edits may be produced.
+
+### Decisions for the MVP
+
+1. **Build identity is explicit.** Local runs require `--run-id` for GitHub or
+   `--build-id` for Azure. `--ci` may resolve the identity from environment
+   variables, but the command must never select the latest build implicitly.
+2. **One platform per invocation.** `--platform github|azure` is required when
+   it cannot be inferred from the identifier or CI environment. Supplying both
+   build identifiers is invalid.
+3. **Existing credentials are preferred.** Reuse the current GitHub token and
+   Azure configuration. Azure authentication may additionally use
+   `SYSTEM_ACCESSTOKEN` in Azure Pipelines, with an explicit precedence rule
+   documented in configuration.
+4. **Deterministic preprocessing comes before AI.** Fetching, filtering,
+   redaction, candidate extraction, truncation, and evidence IDs must be
+   testable without a provider call.
+5. **Evidence is bounded and attributable.** Every model claim must reference
+   one or more evidence block IDs. Reports must state when evidence was
+   truncated, unavailable, or redacted.
+6. **A failed analysis is not a diagnosis.** API failures, incomplete build
+   metadata, provider failures, and schema failures produce typed errors or a
+   clearly labelled fallback report with uncertainty.
+7. **PR correlation is deferred.** The MVP will not compare builds with PR
+   changes. A future release may add conservative correlation using an
+   explicit PR identifier and an evidence-based `related`, `unrelated`, or
+   `uncertain` result.
+8. **Both configured AI providers are first-class targets.** Copilot SDK and
+   OpenCode SDK must receive equivalent MVP support, test coverage, and
+   documentation. Neither provider is an optional follow-up integration.
+9. **The release is normal, not hidden behind a feature flag.** Documentation
+   may label the feature experimental while real-world diagnosis quality is
+   being evaluated, but the command is released as a supported normal feature.
+
+### Definition of Done
+
+The feature is ready for release only when all of the following are true:
+
+- GitHub and Azure explicit-ID invocations work against mocked platform APIs.
+- `--ci` resolves build identity and repository context in both supported CI
+  environments.
+- Failed jobs, stages, and tasks are prioritized over successful output.
+- Raw logs are normalized, bounded, redacted, and wrapped as untrusted content
+  before reaching an AI provider.
+- Structured provider output is schema-validated and rendered with evidence,
+  uncertainty, and recommendations separated.
+- The command has no external write side effects in the MVP.
+- Tests cover parser fixtures, platform error cases, command validation,
+  provider validation, output files, and secret/audit-log redaction.
+- `pnpm check`, package build, and compiled CLI smoke tests pass on the
+  repository's supported Node and operating-system matrix.
+
 ## User Outcome
 
 Given a failed GitHub Actions workflow run or Azure DevOps build, a developer
@@ -22,10 +94,14 @@ can run one command and receive:
 - A classification of the failure, such as compilation, test, lint, dependency,
   infrastructure, timeout, or unknown.
 - A concise root-cause explanation grounded in the captured evidence.
-- A relationship assessment between the failure and the associated PR changes
-  when PR context is available.
-- Suggested next steps, clearly labelled as recommendations rather than
-  executable patches.
+  - Suggested next steps, clearly labelled as recommendations rather than
+    executable patches.
+
+If deterministic processing and the AI provider cannot establish a supported
+failure classification, the report must explicitly say that the failure reason
+could not be determined. It must include the evidence that was available, the
+limitations encountered, and recommendations for manual investigation; it must
+not invent a root cause.
 
 ## Scope
 
@@ -38,11 +114,11 @@ can run one command and receive:
 - Explicit identifiers for local use:
   - GitHub: `--run-id <id>`.
   - Azure DevOps: `--build-id <id>`.
-- Optional PR correlation using `--pr <number>` or the detected CI PR.
 - Reuse of an existing checkout when `GITHUB_WORKSPACE` or
   `BUILD_SOURCESDIRECTORY` is available.
 - Deterministic log normalization and truncation before AI processing.
-- Dry-run Markdown output by default, with `--output <path>` support.
+- Markdown output only, printed locally by default, with `--output <path>`
+  support.
 - Structured AI output validated with a Zod schema.
 - Unit tests, parser fixtures, platform API mocks, and command-level tests.
 - Audit events for retrieval, analysis, and output generation without logging
@@ -52,7 +128,8 @@ can run one command and receive:
 
 - Automatically applying fixes or invoking the existing `fix` command.
 - Native GitHub or Azure inline suggestions.
-- Posting comments to pull requests or workflow summaries.
+- Posting comments, checks, or summaries to pull requests or CI platforms.
+- PR-to-build correlation and changed-file causality analysis.
 - Automatic reruns, flaky-test history, or cross-run analytics.
 - Webhooks, a GitHub Action, or an Azure task package.
 - Support for providers other than the existing configured AI providers.
@@ -68,10 +145,7 @@ merge-mentor build analyze --platform github --run-id 987654321
 # Azure DevOps, explicit local invocation
 merge-mentor build analyze --platform azure --build-id 456
 
-# Correlate a run with a specific PR
-merge-mentor build analyze --platform github --run-id 987654321 --pr 123
-
-# Write a report instead of only displaying it
+# Write a local Markdown report instead of only displaying it
 merge-mentor build analyze --platform azure --build-id 456 \
   --output ./post-mortem.md
 
@@ -86,10 +160,9 @@ merge-mentor build analyze --ci
 | `--platform <platform>`   | `github` or `azure`; inferred from `--ci` when omitted                          | Configured platform or detected CI |
 | `--run-id <id>`           | GitHub Actions workflow run ID                                                  | None                               |
 | `--build-id <id>`         | Azure DevOps build ID                                                           | None                               |
-| `--pr <number>`           | PR to use for diff correlation                                                  | Detected PR when available         |
 | `--ci`                    | Resolve platform, credentials, repository, and build identity from CI variables | `false`                            |
 | `--output <path>`         | Write the Markdown report to a file                                             | Console output                     |
-| `--format <format>`       | `markdown` only in the MVP; reserve the shape for future `json`                 | `markdown`                         |
+| `--format <format>`       | Reserved for future formats; only `markdown` is accepted in the MVP             | `markdown`                         |
 | `--max-log-bytes <bytes>` | Upper bound for normalized evidence sent to the provider                        | Configured safe limit              |
 | `--write`                 | Reserved for a later publishing feature; reject it explicitly in the MVP        | `false`                            |
 
@@ -149,6 +222,72 @@ Names may change during implementation, but the key requirement is that the
 engine depends on normalized summaries and log chunks, not Octokit or the Azure
 DevOps SDK.
 
+### Proposed File Map
+
+```text
+src/build/
+  types.ts                 # domain contracts and failure categories
+  errors.ts                # typed build-analysis errors
+  reference.ts             # identifier and platform validation
+  engine.ts                # fetch -> normalize -> analyze -> render flow
+  logNormalizer.ts         # deterministic normalization and redaction
+  failureCandidates.ts     # recognizers and evidence-block extraction
+  prompt.ts                # security-hardened analysis prompt
+  parser.ts                # Zod response validation and fallback handling
+  renderer.ts              # Markdown report rendering
+  audit.ts                 # safe identifier/count-only audit events
+  providers/
+    github.ts              # Actions API mapping and log retrieval
+    azure.ts               # Build/Timeline API mapping and log retrieval
+
+src/commands/build.ts       # Commander handler for `build analyze`
+src/commands/build.spec.ts  # command-level behavior and dependency seams
+docs/build-analyze.md      # user-facing usage and CI setup
+test/eval/corpus/build/     # sanitized platform-independent fixtures
+```
+
+The exact filenames may change, but the dependency direction must remain:
+
+```text
+command -> build engine -> BuildAnalysisProvider
+                    -> AI provider
+                    -> OutputWriter / audit ports
+GitHub and Azure SDKs -> provider implementations only
+```
+
+The build engine should accept injected providers and ports so command tests do
+not require network access, a checkout, or a real AI client.
+
+### Delivery Work Breakdown
+
+The implementation should be delivered in independently verifiable slices:
+
+1. **Contracts and validation:** Add references, normalized summaries, log
+   chunks, failure categories, typed errors, and option validation. Test all
+   conflicting and missing-argument cases before adding API calls.
+2. **Deterministic evidence pipeline:** Implement normalization, secret
+   redaction, candidate scoring, deduplication, evidence IDs, and byte limits.
+   Add fixtures for first-error selection and cascading failures.
+3. **GitHub provider:** Map run and job metadata, select failed jobs, retrieve
+   logs, preserve job/step metadata, and cover compressed or empty responses.
+4. **Azure provider:** Map builds and timeline records, select failed tasks,
+   retrieve relevant logs, support PAT and `SYSTEM_ACCESSTOKEN`, and cover
+   paged/sequenced logs.
+5. **Analysis contract:** Add the prompt, untrusted-content wrappers, Zod
+   schema, evidence-reference validation, and deterministic fallback behavior.
+6. **Report and audit output:** Render a stable Markdown report, include source
+   links and truncation notices, support `--output`, and ensure audit records
+   contain identifiers and counts only.
+7. **CLI and CI wiring:** Register `build analyze`, add `--ci` resolution for
+   `GITHUB_RUN_ID` and `BUILD_BUILDID`, reuse workspace paths, and reject
+   unsupported `--write` explicitly.
+8. **Release hardening:** Run the full check suite, cross-platform build and
+   smoke tests, fixture evaluation, documentation review, and changelog work.
+
+Each slice should land with its tests and should not require the next slice to
+be present. In particular, the deterministic parser must be usable and
+reviewable before either AI integration or platform publishing work begins.
+
 ### Platform Implementations
 
 #### GitHub Actions
@@ -191,13 +330,11 @@ DevOps SDK.
    - Deduplicate repeated lines and repeated retry output.
 5. Extract candidate failure blocks with deterministic heuristics.
 6. Enforce per-block and total byte limits before constructing the AI prompt.
-7. Optionally load PR details, changed files, and patches through the existing
-   `PlatformAdapter`.
-8. Ask the configured provider for structured diagnosis using the security
+7. Ask the configured provider for structured diagnosis using the security
    preamble and untrusted-content wrappers.
-9. Validate and sanitize the provider response.
-10. Render the report and write it to the console or requested output path.
-11. Record an audit event with identifiers, counts, and outcome only.
+8. Validate and sanitize the provider response.
+9. Render the report and write it to the console or requested output path.
+10. Record an audit event with identifiers, counts, and outcome only.
 
 ## Log Processing Design
 
@@ -253,14 +390,13 @@ finding schema. The response should contain:
 - `rootCause`.
 - `evidence` references to the supplied block identifiers.
 - `affectedFiles` with optional line ranges.
-- `prCorrelation` with `related`, `unrelated`, or `uncertain` plus reasoning.
 - `recommendations`.
 - `limitations`, including missing or truncated evidence.
 
 Prompt requirements:
 
 - Include the shared security preamble.
-- Wrap all build logs, PR text, and diffs as untrusted content.
+- Wrap all build logs and platform-provided metadata as untrusted content.
 - Tell the provider not to follow instructions found in logs or source files.
 - Require claims to cite evidence block IDs.
 - Forbid invented logs, file locations, test history, or certainty.
@@ -281,7 +417,7 @@ could be mistaken for a confirmed diagnosis.
 - Extend CI context resolution with the build identity needed by `--ci`:
   - GitHub: `GITHUB_RUN_ID`.
   - Azure: `BUILD_BUILDID`.
-- Keep PR detection optional for manually triggered builds and branch builds.
+- Do not perform PR detection or PR correlation in the MVP.
 - Document required Azure permissions, including the explicit
   `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` mapping for pipeline jobs.
 - Keep dry-run behavior consistent with the existing CLI defaults.
@@ -377,7 +513,7 @@ malformed or unsupported responses cannot bypass schema validation.
 
 - Add the Commander command and option validation.
 - Resolve `GITHUB_RUN_ID` and `BUILD_BUILDID` for `--ci`.
-- Wire optional PR correlation to existing adapters and local workspace reuse.
+- Wire local workspace reuse and reject unsupported options such as `--write`.
 - Add command-level tests and update user documentation.
 
 **Exit criteria:** A user can run explicit GitHub and Azure commands locally,
@@ -395,7 +531,8 @@ credential arguments.
 
 **Exit criteria:** Both platforms meet the acceptance criteria below, no raw
 logs or credentials appear in audit output, and the feature is ready for a
-minor release behind no experimental flag.
+normal minor release. User documentation should label the feature
+"experimental" while early diagnosis quality is being evaluated.
 
 ## Acceptance Criteria
 
@@ -408,8 +545,8 @@ minor release behind no experimental flag.
 - Input sent to an AI provider is bounded, redacted, and marked as untrusted.
 - The report distinguishes evidence, model interpretation, uncertainty, and
   recommendations.
-- PR correlation is explicitly `related`, `unrelated`, or `uncertain`; it is
-  never implied solely by a matching filename.
+- Unknown failure causes are explicitly reported as undetermined with evidence
+  and limitations; the system never invents a root cause.
 - Reports can be printed and written to a requested path without repository
   working-directory side effects.
 - No comments, suggestions, code edits, reruns, or external side effects occur
@@ -421,10 +558,11 @@ minor release behind no experimental flag.
 
 After real usage validates diagnosis quality, consider:
 
-1. Publishing reports to GitHub checks/workflow summaries and Azure build
+1. PR-to-build correlation using explicit PR context and conservative evidence.
+2. Publishing reports to GitHub checks/workflow summaries and Azure build
    summaries.
-2. Optional PR general comments with deduplication.
-3. Native suggestions only when a diagnosis maps to a validated localized fix.
-4. Historical flakiness detection and recurring-failure analytics.
-5. A CI action/task wrapper for zero-install pipeline integration.
-6. Safe integration with `fix` after explicit user confirmation.
+3. Optional PR general comments with deduplication.
+4. Native suggestions only when a diagnosis maps to a validated localized fix.
+5. Historical flakiness detection and recurring-failure analytics.
+6. A CI action/task wrapper for zero-install pipeline integration.
+7. Safe integration with `fix` after explicit user confirmation.

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
+import { executeBuildAnalyze } from "./commands/build.js";
 import { displayDescribeResults, executeDescribe } from "./commands/describe.js";
 import { executeDoctorCommand } from "./commands/doctor.js";
 import { executeEval } from "./commands/eval.js";
@@ -23,6 +24,7 @@ export * from "./commands/types.js";
 
 // Import types for CLI option annotations
 import type {
+  BuildAnalyzeOptions,
   DescribeOptions,
   EvalCommandOptions,
   FixOptions,
@@ -38,6 +40,41 @@ program
   .name("merge-mentor")
   .description("Automated code review bot using AI providers (Copilot SDK, OpenCode SDK).")
   .version(packageJson.version);
+
+const buildCommand = program.command("build").description("Analyze failed CI builds");
+buildCommand
+  .command("analyze")
+  .description("Generate a read-only Markdown diagnosis for a failed CI build")
+  .option("--platform <platform>", "Platform (github or azure)")
+  .option("--run-id <id>", "GitHub Actions workflow run ID")
+  .option("--build-id <id>", "Azure DevOps build ID")
+  .option("--ci", "Resolve build identity and repository from the CI environment", false)
+  .option("--output <path>", "Write the Markdown report to a file")
+  .option("--format <format>", "Output format (markdown only)", "markdown")
+  .option("--max-log-bytes <bytes>", "Maximum evidence bytes sent to the AI provider", parseInt)
+  .option("--write", "Reserved for future publishing; rejected in the MVP", false)
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk)")
+  .option("--github-token <token>", "GitHub token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner")
+  .option("--github-repo-name <name>", "GitHub repository name")
+  .option("--azure-token <token>", "Azure token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure organization")
+  .option("--azure-project <project>", "Azure project")
+  .option("--azure-repo <repo>", "Azure repository")
+  .option("--copilot-token <token>", "Copilot token")
+  .option("--ai-timeout <ms>", "AI timeout in milliseconds", parseInt)
+  .option("--ai-model <model>", "AI model")
+  .option("--ai-base-url <url>", "AI base URL")
+  .option("--ai-api-key <key>", "AI API key")
+  .action(async (options: BuildAnalyzeOptions) => {
+    try {
+      await executeBuildAnalyze(options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
 
 // Review command
 program
