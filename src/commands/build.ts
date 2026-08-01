@@ -61,6 +61,8 @@ export async function executeBuildAnalyze(
     org,
     project,
   });
+  const azureTokenSource =
+    options.azureToken !== undefined || !env.get("SYSTEM_ACCESSTOKEN") ? "pat" : "bearer";
   const token =
     platform === "github"
       ? (options.githubToken ?? env.get("GITHUB_TOKEN") ?? env.get("MM_GITHUB_TOKEN"))
@@ -69,7 +71,7 @@ export async function executeBuildAnalyze(
   const buildProvider =
     platform === "github"
       ? new GithubBuildProvider(token)
-      : new AzureBuildProvider(token, org as string);
+      : new AzureBuildProvider(token, org as string, azureTokenSource);
   const aiType = (options.provider ?? env.get("MM_AI_PROVIDER") ?? "copilot-sdk") as AIProviderType;
   const aiProvider = createAIProvider(aiType, {
     model: options.aiModel ?? env.get("MM_AI_MODEL"),
