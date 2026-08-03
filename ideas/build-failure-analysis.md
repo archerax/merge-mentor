@@ -4,7 +4,7 @@
 
 **Merge Mentor** expands its capabilities from pull request review and user story verification to continuous integration build failure intelligence.
 
-When a CI/CD build or workflow run fails in GitHub Actions or Azure Pipelines, `merge-mentor` can automatically trigger (via webhook, CI step action, or CLI command `merge-mentor build analyze`), download and parse the raw build/test execution logs, pinpoint root causes (compilation errors, failed assertions, environment issues, missing dependencies, or flaky tests), and generate a comprehensive **Build Failure Post-Mortem**.
+When a CI/CD build or workflow run fails in GitHub Actions or Azure Pipelines, `merge-mentor` can automatically trigger (via webhook, CI step action, or CLI command `merge-mentor build`), download and parse the raw build/test execution logs, pinpoint root causes (compilation errors, failed assertions, environment issues, missing dependencies, or flaky tests), and generate a comprehensive **Build Failure Post-Mortem**.
 
 Crucially, it posts automated inline remediation suggestions (` ```suggestion ```` blocks) or a detailed diagnostic report directly on the associated PR or workflow run summary, enabling developers to resolve build breaks instantly.
 
@@ -28,8 +28,8 @@ Crucially, it posts automated inline remediation suggestions (` ```suggestion ``
 
 ### 1. Triggering & Integration Mechanisms
 
-- **CI Workflow Action / Webhook:** Trigger `merge-mentor build analyze` automatically upon `failure()` status in GitHub Actions or Azure Pipelines.
-- **CLI Subcommand:** `merge-mentor build analyze --run-id <id>` or `--pr <id>` to run on-demand locally or in CI pipelines.
+- **CI Workflow Action / Webhook:** Trigger `merge-mentor build` automatically upon `failure()` status in GitHub Actions or Azure Pipelines.
+- **CLI Command:** `merge-mentor build --run-id <id>` or `--pr <id>` to run on-demand locally or in CI pipelines.
 - **Platform Log Extraction:** Connect to GitHub REST API (`/repos/{owner}/{repo}/actions/runs/{run_id}/logs`) or Azure DevOps Build API (`_apis/build/builds/{buildId}/logs`) to fetch raw log streams.
 
 ### 2. Log Ingestion & Noise Filtering Engine
@@ -59,13 +59,13 @@ Generates a markdown report containing:
 
 ```bash
 # Analyze a specific build run on GitHub Actions
-MM_GITHUB_TOKEN=your_token merge-mentor build analyze --run-id 987654321 --pr 123
+MM_GITHUB_TOKEN=your_token merge-mentor build --run-id 987654321 --pr 123
 
 # Analyze Azure DevOps build failure in CI
-MM_AZURE_DEVOPS_TOKEN=your_token merge-mentor build analyze --build-id 456 --write
+MM_AZURE_DEVOPS_TOKEN=your_token merge-mentor build --build-id 456 --write
 
 # Generate post-mortem output as local Markdown file or JSON report
-merge-mentor build analyze --run-id 987654321 --format markdown --output ./post-mortem.md
+merge-mentor build --run-id 987654321 --format markdown --output ./post-mortem.md
 ```
 
 ### Modular Pipeline Architecture

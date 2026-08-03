@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add a `build analyze` command that explains failed CI builds for GitHub Actions
+Add a `build` command that explains failed CI builds for GitHub Actions
 and Azure DevOps Pipelines. The MVP should produce a bounded, useful Markdown
 post-mortem locally or in CI without changing the existing pull-request review
 flow.
@@ -22,8 +22,8 @@ The implementation should follow these repository conventions:
 
 - Add a `src/build/` module containing normalized contracts, providers, log
   processing, analysis orchestration, rendering, and audit metadata.
-- Add a thin `src/commands/build.ts` command handler and register the nested
-  `build analyze` command using the existing Commander patterns.
+- Add a thin `src/commands/build.ts` command handler and register the `build`
+  command using the existing Commander patterns.
 - Reuse `Config`, `Environment`, `OutputWriter`, logger, AI provider factory,
   repository workspace handling, retry behavior, and audit infrastructure.
 - Keep platform SDK types inside `src/build/providers/github.ts` and
@@ -107,7 +107,7 @@ not invent a root cause.
 
 ### In Scope
 
-- New `build analyze` command.
+- New `build` command.
 - GitHub Actions workflow run lookup and failed-job log retrieval.
 - Azure DevOps build lookup and failed-log retrieval.
 - Automatic platform/context resolution in supported CI environments.
@@ -140,17 +140,17 @@ not invent a root cause.
 
 ```bash
 # GitHub Actions, explicit local invocation
-merge-mentor build analyze --platform github --run-id 987654321
+merge-mentor build --platform github --run-id 987654321
 
 # Azure DevOps, explicit local invocation
-merge-mentor build analyze --platform azure --build-id 456
+merge-mentor build --platform azure --build-id 456
 
 # Write a local Markdown report instead of only displaying it
-merge-mentor build analyze --platform azure --build-id 456 \
+merge-mentor build --platform azure --build-id 456 \
   --output ./post-mortem.md
 
 # Resolve identifiers and credentials from the current CI environment
-merge-mentor build analyze --ci
+merge-mentor build --ci
 ```
 
 ### Command Options
@@ -240,7 +240,7 @@ src/build/
     github.ts              # Actions API mapping and log retrieval
     azure.ts               # Build/Timeline API mapping and log retrieval
 
-src/commands/build.ts       # Commander handler for `build analyze`
+src/commands/build.ts       # Commander handler for `build`
 src/commands/build.spec.ts  # command-level behavior and dependency seams
 docs/build-analyze.md      # user-facing usage and CI setup
 test/eval/corpus/build/     # sanitized platform-independent fixtures
@@ -278,7 +278,7 @@ The implementation should be delivered in independently verifiable slices:
 6. **Report and audit output:** Render a stable Markdown report, include source
    links and truncation notices, support `--output`, and ensure audit records
    contain identifiers and counts only.
-7. **CLI and CI wiring:** Register `build analyze`, add `--ci` resolution for
+7. **CLI and CI wiring:** Register `build`, add `--ci` resolution for
    `GITHUB_RUN_ID` and `BUILD_BUILDID`, reuse workspace paths, and reject
    unsupported `--write` explicitly.
 8. **Release hardening:** Run the full check suite, cross-platform build and
@@ -518,7 +518,7 @@ malformed or unsupported responses cannot bypass schema validation.
 
 **Exit criteria:** A user can run explicit GitHub and Azure commands locally,
 and a correctly configured GitHub Actions or Azure Pipeline can run
-`merge-mentor build analyze --ci` without manually repeating repository or
+`merge-mentor build --ci` without manually repeating repository or
 credential arguments.
 
 ### Phase 5: Hardening and Release
