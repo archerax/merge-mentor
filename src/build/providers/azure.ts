@@ -11,6 +11,9 @@ import type {
 
 export type AzureBuildAuthMode = "pat" | "bearer";
 
+const FAILURE_LOG_PATTERN =
+  /(?:##\[error\]|task\.logissue\s+type=error|\b(?:failed|failure|fatal|exception|timed?\s*out|timeout|cancelled|canceled)\b|\bexit\s+code\s*[:=]?\s*[1-9]\d*\b|\b(?:npm|pnpm|yarn)\s+ERR!)/i;
+
 export interface AzureBuildConnection {
   getBuildApi(): Promise<IBuildApi>;
 }
@@ -75,10 +78,15 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
           `Failed to retrieve Azure build log ${entry.id}: ${(error as Error).message}`
         );
       }
+      // Azure exposes build logs independently from task results. Keep only
+      // logs with failure markers so successful setup and cleanup output does
+      // not consume the analysis evidence budget.
+      const isFailureCandidate = FAILURE_LOG_PATTERN.test(lines.join("\n"));
+      if (!isFailureCandidate) continue;
       chunks.push({
         sequence: entry.id,
         content: lines.join("\n"),
-        isFailureCandidate: true,
+        isFailureCandidate,
       });
     }
     return chunks;

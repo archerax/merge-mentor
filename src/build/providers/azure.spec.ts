@@ -28,8 +28,14 @@ describe("AzureBuildProvider", () => {
         startTime: new Date("2026-08-01T10:00:00Z"),
         finishTime: new Date("2026-08-01T10:02:00Z"),
       }),
-      getBuildLogs: vi.fn().mockResolvedValue([{ id: 7 }]),
-      getBuildLogLines: vi.fn().mockResolvedValue(["compile failed", "exit 1"]),
+      getBuildLogs: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]),
+      getBuildLogLines: vi
+        .fn()
+        .mockImplementation((_project, _build, id) =>
+          Promise.resolve(
+            id === 7 ? ["compile failed", "exit 1"] : ["Build completed successfully"]
+          )
+        ),
     };
     const provider = new AzureBuildProvider("token", "org", "pat", connection(api));
 
@@ -45,6 +51,7 @@ describe("AzureBuildProvider", () => {
       { sequence: 7, content: "compile failed\nexit 1", isFailureCandidate: true },
     ]);
     expect(api.getBuildLogLines).toHaveBeenCalledWith("project", 42, 7);
+    expect(api.getBuildLogLines).toHaveBeenCalledWith("project", 42, 8);
   });
 
   it("surfaces failures while retrieving a log", async () => {
