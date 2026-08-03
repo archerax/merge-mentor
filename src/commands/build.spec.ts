@@ -44,7 +44,7 @@ function environment(values: Record<string, string | undefined>) {
   return { get: (name: string) => values[name] };
 }
 
-describe("build analyze command", () => {
+describe("build command", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateBuildReference.mockImplementation((reference) => reference);
@@ -124,5 +124,70 @@ describe("build analyze command", () => {
     );
     expect(mockWriteFile).toHaveBeenCalledWith("post-mortem.md", "# diagnosis", "utf8");
     expect(output.log).not.toHaveBeenCalled();
+  });
+
+  it("loads shared MM configuration from the environment", async () => {
+    await executeBuildAnalyze(
+      { platform: "github", runId: "99" },
+      {
+        env: environment({
+          MM_GITHUB_TOKEN: "env-github-token",
+          MM_GITHUB_REPO_OWNER: "env-owner",
+          MM_GITHUB_REPO_NAME: "env-repo",
+          MM_AI_PROVIDER: "opencode-sdk",
+          MM_AI_MODEL: "env-model",
+          MM_AI_TIMEOUT: "45000",
+          MM_AI_BASE_URL: "https://ai.example.test/v1",
+          MM_AI_API_KEY: "env-api-key",
+        }),
+        output,
+      }
+    );
+
+    expect(mockCreateBuildReference).toHaveBeenCalledWith({
+      platform: "github",
+      runId: "99",
+      buildId: undefined,
+      owner: "env-owner",
+      repo: "env-repo",
+      org: undefined,
+      project: undefined,
+    });
+    expect(mockGithubProvider).toHaveBeenCalledWith("env-github-token");
+    expect(mockCreateAIProvider).toHaveBeenCalledWith("opencode-sdk", {
+      model: "env-model",
+      token: undefined,
+      timeoutMs: 45000,
+      aiBaseUrl: "https://ai.example.test/v1",
+      aiApiKey: "env-api-key",
+      tempPath: "/root/merge-mentor/.mergementor",
+    });
+  });
+
+  it("uses MM_PLATFORM when no platform flag is provided", async () => {
+    await executeBuildAnalyze(
+      { buildId: "42" },
+      {
+        env: environment({
+          MM_PLATFORM: "azure",
+          MM_AZURE_TOKEN: "env-azure-token",
+          MM_AZURE_ORG: "env-org",
+          MM_AZURE_PROJECT: "env-project",
+          MM_AZURE_REPO: "env-repo",
+        }),
+        output,
+      }
+    );
+
+    expect(mockCreateBuildReference).toHaveBeenCalledWith({
+      platform: "azure",
+      runId: undefined,
+      buildId: "42",
+      owner: undefined,
+      repo: "env-repo",
+      org: "env-org",
+      project: "env-project",
+    });
+    expect(mockAzureProvider).toHaveBeenCalledWith("env-azure-token", "env-org", "pat");
   });
 });

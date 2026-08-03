@@ -1,4 +1,5 @@
 import { BuildAnalysisError } from "./errors.js";
+import { storeLogArtifacts } from "./logArtifacts.js";
 import { prepareEvidence } from "./logNormalizer.js";
 import { fallbackDiagnosis, parseDiagnosis } from "./parser.js";
 import { buildAnalysisPrompt } from "./prompt.js";
@@ -29,14 +30,20 @@ export async function analyzeBuild(
   }
   const chunks = await provider.getFailedLogs(reference);
   const evidence = prepareEvidence(chunks, options.maxLogBytes);
+  const artifacts = await storeLogArtifacts(reference, chunks, evidence.blocks, {
+    tempPath: options.tempPath ?? ".mergementor",
+    tailLines: options.initialTailLines,
+    tailBytes: options.initialTailBytes,
+    fileSystem: options.fileSystem,
+  });
   let diagnosis: BuildDiagnosis;
   if (options.aiProvider) {
     try {
       const response = await options.aiProvider.executePrompt(
-        buildAnalysisPrompt(reference, summary, evidence),
-        { promptType: "fast-review" }
+        buildAnalysisPrompt(reference, summary, evidence, artifacts.artifacts),
+        { promptType: "build-analysis", workingDirectory: artifacts.directory }
       );
-      diagnosis = parseDiagnosis(response.raw, evidence);
+      diagnosis = parseDiagnosis(response.raw, evidence, artifacts.artifacts);
     } catch (error) {
       diagnosis = fallbackDiagnosis(
         evidence,
@@ -51,5 +58,6 @@ export async function analyzeBuild(
     evidence,
     diagnosis,
     report: renderReport(reference, summary, evidence, diagnosis),
+    logDirectory: artifacts.directory,
   };
 }

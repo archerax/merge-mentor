@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Disk-Backed Build Logs**: Build failure analysis now retains redacted logs
+  from failed jobs/tasks on disk, includes bounded per-log tails in the initial
+  prompt, and lets the AI agent search the complete artifacts read-only.
 - **Native Platform Suggestions**: High-confidence, localized review findings
   can now include automatically validated native suggestion blocks on GitHub
   and Azure DevOps. Suggestions are limited to fewer than 10 target and

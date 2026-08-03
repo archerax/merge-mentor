@@ -1,3 +1,4 @@
+import { redactLog } from "./logArtifacts.js";
 import type { BuildLogChunk, EvidenceBlock, FailureType, PreparedEvidence } from "./types.js";
 
 const SIGNALS: readonly [FailureType, RegExp, number][] = [
@@ -20,18 +21,6 @@ const SIGNALS: readonly [FailureType, RegExp, number][] = [
     0.8,
   ],
 ];
-
-function redact(text: string): { text: string; changed: boolean } {
-  let changed = false;
-  const redacted = text.replace(
-    /((?:token|password|secret|api[_-]?key|authorization)\s*[=:]\s*)([^\s,;]+)/gi,
-    (_match, prefix: string) => {
-      changed = true;
-      return `${prefix}[REDACTED]`;
-    }
-  );
-  return { text: redacted, changed };
-}
 
 function classify(text: string): { category: FailureType; confidence: number } {
   for (const [category, pattern, confidence] of SIGNALS) {
@@ -64,7 +53,8 @@ export function prepareEvidence(
     const content = source.join("\n");
     if (!content || seen.has(content)) continue;
     seen.add(content);
-    const safe = redact(content);
+    const safeText = redactLog(content);
+    const safe = { text: safeText, changed: safeText !== content };
     redacted ||= safe.changed;
     const classification = classify(safe.text);
     const prefix = `E${blocks.length + 1}`;

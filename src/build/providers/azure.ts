@@ -61,6 +61,7 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
     const buildApi = await this.connection.getBuildApi();
     const logs = await buildApi.getBuildLogs(reference.project ?? "", Number(reference.id));
     const chunks: BuildLogChunk[] = [];
+    const failedLogIds = await this.getFailedLogIds(buildApi, reference);
 
     for (const entry of logs ?? []) {
       if (entry.id === undefined) continue;
@@ -78,18 +79,43 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
           `Failed to retrieve Azure build log ${entry.id}: ${(error as Error).message}`
         );
       }
-      // Azure exposes build logs independently from task results. Keep only
-      // logs with failure markers so successful setup and cleanup output does
-      // not consume the analysis evidence budget.
-      const isFailureCandidate = FAILURE_LOG_PATTERN.test(lines.join("\n"));
+      const content = lines.join("\n");
+      const isFailureCandidate = failedLogIds
+        ? failedLogIds.has(entry.id)
+        : FAILURE_LOG_PATTERN.test(content);
       if (!isFailureCandidate) continue;
       chunks.push({
         sequence: entry.id,
-        content: lines.join("\n"),
+        content,
         isFailureCandidate,
       });
     }
     return chunks;
+  }
+
+  private async getFailedLogIds(
+    buildApi: IBuildApi,
+    reference: BuildReference
+  ): Promise<Set<number> | undefined> {
+    try {
+      const timeline = await buildApi.getBuildTimeline(
+        reference.project ?? "",
+        Number(reference.id)
+      );
+      const failedIds = new Set(
+        (timeline.records ?? [])
+          .filter((record) =>
+            ["failed", "canceled", "cancelled", "abandoned", "timedout", "timed_out"].includes(
+              String(record.result ?? "").toLowerCase()
+            )
+          )
+          .map((record) => record.log?.id)
+          .filter((id): id is number => typeof id === "number")
+      );
+      return failedIds.size > 0 ? failedIds : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 

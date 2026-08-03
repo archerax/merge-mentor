@@ -141,6 +141,9 @@ export interface BuildAnalyzeOptions {
   output?: string;
   format?: string;
   maxLogBytes?: number;
+  initialTailLines?: number;
+  initialTailBytes?: number;
+  tempPath?: string;
   write?: boolean;
   provider?: string;
   githubToken?: string;

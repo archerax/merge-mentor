@@ -59,6 +59,16 @@ export interface PreparedEvidence {
   readonly redacted: boolean;
 }
 
+export interface LogArtifact {
+  readonly filename: string;
+  readonly path: string;
+  readonly jobName?: string;
+  readonly stageName?: string;
+  readonly stepName?: string;
+  readonly sequence?: number;
+  readonly tail: string;
+}
+
 export interface BuildDiagnosis {
   readonly failureType: FailureType;
   readonly confidence: number;
@@ -75,9 +85,14 @@ export interface BuildAnalysisResult {
   readonly evidence: PreparedEvidence;
   readonly diagnosis: BuildDiagnosis;
   readonly report: string;
+  readonly logDirectory?: string;
 }
 
 export interface BuildAnalysisOptions {
   readonly maxLogBytes?: number;
   readonly aiProvider?: AIProviderClient;
+  readonly tempPath?: string;
+  readonly initialTailLines?: number;
+  readonly initialTailBytes?: number;
+  readonly fileSystem?: import("../ports/index.js").FileSystem;
 }

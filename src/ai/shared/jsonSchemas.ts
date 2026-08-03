@@ -162,6 +162,44 @@ export const FAST_REVIEW_SCHEMA = {
   required: ["findings"],
 } as const;
 
+const BUILD_ANALYSIS_SCHEMA = {
+  type: "object",
+  properties: {
+    failureType: {
+      type: "string",
+      enum: ["compilation", "test", "lint", "dependency", "infrastructure", "timeout", "unknown"],
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    summary: { type: "string" },
+    rootCause: { type: "string" },
+    evidence: { type: "array", items: { type: "string" } },
+    affectedFiles: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          line: { type: "number" },
+          column: { type: "number" },
+        },
+        required: ["path"],
+      },
+    },
+    recommendations: { type: "array", items: { type: "string" } },
+    limitations: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "failureType",
+    "confidence",
+    "summary",
+    "rootCause",
+    "evidence",
+    "affectedFiles",
+    "recommendations",
+    "limitations",
+  ],
+} as const;
+
 /**
  * Returns the structured JSON schema corresponding to the prompt type,
  * or undefined if structured schema output is not used for that prompt type.
@@ -176,6 +214,8 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return BATCHED_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "fast-review":
       return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
+    case "build-analysis":
+      return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
     default:
       return undefined;
   }

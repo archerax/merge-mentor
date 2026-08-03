@@ -44,4 +44,23 @@ describe("parseDiagnosis", () => {
     expect(diagnosis.failureType).toBe("unknown");
     expect(diagnosis.confidence).toBe(0);
   });
+
+  it("accepts citations to searched log artifacts with line references", () => {
+    const diagnosis = parseDiagnosis(
+      JSON.stringify({
+        failureType: "test",
+        confidence: 0.9,
+        summary: "A test failed.",
+        rootCause: "The assertion failed.",
+        evidence: ["001-linux.log:42"],
+        affectedFiles: [],
+        recommendations: [],
+        limitations: [],
+      }),
+      { blocks: [], truncated: false, redacted: false },
+      [{ filename: "001-linux.log", path: "/tmp/001-linux.log", tail: "" }]
+    );
+
+    expect(diagnosis.evidence).toEqual(["001-linux.log:42"]);
+  });
 });

@@ -41,9 +41,8 @@ program
   .description("Automated code review bot using AI providers (Copilot SDK, OpenCode SDK).")
   .version(packageJson.version);
 
-const buildCommand = program.command("build").description("Analyze failed CI builds");
-buildCommand
-  .command("analyze")
+program
+  .command("build")
   .description("Generate a read-only Markdown diagnosis for a failed CI build")
   .option("--platform <platform>", "Platform (github or azure)")
   .option("--run-id <id>", "GitHub Actions workflow run ID")
@@ -52,6 +51,20 @@ buildCommand
   .option("--output <path>", "Write the Markdown report to a file")
   .option("--format <format>", "Output format (markdown only)", "markdown")
   .option("--max-log-bytes <bytes>", "Maximum evidence bytes sent to the AI provider", parseInt)
+  .option(
+    "--initial-tail-lines <lines>",
+    "Log tail lines included in the initial AI prompt",
+    parseInt
+  )
+  .option(
+    "--initial-tail-bytes <bytes>",
+    "Maximum bytes of each log tail in the initial AI prompt",
+    parseInt
+  )
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
   .option("--write", "Reserved for future publishing; rejected in the MVP", false)
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk)")
   .option("--github-token <token>", "GitHub token. Env: MM_GITHUB_TOKEN")

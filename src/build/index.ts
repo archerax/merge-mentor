@@ -1,5 +1,6 @@
 export * from "./engine.js";
 export * from "./errors.js";
+export * from "./logArtifacts.js";
 export * from "./logNormalizer.js";
 export * from "./parser.js";
 export * from "./prompt.js";

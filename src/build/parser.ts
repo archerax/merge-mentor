@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseJsonResponse } from "../ai/shared/parseJsonResponse.js";
-import type { BuildDiagnosis, PreparedEvidence } from "./types.js";
+import type { BuildDiagnosis, LogArtifact, PreparedEvidence } from "./types.js";
 
 const DiagnosisSchema = z.object({
   failureType: z.enum([
@@ -27,10 +27,17 @@ const DiagnosisSchema = z.object({
   limitations: z.array(z.string()),
 });
 
-export function parseDiagnosis(raw: string, evidence: PreparedEvidence): BuildDiagnosis {
+export function parseDiagnosis(
+  raw: string,
+  evidence: PreparedEvidence,
+  artifacts: readonly LogArtifact[] = []
+): BuildDiagnosis {
   const parsed = DiagnosisSchema.parse(parseJsonResponse(raw));
   const validIds = new Set(evidence.blocks.map((block) => block.id));
-  const cited = parsed.evidence.filter((id) => validIds.has(id));
+  const validArtifactCitations = artifacts.map((artifact) => `${artifact.filename}:`);
+  const cited = parsed.evidence.filter(
+    (id) => validIds.has(id) || validArtifactCitations.some((prefix) => id.startsWith(prefix))
+  );
   const limitations = [...parsed.limitations];
   if (cited.length !== parsed.evidence.length)
     limitations.push("The provider cited evidence blocks that were not supplied.");
