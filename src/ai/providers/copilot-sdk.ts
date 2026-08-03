@@ -19,7 +19,6 @@ import {
   type OutputWriter,
   systemClock,
 } from "../../ports/index.js";
-import { resolveCopilotCliPath } from "../../utils/copilotCliResolver.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import { delay } from "../shared/delay.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";
@@ -261,10 +260,7 @@ export class CopilotSdkProvider implements AIProviderClient {
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
-    const cliPath = process.env.COPILOT_CLI_PATH || resolveCopilotCliPath();
-    if (!cliPath) {
-      this.logger.debug("Could not resolve @github/copilot path dynamically");
-    }
+    const cliPath = process.env.COPILOT_CLI_PATH;
 
     const config: Record<string, unknown> = {};
     if (this.token) {

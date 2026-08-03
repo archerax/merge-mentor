@@ -149,41 +149,6 @@ describe("doctor command", () => {
     );
   });
 
-  it("checks only specified provider with --provider", async () => {
-    await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Checking copilot CLI"));
-  });
-
-  it("shows installed version when provider is found", async () => {
-    await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Installed: copilot 2.5.0"));
-  });
-
-  it("shows location when which/where succeeds", async () => {
-    await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Location: /usr/local/bin/copilot")
-    );
-  });
-
-  it("shows warning when which/where fails", async () => {
-    vi.mocked(execSync).mockImplementation((cmd) => {
-      const cmdStr = typeof cmd === "string" ? cmd : "";
-      if (cmdStr.includes("git --version")) return "git version 2.40.1";
-      if (cmdStr.includes("copilot --version")) return "copilot 2.5.0";
-      throw new Error("which/where failed");
-    });
-
-    await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Could not determine installation location")
-    );
-  });
-
   it("shows not found when provider version check fails", async () => {
     vi.mocked(execSync).mockImplementation((cmd) => {
       const cmdStr = typeof cmd === "string" ? cmd : "";

@@ -5,7 +5,6 @@ import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
 import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
 import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
-import { resolveCopilotCliPath } from "../utils/copilotCliResolver.js";
 
 export async function executeDoctorCommand(options: { provider?: string }): Promise<void> {
   const output = consoleOutputWriter;
@@ -43,18 +42,8 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
   // Check and display quick status summary of AI providers
   output.log("🤖 AI Provider Status:");
 
-  let copilotStatus = "Not Installed";
-  if (resolveCopilotCliPath()) {
-    copilotStatus = "Available";
-  } else {
-    try {
-      const cmd = "copilot";
-      execSync(process.platform === "win32" ? `where ${cmd}` : `which ${cmd}`, {
-        stdio: "ignore",
-      });
-      copilotStatus = "Available";
-    } catch {}
-  }
+  // The SDK dependency includes the platform-specific Copilot CLI runtime.
+  const copilotStatus = "Available";
   output.log(`  Copilot: ${copilotStatus === "Available" ? "✅ Available" : "❌ Not Installed"}`);
 
   let opencodeStatus = "Not Installed";
@@ -121,34 +110,6 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
           }
         }
 
-        output.log(`\n📦 Checking copilot CLI (Global):`);
-        try {
-          const versionOutput = execSync("copilot --version", {
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-            timeout: 5000,
-          }).trim();
-          output.log(`  ✅ Installed: ${cleanVersion(versionOutput)}`);
-
-          const whichCommand = process.platform === "win32" ? "where" : "which";
-          try {
-            const pathOutput = execSync(`${whichCommand} copilot`, {
-              encoding: "utf-8",
-              stdio: ["pipe", "pipe", "pipe"],
-              timeout: 5000,
-            }).trim();
-            output.log(`  📍 Location: ${pathOutput}`);
-          } catch {
-            output.log(`  ⚠️  Could not determine installation location`);
-          }
-        } catch (error) {
-          const err = error as Error & { status?: number };
-          output.log(`  ❌ Not found or not working`);
-          if (err.message) {
-            output.log(`     Error: ${err.message.split("\n")[0]}`);
-          }
-        }
-
         output.log(`\n📦 Checking copilot-sdk (Local package):`);
         try {
           await import("@github/copilot-sdk");
@@ -156,40 +117,6 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
         } catch (error) {
           output.log("  ❌ Not found: @github/copilot-sdk is not installed or importable");
           output.log(`     Error: ${(error as Error).message}`);
-        }
-
-        // Check if Copilot CLI executable path is resolved
-        const resolvedCliPath = resolveCopilotCliPath();
-
-        if (resolvedCliPath) {
-          if (fs.existsSync(resolvedCliPath)) {
-            output.log(`  ✅ Copilot CLI path resolved: ${resolvedCliPath}`);
-
-            // Verify that the CLI executes successfully
-            try {
-              const execCmd = resolvedCliPath.endsWith(".js")
-                ? `node "${resolvedCliPath}" --version`
-                : `"${resolvedCliPath}" --version`;
-              const versionOutput = execSync(execCmd, {
-                encoding: "utf-8",
-                stdio: ["pipe", "pipe", "pipe"],
-                timeout: 5000,
-              }).trim();
-              output.log(`  ✅ CLI executes: ${cleanVersion(versionOutput)}`);
-            } catch (error) {
-              const err = error as Error & { status?: number };
-              output.log(`  ❌ CLI fails to execute`);
-              if (err.message) {
-                output.log(`     Error: ${err.message.split("\n")[0]}`);
-              }
-            }
-          } else {
-            output.log(`  ❌ Not found: Resolved CLI path does not exist: ${resolvedCliPath}`);
-          }
-        } else {
-          output.log(
-            "  ⚠️  Copilot CLI executable not resolved. Install Copilot CLI globally or set COPILOT_CLI_PATH"
-          );
         }
 
         // Check Copilot authentication status
@@ -206,8 +133,6 @@ export async function executeDoctorCommand(options: { provider?: string }): Prom
             }
             if (env.get("COPILOT_CLI_PATH")) {
               config.connection = RuntimeConnection.forStdio({ path: env.get("COPILOT_CLI_PATH") });
-            } else if (resolvedCliPath) {
-              config.connection = RuntimeConnection.forStdio({ path: resolvedCliPath });
             }
 
             const client = new CopilotClient(config);

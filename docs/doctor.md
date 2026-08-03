@@ -5,7 +5,7 @@ title: Doctor Command
 
 # `doctor` Command
 
-The `doctor` command is a diagnostic tool that checks AI provider CLI installations and configuration. Use it to ensure that your environment variables, authentication credentials, and CLI dependencies are correctly configured before running reviews or fixes.
+The `doctor` command is a diagnostic tool that checks AI provider configuration. The Copilot CLI runtime is bundled with the Copilot SDK; set `COPILOT_CLI_PATH` only when an alternate runtime is intentionally configured.
 
 ## Usage
 
@@ -22,6 +22,6 @@ merge-mentor doctor --provider opencode
 
 ## Options
 
-| Option                  | Description                                          |
-| ----------------------- | ---------------------------------------------------- |
-| `--provider <provider>` | Check a specific provider (`copilot` or `opencode`). |
+| Option                  | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `--provider <provider>` | Check a specific provider (`copilot-sdk` or `opencode-sdk`). |
