@@ -122,46 +122,26 @@ describe("IsomorphicGitClient", () => {
     });
 
     it("throws a timeout error when the operation exceeds the limit", async () => {
-      mockedGit.clone.mockImplementationOnce(
-        () => new Promise((_res) => setTimeout(_res, 99_999_999))
-      );
+      vi.useFakeTimers();
+      try {
+        mockedGit.clone.mockReturnValueOnce(new Promise(() => {}));
 
-      // Use a very small timeout to trigger quickly
-      const slowClient = new (class extends IsomorphicGitClient {
-        override async clone(
-          url: string,
-          targetPath: string,
-          _auth: import("../gitClient.js").GitAuth,
-          opts: import("../gitClient.js").GitCloneOptions
-        ): Promise<void> {
-          // Re-invoke through the module's withTimeout directly by
-          // calling the underlying promise with a 1ms timeout race
-          const p = git.clone({
-            fs: (await import("node:fs")).default,
-            http: (await import("isomorphic-git/http/node")).default,
-            dir: targetPath,
-            url,
-            ref: opts.branch,
-            singleBranch: true,
-            depth: 1,
-          });
-          await Promise.race([
-            p,
-            new Promise<never>((_, rej) =>
-              setTimeout(() => rej(new Error("git operation timed out after 1ms")), 1)
-            ),
-          ]);
-        }
-      })();
-
-      await expect(
-        slowClient.clone(
+        const clonePromise = client.clone(
           "https://github.com/org/repo.git",
           "/tmp/repo",
           { type: "ci" },
           { branch: "main" }
-        )
-      ).rejects.toThrow(/timed out/);
+        );
+        const rejection = expect(clonePromise).rejects.toThrow(
+          "git operation timed out after 120000ms"
+        );
+
+        await vi.advanceTimersByTimeAsync(120_000);
+
+        await rejection;
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("passes http adapter to git.clone", async () => {
