@@ -7,18 +7,25 @@ vi.mock("isomorphic-git", () => ({
     fetch: vi.fn().mockResolvedValue(undefined),
     checkout: vi.fn().mockResolvedValue(undefined),
     writeRef: vi.fn().mockResolvedValue(undefined),
+    statusMatrix: vi.fn().mockResolvedValue([]),
     setConfig: vi.fn().mockResolvedValue(undefined),
   },
+}));
+
+vi.mock("node:fs/promises", () => ({
+  rm: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("isomorphic-git/http/node", () => ({
   default: {},
 }));
 
+import { rm } from "node:fs/promises";
 import git from "isomorphic-git";
 import { IsomorphicGitClient } from "./isomorphicGitClient.js";
 
 const mockedGit = vi.mocked(git);
+const mockedRm = vi.mocked(rm);
 
 describe("IsomorphicGitClient", () => {
   let client: IsomorphicGitClient;
@@ -272,16 +279,35 @@ describe("IsomorphicGitClient", () => {
   // ── clean ──────────────────────────────────────────────────────────────────
 
   describe("clean", () => {
-    it("is a no-op and does not throw", async () => {
-      await expect(client.clean("/tmp/repo")).resolves.toBeUndefined();
-    });
-
-    it("does not invoke any git operations", async () => {
+    it("uses statusMatrix with ignored files enabled", async () => {
       await client.clean("/tmp/repo");
 
-      expect(mockedGit.clone).not.toHaveBeenCalled();
-      expect(mockedGit.fetch).not.toHaveBeenCalled();
-      expect(mockedGit.checkout).not.toHaveBeenCalled();
+      expect(mockedGit.statusMatrix).toHaveBeenCalledWith({
+        fs: expect.anything(),
+        dir: "/tmp/repo",
+        ignored: true,
+      });
+    });
+
+    it("removes untracked and ignored paths but preserves tracked paths", async () => {
+      mockedGit.statusMatrix.mockResolvedValueOnce([
+        ["untracked.txt", 0, 2, 0],
+        ["ignored", 0, 2, 0],
+        ["tracked.txt", 1, 2, 1],
+        ["deleted.txt", 1, 0, 0],
+      ]);
+
+      await client.clean("/tmp/repo");
+
+      expect(mockedRm).toHaveBeenCalledTimes(2);
+      expect(mockedRm).toHaveBeenNthCalledWith(1, "/tmp/repo/untracked.txt", {
+        recursive: true,
+        force: true,
+      });
+      expect(mockedRm).toHaveBeenNthCalledWith(2, "/tmp/repo/ignored", {
+        recursive: true,
+        force: true,
+      });
     });
   });
 

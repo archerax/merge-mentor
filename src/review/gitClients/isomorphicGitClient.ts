@@ -5,9 +5,9 @@
  * (`isomorphic-git/http/node`). Credentials are passed via the `onAuth`
  * callback and never appear in process arguments or on-disk config.
  *
- * Known limitation: isomorphic-git has no equivalent of `git clean -fdx`.
- * The `clean()` method is therefore a no-op. Tracked file changes are still
- * reset by `checkout()` (which uses `force: true`).
+ * isomorphic-git has no equivalent of `git clean -fdx`. The `clean()` method
+ * approximates it with `statusMatrix()` and Node's filesystem APIs. Tracked
+ * file changes are still reset by `checkout()` (which uses `force: true`).
  *
  * Timeouts are enforced with `Promise.race` against an `AbortController`
  * signal passed to every isomorphic-git call, matching the timeout contract
@@ -15,6 +15,8 @@
  */
 
 import fs from "node:fs";
+import { rm } from "node:fs/promises";
+import path from "node:path";
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/node";
 import { createChildLogger } from "../../logger.js";
@@ -106,14 +108,22 @@ export class IsomorphicGitClient implements GitClient {
   }
 
   /**
-   * No-op: isomorphic-git has no `git clean -fdx` equivalent.
-   *
-   * Tracked files are reset by `checkout()` via `force: true`. Untracked or
-   * ignored files from a previous run may persist — this is an accepted
-   * limitation of the isomorphic backend in v2.
+   * Approximates `git clean -fdx` by removing every ignored or untracked path
+   * reported by isomorphic-git's status matrix.
    */
-  async clean(_repoPath: string): Promise<void> {
-    // intentional no-op — see JSDoc above
+  async clean(repoPath: string): Promise<void> {
+    const status = await withTimeout(
+      git.statusMatrix({ fs, dir: repoPath, ignored: true }),
+      DEFAULT_TIMEOUT_MS
+    );
+
+    for (const [filepath, head, workdir] of status) {
+      // HEAD=0 identifies an untracked path. A present workdir entry excludes
+      // paths that are absent from disk and tracked files removed by a user.
+      if (head === 0 && workdir !== 0) {
+        await rm(path.join(repoPath, filepath), { recursive: true, force: true });
+      }
+    }
   }
 
   async setRemoteUrl(repoPath: string, remoteUrl: string): Promise<void> {

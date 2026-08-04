@@ -88,9 +88,9 @@ export interface GitClient {
    *
    * Equivalent to `git clean -fdx`.
    *
-   * > **Note for `IsomorphicGitClient`:** isomorphic-git has no direct
-   * > equivalent to `git clean`. This method is a no-op in that adapter.
-   * > Tracked files are still reset by `checkout({ force: true })`.
+   * > **Note for `IsomorphicGitClient`:** this is approximated with
+   * > `statusMatrix({ ignored: true })` and filesystem removal. Tracked files
+   * > are still reset by `checkout({ force: true })`.
    *
    * @param repoPath - Absolute path to the working tree.
    */
