@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { executeBuildAnalyze } from "./build.js";
 
@@ -160,7 +161,7 @@ describe("build command", () => {
       timeoutMs: 45000,
       aiBaseUrl: "https://ai.example.test/v1",
       aiApiKey: "env-api-key",
-      tempPath: "/root/merge-mentor/.mergementor",
+      tempPath: resolve(".mergementor"),
     });
   });
 

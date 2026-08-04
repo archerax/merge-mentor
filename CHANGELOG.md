@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-08-04
+
+### Fixed
+
+- **Cross-Platform Build Test Paths**: Updated the build command test to derive
+  the default workspace path instead of relying on the repository's local path.
+
 ## [3.1.0] - 2026-08-04
 
 ### Added
