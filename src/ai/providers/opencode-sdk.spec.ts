@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
 const { mockClient, mockServer, mockCreateOpencode } = vi.hoisted(() => {
   const mockClient = {
+    event: {
+      subscribe: vi.fn(),
+    },
     session: {
       create: vi.fn(),
       prompt: vi.fn(),
@@ -73,6 +76,9 @@ describe("OpenCodeSdkProvider", () => {
     vi.useFakeTimers();
     mockClient.session.create.mockResolvedValue({ data: { id: "session-123" } });
     mockClient.session.delete.mockResolvedValue(undefined);
+    mockClient.event.subscribe.mockResolvedValue({
+      stream: (async function* () {})(),
+    });
     mockServer.close.mockReturnValue(undefined);
   });
 
@@ -90,6 +96,13 @@ describe("OpenCodeSdkProvider", () => {
     it("should accept custom maxRetries and timeoutMs", () => {
       const provider = new OpenCodeSdkProvider({ maxRetries: 5, timeoutMs: 30000 });
       expect(provider).toBeDefined();
+    });
+
+    it("should reject BYOK options instead of silently ignoring them", () => {
+      expect(() => new OpenCodeSdkProvider({ aiBaseUrl: "https://ai.example.test/v1" })).toThrow(
+        'BYOK options ("aiBaseUrl" and "aiApiKey") are not supported by "opencode-sdk"'
+      );
+      expect(() => new OpenCodeSdkProvider({ aiApiKey: "secret" })).toThrow(ValidationError);
     });
   });
 
@@ -139,6 +152,134 @@ describe("OpenCodeSdkProvider", () => {
           query: { directory: "/tmp/my-repo" },
         })
       );
+    });
+
+    it("should send diff files as OpenCode file parts", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the changes", {
+        diffFiles: ["/tmp/first.diff", "/tmp/second.diff"],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.session.prompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            parts: [
+              { type: "text", text: "Review the changes" },
+              expect.objectContaining({
+                type: "file",
+                filename: "first.diff",
+                mime: "text/plain",
+                url: "file:///tmp/first.diff",
+              }),
+              expect.objectContaining({
+                type: "file",
+                filename: "second.diff",
+              }),
+            ],
+          }),
+        })
+      );
+    });
+
+    it("should forward streamed text deltas to onStreamData", async () => {
+      const provider = createProvider();
+      const onStreamData = vi.fn();
+      mockSuccessfulPrompt();
+      mockClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: "message.part.updated",
+            properties: {
+              part: { sessionID: "session-123", type: "text" },
+              delta: "partial output",
+            },
+          };
+          yield {
+            type: "message.part.updated",
+            properties: {
+              part: { sessionID: "session-123", type: "reasoning" },
+              delta: "internal reasoning",
+            },
+          };
+        })(),
+      });
+
+      const resultPromise = provider.executePrompt("Review the changes", { onStreamData });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(onStreamData).toHaveBeenCalledWith("partial output");
+      expect(onStreamData).not.toHaveBeenCalledWith("internal reasoning");
+    });
+
+    it("should return OpenCode token usage", async () => {
+      const provider = createProvider();
+      mockClient.session.prompt.mockResolvedValue({
+        data: {
+          info: {
+            structured_output: { findings: [] },
+            providerID: "openai",
+            modelID: "gpt-5",
+            tokens: {
+              input: 100,
+              output: 50,
+              reasoning: 10,
+              cache: { read: 20, write: 5 },
+            },
+            time: { created: 1000, completed: 2500 },
+          },
+          parts: [],
+        },
+      });
+
+      const resultPromise = provider.executePrompt("Review the changes");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toEqual({
+        inputTokens: 100,
+        outputTokens: 60,
+        cachedTokens: 25,
+        model: "openai/gpt-5",
+        durationWallSeconds: 1.5,
+      });
+    });
+
+    it("should accumulate token usage across retry attempts", async () => {
+      const provider = new OpenCodeSdkProvider({ maxRetries: 2, timeoutMs: 5000 });
+      let attempt = 0;
+      mockClient.session.prompt.mockImplementation(() => {
+        attempt++;
+        if (attempt === 1) {
+          return Promise.resolve({
+            data: {
+              info: {
+                tokens: { input: 10, output: 5 },
+              },
+              parts: [{ type: "text", text: "not json" }],
+            },
+          });
+        }
+        return Promise.resolve({
+          data: {
+            info: {
+              structured_output: { findings: [] },
+              tokens: { input: 20, output: 15 },
+            },
+            parts: [],
+          },
+        });
+      });
+
+      const resultPromise = provider.executePrompt("Review the changes");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toMatchObject({ inputTokens: 30, outputTokens: 20 });
     });
 
     it("should not pass directory query when workingDirectory is not provided", async () => {
@@ -461,6 +602,30 @@ describe("OpenCodeSdkProvider", () => {
       expect(mockCreateOpencode).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.not.objectContaining({ model: expect.anything() }),
+        })
+      );
+    });
+
+    it("should configure reasoning effort for qualified OpenCode models", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        model: "openai/gpt-5",
+        reasoningEffort: "high",
+      });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            provider: {
+              openai: { options: { reasoningEffort: "high" } },
+            },
+          }),
         })
       );
     });

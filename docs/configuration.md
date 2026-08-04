@@ -104,6 +104,10 @@ export MM_AI_API_KEY=your_azure_api_key
 export MM_AI_MODEL=gpt-4o               # Your deployed model name
 ```
 
+BYOK settings are currently supported by `copilot-sdk` only. When
+`opencode-sdk` is selected, supplying `MM_AI_BASE_URL` or `MM_AI_API_KEY`
+fails fast; configure OpenCode providers through its own configuration instead.
+
 ---
 
 ## Optional Settings
@@ -115,7 +119,10 @@ export MM_REVIEW_STRATEGY=fast
 # Reasoning effort level (low, medium, high, xhigh)
 export MM_REASONING=high
 
-# Pin Copilot session to long-context tier (true/false)
+# Stream incremental AI output when the provider supports it (true/false)
+export MM_STREAMING_ENABLED=true
+
+# Pin Copilot sessions to the long-context tier (true/false)
 export MM_LONG_CONTEXT=true
 
 # Enable experimental structured output via Copilot SDK tool calls (true/false)

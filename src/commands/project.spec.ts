@@ -112,4 +112,26 @@ describe("project command", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
+
+  it("resolves an Azure work-item URL", async () => {
+    await program.parseAsync([
+      "node",
+      "test",
+      "project",
+      "--url",
+      "https://dev.azure.com/url-org/url-project/_workitems/edit/42",
+      "--azure-repo",
+      "url-repo",
+    ]);
+
+    expect(loadConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "azure",
+        azureOrg: "url-org",
+        azureProject: "url-project",
+        azureRepo: "url-repo",
+      })
+    );
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
 });

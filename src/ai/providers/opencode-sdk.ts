@@ -1,4 +1,5 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { createOpencode } from "@opencode-ai/sdk";
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
@@ -13,6 +14,7 @@ import {
   type OutputWriter,
   systemClock,
 } from "../../ports/index.js";
+import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import { delay } from "../shared/delay.js";
 import { getJsonSchema } from "../shared/jsonSchemas.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";
@@ -36,6 +38,8 @@ import type {
   AIResponse,
   ExecutePromptOptions,
   FastReviewResult,
+  ReasoningEffort,
+  TokenUsage,
 } from "../types.js";
 
 /** Timeout for OpenCode server startup (connection), separate from prompt execution timeout. */
@@ -54,6 +58,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
   private readonly maxRetries: number;
   private readonly timeoutMs: number;
   private readonly model?: string;
+  private readonly reasoningEffort?: ReasoningEffort;
   private readonly experimentalTools: boolean;
   private readonly enableWriteTools: boolean;
   private readonly enableShellTools: boolean;
@@ -73,6 +78,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.model = options?.model;
+    this.reasoningEffort = options?.reasoningEffort;
     this.experimentalTools = options?.experimentalTools ?? false;
     this.enableWriteTools = options?.enableWriteTools ?? false;
     this.enableShellTools = options?.enableShellTools ?? false;
@@ -80,6 +86,12 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     this.tempPath = options?.tempPath ?? path.join(process.cwd(), ".mergementor");
     this.fileSystem = options?.fileSystem ?? nodeFs;
     this.clock = options?.clock ?? systemClock;
+    if (options?.aiBaseUrl || options?.aiApiKey) {
+      throw new ValidationError(
+        "aiBaseUrl",
+        'BYOK options ("aiBaseUrl" and "aiApiKey") are not supported by "opencode-sdk". Configure the OpenCode provider externally.'
+      );
+    }
   }
 
   /**
@@ -115,12 +127,15 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     const promptType: PromptType = options?.promptType ?? inferPromptType(prompt);
     const schema = getJsonSchema(promptType);
     let lastError: Error | null = null;
+    let accumulatedUsage: TokenUsage | undefined;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const { raw, parsed } = await this.runSdk(prompt, schema, options, attempt + 1);
+        const { raw, parsed } = await this.runSdk(prompt, schema, options, attempt + 1, (usage) => {
+          accumulatedUsage = mergeTokenUsage(accumulatedUsage, usage);
+        });
         this.auditLogger.logAIProviderExecution("opencode-sdk", promptType, this.model, "success");
-        return { raw, parsed };
+        return { raw, parsed, tokenUsage: accumulatedUsage };
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(
@@ -174,6 +189,11 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       };
     }
 
+    const reasoningConfig = this.buildReasoningConfig();
+    if (Object.keys(reasoningConfig).length > 0) {
+      Object.assign(opencodeConfig, reasoningConfig);
+    }
+
     // Restrict the agent to read-only access by default. File edits are allowed
     // when enableWriteTools is true; bash execution only when enableShellTools
     // is explicitly enabled — never for flows whose prompts contain untrusted
@@ -200,7 +220,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     prompt: string,
     schema: Record<string, unknown> | undefined,
     options?: ExecutePromptOptions,
-    attempt = 1
+    attempt = 1,
+    onUsageCollected?: (usage: TokenUsage | undefined) => void
   ): Promise<{ raw: string; parsed: unknown }> {
     let client: Awaited<ReturnType<typeof createOpencode>>["client"];
     try {
@@ -237,10 +258,18 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         );
       }
 
-      const promptParts: Array<{ type: "text"; text: string }> = [{ type: "text", text: prompt }];
+      const promptParts: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+      for (const diffFile of options?.diffFiles ?? []) {
+        promptParts.push({
+          type: "file",
+          mime: "text/plain",
+          filename: path.basename(diffFile),
+          url: pathToFileURL(diffFile).href,
+        });
+      }
 
       const body: {
-        parts: Array<{ type: "text"; text: string }>;
+        parts: Array<Record<string, unknown>>;
         format?: { type: string; schema: Record<string, unknown> };
       } = { parts: promptParts };
 
@@ -251,147 +280,161 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         };
       }
 
+      const stopStreaming = options?.onStreamData
+        ? await this.subscribeToStream(client, directoryQuery, sessionId, options.onStreamData)
+        : undefined;
+
       const promptCall = client.session.prompt({
         path: { id: sessionId },
         body: body as Parameters<typeof client.session.prompt>[0]["body"],
         query: directoryQuery,
       });
 
-      const result = await this.withTimeout(promptCall, this.timeoutMs);
+      try {
+        const result = await this.withTimeout(promptCall, this.timeoutMs);
 
-      // Extract structured output if available (native JSON, no parsing needed)
-      const resultData = result as {
-        data?: {
+        // Extract structured output if available (native JSON, no parsing needed)
+        const resultData = result as {
+          data?: {
+            info?: { structured_output?: unknown; error?: { name?: string; message?: string } };
+            parts?: Array<{ type: string; text?: string }>;
+          };
           info?: { structured_output?: unknown; error?: { name?: string; message?: string } };
           parts?: Array<{ type: string; text?: string }>;
         };
-        info?: { structured_output?: unknown; error?: { name?: string; message?: string } };
-        parts?: Array<{ type: string; text?: string }>;
-      };
 
-      const info = resultData.data?.info ?? resultData.info;
-      const parts = resultData.data?.parts ?? resultData.parts ?? [];
+        const info = resultData.data?.info ?? resultData.info;
+        const tokenUsage = this.extractTokenUsage(info);
+        onUsageCollected?.(tokenUsage);
+        const parts = resultData.data?.parts ?? resultData.parts ?? [];
 
-      // Check for structured output errors
-      if (info?.error?.name === "StructuredOutputError") {
-        const err = new AIProviderError(
-          "opencode-sdk",
-          `Structured output failed: ${info.error.message ?? "unknown error"}`
-        );
-
-        await this.saveTranscript({
-          prompt,
-          rawResponse: JSON.stringify(result, null, 2),
-          success: false,
-          error: err.message,
-          attempt,
-        });
-
-        throw err;
-      }
-
-      if (info?.structured_output != null) {
-        let structured: unknown = info.structured_output;
-        if (this.experimentalTools) {
-          const toolFindings = this.findingsCollector.getAllFindings();
-          this.logger.info(
-            { count: toolFindings.length },
-            "Combining findings from tool calls and structured output."
+        // Check for structured output errors
+        if (info?.error?.name === "StructuredOutputError") {
+          const err = new AIProviderError(
+            "opencode-sdk",
+            `Structured output failed: ${info.error.message ?? "unknown error"}`
           );
-          structured = combineToolAndJsonFindings(structured, toolFindings);
+
+          await this.saveTranscript({
+            prompt,
+            rawResponse: JSON.stringify(result, null, 2),
+            success: false,
+            error: err.message,
+            attempt,
+          });
+
+          throw err;
         }
-        const raw = typeof structured === "string" ? structured : JSON.stringify(structured);
 
-        await this.saveTranscript({
-          prompt,
-          rawResponse: JSON.stringify(result, null, 2),
-          jsonOutput: raw,
-          success: true,
-          attempt,
-        });
-
-        return { raw, parsed: structured };
-      }
-
-      // Fall back to extracting text from response parts
-      const rawText = parts
-        .filter((p) => p.type === "text" && p.text)
-        .map((p) => p.text)
-        .join("");
-
-      if (!rawText) {
-        if (this.experimentalTools) {
-          const toolFindings = this.findingsCollector.getAllFindings();
-          if (toolFindings.length > 0) {
-            const parsed = convertFindingsToParsedResponse(toolFindings);
-            await this.saveTranscript({
-              prompt,
-              rawResponse: JSON.stringify(result, null, 2),
-              jsonOutput: JSON.stringify(parsed, null, 2),
-              success: true,
-              attempt,
-            });
-            return { raw: "", parsed };
-          }
-        }
-        throw new AIProviderError("opencode-sdk", "No content in response from OpenCode SDK");
-      }
-
-      let parsed: unknown;
-      let jsonParseError: unknown;
-      try {
-        parsed = parseJsonResponse(rawText);
-      } catch (error) {
-        jsonParseError = error;
-      }
-
-      if (this.experimentalTools) {
-        const toolFindings = this.findingsCollector.getAllFindings();
-        if (jsonParseError) {
-          if (toolFindings.length > 0) {
+        if (info?.structured_output != null) {
+          let structured: unknown = info.structured_output;
+          if (this.experimentalTools) {
+            const toolFindings = this.findingsCollector.getAllFindings();
             this.logger.info(
               { count: toolFindings.length },
-              "JSON parse failed but tool calls were made. Returning tool findings."
+              "Combining findings from tool calls and structured output."
             );
-            parsed = convertFindingsToParsedResponse(toolFindings);
+            structured = combineToolAndJsonFindings(structured, toolFindings);
+          }
+          const raw = typeof structured === "string" ? structured : JSON.stringify(structured);
+
+          await this.saveTranscript({
+            prompt,
+            rawResponse: JSON.stringify(result, null, 2),
+            jsonOutput: raw,
+            tokenUsage,
+            success: true,
+            attempt,
+          });
+
+          return { raw, parsed: structured };
+        }
+
+        // Fall back to extracting text from response parts
+        const rawText = parts
+          .filter((p) => p.type === "text" && p.text)
+          .map((p) => p.text)
+          .join("");
+
+        if (!rawText) {
+          if (this.experimentalTools) {
+            const toolFindings = this.findingsCollector.getAllFindings();
+            if (toolFindings.length > 0) {
+              const parsed = convertFindingsToParsedResponse(toolFindings);
+              await this.saveTranscript({
+                prompt,
+                rawResponse: JSON.stringify(result, null, 2),
+                jsonOutput: JSON.stringify(parsed, null, 2),
+                tokenUsage,
+                success: true,
+                attempt,
+              });
+              return { raw: "", parsed };
+            }
+          }
+          throw new AIProviderError("opencode-sdk", "No content in response from OpenCode SDK");
+        }
+
+        let parsed: unknown;
+        let jsonParseError: unknown;
+        try {
+          parsed = parseJsonResponse(rawText);
+        } catch (error) {
+          jsonParseError = error;
+        }
+
+        if (this.experimentalTools) {
+          const toolFindings = this.findingsCollector.getAllFindings();
+          if (jsonParseError) {
+            if (toolFindings.length > 0) {
+              this.logger.info(
+                { count: toolFindings.length },
+                "JSON parse failed but tool calls were made. Returning tool findings."
+              );
+              parsed = convertFindingsToParsedResponse(toolFindings);
+            } else {
+              this.logger.info(
+                "JSON parse failed and no tool calls were made. Returning empty findings."
+              );
+              parsed = convertFindingsToParsedResponse([]);
+            }
           } else {
             this.logger.info(
-              "JSON parse failed and no tool calls were made. Returning empty findings."
+              { count: toolFindings.length },
+              "Combining findings from both tool calls and JSON response."
             );
-            parsed = convertFindingsToParsedResponse([]);
+            parsed = combineToolAndJsonFindings(parsed, toolFindings);
           }
-        } else {
-          this.logger.info(
-            { count: toolFindings.length },
-            "Combining findings from both tool calls and JSON response."
-          );
-          parsed = combineToolAndJsonFindings(parsed, toolFindings);
+
+          await this.saveTranscript({
+            prompt,
+            rawResponse: JSON.stringify(result, null, 2),
+            jsonOutput: JSON.stringify(parsed, null, 2),
+            tokenUsage,
+            success: true,
+            attempt,
+          });
+
+          return { raw: rawText, parsed };
+        }
+
+        if (jsonParseError) {
+          throw jsonParseError;
         }
 
         await this.saveTranscript({
           prompt,
           rawResponse: JSON.stringify(result, null, 2),
           jsonOutput: JSON.stringify(parsed, null, 2),
+          tokenUsage,
           success: true,
           attempt,
         });
 
         return { raw: rawText, parsed };
+      } finally {
+        stopStreaming?.();
       }
-
-      if (jsonParseError) {
-        throw jsonParseError;
-      }
-
-      await this.saveTranscript({
-        prompt,
-        rawResponse: JSON.stringify(result, null, 2),
-        jsonOutput: JSON.stringify(parsed, null, 2),
-        success: true,
-        attempt,
-      });
-
-      return { raw: rawText, parsed };
     } catch (error) {
       await this.saveTranscript({
         prompt,
@@ -415,6 +458,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     prompt: string;
     rawResponse?: string;
     jsonOutput?: string;
+    tokenUsage?: TokenUsage;
     success: boolean;
     error?: string;
     attempt: number;
@@ -432,6 +476,103 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       },
       data
     );
+  }
+
+  private buildReasoningConfig(): Record<string, unknown> {
+    if (!this.reasoningEffort) return {};
+
+    const separator = this.model?.indexOf("/") ?? -1;
+    if (separator <= 0) {
+      this.logger.warn(
+        { model: this.model, reasoningEffort: this.reasoningEffort },
+        "OpenCode reasoning effort was requested but the model provider is unknown; continuing without it"
+      );
+      return {};
+    }
+
+    const providerId = this.model?.slice(0, separator);
+    if (!providerId) return {};
+
+    return {
+      provider: {
+        [providerId]: {
+          options: { reasoningEffort: this.reasoningEffort },
+        },
+      },
+    };
+  }
+
+  private async subscribeToStream(
+    client: Awaited<ReturnType<typeof createOpencode>>["client"],
+    query: { directory: string } | undefined,
+    sessionId: string,
+    onStreamData: (chunk: string) => void
+  ): Promise<() => void> {
+    try {
+      const eventStream = await client.event.subscribe({ query });
+      let active = true;
+      void (async () => {
+        try {
+          for await (const event of eventStream.stream) {
+            if (!active || event.type !== "message.part.updated") continue;
+            const properties = event.properties as {
+              part?: { sessionID?: string; type?: string };
+              delta?: string;
+            };
+            if (
+              properties.part?.sessionID === sessionId &&
+              properties.part.type === "text" &&
+              properties.delta
+            ) {
+              onStreamData(properties.delta);
+            }
+          }
+        } catch (error) {
+          this.logger.debug({ error: (error as Error).message }, "OpenCode stream ended");
+        }
+      })();
+
+      return () => {
+        active = false;
+        void eventStream.stream.return?.(undefined);
+      };
+    } catch (error) {
+      this.logger.warn(
+        { error: (error as Error).message },
+        "OpenCode streaming unavailable; continuing without streamed output"
+      );
+      return () => {};
+    }
+  }
+
+  private extractTokenUsage(info: unknown): TokenUsage | undefined {
+    const message = info as {
+      tokens?: {
+        input?: number;
+        output?: number;
+        reasoning?: number;
+        cache?: { read?: number; write?: number };
+      };
+      providerID?: string;
+      modelID?: string;
+      time?: { created?: number; completed?: number };
+    };
+    const tokens = message?.tokens;
+    if (!tokens) return undefined;
+
+    return {
+      inputTokens: tokens.input ?? 0,
+      outputTokens: (tokens.output ?? 0) + (tokens.reasoning ?? 0),
+      ...(tokens.cache
+        ? { cachedTokens: (tokens.cache.read ?? 0) + (tokens.cache.write ?? 0) }
+        : {}),
+      ...(message.providerID && message.modelID
+        ? { model: `${message.providerID}/${message.modelID}` }
+        : {}),
+      ...(message.time?.created !== undefined && message.time.completed !== undefined
+        ? { durationWallSeconds: (message.time.completed - message.time.created) / 1000 }
+        : {}),
+    };
   }
 
   private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

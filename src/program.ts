@@ -18,6 +18,7 @@ import { logger } from "./logger.js";
 import { consoleOutputWriter } from "./ports/index.js";
 import { REVIEW_PASSES } from "./review/reviewSelection.js";
 import { parsePRUrl } from "./utils/prUrl.js";
+import { resolveWorkItemReference } from "./utils/workItemReference.js";
 
 // Re-export types and functions for backward compatibility
 export * from "./commands/types.js";
@@ -439,9 +440,11 @@ program
 
 // PBI Review command
 program
-  .command("pbi <id>")
+  .command("pbi [id]")
   .description("Review a Product Backlog Item / User Story / Issue against the INVEST model")
   .optionsGroup("General Options")
+  .option("--id <id>", "Work item ID")
+  .option("--url <url>", "Work item URL (automatically parses platform and repository details)")
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option("--write", "Post comments back to the PBI/Issue (default is dry-run mode)", false)
   .option(
@@ -475,9 +478,13 @@ program
     "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
   )
   .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
-  .action(async (id: string, options: PBIOptions) => {
+  .action(async (positionalId: string | undefined, options: PBIOptions) => {
     try {
-      await executePBIReview(id, options);
+      const reference = resolveWorkItemReference({ positionalId, ...options });
+      await executePBIReview(reference.id, {
+        ...options,
+        ...reference,
+      });
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
@@ -487,9 +494,11 @@ program
 
 // Project Review command
 program
-  .command("project <id>")
+  .command("project [id]")
   .description("Review a project/feature plan hierarchy against planning guidelines")
   .optionsGroup("General Options")
+  .option("--id <id>", "Root planning item or Epic ID")
+  .option("--url <url>", "Work item URL (Azure DevOps work-item URLs are supported)")
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--write",
@@ -527,9 +536,13 @@ program
     "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
   )
   .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
-  .action(async (id: string, options: ProjectOptions) => {
+  .action(async (positionalId: string | undefined, options: ProjectOptions) => {
     try {
-      await executeProjectReview(id, options);
+      const reference = resolveWorkItemReference({ positionalId, ...options });
+      await executeProjectReview(reference.id, {
+        ...options,
+        ...reference,
+      });
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);

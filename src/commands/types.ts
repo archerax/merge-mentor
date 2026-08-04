@@ -76,6 +76,8 @@ export interface DescribeExecutionResult {
 }
 
 export interface PBIOptions {
+  id?: string;
+  url?: string;
   platform?: string;
   write?: boolean;
   githubToken?: string;
@@ -97,6 +99,8 @@ export interface PBIOptions {
 }
 
 export interface ProjectOptions {
+  id?: string;
+  url?: string;
   platform?: string;
   write?: boolean;
   githubToken?: string;

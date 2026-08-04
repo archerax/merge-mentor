@@ -146,6 +146,48 @@ describe("pbi command", () => {
     }
   });
 
+  it("resolves a GitHub issue URL", async () => {
+    await program.parseAsync([
+      "node",
+      "test",
+      "pbi",
+      "--url",
+      "https://github.com/url-owner/url-repo/issues/42",
+    ]);
+
+    expect(loadConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "github",
+        githubRepoOwner: "url-owner",
+        githubRepoName: "url-repo",
+      })
+    );
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it("supports an explicit --id", async () => {
+    await program.parseAsync(["node", "test", "pbi", "--id", "42"]);
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it("rejects a URL combined with an explicit ID", async () => {
+    await program.parseAsync([
+      "node",
+      "test",
+      "pbi",
+      "--id",
+      "42",
+      "--url",
+      "https://github.com/owner/repo/issues/1",
+    ]);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("--url cannot be combined with --id")
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
   it("errors and exits when executePBIReview throws", async () => {
     const mockPbiEngine = await import("../review/pbiEngine.js");
     // biome-ignore lint/complexity/useArrowFunction: regular function required so it can be constructible when called with new

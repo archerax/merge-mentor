@@ -13,6 +13,9 @@ The `project` command reviews a project or feature plan hierarchy against planni
 # Review a project hierarchy (dry-run, console output)
 merge-mentor project 99
 
+# Review an Azure work item by URL
+merge-mentor project --url https://dev.azure.com/org/project/_workitems/edit/99 --azure-repo repo
+
 # Review project plan and post comments back to the root epic/plan on the remote platform
 merge-mentor project 99 --write
 
@@ -28,7 +31,9 @@ merge-mentor project 5432 --platform azure --write
 
 | Option                  | Description                                                            | Env Variable   | Default          |
 | ----------------------- | ---------------------------------------------------------------------- | -------------- | ---------------- |
-| `<id>`                  | The ID of the root planning item/Epic (required argument)              | -              | -                |
+| `[id]`                  | The ID of the root planning item/Epic                                  | -              | -                |
+| `--id <id>`             | The ID of the root planning item/Epic                                  | -              | -                |
+| `--url <url>`           | Azure DevOps work-item URL (sets platform, organization, and project)  | -              | -                |
 | `--platform <platform>` | Platform to use (`github` or `azure`)                                  | `MM_PLATFORM`  | `github`         |
 | `--write`               | Post comments back to the root planning item (default is dry-run mode) | -              | `false`          |
 | `--temp-path <path>`    | Base path for temporary files                                          | `MM_TEMP_PATH` | `./.mergementor` |

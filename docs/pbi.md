@@ -13,6 +13,9 @@ The `pbi` command reviews a Product Backlog Item, User Story, or Issue against t
 # Review a GitHub issue / PBI (dry-run, console output)
 merge-mentor pbi 42
 
+# Review by URL
+merge-mentor pbi --url https://github.com/owner/repo/issues/42
+
 # Review a PBI and post comments back to the issue/story on the platform
 merge-mentor pbi 42 --write
 
@@ -26,12 +29,14 @@ merge-mentor pbi 1024 --platform azure --write
 
 ### General & Platform Options
 
-| Option                  | Description                                                     | Env Variable   | Default          |
-| ----------------------- | --------------------------------------------------------------- | -------------- | ---------------- |
-| `<id>`                  | The ID of the issue or Product Backlog Item (required argument) | -              | -                |
-| `--platform <platform>` | Platform to use (`github` or `azure`)                           | `MM_PLATFORM`  | `github`         |
-| `--write`               | Post comments back to the PBI/Issue (default is dry-run mode)   | -              | `false`          |
-| `--temp-path <path>`    | Base path for temporary files                                   | `MM_TEMP_PATH` | `./.mergementor` |
+| Option                  | Description                                                   | Env Variable   | Default          |
+| ----------------------- | ------------------------------------------------------------- | -------------- | ---------------- |
+| `[id]`                  | The ID of the issue or Product Backlog Item                   | -              | -                |
+| `--id <id>`             | The ID of the issue or Product Backlog Item                   | -              | -                |
+| `--url <url>`           | GitHub issue or Azure DevOps work-item URL                    | -              | -                |
+| `--platform <platform>` | Platform to use (`github` or `azure`)                         | `MM_PLATFORM`  | `github`         |
+| `--write`               | Post comments back to the PBI/Issue (default is dry-run mode) | -              | `false`          |
+| `--temp-path <path>`    | Base path for temporary files                                 | `MM_TEMP_PATH` | `./.mergementor` |
 
 ### Platform Credentials
 
