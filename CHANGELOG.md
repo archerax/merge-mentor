@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-04
+
 ### Added
 
 - **Disk-Backed Build Logs**: Build failure analysis now retains redacted logs
