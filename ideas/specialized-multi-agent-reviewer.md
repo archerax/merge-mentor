@@ -1,12 +1,34 @@
 # Feature Idea: Specialized Multi-Agent Reviewer Architecture
 
+> **Status:** Partially implemented. Merge Mentor already supports configurable
+> multi-pass reviews; this document describes the remaining work to introduce
+> independent specialist agents and a lead synthesizer.
+
 ## Executive Summary
 
-**Merge Mentor** originally implemented a single-pass review architecture where a single LLM prompt evaluated pull request diffs for bugs, security risks, performance bottlenecks, and architectural guidelines simultaneously. This choice was largely driven by historical API constraints—specifically GitHub Copilot's legacy "premium request" billing model, which metered usage by discrete API calls regardless of prompt token size.
+**Merge Mentor** now has a configurable multi-pass review foundation. Review
+profiles can combine passes such as security, logic, performance, testing,
+database, and monorepo analysis, with aggregated and deduplicated findings.
+Those passes are still orchestrated by the existing review engine rather than
+being independent specialist agents.
+
+Historically, Merge Mentor used a single-pass review architecture where a
+single LLM prompt evaluated pull request diffs for bugs, security risks,
+performance bottlenecks, and architectural guidelines simultaneously. This
+choice was largely driven by historical API constraints—specifically GitHub
+Copilot's legacy "premium request" billing model, which metered usage by
+discrete API calls regardless of prompt token size.
 
 With major AI providers (including GitHub Copilot SDK, OpenCode, and OpenAI-compatible endpoints) transitioning to token-based billing and higher rate limits, multi-pass and multi-agent execution patterns are now cost-effective, scalable, and highly practical.
 
-This feature introduces a **Specialized Multi-Agent Reviewer Architecture**, decomposing the single-pass PR review engine into domain-focused subagents (Security, Performance, Test Coverage, Architecture/Style) coordinated by a Lead Synthesizer Agent.
+This feature extends the existing multi-pass system into a **Specialized
+Multi-Agent Reviewer Architecture**, decomposing PR analysis into
+domain-focused subagents (Security, Performance, Test Coverage,
+Architecture/Style) coordinated by a Lead Synthesizer Agent.
+
+The target architecture is therefore not a replacement for the existing
+review profiles. It is a separate execution mode that can reuse their prompts,
+finding types, aggregation, comment lifecycle, and platform adapters.
 
 ---
 
@@ -24,12 +46,24 @@ This feature introduces a **Specialized Multi-Agent Reviewer Architecture**, dec
 
 ## 🛠 MVP Scope & Key Capabilities
 
-### 1. Shift to Token-Based Execution
+### Existing Foundation
+
+The following capabilities already exist and should be reused rather than
+reimplemented:
+
+- Configurable review types and additive review passes.
+- `--passes` and `--strategy` CLI options, plus corresponding environment configuration.
+- Specialized analysis areas including security, performance, testing, database, and monorepo concerns.
+- Finding aggregation and fingerprint-based deduplication across review runs.
+
+### Remaining MVP Scope
+
+#### 1. Shift to Token-Based Execution
 
 - Leverage token-based billing structures to execute targeted sub-prompts without penalty.
 - Run lightweight, focused subagent invocations in parallel to maintain fast overall CLI response times.
 
-### 2. Specialized Subagent Roles
+#### 2. Specialized Subagent Roles
 
 The review engine delegates diff analysis to four primary specialized subagents:
 
@@ -42,7 +76,7 @@ The review engine delegates diff analysis to four primary specialized subagents:
 4. **🏗️ Architecture & Style Agent:**
    - Inspects breaking API contract changes, project structure guidelines, design pattern consistency, naming conventions, and linting compliance.
 
-### 3. Lead Synthesizer & Consensus Engine
+#### 3. Lead Synthesizer & Consensus Engine
 
 - **Deduplication:** Merges findings from subagents and eliminates overlapping or redundant feedback.
 - **Conflict Resolution:** Resolves conflicting recommendations (e.g., if a style suggestion conflicts with a performance optimization).
@@ -56,7 +90,7 @@ The review engine delegates diff analysis to four primary specialized subagents:
 ### Command & Configuration Interface
 
 ```bash
-# Execute review using multi-agent mode (dry-run)
+# Execute review using the proposed multi-agent mode (dry-run)
 merge-mentor review --pr 123 --multi-agent
 
 # Execute write mode with specific active subagents
