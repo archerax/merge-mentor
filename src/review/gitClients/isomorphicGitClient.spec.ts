@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock isomorphic-git before importing the client under test
@@ -300,11 +301,11 @@ describe("IsomorphicGitClient", () => {
       await client.clean("/tmp/repo");
 
       expect(mockedRm).toHaveBeenCalledTimes(2);
-      expect(mockedRm).toHaveBeenNthCalledWith(1, "/tmp/repo/untracked.txt", {
+      expect(mockedRm).toHaveBeenNthCalledWith(1, path.join("/tmp/repo", "untracked.txt"), {
         recursive: true,
         force: true,
       });
-      expect(mockedRm).toHaveBeenNthCalledWith(2, "/tmp/repo/ignored", {
+      expect(mockedRm).toHaveBeenNthCalledWith(2, path.join("/tmp/repo", "ignored"), {
         recursive: true,
         force: true,
       });

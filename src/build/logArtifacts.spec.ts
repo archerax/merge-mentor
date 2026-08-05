@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
 import { storeLogArtifacts } from "./logArtifacts.js";
@@ -20,18 +21,19 @@ describe("storeLogArtifacts", () => {
       { tempPath: "/tmp/mm", tailLines: 2, tailBytes: 100, fileSystem }
     );
 
-    expect(result.directory).toBe("/tmp/mm/build-logs/github-42-123");
+    const directory = path.join("/tmp/mm", "build-logs", "github-42-123");
+    expect(result.directory).toBe(directory);
     expect(result.artifacts[0]).toMatchObject({
       filename: "001-typecheck_linux.log",
       tail: "TOKEN=[REDACTED]\nerror TS2339",
     });
     expect(fileSystem.writeFile).toHaveBeenCalledWith(
-      "/tmp/mm/build-logs/github-42-123/001-typecheck_linux.log",
+      path.join(directory, "001-typecheck_linux.log"),
       "line 1\nTOKEN=[REDACTED]\nerror TS2339",
       "utf8"
     );
     expect(fileSystem.writeFile).toHaveBeenCalledWith(
-      "/tmp/mm/build-logs/github-42-123/manifest.json",
+      path.join(directory, "manifest.json"),
       expect.stringContaining("001-typecheck_linux.log"),
       "utf8"
     );

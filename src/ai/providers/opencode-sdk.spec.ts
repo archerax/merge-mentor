@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
@@ -157,9 +158,10 @@ describe("OpenCodeSdkProvider", () => {
     it("should send diff files as OpenCode file parts", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();
+      const diffFiles = ["/tmp/first.diff", "/tmp/second.diff"];
 
       const resultPromise = provider.executePrompt("Review the changes", {
-        diffFiles: ["/tmp/first.diff", "/tmp/second.diff"],
+        diffFiles,
       });
       await vi.runAllTimersAsync();
       await resultPromise;
@@ -173,7 +175,7 @@ describe("OpenCodeSdkProvider", () => {
                 type: "file",
                 filename: "first.diff",
                 mime: "text/plain",
-                url: "file:///tmp/first.diff",
+                url: pathToFileURL(diffFiles[0]).href,
               }),
               expect.objectContaining({
                 type: "file",
