@@ -32,6 +32,7 @@ Add configuration for:
 
 - `MM_WEBHOOK_HOST`
 - `MM_WEBHOOK_PORT`
+- `MM_WEBHOOK_QUEUE_CAPACITY` (default `5`)
 - Webhook basic-auth credentials
 
 Reuse the existing Azure DevOps and AI configuration. Webhook mode must
@@ -53,6 +54,8 @@ The server should:
 - Enforce a maximum request-body size.
 - Parse JSON safely.
 - Avoid logging full payloads or authorization headers.
+- Return `503` when the review queue is full, so Azure DevOps's service-hook
+  retry re-delivers the event later.
 
 ### 3. Authenticate Azure DevOps Requests
 
@@ -94,9 +97,13 @@ For an accepted event:
 
 1. Build Azure review options from the validated event and configured values.
 2. Force `write: true` for webhook-triggered reviews.
-3. Return `202 Accepted` promptly.
-4. Run the review in the background.
-5. Log completion or failure with the event ID and PR number.
+3. Persist the event payload beneath `{tempPath}/queue/pending/` (durable
+   accept) before acknowledging.
+4. Enqueue the event on the single review worker.
+5. Return `202 Accepted` promptly.
+6. Run the review in the background; move the event to `processed/` on
+   completion or `failed/` on error.
+7. Log completion or failure with the event ID and PR number.
 
 The review engine can continue to use the existing Azure adapter, workspace
 manager, state cache, and platform comment APIs.
@@ -106,13 +113,35 @@ manager, state cache, and platform comment APIs.
 Azure DevOps may redeliver service-hook events. Use the top-level event ID or
 notification ID as the delivery key.
 
-Persist processed and in-progress events beneath the configured temp path so
-deduplication survives process restarts. Also prevent simultaneous reviews for
-the same PR.
+**Global single worker.** A single review worker serializes all reviews: exactly
+one review runs at any time, across all PRs. No cross-process locking is needed
+for a single-instance deployment; multi-instance support is future work.
 
-Define explicit behavior for retries after a failed review. A failed event
-should be distinguishable from a completed event and should be eligible for a
-controlled retry without allowing unbounded duplicate reviews.
+**Durable accept (write-ahead log).** Before returning `202`, write the validated
+event payload to `{tempPath}/queue/pending/{eventId}.json`. The event is only
+moved out of `pending/` once the review finishes. On startup, re-enqueue
+everything in `pending/`, so queued and in-flight reviews survive process
+restarts (at-least-once delivery).
+
+**Deduplication.** Persist completed events under `{tempPath}/queue/processed/{eventId}.json`
+and failed events under `{tempPath}/queue/failed/{eventId}.json`. Events already
+present in `pending/`, `processed/`, or `failed/` are skipped, so a redelivered
+event does not start a duplicate review. Deduplication therefore survives process
+restarts.
+
+**Bounded queue.** Queue up to `MM_WEBHOOK_QUEUE_CAPACITY` events. When the queue
+(including the running review) is full, the handler returns `503` and Azure
+DevOps's service-hook retry re-delivers the event later.
+
+**Coalescing by PR.** If a PR is already queued or in-flight, drop the duplicate
+enqueue (log the event ID and PR) rather than queueing it twice. This is a
+safety net on top of event-ID deduplication.
+
+**Failure handling.** A failed review moves its event to
+`{tempPath}/queue/failed/{eventId}.json` with the error and timestamp, logs it,
+and the worker continues to the next queued item — one failure does not stall the
+queue. Failed events are distinguishable from completed events and are eligible
+for a controlled retry without allowing unbounded duplicate reviews.
 
 ### 7. Add Tests
 
@@ -126,7 +155,11 @@ Add tests for:
 - HTTP response status codes.
 - Asynchronous review dispatch and failure logging.
 - Duplicate delivery handling.
-- Concurrent events for the same PR.
+- Single-worker serialization (only one review runs at a time).
+- Bounded-queue capacity returning `503` when full.
+- Durable accept: restart re-enqueues `pending/` events.
+- PR coalescing: duplicate enqueue for an already-queued/in-flight PR is dropped.
+- A failed review does not block the next queued event.
 
 Preserve and extend the existing Azure adapter and review-engine coverage.
 
@@ -135,7 +168,7 @@ Preserve and extend the existing Azure adapter and review-engine coverage.
 Document:
 
 - The `webhook` command.
-- All webhook environment variables.
+- All webhook environment variables, including `MM_WEBHOOK_QUEUE_CAPACITY`.
 - Required Azure and AI configuration.
 - Azure DevOps Service Hooks setup:
   - Select the Web Hooks service.
@@ -145,6 +178,8 @@ Document:
   - Configure basic authentication.
 - HTTPS and reverse-proxy requirements.
 - Health checks and long-running process deployment.
+- Single-worker review queueing, `503` backpressure behavior, and crash
+  recovery of `{tempPath}/queue/` events.
 
 ## Security Considerations
 
@@ -178,13 +213,21 @@ Before merging the implementation:
 5. Create a test PR and verify that exactly one review is started and comments
    are posted to the expected PR.
 6. Redeliver the same event and verify that no duplicate review is started.
+7. Fire a burst of events beyond `MM_WEBHOOK_QUEUE_CAPACITY` and verify that only
+   one review runs at a time, excess events receive `503`, and the queue drains.
 
 ## Open Decisions
 
 - Exact names and format for webhook basic-auth environment variables.
-- Whether event deduplication should use a JSON file, an existing state-cache
-  mechanism, or a small embedded database.
 - Whether webhook-triggered reviews should use the configured review profile or
   expose webhook-specific overrides.
 - Whether failed reviews should be retried automatically or only through a
   manual replay mechanism.
+
+Resolved:
+
+- Review concurrency uses a bounded single-worker queue with global single-flight
+  and durable accept.
+- Event and queue state persists as per-event JSON files beneath
+  `{tempPath}/queue/{pending,processed,failed}/`, matching the existing
+  file-per-item `ReviewStateCache` style with no new dependency.
