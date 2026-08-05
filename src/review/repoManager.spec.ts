@@ -202,11 +202,40 @@ describe("RepoManager", () => {
       );
     });
 
-    it("throws error when update fails", async () => {
+    it("re-clones when the update fails and re-clone succeeds", async () => {
+      fileSystem.stat.mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+      gitClient.fetch.mockRejectedValueOnce(new Error("Fetch failed"));
+
+      const result = await repoManager.ensureRepo(repoInfo, branch, token);
+
+      expect(gitClient.fetch).toHaveBeenCalledOnce();
+      expect(gitClient.clone).toHaveBeenCalledOnce();
+      expect(fileSystem.rm).toHaveBeenCalledWith(
+        expect.stringContaining("github-testowner-testrepo"),
+        expect.objectContaining({ recursive: true, force: true })
+      );
+      expect(result).toBe(path.join(testReposDir, "github-testowner-testrepo"));
+    });
+
+    it("re-clones when checkout fails", async () => {
+      fileSystem.stat.mockResolvedValue({
+        isDirectory: () => true,
+      } as unknown as Stats);
+      gitClient.checkout.mockRejectedValueOnce(new Error("Checkout failed"));
+
+      await repoManager.ensureRepo(repoInfo, branch, token);
+
+      expect(gitClient.clone).toHaveBeenCalledOnce();
+    });
+
+    it("throws error when update fails and re-clone also fails", async () => {
       fileSystem.stat.mockResolvedValue({
         isDirectory: () => true,
       } as unknown as Stats);
       gitClient.fetch.mockRejectedValue(new Error("Fetch failed"));
+      gitClient.clone.mockRejectedValue(new Error("Clone failed"));
 
       await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow(
         "Failed to update repository"
@@ -220,6 +249,11 @@ describe("RepoManager", () => {
       gitClient.fetch.mockRejectedValue(
         new Error(
           `error: could not read Username for 'https://${token}@github.com': No such device or address`
+        )
+      );
+      gitClient.clone.mockRejectedValue(
+        new Error(
+          `fatal: repository 'https://${token}@github.com/testowner/testrepo.git' not found`
         )
       );
 

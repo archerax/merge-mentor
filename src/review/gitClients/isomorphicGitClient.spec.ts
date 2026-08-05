@@ -8,6 +8,7 @@ vi.mock("isomorphic-git", () => ({
     fetch: vi.fn().mockResolvedValue(undefined),
     checkout: vi.fn().mockResolvedValue(undefined),
     writeRef: vi.fn().mockResolvedValue(undefined),
+    resolveRef: vi.fn().mockResolvedValue("a".repeat(40)),
     statusMatrix: vi.fn().mockResolvedValue([]),
     setConfig: vi.fn().mockResolvedValue(undefined),
   },
@@ -233,14 +234,32 @@ describe("IsomorphicGitClient", () => {
   // ── checkout ───────────────────────────────────────────────────────────────
 
   describe("checkout", () => {
-    it("calls git.writeRef then git.checkout with force:true", async () => {
+    it("syncs the local branch to the fetched remote tip before checking out", async () => {
       await client.checkout("/tmp/repo", "feature-x");
 
-      expect(mockedGit.writeRef).toHaveBeenCalledWith(
+      expect(mockedGit.resolveRef).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dir: "/tmp/repo",
+          ref: "refs/remotes/origin/feature-x",
+        })
+      );
+
+      expect(mockedGit.writeRef).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          dir: "/tmp/repo",
+          ref: "refs/heads/feature-x",
+          value: "a".repeat(40),
+          force: true,
+        })
+      );
+
+      expect(mockedGit.writeRef).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
           dir: "/tmp/repo",
           ref: "HEAD",
-          value: "refs/remotes/origin/feature-x",
+          value: "refs/heads/feature-x",
           symbolic: true,
           force: true,
         })
@@ -267,13 +286,14 @@ describe("IsomorphicGitClient", () => {
       await expect(client.checkout("/tmp/repo", "branch")).rejects.toThrow("checkout failed");
     });
 
-    it("uses correct remote ref format for branch", async () => {
+    it("resolves the correct remote ref format for branch", async () => {
       await client.checkout("/tmp/repo", "main");
 
-      const writeRefCall = (mockedGit.writeRef as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
-        value: string;
+      const resolveRefCall = (mockedGit.resolveRef as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as {
+        ref: string;
       };
-      expect(writeRefCall.value).toBe("refs/remotes/origin/main");
+      expect(resolveRefCall.ref).toBe("refs/remotes/origin/main");
     });
   });
 

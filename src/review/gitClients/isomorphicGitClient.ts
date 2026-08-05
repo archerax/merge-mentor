@@ -89,12 +89,28 @@ export class IsomorphicGitClient implements GitClient {
   }
 
   async checkout(repoPath: string, branch: string): Promise<void> {
-    // First update HEAD to point to the newly fetched remote ref
+    // Point the local branch at the freshly fetched remote tip so the working
+    // tree reflects the latest remote state (e.g. after a force-push). Without
+    // this, `git.checkout` resolves the stale `refs/heads/<branch>` because it
+    // is preferred over `refs/remotes/origin/<branch>` during ref resolution.
+    const oid = await withTimeout(
+      git.resolveRef({ fs, dir: repoPath, ref: `refs/remotes/origin/${branch}` }),
+      DEFAULT_TIMEOUT_MS
+    );
+    await git.writeRef({
+      fs,
+      dir: repoPath,
+      ref: `refs/heads/${branch}`,
+      value: oid,
+      force: true,
+    });
+
+    // Update HEAD to point to the freshly synced local branch
     await git.writeRef({
       fs,
       dir: repoPath,
       ref: "HEAD",
-      value: `refs/remotes/origin/${branch}`,
+      value: `refs/heads/${branch}`,
       symbolic: true,
       force: true,
     });

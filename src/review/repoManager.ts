@@ -281,6 +281,10 @@ export class RepoManager {
 
   /**
    * Updates an existing repository.
+   *
+   * If the update fails (e.g. the branch was force-pushed and the fetched
+   * history no longer matches the local clone, or the clone is corrupt), the
+   * clone is discarded and re-cloned from scratch as a self-healing fallback.
    */
   private async updateRepo(
     repoPath: string,
@@ -307,9 +311,22 @@ export class RepoManager {
 
       this.logger.info({ repoPath, branch }, "Repository updated successfully");
     } catch (error) {
-      throw new Error(
-        `Failed to update repository: ${redactToken((error as Error).message, token)}`
+      this.logger.warn(
+        { repoPath, branch, error: (error as Error).message },
+        "Repository update failed, re-cloning from scratch"
       );
+
+      // Discard the stale or corrupt clone and fall back to a fresh clone
+      await this.fileSystem.rm(repoPath, { recursive: true, force: true }).catch(() => {});
+
+      try {
+        await this.cloneRepo(repoInfo, branch, token, repoPath);
+        this.logger.info({ repoPath, branch }, "Repository re-cloned successfully");
+      } catch (cloneError) {
+        throw new Error(
+          `Failed to update repository: ${redactToken((cloneError as Error).message, token)}`
+        );
+      }
     }
   }
 

@@ -68,7 +68,7 @@ export class CliGitClient implements GitClient {
         "--depth",
         String(depth),
         "origin",
-        `${branch}:refs/remotes/origin/${branch}`,
+        `+${branch}:refs/remotes/origin/${branch}`,
       ],
       this.timeoutMs,
       env

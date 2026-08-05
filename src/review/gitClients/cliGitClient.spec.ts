@@ -183,7 +183,7 @@ describe("CliGitClient", () => {
           "--depth",
           "1",
           "origin",
-          "main:refs/remotes/origin/main",
+          "+main:refs/remotes/origin/main",
         ]),
         expect.any(Object)
       );
