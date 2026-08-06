@@ -78,6 +78,17 @@ export interface Config {
   readonly experimentalTools: boolean;
   /** Verify pull request changes against linked Product Backlog Items/Issues */
   readonly verifyPbi: boolean;
+  /**
+   * Minimum confidence threshold for findings produced by the multi-agent
+   * strategy. Findings whose confidence scores below this value are discarded
+   * by the Lead Synthesizer. Config-only (no CLI flag). Default: 0.7
+   */
+  readonly multiAgentMinConfidence: number;
+  /**
+   * Maximum number of subagents the multi-agent orchestrator dispatches
+   * concurrently. Config-only (no CLI flag). Default: 4
+   */
+  readonly multiAgentMaxParallel: number;
 }
 
 const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-sdk");
@@ -90,7 +101,25 @@ const ConfigParserSchema = z.object({
   reviewType: z
     .enum(["general", "testing", "security", "performance", "fast", "custom"])
     .catch("general"),
-  reviewStrategy: z.enum(["deep", "fast"]).catch("fast"),
+  reviewStrategy: z.enum(["deep", "fast", "multi-agent"]).catch("fast"),
+  multiAgentMinConfidence: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      const parsed = typeof val === "string" ? Number.parseFloat(val) : val;
+      return Number.isFinite(parsed) && (parsed as number) >= 0 && (parsed as number) <= 1
+        ? parsed
+        : undefined;
+    },
+    z.custom<number>((val) => typeof val === "number").catch(0.7)
+  ),
+  multiAgentMaxParallel: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      const parsed = typeof val === "string" ? Number.parseInt(val, 10) : val;
+      return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
+    },
+    z.custom<number>((val) => typeof val === "number").catch(4)
+  ),
   streamingEnabled: z.preprocess(
     (val) => val !== "false" && val !== false,
     z.boolean().default(true)
@@ -145,6 +174,8 @@ export function loadConfig(
     gitBackend: cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"),
     reviewType: cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"),
     reviewStrategy: cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY"),
+    multiAgentMinConfidence: env.get("MM_MULTI_AGENT_MIN_CONFIDENCE"),
+    multiAgentMaxParallel: env.get("MM_MULTI_AGENT_MAX_PARALLEL"),
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED"),
     streamingLines:
       cliOverrides?.streamingLines ??
@@ -200,6 +231,8 @@ export function loadConfig(
     reasoningEffort: parsed.reasoningEffort,
     experimentalTools: parsed.experimentalTools,
     verifyPbi: parsed.verifyPbi,
+    multiAgentMinConfidence: parsed.multiAgentMinConfidence,
+    multiAgentMaxParallel: parsed.multiAgentMaxParallel,
   };
 }
 

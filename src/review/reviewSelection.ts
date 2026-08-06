@@ -16,7 +16,7 @@ export const REVIEW_PASSES = [
 
 export type ReviewPass = (typeof REVIEW_PASSES)[number];
 
-const REVIEW_STRATEGIES = ["deep", "fast"] as const;
+const REVIEW_STRATEGIES = ["deep", "fast", "multi-agent"] as const;
 
 export type ReviewStrategy = (typeof REVIEW_STRATEGIES)[number];
 
@@ -173,8 +173,14 @@ function formatReviewProfileLabel(
 ): string {
   const reviewPassList = formatReviewPasses(reviewPasses);
   const baseLabel = reviewPassList ? `Standard review + ${reviewPassList}` : "Standard review";
+  const strategySuffix =
+    reviewStrategy === "deep"
+      ? " (deep strategy)"
+      : reviewStrategy === "multi-agent"
+        ? " (multi-agent strategy)"
+        : "";
 
-  return reviewStrategy === "deep" ? `${baseLabel} (deep strategy)` : baseLabel;
+  return `${baseLabel}${strategySuffix}`;
 }
 
 export function formatReviewTypeLabel(

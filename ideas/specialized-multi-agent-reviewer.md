@@ -1,8 +1,9 @@
 # Feature Idea: Specialized Multi-Agent Reviewer Architecture
 
-> **Status:** Partially implemented. Merge Mentor already supports configurable
-> multi-pass reviews; this document describes the remaining work to introduce
-> independent specialist agents and a lead synthesizer.
+> **Status:** Spec resolved. Partially implemented. Merge Mentor already supports
+> configurable multi-pass reviews; this document describes the remaining work to
+> introduce independent specialist agents and a lead synthesizer. Design decisions
+> from the spec workshop are captured in [Spec Decisions](#-spec-decisions).
 
 ## Executive Summary
 
@@ -29,6 +30,35 @@ Architecture/Style) coordinated by a Lead Synthesizer Agent.
 The target architecture is therefore not a replacement for the existing
 review profiles. It is a separate execution mode that can reuse their prompts,
 finding types, aggregation, comment lifecycle, and platform adapters.
+
+---
+
+## ✅ Spec Decisions
+
+Resolved via spec workshop; these lock the MVP shape:
+
+1. **Mode relationship:** Multi-agent is a **new `--strategy` value**
+   (`--strategy multi-agent`) that complements the existing `deep` and `fast`
+   strategies. Existing passes/profiles remain untouched.
+2. **Confidence threshold:** `minConfidence` is **config-only** (no CLI flag),
+   **default 0.7**.
+3. **Conflict resolution:** The **Lead Synthesizer decides via LLM judgment**,
+   including reasoning for the winning finding.
+4. **Output surfaces:** All supported **in parallel from day one** — console
+   markdown preview, JSON output, and remote PR comments.
+5. **Selective dispatch:** An **LLM pre-classification pass** selects which
+   subagents run per PR (cheap classifier prompt before agent dispatch).
+6. **Deduplication:** **Synthesizer-level LLM dedup**; the existing fingerprint
+   mechanism is not extended for agent overlap.
+7. **Model routing:** **Same model everywhere** in MVP; per-role routing is
+   deferred to post-MVP.
+8. **Cost & concurrency:** **No extra controls**; `maxParallel` is config-only
+   and existing provider rate-limit handling is reused.
+9. **Agent roles:** **Hardcoded 4 roles**; agent selection reuses the existing
+   `--passes` parameter (see the pass-to-agent mapping in the MVP scope).
+   Custom domain agents are post-MVP.
+10. **Validation:** **Manual field testing** behind a flag before trust;
+    eval-suite accuracy measurement is deferred.
 
 ---
 
@@ -76,12 +106,41 @@ The review engine delegates diff analysis to four primary specialized subagents:
 4. **🏗️ Architecture & Style Agent:**
    - Inspects breaking API contract changes, project structure guidelines, design pattern consistency, naming conventions, and linting compliance.
 
+#### Pass-to-Agent Mapping
+
+Agent selection is driven entirely by the existing `--passes` parameter. Each
+configured `ReviewPass` resolves to exactly one subagent; multiple passes can
+target the same agent, and that agent's prompt covers each configured lens:
+
+| ReviewPass    | Subagent                           |
+| ------------- | ---------------------------------- |
+| `security`    | 🔒 Security & Trust Agent          |
+| `performance` | ⚡ Performance & Scalability Agent |
+| `database`    | ⚡ Performance & Scalability Agent |
+| `testing`     | 🧪 Test Coverage & Quality Agent   |
+| `logic`       | 🏗️ Architecture & Style Agent      |
+| `monorepo`    | 🏗️ Architecture & Style Agent      |
+| `scan`        | 🏗️ Architecture & Style Agent      |
+
+With `--strategy multi-agent` and no explicit `--passes`, all four agents run
+with the default lenses above. Supplying e.g.
+`--passes security,performance,testing` limits execution to the Security,
+Performance, and Test Coverage agents.
+
 #### 3. Lead Synthesizer & Consensus Engine
 
-- **Deduplication:** Merges findings from subagents and eliminates overlapping or redundant feedback.
-- **Conflict Resolution:** Resolves conflicting recommendations (e.g., if a style suggestion conflicts with a performance optimization).
-- **Confidence Scoring & Noise Filtering:** Applies a configurable minimum confidence threshold (`minConfidence`) so only actionable, high-quality comments are presented to the user.
-- **Unified Output:** Formats the consolidated findings into standard Merge Mentor outputs (console markdown preview, JSON output, or remote PR comments).
+- **Deduplication:** The Lead Synthesizer merges overlapping or near-duplicate
+  findings from subagents via LLM judgment (no fingerprint extension for
+  cross-agent overlap).
+- **Conflict Resolution:** When subagent recommendations conflict (e.g., a
+  style suggestion vs. a performance optimization), the synthesizer decides
+  which finding wins via LLM judgment, explaining its reasoning in the report.
+- **Confidence Scoring & Noise Filtering:** Discards findings below the
+  config-only `minConfidence` threshold (**default 0.7**) so only actionable,
+  high-quality comments reach the user.
+- **Unified Output:** Formats the consolidated findings into standard Merge
+  Mentor outputs — console markdown preview, JSON output, and remote PR
+  comments — all supported in parallel.
 
 ---
 
@@ -90,11 +149,11 @@ The review engine delegates diff analysis to four primary specialized subagents:
 ### Command & Configuration Interface
 
 ```bash
-# Execute review using the proposed multi-agent mode (dry-run)
-merge-mentor review --pr 123 --multi-agent
+# Execute review using the multi-agent strategy (dry-run)
+merge-mentor review --pr 123 --strategy multi-agent
 
-# Execute write mode with specific active subagents
-merge-mentor review --pr 123 --write --multi-agent --agents security,performance,test-coverage
+# Execute write mode with specific active subagents selected via existing passes
+merge-mentor review --pr 123 --write --strategy multi-agent --passes security,performance,testing
 ```
 
 #### `.mergementor/config.json` Configuration
@@ -102,29 +161,33 @@ merge-mentor review --pr 123 --write --multi-agent --agents security,performance
 ```json
 {
   "review": {
-    "mode": "multi-agent",
+    "strategy": "multi-agent",
     "multiAgent": {
-      "agents": ["security", "performance", "test-coverage", "architecture"],
-      "minConfidence": 0.8,
+      "minConfidence": 0.7,
       "maxParallel": 4
     }
   }
 }
 ```
 
+Agent selection follows the resolved `--passes` / `MM_REVIEW_PASSES` value;
+there is no separate agent list.
+
 ### Component Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        CLI (Commander)                          │
-│          merge-mentor review --pr 123 --multi-agent             │
+│     merge-mentor review --pr 123 --strategy multi-agent         │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Multi-Agent Orchestrator                     │
-│  - Parses PR diff & filters files per subagent interest         │
-│  - Dispatches parallel requests to configured subagents        │
+│  - Resolves --passes into enabled subagents (pass-to-agent map) │
+│  - Runs LLM pre-classifier to select relevant subagents        │
+│  - Parses PR diff & filters files per subagent interest        │
+│  - Dispatches parallel requests to enabled subagents           │
 └────┬──────────────────┬──────────────────┬──────────────────┬───┘
      │                  │                  │                  │
      ▼                  ▼                  ▼                  ▼
@@ -153,9 +216,14 @@ merge-mentor review --pr 123 --write --multi-agent --agents security,performance
 
 ## 💡 Quality & Efficiency Strategy
 
-1. **Selective Subagent Dispatch:** Automatically skip irrelevant subagents based on diff file taxonomy (e.g., skip the Database Performance Agent on CSS or Markdown diffs).
-2. **Parallel Subagent Execution:** Run all enabled subagents concurrently via `Promise.all` to keep execution latency comparable to a single-pass review.
-3. **Strict Noise Thresholds:** Require the Lead Synthesizer to discard findings below a target confidence score (e.g. 0.8) to protect developer trust.
+1. **Selective Subagent Dispatch:** A lightweight LLM pre-classification pass
+   selects which subagents are relevant for the PR's diff (e.g., skip the
+   Security Agent on CSS or Markdown-only diffs) before dispatching any agents.
+2. **Parallel Subagent Execution:** Run all enabled subagents concurrently via
+   `Promise.all` to keep execution latency comparable to a single-pass review.
+3. **Strict Noise Thresholds:** Require the Lead Synthesizer to discard findings
+   below the config-only `minConfidence` (default 0.7) to protect developer
+   trust.
 
 ---
 

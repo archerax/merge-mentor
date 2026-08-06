@@ -90,3 +90,57 @@ export const PBIAlignmentResponseSchema = z.object({
   scopeCreep: z.array(z.coerce.string()).default([]),
   overallAssessment: z.coerce.string().default(""),
 });
+
+// Multi-agent review schemas
+
+/** Agent ids selectable by the pre-classifier and agent registry. */
+const MultiAgentIdSchema = z.enum(["security", "performance", "testing", "architecture"]);
+
+/** Category union shared by multi-agent file findings and synthesized findings. */
+const MultiAgentFindingCategorySchema = z
+  .enum([
+    "bug",
+    "security",
+    "performance",
+    "quality",
+    "documentation",
+    "architecture",
+    "design",
+    "testing",
+  ])
+  .catch("quality");
+
+/** A finding reported by a specialized subagent or the lead synthesizer. */
+const MultiAgentFindingSchema = z.object({
+  file: z.coerce.string().optional(),
+  line: z.coerce.number().int().nonnegative().default(0),
+  start_line: z.coerce.number().int().positive().optional(),
+  end_line: z.coerce.number().int().positive().optional(),
+  severity: FindingSeveritySchema,
+  confidence: FindingConfidenceSchema,
+  category: MultiAgentFindingCategorySchema,
+  message: z.coerce.string().default(""),
+  suggestion: z.coerce.string().default(""),
+  replacement: z.coerce.string().optional(),
+  reasoning: z.coerce.string().default("Reasoning not provided by the model."),
+  isPreExisting: z.boolean().default(false),
+  /** Files affected by a cross-file (pr-level) finding. Only used by the synthesizer. */
+  affected_files: z.array(z.coerce.string()).default([]),
+});
+
+/** Response from the LLM pre-classification pass. */
+export const PreClassifierResponseSchema = z.object({
+  agents: z.array(MultiAgentIdSchema).default([]),
+});
+
+/** Response from a single specialized subagent. */
+export const AgentReviewResponseSchema = z.object({
+  findings: z.array(MultiAgentFindingSchema).default([]),
+});
+
+/** Response from the lead synthesizer (deduplicated, filtered, prioritized). */
+export const SynthesizedReviewResponseSchema = z.object({
+  overall_assessment: z.coerce.string().default("Review completed"),
+  findings: z.array(MultiAgentFindingSchema).default([]),
+  recommendations: z.array(z.coerce.string()).default([]),
+});

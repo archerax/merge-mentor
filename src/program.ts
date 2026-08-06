@@ -125,7 +125,10 @@ program
     "--passes <passNames>",
     `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
   )
-  .option("--strategy <strategy>", "Execution strategy (deep or fast). Env: MM_REVIEW_STRATEGY")
+  .option(
+    "--strategy <strategy>",
+    "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
+  )
   .option(
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"

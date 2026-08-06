@@ -136,6 +136,8 @@ export async function executeReview(
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
     verifyPbi: config.verifyPbi,
+    multiAgentMinConfidence: config.multiAgentMinConfidence,
+    multiAgentMaxParallel: config.multiAgentMaxParallel,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";

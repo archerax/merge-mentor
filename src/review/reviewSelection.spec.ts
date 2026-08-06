@@ -30,6 +30,7 @@ describe("reviewSelection", () => {
     it("returns the strategy if it is a valid review strategy", () => {
       expect(validateReviewStrategy("deep")).toBe("deep");
       expect(validateReviewStrategy("fast")).toBe("fast");
+      expect(validateReviewStrategy("multi-agent")).toBe("multi-agent");
     });
 
     it("falls back to 'fast' if strategy is undefined or invalid", () => {
@@ -164,6 +165,15 @@ describe("reviewSelection", () => {
 
       expect(profile.strategy).toBe("deep");
     });
+
+    it("resolves the multi-agent strategy when requested", () => {
+      const profile = resolveReviewProfile({
+        reviewType: "general",
+        reviewStrategy: "multi-agent",
+      });
+
+      expect(profile.strategy).toBe("multi-agent");
+    });
   });
 
   describe("formatReviewPasses", () => {
@@ -204,6 +214,15 @@ describe("reviewSelection", () => {
 
     it("formats fast review type label without deep strategy override", () => {
       expect(formatReviewTypeLabel("fast", [], "deep")).toBe("Standard review");
+    });
+
+    it("formats multi-agent strategy labels", () => {
+      expect(formatReviewTypeLabel("general", undefined, "multi-agent")).toBe(
+        "Standard review (multi-agent strategy)"
+      );
+      expect(formatReviewTypeLabel("general", ["scan", "logic"], "multi-agent")).toBe(
+        "Standard review + scan → logic (multi-agent strategy)"
+      );
     });
   });
 });

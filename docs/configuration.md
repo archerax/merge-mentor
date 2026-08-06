@@ -113,7 +113,7 @@ fails fast; configure OpenCode providers through its own configuration instead.
 ## Optional Settings
 
 ```bash
-# Review profile strategy (fast or deep)
+# Review profile strategy (fast, deep, or multi-agent)
 export MM_REVIEW_STRATEGY=fast
 
 # Reasoning effort level (low, medium, high, xhigh)

@@ -1250,6 +1250,88 @@ describe("ReviewEngine", () => {
       expect(result.crossFileResult.overallAssessment).toBe("Fast review complete");
     });
 
+    it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewStrategy: "multi-agent",
+        multiAgentMinConfidence: 0.7,
+        multiAgentMaxParallel: 2,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile()];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      mockExecutePrompt.mockImplementation(async (_prompt: string, options: unknown) => {
+        const promptType = (options as { promptType?: string } | undefined)?.promptType;
+        if (promptType === "multi-agent-classifier") {
+          return { raw: "{}", parsed: { agents: ["security"] } };
+        }
+        if (promptType === "multi-agent-subagent") {
+          return {
+            raw: "{}",
+            parsed: {
+              findings: [
+                {
+                  file: "test.ts",
+                  line: 2,
+                  severity: "high",
+                  confidence: "high",
+                  category: "security",
+                  message: "Injection risk",
+                  suggestion: "Use parameterized queries",
+                  reasoning:
+                    "User input flows into a SQL query on an added line, enabling injection.",
+                  isPreExisting: false,
+                },
+              ],
+            },
+          };
+        }
+        if (promptType === "multi-agent-synthesizer") {
+          return {
+            raw: "{}",
+            parsed: {
+              overall_assessment: "Multi-agent review complete",
+              findings: [
+                {
+                  file: "test.ts",
+                  line: 2,
+                  severity: "high",
+                  confidence: "high",
+                  category: "security",
+                  message: "Injection risk",
+                  suggestion: "Use parameterized queries",
+                  reasoning:
+                    "User input flows into a SQL query on an added line, enabling injection.",
+                  isPreExisting: false,
+                },
+              ],
+              recommendations: ["Add integration tests"],
+            },
+          };
+        }
+        return { raw: "{}", parsed: {} };
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(result).toBeDefined();
+      expect(result.filesReviewed).toBe(1);
+      const promptTypes = mockExecutePrompt.mock.calls.map(
+        (call) => (call[1] as { promptType?: string } | undefined)?.promptType
+      );
+      expect(promptTypes).toContain("multi-agent-classifier");
+      expect(promptTypes).toContain("multi-agent-subagent");
+      expect(promptTypes).toContain("multi-agent-synthesizer");
+      expect(result.crossFileResult.overallAssessment).toBe("Multi-agent review complete");
+      expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
+      const totalFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
+      expect(totalFindings).toBe(1);
+    });
+
     it("uses ordered additive passes when reviewType is custom", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,

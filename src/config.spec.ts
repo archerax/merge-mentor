@@ -350,6 +350,50 @@ describe("Config", () => {
       expect(config.reviewType).toBe("general");
     });
 
+    it("should load MM_REVIEW_STRATEGY=multi-agent from environment", () => {
+      const env = createStubEnvironment({
+        MM_REVIEW_STRATEGY: "multi-agent",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.reviewStrategy).toBe("multi-agent");
+      expect(config.reviewProfile.strategy).toBe("multi-agent");
+    });
+
+    it("should default multiAgentMinConfidence to 0.7 and maxParallel to 4", () => {
+      const env = createStubEnvironment();
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.multiAgentMinConfidence).toBe(0.7);
+      expect(config.multiAgentMaxParallel).toBe(4);
+    });
+
+    it("should load multi-agent config from environment", () => {
+      const env = createStubEnvironment({
+        MM_MULTI_AGENT_MIN_CONFIDENCE: "0.85",
+        MM_MULTI_AGENT_MAX_PARALLEL: "2",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.multiAgentMinConfidence).toBe(0.85);
+      expect(config.multiAgentMaxParallel).toBe(2);
+    });
+
+    it("should fall back to defaults for invalid multi-agent config values", () => {
+      const env = createStubEnvironment({
+        MM_MULTI_AGENT_MIN_CONFIDENCE: "1.5",
+        MM_MULTI_AGENT_MAX_PARALLEL: "-1",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.multiAgentMinConfidence).toBe(0.7);
+      expect(config.multiAgentMaxParallel).toBe(4);
+    });
+
     it("should accept all valid MM_REVIEW_TYPE values", () => {
       expect(
         loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "general" })).reviewType
@@ -660,9 +704,10 @@ describe("Validator functions", () => {
   });
 
   describe("validateReviewStrategy", () => {
-    it("should accept valid review strategies", () => {
+    it("accepts all valid review strategies", () => {
       expect(validateReviewStrategy("deep")).toBe("deep");
       expect(validateReviewStrategy("fast")).toBe("fast");
+      expect(validateReviewStrategy("multi-agent")).toBe("multi-agent");
     });
 
     it("should default to fast for invalid strategies", () => {

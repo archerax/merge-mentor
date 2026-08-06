@@ -92,6 +92,7 @@ import { DiffStorage } from "./diffStorage.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
+import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";
 import { PbiVerifier } from "./pbiVerifier.js";
 import { RepoManager } from "./repoManager.js";
 import {
@@ -202,6 +203,10 @@ interface ReviewEngineOptions {
   readonly reasoningEffort?: ReasoningEffort;
   /** Verify pull request changes against linked Product Backlog Items/Issues */
   readonly verifyPbi?: boolean;
+  /** Minimum confidence threshold for multi-agent strategy findings (default: 0.7). */
+  readonly multiAgentMinConfidence?: number;
+  /** Maximum concurrent subagents for the multi-agent strategy (default: 4). */
+  readonly multiAgentMaxParallel?: number;
 }
 
 /**
@@ -594,6 +599,21 @@ export class ReviewEngine {
       crossFileResult = fastReviewData.crossFileResult;
       filesSkipped = fastReviewData.filesSkipped;
       filesAnalyzed = fastReviewData.filesAnalyzed;
+    } else if (this.reviewProfile.strategy === "multi-agent") {
+      this.log("Using multi-agent review mode (specialized subagents + lead synthesizer)...");
+      const multiAgentData = await this.performMultiAgentReview(
+        prIdentifier,
+        prDetails,
+        files,
+        existingComments,
+        cachedState,
+        repoPath,
+        onTokenUsage
+      );
+      fileResults = multiAgentData.fileResults;
+      crossFileResult = multiAgentData.crossFileResult;
+      filesSkipped = multiAgentData.filesSkipped;
+      filesAnalyzed = multiAgentData.filesAnalyzed;
     } else {
       const reviewData = await this.reviewFiles(
         prIdentifier,
@@ -1313,6 +1333,175 @@ During the database pass, pay extra attention to query correctness, transaction 
         (error as Error).message
       );
       throw error;
+    }
+  }
+
+  /**
+   * Performs a multi-agent review: specialized subagents (Security, Performance,
+   * Test Coverage, Architecture) run concurrently over the diff, then a Lead
+   * Synthesizer deduplicates, filters, and compiles the unified report.
+   *
+   * Uses the same cache/diff storage plumbing as fast review so unchanged files
+   * are skipped and diffs are available to the AI workspace.
+   */
+  private async performMultiAgentReview(
+    prIdentifier: string,
+    prDetails: PRDetails,
+    files: PRFile[],
+    existingComments: readonly ExistingComment[],
+    cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>,
+    repoPath?: string,
+    onTokenUsage?: (usage: TokenUsage | undefined) => void
+  ): Promise<{
+    fileResults: FileReviewResult[];
+    crossFileResult: CrossFileReviewResult;
+    filesSkipped: number;
+    filesAnalyzed: number;
+  }> {
+    this.log("Performing multi-agent review (specialized subagents + lead synthesizer)...");
+
+    const prNumber = parsePRNumber(prIdentifier);
+    this.auditLogger.logFileReviewStart("multi-agent", prNumber);
+
+    // Filter unchanged files vs files requiring review
+    const filesToReview: PRFile[] = [];
+    const cachedResults: FileReviewResult[] = [];
+    let filesSkipped = 0;
+
+    for (const file of files) {
+      if (this.shouldSkipFile(file) || !file.patch) continue;
+
+      if (file.sha && cachedState) {
+        const cachedReview = this.stateCache.getCachedFileReview(
+          file.filename,
+          file.sha,
+          cachedState
+        );
+        if (cachedReview) {
+          this.log(`Using cached review for ${file.filename} (unchanged)`);
+          cachedResults.push(cachedReview);
+          filesSkipped++;
+          continue;
+        }
+      }
+
+      filesToReview.push(file);
+    }
+
+    // Full cache hit check
+    if (filesToReview.length === 0) {
+      if (cachedState?.crossFileResult) {
+        this.log(
+          `Skipped ${filesSkipped} unchanged file(s) from previous review in multi-agent mode`
+        );
+        return {
+          fileResults: cachedResults,
+          crossFileResult: cachedState.crossFileResult,
+          filesSkipped,
+          filesAnalyzed: cachedResults.length,
+        };
+      }
+      // Fallback: If cached crossFileResult is missing, process all files with patches to regenerate it
+      filesToReview.push(...files.filter((f) => !this.shouldSkipFile(f) && f.patch));
+    }
+
+    if (filesToReview.length === 0) {
+      return {
+        fileResults: cachedResults,
+        crossFileResult: cachedState?.crossFileResult ?? {
+          overallAssessment: "No files to review",
+          findings: [],
+          recommendations: [],
+        },
+        filesSkipped,
+        filesAnalyzed: cachedResults.length,
+      };
+    }
+
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
+
+    try {
+      // Store diffs to disk
+      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesToReview);
+      this.logger.info(
+        { prNumber, fileCount: manifest.files.length, diffDir },
+        "Stored diffs for multi-agent review"
+      );
+
+      // Copy diff files to repo's .mergementor directory for AI access
+      const { paths: diffFiles } = await this.workspaceManager.copyDiffsToRepoDir(
+        diffDir,
+        manifest,
+        repoPath
+      );
+
+      const orchestrator = new MultiAgentOrchestrator(this.provider, {
+        passes: this.reviewProfile.passes,
+        minConfidence: this.options.multiAgentMinConfidence ?? 0.7,
+        maxParallel: this.options.multiAgentMaxParallel ?? 4,
+        output: this.output,
+      });
+
+      const multiAgentOutput = await orchestrator.review({
+        prDetails,
+        manifest,
+        diffFiles,
+        existingComments,
+        repoPath,
+      });
+      onTokenUsage?.(multiAgentOutput.tokenUsage);
+
+      // Validate line numbers specifically on filesToReview
+      const validatedNewResults = this.lineNumberValidator.validate(
+        [...multiAgentOutput.fileResults],
+        filesToReview
+      );
+      const mergedFileResults = [...cachedResults, ...validatedNewResults];
+      const combinedCrossFile = this.combineCrossFileResults(
+        cachedState?.crossFileResult,
+        multiAgentOutput.crossFileResult
+      );
+
+      // Log results
+      const totalFileFindings = mergedFileResults.reduce((sum, r) => sum + r.findings.length, 0);
+      const crossFileFindings = combinedCrossFile.findings.length;
+      this.log(
+        `  Multi-agent review found ${totalFileFindings} file-level issues and ${crossFileFindings} architectural issues`
+      );
+
+      for (const fileResult of mergedFileResults) {
+        if (fileResult.findings.length > 0) {
+          this.log(`    ${fileResult.filename}: ${fileResult.findings.length} issues`);
+        }
+      }
+
+      if (filesSkipped > 0) {
+        this.log(
+          `Skipped ${filesSkipped} unchanged file(s) from previous review in multi-agent mode`
+        );
+      }
+
+      this.auditLogger.logFileReviewComplete("multi-agent", prNumber, totalFileFindings);
+      this.auditLogger.logCrossFileReviewComplete(prNumber, crossFileFindings);
+
+      return {
+        fileResults: mergedFileResults,
+        crossFileResult: combinedCrossFile,
+        filesSkipped,
+        filesAnalyzed: mergedFileResults.length,
+      };
+    } catch (error) {
+      this.auditLogger.logFileReviewComplete(
+        "multi-agent",
+        prNumber,
+        0,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    } finally {
+      await diffStorage.cleanup(prIdentifier);
     }
   }
 

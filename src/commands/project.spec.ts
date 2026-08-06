@@ -57,6 +57,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     longContext = false,
     experimentalTools = false,
     verifyPbi = false,
+    multiAgentMinConfidence = 0.7,
+    multiAgentMaxParallel = 4,
     ...restOverrides
   } = overrides;
   const reviewType = overrides.reviewType ?? "general";
@@ -92,6 +94,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     longContext,
     experimentalTools,
     verifyPbi,
+    multiAgentMinConfidence,
+    multiAgentMaxParallel,
     ...restOverrides,
   };
 }

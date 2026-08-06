@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  parseAgentReview,
   parseBatchedFileReview,
   parseCrossFileReview,
   parseFastReview,
   parseFileReview,
+  parsePreClassifier,
+  parseSynthesizedReview,
 } from "./responseParsers.js";
 
 describe("responseParsers", () => {
@@ -122,5 +125,101 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.overallAssessment).toBe("Fast review completed");
     expect(result.fileResults).toHaveLength(1);
     expect(result.fileResults[0].filename).toBe("main.ts");
+  });
+
+  it("parsePreClassifier returns selected agent ids", () => {
+    const result = parsePreClassifier(mockLogger, {
+      raw: "",
+      parsed: { agents: ["security", "testing"] },
+    });
+
+    expect(result).toEqual(["security", "testing"]);
+  });
+
+  it("parsePreClassifier falls back to an empty list on schema drift", () => {
+    const result = parsePreClassifier(mockLogger, {
+      raw: "",
+      parsed: { agents: "security" },
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("parseAgentReview parses subagent findings and requires file attribution", () => {
+    const response = {
+      raw: "",
+      parsed: {
+        findings: [
+          {
+            file: "auth.ts",
+            line: 12,
+            severity: "high",
+            confidence: "high",
+            category: "security",
+            message: "SQL injection risk",
+            suggestion: "Use parameterized queries",
+            reasoning:
+              "User input is concatenated into a SQL query on an added line, enabling injection.",
+          },
+          {
+            severity: "high",
+            confidence: "high",
+            category: "architecture",
+            message: "PR-level concern without a file",
+            reasoning:
+              "This cross-file concern is reserved for the lead synthesizer and has enough context.",
+          },
+        ],
+      },
+    };
+
+    const findings = parseAgentReview(mockLogger, response);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0].line).toBe(12);
+    expect(findings[0].category).toBe("security");
+    expect(mockLogger.warn).toHaveBeenCalled();
+  });
+
+  it("parseSynthesizedReview splits file and cross-file findings", () => {
+    const response = {
+      raw: "",
+      parsed: {
+        overall_assessment: "Solid PR with minor concerns.",
+        findings: [
+          {
+            file: "auth.ts",
+            line: 12,
+            severity: "high",
+            confidence: "high",
+            category: "security",
+            message: "SQL injection risk",
+            suggestion: "Use parameterized queries",
+            reasoning:
+              "User input is concatenated into a SQL query on an added line, enabling injection.",
+          },
+          {
+            severity: "high",
+            confidence: "high",
+            category: "architecture",
+            message: "Layering violation across modules",
+            reasoning:
+              "The new module reaches across layers on added lines, coupling presentation to data access.",
+            affected_files: ["auth.ts", "db.ts"],
+          },
+        ],
+        recommendations: ["Add integration tests"],
+      },
+    };
+
+    const result = parseSynthesizedReview(mockLogger, response);
+
+    expect(result.overallAssessment).toBe("Solid PR with minor concerns.");
+    expect(result.fileResults).toHaveLength(1);
+    expect(result.fileResults[0].filename).toBe("auth.ts");
+    expect(result.fileResults[0].findings[0].line).toBe(12);
+    expect(result.crossFileResult.findings).toHaveLength(1);
+    expect(result.crossFileResult.findings[0].affectedFiles).toEqual(["auth.ts", "db.ts"]);
+    expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
   });
 });

@@ -88,7 +88,10 @@ export interface ExecutePromptOptions {
     | "cross-file-review"
     | "batched-file-review"
     | "fast-review"
-    | "build-analysis";
+    | "build-analysis"
+    | "multi-agent-classifier"
+    | "multi-agent-subagent"
+    | "multi-agent-synthesizer";
 }
 
 /**

@@ -54,7 +54,7 @@ unsafe or malformed replacements do not produce native suggestions.
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------- | --------- |
 | `--review-type <type>`    | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`)                                     | `MM_REVIEW_TYPE`     | `general` |
 | `--passes <passNames>`    | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | `MM_REVIEW_PASSES`   | -         |
-| `--strategy <strategy>`   | Execution strategy (`deep` or `fast`)                                                                                  | `MM_REVIEW_STRATEGY` | `fast`    |
+| `--strategy <strategy>`   | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                  | `MM_REVIEW_STRATEGY` | `fast`    |
 | `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                                                               | `MM_GIT_BACKEND`     | `cli`     |
 
 ### Platform Credentials
@@ -101,7 +101,7 @@ unsafe or malformed replacements do not produce native suggestions.
 
 ## Review Profiles, Passes, and Strategies
 
-Every review includes a **baseline review** running with the **fast** execution strategy by default. You can optionally switch to the **deep** execution strategy for higher coverage, or add ordered **passes** to increase attention in specific areas.
+Every review includes a **baseline review** running with the **fast** execution strategy by default. You can optionally switch to the **deep** execution strategy for higher coverage, the **multi-agent** strategy for specialized subagent reviews, or add ordered **passes** to increase attention in specific areas.
 
 ```bash
 # Baseline review with deep strategy for maximum issues detection
@@ -112,12 +112,41 @@ merge-mentor review --pr 123 --passes "testing" --write
 
 # Baseline review plus multiple ordered passes with deep strategy
 merge-mentor review --pr 123 --passes "security,database,performance" --strategy deep --write
+
+# Multi-agent review: specialized subagents coordinated by a lead synthesizer
+merge-mentor review --pr 123 --strategy multi-agent
+
+# Multi-agent review limited to specific subagents via passes
+merge-mentor review --pr 123 --strategy multi-agent --passes security,performance,testing
 ```
 
 ### Choosing a Strategy
 
 - **`fast` (default)**: Minimizes token/credit usage and gets faster results.
 - **`deep`**: Highest issue detection rate. Uses multiple API calls. Under GitHub Copilot's usage-based billing, `deep` consumes roughly **2x the AI credits/tokens** compared to `fast`.
+- **`multi-agent`**: Deconstructs PR analysis into independent domain-specialized subagents (Security & Trust, Performance & Scalability, Test Coverage & Quality, Architecture & Style) that run concurrently, coordinated by a **Lead Synthesizer** that deduplicates overlapping findings, resolves conflicting recommendations, and discards low-confidence noise.
+
+### Multi-Agent Strategy Details
+
+The `multi-agent` strategy is a separate execution mode that reuses the existing review profiles, finding types, aggregation, comment lifecycle, and platform adapters. It does not replace `deep` or `fast`.
+
+- **Agent selection** is driven entirely by `--passes`. Each `ReviewPass` resolves to exactly one subagent; multiple passes can target the same agent.
+
+| ReviewPass    | Subagent                           |
+| ------------- | ---------------------------------- |
+| `security`    | 🔒 Security & Trust Agent          |
+| `performance` | ⚡ Performance & Scalability Agent |
+| `database`    | ⚡ Performance & Scalability Agent |
+| `testing`     | 🧪 Test Coverage & Quality Agent   |
+| `logic`       | 🏗️ Architecture & Style Agent      |
+| `monorepo`    | 🏗️ Architecture & Style Agent      |
+| `scan`        | 🏗️ Architecture & Style Agent      |
+
+With `--strategy multi-agent` and no explicit `--passes`, all four agents run with their default lenses. Supplying e.g. `--passes security,performance,testing` limits execution to the Security, Performance, and Test Coverage agents.
+
+- **Selective dispatch:** A lightweight LLM pre-classification pass selects which subagents are relevant for the PR's diff before any agent is dispatched (e.g. the Security agent is skipped on CSS/Markdown-only diffs).
+- **Confidence threshold:** The Lead Synthesizer discards findings below the config-only `minConfidence` (default `0.7`, mapping high = 1.0, medium = 0.6, low = 0.3). Configure via `MM_MULTI_AGENT_MIN_CONFIDENCE`.
+- **Concurrency:** Subagents run in parallel, bounded by the config-only `maxParallel` (default `4`). Configure via `MM_MULTI_AGENT_MAX_PARALLEL`.
 
 ### Available Passes
 
