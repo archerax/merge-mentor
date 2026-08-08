@@ -1558,6 +1558,11 @@ During the database pass, pay extra attention to query correctness, transaction 
         minConfidence: this.options.multiAgentMinConfidence ?? 0.7,
         maxParallel: this.options.multiAgentMaxParallel ?? 2,
         output: this.output,
+        streaming: {
+          enabled: this.streamingEnabled,
+          lines: this.streamingLines,
+          ciMode: this.options.ciMode ?? false,
+        },
       });
 
       const multiAgentOutput = await orchestrator.review({

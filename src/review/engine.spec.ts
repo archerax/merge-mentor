@@ -1284,6 +1284,7 @@ describe("ReviewEngine", () => {
     it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
+        streamingEnabled: false,
         reviewStrategy: "multi-agent",
         multiAgentMinConfidence: 0.7,
         multiAgentMaxParallel: 2,
@@ -1366,6 +1367,7 @@ describe("ReviewEngine", () => {
     it("multi-agent review counts analyzed files even when no findings survive", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
+        streamingEnabled: false,
         reviewStrategy: "multi-agent",
         multiAgentMinConfidence: 0.7,
         multiAgentMaxParallel: 2,

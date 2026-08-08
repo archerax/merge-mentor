@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse, ExecutePromptOptions } from "../../ai/types.js";
 import type { PRDetails } from "../../platforms/types.js";
+import type { OutputWriter } from "../../ports/index.js";
 import type { DiffManifest } from "../diffStorage.js";
 import { MultiAgentOrchestrator } from "./orchestrator.js";
 
@@ -60,14 +61,18 @@ function createMockProvider(): {
   setResponder: (
     fn: (prompt: string, options?: ExecutePromptOptions) => Promise<AIResponse>
   ) => void;
-  getCalls: () => { promptType: string; prompt: string }[];
+  getCalls: () => { promptType: string; prompt: string; streamed: boolean }[];
 } {
-  const calls: { promptType: string; prompt: string }[] = [];
+  const calls: { promptType: string; prompt: string; streamed: boolean }[] = [];
   let responder: (prompt: string, options?: ExecutePromptOptions) => Promise<AIResponse> =
     async () => createResponse({});
 
   const execute = vi.fn(async (prompt: string, options?: ExecutePromptOptions) => {
-    calls.push({ promptType: options?.promptType ?? "unknown", prompt });
+    calls.push({
+      promptType: options?.promptType ?? "unknown",
+      prompt,
+      streamed: options?.onStreamData !== undefined,
+    });
     return responder(prompt, options);
   });
 
@@ -335,5 +340,163 @@ describe("MultiAgentOrchestrator", () => {
     // classifier (100/50) + subagent (100/50) + synthesizer (100/50)
     expect(output.tokenUsage?.inputTokens).toBe(300);
     expect(output.tokenUsage?.outputTokens).toBe(150);
+  });
+
+  it("streams live feedback for each phase when streaming is enabled", async () => {
+    const { provider, setResponder, getCalls } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      if (options?.onStreamData) {
+        options.onStreamData('{"streamed":');
+      }
+      switch (options?.promptType) {
+        case "multi-agent-classifier":
+          return createResponse({ agents: ["security", "performance"] });
+        case "multi-agent-subagent":
+          return createResponse({ findings: [createFinding()] });
+        case "multi-agent-synthesizer":
+          return createResponse({
+            overall_assessment: "Review completed",
+            findings: [],
+            recommendations: [],
+          });
+        default:
+          return createResponse({});
+      }
+    });
+
+    const logLines: string[] = [];
+    const written: string[] = [];
+    const output: OutputWriter = {
+      log: (message) => logLines.push(message),
+      error: (message) => logLines.push(`ERROR: ${message}`),
+      write: (data) => {
+        written.push(data);
+        return true;
+      },
+    };
+
+    const orchestrator = new MultiAgentOrchestrator(provider, {
+      output,
+      streaming: { enabled: true, lines: 9, ciMode: true },
+    });
+
+    const result = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    expect(result.dispatchedAgents).toEqual(["security", "performance"]);
+
+    // Classifier and synthesizer calls receive onStreamData; subagents report
+    // progress as plain-text lines instead.
+    const calls = getCalls();
+    expect(calls.find((c) => c.promptType === "multi-agent-classifier")?.streamed).toBe(true);
+    expect(calls.find((c) => c.promptType === "multi-agent-synthesizer")?.streamed).toBe(true);
+    for (const call of calls.filter((c) => c.promptType === "multi-agent-subagent")) {
+      expect(call.streamed).toBe(false);
+    }
+
+    // Streamed model output reaches the output writer in CI mode.
+    const allWritten = written.join("");
+    expect(allWritten).toContain('{"streamed":');
+
+    // Plain-text subagent progress reports agent activity.
+    expect(logLines).toContain("  ⏳ [security] analyzing…");
+    expect(logLines).toContain("  ⏳ [performance] analyzing…");
+    expect(logLines.some((l) => l.includes("  ✓ [security] done — 1 finding(s) in"))).toBe(true);
+    expect(logLines.some((l) => l.includes("  ✓ [performance] done — 1 finding(s) in"))).toBe(true);
+
+    // Static phase logs remain.
+    expect(logLines).toContain("Running LLM pre-classifier to select relevant subagents...");
+    expect(logLines).toContain("Dispatching 2 subagent(s): security, performance");
+    expect(logLines).toContain("Running Lead Synthesizer over 2 subagent result(s)...");
+  });
+
+  it("passes no onStreamData when streaming is disabled", async () => {
+    const { provider, setResponder, getCalls } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      if (options?.promptType === "multi-agent-classifier") {
+        return createResponse({ agents: ["security"] });
+      }
+      if (options?.promptType === "multi-agent-subagent") {
+        return createResponse({ findings: [] });
+      }
+      return createResponse({
+        overall_assessment: "Review completed",
+        findings: [],
+        recommendations: [],
+      });
+    });
+
+    const logLines: string[] = [];
+    const output: OutputWriter = {
+      log: (message) => logLines.push(message),
+      error: (message) => logLines.push(`ERROR: ${message}`),
+      write: () => true,
+    };
+
+    const orchestrator = new MultiAgentOrchestrator(provider, { output });
+    const result = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    expect(result.dispatchedAgents).toEqual(["security"]);
+    expect(getCalls().every((c) => !c.streamed)).toBe(true);
+    expect(logLines).toContain("Dispatching 1 subagent(s): security");
+    expect(logLines).toContain("  ⏳ [security] analyzing…");
+    expect(logLines.some((l) => l.includes("  ✓ [security] done — 0 finding(s) in"))).toBe(true);
+  });
+
+  it("logs a still-working heartbeat while subagents run when streaming is inactive", async () => {
+    vi.useFakeTimers();
+    try {
+      const { provider, setResponder } = createMockProvider();
+
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+        if (options?.promptType === "multi-agent-classifier") {
+          return createResponse({ agents: ["security"] });
+        }
+        if (options?.promptType === "multi-agent-subagent") {
+          await gate;
+          return createResponse({ findings: [] });
+        }
+        return createResponse({
+          overall_assessment: "Review completed",
+          findings: [],
+          recommendations: [],
+        });
+      });
+
+      const logLines: string[] = [];
+      const output: OutputWriter = {
+        log: (message) => logLines.push(message),
+        error: (message) => logLines.push(`ERROR: ${message}`),
+        write: () => true,
+      };
+
+      const orchestrator = new MultiAgentOrchestrator(provider, { output });
+      const reviewPromise = orchestrator.review({
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      // Advance past the 10s heartbeat threshold while the subagent is still running.
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(logLines.some((l) => l.includes("still working: security"))).toBe(true);
+
+      release?.();
+      const result = await reviewPromise;
+      expect(result.dispatchedAgents).toEqual(["security"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

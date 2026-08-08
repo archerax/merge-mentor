@@ -9,7 +9,7 @@ import {
   parsePreClassifier,
   parseSynthesizedReview,
 } from "../../ai/shared/responseParsers.js";
-import type { AIProviderClient, TokenUsage } from "../../ai/types.js";
+import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
 import { createChildLogger } from "../../logger.js";
 import type {
   CrossFileReviewResult,
@@ -19,6 +19,7 @@ import type {
   PRDetails,
 } from "../../platforms/types.js";
 import type { OutputWriter } from "../../ports/index.js";
+import { StreamingDisplay } from "../../utils/streamingDisplay.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import type { DiffManifest } from "../diffStorage.js";
 import type { ReviewPass } from "../reviewSelection.js";
@@ -40,6 +41,12 @@ export interface MultiAgentOrchestratorOptions {
   readonly maxParallel?: number;
   /** Output writer for progress/status messages. */
   readonly output?: OutputWriter;
+  /** Streaming display configuration (mirrors the engine's streaming options). */
+  readonly streaming?: {
+    readonly enabled: boolean;
+    readonly lines: number;
+    readonly ciMode: boolean;
+  };
 }
 
 export interface MultiAgentReviewInput {
@@ -114,6 +121,7 @@ export class MultiAgentOrchestrator {
   private readonly minConfidence: number;
   private readonly maxParallel: number;
   private readonly output?: OutputWriter;
+  private readonly streaming?: MultiAgentOrchestratorOptions["streaming"];
   private readonly logger = createChildLogger({ component: "MultiAgentOrchestrator" });
 
   constructor(provider: AIProviderClient, options?: MultiAgentOrchestratorOptions) {
@@ -122,11 +130,71 @@ export class MultiAgentOrchestrator {
     this.minConfidence = options?.minConfidence ?? 0.7;
     this.maxParallel = options?.maxParallel ?? 2;
     this.output = options?.output;
+    this.streaming = options?.streaming;
   }
 
   private log(message: string): void {
     this.output?.log(message);
     this.logger.debug(message);
+  }
+
+  /**
+   * Whether streaming output will actually render for the user: CI mode prints
+   * plain text, interactive TTYs render the rolling window. In other contexts
+   * (piped/captured output) the ANSI escape codes StreamingDisplay emits would
+   * be invisible, so we fall back to plain-text progress lines instead.
+   */
+  private get streamingActive(): boolean {
+    return (
+      this.streaming?.enabled === true && (this.streaming.ciMode || process.stdout.isTTY === true)
+    );
+  }
+
+  /**
+   * Creates a streaming display and returns a callback for streaming data.
+   * Returns undefined callback when streaming output is not active.
+   */
+  private createStreaming(context: string): {
+    callback: ((chunk: string) => void) | undefined;
+    finish: () => void;
+  } {
+    if (!this.streamingActive) {
+      return { callback: undefined, finish: () => {} };
+    }
+
+    const display = new StreamingDisplay({
+      maxLines: this.streaming?.lines ?? 9,
+      title: `🤖 ${context}`,
+      enabled: true,
+      ciMode: this.streaming?.ciMode ?? false,
+      ...(this.output ? { output: this.output } : {}),
+    });
+
+    return {
+      callback: (chunk: string) => display.push(chunk),
+      finish: () => display.finish(),
+    };
+  }
+
+  /**
+   * Returns a stop function for a plain-text "still working" heartbeat shown
+   * while a long-running phase runs. Used when streaming output is not active
+   * so the user always sees progress regardless of terminal support.
+   */
+  private heartbeat(label: string): () => void {
+    if (this.streamingActive) {
+      return () => {};
+    }
+    const started = Date.now();
+    let lastLogged = 0;
+    const timer = setInterval(() => {
+      const elapsed = Math.round((Date.now() - started) / 1000);
+      if (elapsed >= 10 && elapsed - lastLogged >= 10) {
+        lastLogged = elapsed;
+        this.log(`  ⏳ ${label} still working… (${elapsed}s)`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
   }
 
   private enabledAgents(): AgentRoleId[] {
@@ -169,10 +237,13 @@ export class MultiAgentOrchestrator {
 
     let selected: string[];
     let tokenUsage: TokenUsage | undefined;
+    const streaming = this.createStreaming("Running pre-classifier…");
+    const stopHeartbeat = this.heartbeat("pre-classifier");
     try {
       const response = await this.provider.executePrompt(prompt, {
         workingDirectory: input.repoPath,
         promptType: "multi-agent-classifier",
+        ...(streaming.callback ? { onStreamData: streaming.callback } : {}),
       });
       tokenUsage = response.tokenUsage;
       selected = parsePreClassifier(this.logger, response);
@@ -182,6 +253,9 @@ export class MultiAgentOrchestrator {
         "Pre-classifier failed; running all enabled subagents"
       );
       return { agents: enabledAgents };
+    } finally {
+      stopHeartbeat();
+      streaming.finish();
     }
 
     const filtered = enabledAgents.filter((agent) => selected.includes(agent));
@@ -238,10 +312,19 @@ export class MultiAgentOrchestrator {
       existingCommentsContext: this.existingCommentsContext(input),
     });
 
-    const response = await this.provider.executePrompt(prompt, {
-      workingDirectory: input.repoPath,
-      promptType: "multi-agent-synthesizer",
-    });
+    const streaming = this.createStreaming("Running Lead Synthesizer…");
+    const stopHeartbeat = this.heartbeat("Lead Synthesizer");
+    let response: AIResponse;
+    try {
+      response = await this.provider.executePrompt(prompt, {
+        workingDirectory: input.repoPath,
+        promptType: "multi-agent-synthesizer",
+        ...(streaming.callback ? { onStreamData: streaming.callback } : {}),
+      });
+    } finally {
+      stopHeartbeat();
+      streaming.finish();
+    }
 
     const mergedUsage = mergeTokenUsage(tokenUsage, response.tokenUsage);
     const parsed = parseSynthesizedReview(this.logger, response);
@@ -273,6 +356,70 @@ export class MultiAgentOrchestrator {
   }
 
   /**
+   * Dispatches the selected subagents concurrently (bounded by maxParallel),
+   * reporting each agent's start and completion with a plain-text progress line.
+   * Plain text (via output.log) is used so progress is visible in every
+   * environment — TTY, CI, piped, or captured output — regardless of streaming.
+   */
+  private async runSubagents(
+    dispatched: readonly AgentRoleId[],
+    input: MultiAgentReviewInput
+  ): Promise<{ executions: readonly AgentExecution[]; tokenUsage?: TokenUsage }> {
+    const startedAt = new Map<AgentRoleId, number>();
+    const running = new Set<AgentRoleId>();
+    let tokenUsage: TokenUsage | undefined;
+
+    const stopHeartbeat = this.subagentHeartbeat(dispatched, running, startedAt);
+    try {
+      const executions = await runWithConcurrency(dispatched, this.maxParallel, async (agent) => {
+        running.add(agent);
+        startedAt.set(agent, Date.now());
+        this.log(`  ⏳ [${agent}] analyzing…`);
+
+        const started = Date.now();
+        const execution = await this.runAgent(agent, input);
+        running.delete(agent);
+
+        const duration = Math.max(0, Math.round((Date.now() - started) / 1000));
+        this.log(`  ✓ [${agent}] done — ${execution.findings.length} finding(s) in ${duration}s`);
+        tokenUsage = mergeTokenUsage(tokenUsage, execution.tokenUsage);
+        return execution;
+      });
+
+      return { executions, tokenUsage };
+    } finally {
+      stopHeartbeat();
+    }
+  }
+
+  /**
+   * Returns a stop function for a heartbeat that lists which subagents are
+   * still running. Only used when streaming output is not active.
+   */
+  private subagentHeartbeat(
+    dispatched: readonly AgentRoleId[],
+    running: Set<AgentRoleId>,
+    startedAt: Map<AgentRoleId, number>
+  ): () => void {
+    if (this.streamingActive) {
+      return () => {};
+    }
+    const timer = setInterval(() => {
+      const active = dispatched.filter((agent) => running.has(agent));
+      if (active.length === 0) {
+        return;
+      }
+      const now = Date.now();
+      const parts = active.map((agent) => {
+        const elapsed = Math.round((now - (startedAt.get(agent) ?? now)) / 1000);
+        return `${agent} (${elapsed}s)`;
+      });
+      this.log(`  ⏳ still working: ${parts.join(", ")}…`);
+    }, 10000);
+    return () => clearInterval(timer);
+  }
+
+  /**
    * Runs the full multi-agent review pipeline for a stored diff manifest.
    */
   async review(input: MultiAgentReviewInput): Promise<MultiAgentReviewOutput> {
@@ -286,12 +433,8 @@ export class MultiAgentOrchestrator {
     let tokenUsage = classified.tokenUsage;
     this.log(`Dispatching ${dispatched.length} subagent(s): ${dispatched.join(", ")}`);
 
-    const executions = await runWithConcurrency(dispatched, this.maxParallel, async (agent) => {
-      const execution = await this.runAgent(agent, input);
-      tokenUsage = mergeTokenUsage(tokenUsage, execution.tokenUsage);
-      this.log(`  ${agent} agent found ${execution.findings.length} finding(s)`);
-      return execution;
-    });
+    const { executions, tokenUsage: subAgentUsage } = await this.runSubagents(dispatched, input);
+    tokenUsage = mergeTokenUsage(tokenUsage, subAgentUsage);
 
     return this.synthesize(input, executions, tokenUsage);
   }
