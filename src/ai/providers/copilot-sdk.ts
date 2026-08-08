@@ -211,6 +211,10 @@ export class CopilotSdkProvider implements AIProviderClient {
         ) {
           break;
         }
+        // A session timeout or stream failure can leave the SDK connection wedged.
+        // Drop the cached client so the next attempt (or any other caller) spawns
+        // a fresh CLI process instead of retrying against a dead connection.
+        this.destroy();
         this.logger.warn(
           {
             attempt: attempt + 1,
@@ -332,8 +336,8 @@ export class CopilotSdkProvider implements AIProviderClient {
       this.logger.debug("Verifying Copilot authentication status...");
       let authStatus: GetAuthStatusResponse;
       try {
-        await client.start();
-        authStatus = await client.getAuthStatus();
+        await this.withTimeout(client.start(), this.timeoutMs);
+        authStatus = await this.withTimeout(client.getAuthStatus(), this.timeoutMs);
       } catch (error) {
         const originalMessage = (error as Error).message;
         let msg = `Failed to retrieve Copilot authentication status: ${originalMessage}`;
@@ -364,27 +368,30 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     const provider = this.buildByokProviderConfig();
     const postCommentTool = createPostCommentTool(this.findingsCollector, { output: this.output });
-    const session = await client.createSession({
-      model: this.model,
-      workingDirectory: options?.workingDirectory,
-      streaming: true,
-      includeSubAgentStreamingEvents: false,
-      availableTools: [
-        ...READ_ONLY_REVIEW_TOOLS,
-        ...(this.experimentalTools ? ["postComment" as const] : []),
-        ...(this.enableWriteTools ? ["write" as const, "edit" as const] : []),
-        ...(this.enableShellTools ? ["shell" as const] : []),
-      ],
-      tools: this.experimentalTools ? [postCommentTool] : undefined,
-      onPermissionRequest: createReviewPermissionHandler(
-        this.logger,
-        this.enableWriteTools,
-        this.enableShellTools
-      ),
-      contextTier: this.longContext ? "long_context" : undefined,
-      reasoningEffort: this.reasoningEffort,
-      ...(provider ? { provider } : {}),
-    });
+    const session = await this.withTimeout(
+      client.createSession({
+        model: this.model,
+        workingDirectory: options?.workingDirectory,
+        streaming: true,
+        includeSubAgentStreamingEvents: false,
+        availableTools: [
+          ...READ_ONLY_REVIEW_TOOLS,
+          ...(this.experimentalTools ? ["postComment" as const] : []),
+          ...(this.enableWriteTools ? ["write" as const, "edit" as const] : []),
+          ...(this.enableShellTools ? ["shell" as const] : []),
+        ],
+        tools: this.experimentalTools ? [postCommentTool] : undefined,
+        onPermissionRequest: createReviewPermissionHandler(
+          this.logger,
+          this.enableWriteTools,
+          this.enableShellTools
+        ),
+        contextTier: this.longContext ? "long_context" : undefined,
+        reasoningEffort: this.reasoningEffort,
+        ...(provider ? { provider } : {}),
+      }),
+      this.timeoutMs
+    );
 
     let collectedUsage: TokenUsage | undefined;
     const sessionEvents: SessionEvent[] = [];
@@ -559,10 +566,25 @@ export class CopilotSdkProvider implements AIProviderClient {
     } finally {
       unsubscribeAllEvents();
       try {
-        await session.disconnect();
+        await this.withTimeout(session.disconnect(), this.timeoutMs);
       } catch {
         // Best-effort session cleanup
       }
+    }
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new AIProviderError("copilot-sdk", `Operation timed out after ${ms}ms`)),
+        ms
+      );
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
