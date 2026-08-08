@@ -1,5 +1,9 @@
 # Feature Plan: Staged-Changes Review (Pre-Push Mentoring)
 
+> **Status:** Implemented (`merge-mentor stage`). See [docs/stage.md](../docs/stage.md).
+> Remaining roadmap items (offline provider pairing, `--apply`, web UI
+> integration, webhook synergy) are tracked in the [Future Roadmap](#future-roadmap-post-mvp).
+
 ## Overview
 
 **Merge Mentor** reviews pull requests after they are pushed to GitHub or Azure

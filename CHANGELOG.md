@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-Agent Review Strategy (`--strategy multi-agent`)**: PR review can now
+  be decomposed into specialized subagents — Security, Performance, Test
+  Coverage, and Architecture — coordinated by a Lead Synthesizer. Agent
+  selection is driven by `--passes`; an LLM pre-classifier skips irrelevant
+  subagents. Subagents run concurrently, bounded by the config-only
+  `maxParallel` setting, and the synthesizer deduplicates findings, resolves
+  conflicts, and drops findings below the config-only `minConfidence`
+  threshold. Includes schemas, prompt builders, response parsers, engine
+  integration, config/env plumbing, and tests.
+- **Stage Review (`merge-mentor stage`)**: reviews the local working tree
+  against a base ref before pushing. Reviews unstaged + staged changes (or only
+  staged with `--staged`, or an arbitrary ref pair with `--base`/`--head`) using
+  the existing review pipeline. Adds diff/status operations to both git backends
+  (`cli` and `isomorphic`), a `LocalPlatformAdapter` with no-op comment methods,
+  per-branch SHA caching, `--format terminal|markdown|json`, `--output`,
+  `--no-cache`, and `--exit-code` for pre-commit/pre-push hooks. No remote
+  platform or credentials are required. Includes docs and tests.
+
 ## [3.1.1] - 2026-08-04
 
 ### Fixed

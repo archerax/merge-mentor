@@ -77,7 +77,11 @@ import type {
 import { consoleOutputWriter, type FileSystem, nodeFs, type OutputWriter } from "../ports/index.js";
 import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
 import { detectLanguage } from "../utils/languageDetector.js";
-import { generatePRIdentifier, parsePRNumber, sanitizeProjectName } from "../utils/prIdentifier.js";
+import {
+  generatePRIdentifier,
+  parsePRNumberSafe,
+  sanitizeProjectName,
+} from "../utils/prIdentifier.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
 import {
   findTestFileForProduction,
@@ -203,6 +207,8 @@ interface ReviewEngineOptions {
   readonly reasoningEffort?: ReasoningEffort;
   /** Verify pull request changes against linked Product Backlog Items/Issues */
   readonly verifyPbi?: boolean;
+  /** Skip reading/writing the per-file SHA review cache (default: false). */
+  readonly noCache?: boolean;
   /** Minimum confidence threshold for multi-agent strategy findings (default: 0.7). */
   readonly multiAgentMinConfidence?: number;
   /** Maximum concurrent subagents for the multi-agent strategy (default: 4). */
@@ -534,13 +540,106 @@ export class ReviewEngine {
 
     const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
-    const cachedState = await this.stateCache.getState(prIdentifier);
+    const cachedState = this.options.noCache
+      ? undefined
+      : await this.stateCache.getState(prIdentifier);
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
     const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
 
-    // Load custom project configuration if available
-    this.projectConfig = await this.configLoader.loadProjectConfig(repoPath);
+    return this.runReviewPipeline({
+      prIdentifier,
+      prDetails,
+      files,
+      ignoredFiles,
+      existingComments,
+      cachedState,
+      repoPath,
+      postComments: true,
+      saveState: !this.options.noCache,
+    });
+  }
+
+  /**
+   * Reviews the local working tree (or a ref pair) via a `LocalPlatformAdapter`.
+   *
+   * Reuses the same review pipeline as `reviewPR`, but no comments are posted —
+   * findings are only reported to the user — and the cache key is scoped to the
+   * local repository and branch.
+   *
+   * @param prDetails - Pseudo-PR details synthesized from the local git state.
+   * @param files     - Files derived from the local diff.
+   */
+  async reviewLocal(prDetails: PRDetails, files: PRFile[]): Promise<ReviewResult> {
+    const projectId = sanitizeProjectName(this.platform.getProjectIdentifier());
+    const branchId = sanitizeProjectName(prDetails.headBranch);
+    const prIdentifier = `Local-${projectId}-${branchId}`;
+
+    this.logger.info(
+      { prIdentifier, branch: prDetails.headBranch, base: prDetails.baseBranch },
+      "Starting local review"
+    );
+    this.log(`Starting local review of ${prDetails.headBranch} → ${prDetails.baseBranch}...`);
+
+    const ignorePatterns = getIgnorePatterns(this.options.ignorePatterns);
+    const { kept, ignored } = filterPRFiles(files, ignorePatterns);
+
+    if (ignored.length > 0) {
+      this.log(`Ignoring ${ignored.length} file(s):`);
+      ignored.forEach((file) => {
+        this.log(`  - ${file}`);
+      });
+    }
+
+    const existingComments: ExistingComment[] = [];
+    const cachedState = this.options.noCache
+      ? undefined
+      : await this.stateCache.getState(prIdentifier);
+
+    // Use the local checkout directly for CLI agent access (never clones).
+    const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
+
+    return this.runReviewPipeline({
+      prIdentifier,
+      prDetails,
+      files: kept,
+      ignoredFiles: ignored,
+      existingComments,
+      cachedState,
+      repoPath,
+      postComments: false,
+      saveState: !this.options.noCache,
+    });
+  }
+
+  /**
+   * Executes the shared review pipeline: per-file review, cross-file analysis,
+   * optional comment posting, and state caching.
+   */
+  private async runReviewPipeline(params: {
+    readonly prIdentifier: string;
+    readonly prDetails: PRDetails;
+    readonly files: PRFile[];
+    readonly ignoredFiles: readonly string[];
+    readonly existingComments: readonly ExistingComment[];
+    readonly cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>;
+    readonly repoPath?: string;
+    readonly postComments: boolean;
+    readonly saveState: boolean;
+  }): Promise<ReviewResult> {
+    const {
+      prIdentifier,
+      prDetails,
+      files,
+      ignoredFiles,
+      existingComments,
+      cachedState,
+      repoPath,
+      postComments,
+      saveState,
+    } = params;
+
+    this.projectConfig = await this.configLoader.loadProjectConfig(repoPath ?? process.cwd());
 
     const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
     const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
@@ -563,7 +662,7 @@ export class ReviewEngine {
       this.log(
         "\n⚠️  Warning: All changed files are ignored by your patterns. No review will be performed.\n"
       );
-      this.logger.warn({ prNumber }, "All changed files ignored");
+      this.logger.warn({ prIdentifier }, "All changed files ignored");
       return {
         prDetails,
         filesReviewed: 0,
@@ -632,7 +731,7 @@ export class ReviewEngine {
       // Skip cross-file analysis if all files were cached
       if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
         this.log("All files unchanged - using cached cross-file analysis");
-        this.logger.info({ prNumber }, "Reusing cached cross-file analysis");
+        this.logger.info({ prIdentifier }, "Reusing cached cross-file analysis");
         crossFileResult = cachedState.crossFileResult;
       } else {
         crossFileResult = await this.performCrossFileAnalysis(
@@ -648,63 +747,71 @@ export class ReviewEngine {
 
     if (this.options.verifyPbi) {
       crossFileResult = await this.pbiVerifier.verifyPRAlignment(
-        prNumber,
+        prDetails.number,
         files,
         crossFileResult,
         onTokenUsage
       );
     }
 
-    const filePatches = new Map<string, string>(
-      files
-        .map((f): [string, string] => [f.filename, f.patch ?? ""])
-        .filter(([_, p]) => p.length > 0)
-    );
+    let commentsCreated = 0;
+    let commentErrors: string[] = [];
+    if (postComments) {
+      const filePatches = new Map<string, string>(
+        files
+          .map((f): [string, string] => [f.filename, f.patch ?? ""])
+          .filter(([_, p]) => p.length > 0)
+      );
 
-    const actions = this.commentManager.determineActions(
-      existingComments,
-      fileResults,
-      crossFileResult,
-      filePatches
-    );
+      const actions = this.commentManager.determineActions(
+        existingComments,
+        fileResults,
+        crossFileResult,
+        filePatches
+      );
 
-    const commentStats = await this.executeCommentActions(prNumber, actions);
+      const commentStats = await this.executeCommentActions(prDetails.number, actions);
+      commentsCreated = commentStats.commentsCreated;
+      commentErrors = commentStats.commentErrors;
+    }
 
     // Save state for future re-reviews
-    const fileShaMap = this.buildFileShaMap(files);
-    await this.stateCache.saveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
+    if (saveState) {
+      const fileShaMap = this.buildFileShaMap(files);
+      await this.stateCache.saveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
+    }
 
-    if (commentStats.commentErrors.length > 0) {
+    if (commentErrors.length > 0) {
       this.logger.warn(
         {
-          errorCount: commentStats.commentErrors.length,
-          errors: commentStats.commentErrors,
+          errorCount: commentErrors.length,
+          errors: commentErrors,
         },
         "Some comments failed to post"
       );
-      this.log(`\n⚠️  ${commentStats.commentErrors.length} comment(s) failed to post`);
+      this.log(`\n⚠️  ${commentErrors.length} comment(s) failed to post`);
     }
 
     this.logger.info(
       {
-        prNumber,
+        prIdentifier,
         filesReviewed: (filesAnalyzed ?? fileResults.length) - filesSkipped,
         filesSkipped,
         totalFindings: fileResults.reduce((sum, r) => sum + r.findings.length, 0),
-        commentsCreated: commentStats.commentsCreated,
-        commentErrors: commentStats.commentErrors.length,
+        commentsCreated,
+        commentErrors: commentErrors.length,
         tokenUsage,
       },
       "PR review completed"
     );
 
     this.auditLogger.logReviewComplete(
-      prNumber,
+      prDetails.number,
       this.platformName,
       (filesAnalyzed ?? fileResults.length) - filesSkipped,
       filesSkipped,
-      commentStats.commentsCreated,
-      commentStats.commentErrors.length
+      commentsCreated,
+      commentErrors.length
     );
 
     return {
@@ -717,7 +824,8 @@ export class ReviewEngine {
       linesAdded,
       linesDeleted,
       crossFileResult,
-      ...commentStats,
+      commentsCreated,
+      commentErrors,
       tokenUsage,
     };
   }
@@ -949,7 +1057,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       return files.map((f) => ({ filename: f.filename, findings: [] }));
     }
 
-    const prNumber = parsePRNumber(prIdentifier);
+    const prNumber = parsePRNumberSafe(prIdentifier);
     this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
 
     try {
@@ -1177,7 +1285,7 @@ During the database pass, pay extra attention to query correctness, transaction 
   }> {
     this.log("Performing fast review (combined file + architectural analysis)...");
 
-    const prNumber = parsePRNumber(prIdentifier);
+    const prNumber = parsePRNumberSafe(prIdentifier);
     this.auditLogger.logFileReviewStart("fast-review", prNumber);
 
     // Filter unchanged files vs files requiring review
@@ -1292,7 +1400,16 @@ During the database pass, pay extra attention to query correctness, transaction 
         result.fileResults,
         filesToReview
       );
-      const mergedFileResults = [...cachedResults, ...validatedNewResults];
+      const resultMap = new Map(validatedNewResults.map((r) => [r.filename, r]));
+      const completeNewResults: FileReviewResult[] = filesToReview.map((file) => {
+        return (
+          resultMap.get(file.filename) ?? {
+            filename: file.filename,
+            findings: [],
+          }
+        );
+      });
+      const mergedFileResults = [...cachedResults, ...completeNewResults];
       const combinedCrossFile = this.combineCrossFileResults(
         cachedState?.crossFileResult,
         result.crossFileResult
@@ -1360,7 +1477,7 @@ During the database pass, pay extra attention to query correctness, transaction 
   }> {
     this.log("Performing multi-agent review (specialized subagents + lead synthesizer)...");
 
-    const prNumber = parsePRNumber(prIdentifier);
+    const prNumber = parsePRNumberSafe(prIdentifier);
     this.auditLogger.logFileReviewStart("multi-agent", prNumber);
 
     // Filter unchanged files vs files requiring review
@@ -1439,7 +1556,7 @@ During the database pass, pay extra attention to query correctness, transaction 
       const orchestrator = new MultiAgentOrchestrator(this.provider, {
         passes: this.reviewProfile.passes,
         minConfidence: this.options.multiAgentMinConfidence ?? 0.7,
-        maxParallel: this.options.multiAgentMaxParallel ?? 4,
+        maxParallel: this.options.multiAgentMaxParallel ?? 2,
         output: this.output,
       });
 
@@ -1457,7 +1574,16 @@ During the database pass, pay extra attention to query correctness, transaction 
         [...multiAgentOutput.fileResults],
         filesToReview
       );
-      const mergedFileResults = [...cachedResults, ...validatedNewResults];
+      const resultMap = new Map(validatedNewResults.map((r) => [r.filename, r]));
+      const completeNewResults: FileReviewResult[] = filesToReview.map((file) => {
+        return (
+          resultMap.get(file.filename) ?? {
+            filename: file.filename,
+            findings: [],
+          }
+        );
+      });
+      const mergedFileResults = [...cachedResults, ...completeNewResults];
       const combinedCrossFile = this.combineCrossFileResults(
         cachedState?.crossFileResult,
         multiAgentOutput.crossFileResult

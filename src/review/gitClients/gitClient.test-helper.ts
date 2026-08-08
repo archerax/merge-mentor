@@ -9,6 +9,11 @@ export function createStubGitClient(overrides?: Partial<GitClient>): GitClient {
     checkout: vi.fn().mockResolvedValue(undefined),
     clean: vi.fn().mockResolvedValue(undefined),
     setRemoteUrl: vi.fn().mockResolvedValue(undefined),
+    workingTreeDiff: vi.fn().mockResolvedValue([]),
+    stagedDiff: vi.fn().mockResolvedValue([]),
+    diff: vi.fn().mockResolvedValue([]),
+    currentBranch: vi.fn().mockResolvedValue("main"),
+    getRemoteUrl: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

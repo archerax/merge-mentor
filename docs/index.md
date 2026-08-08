@@ -45,6 +45,7 @@ For more detailed setup, see the [Configuration Guide](./configuration.md) and [
 Merge Mentor provides several subcommands to review, fix, and manage your development lifecycle:
 
 - **[review](./review.md)**: Reviews a pull request and identifies potential bugs, security issues, and quality problems.
+- **[stage](./stage.md)**: Reviews the local working tree against a base ref before you push or open a PR.
 - **[fix](./fix.md)**: Interactively fixes active review comments on a PR using an AI provider.
 - **[reply](./reply.md)**: Generates responses to review comments and optionally resolves comment threads.
 - **[describe](./describe.md)**: Generates a title, summary, and changelog for a pull request.

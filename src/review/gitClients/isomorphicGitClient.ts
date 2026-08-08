@@ -20,12 +20,32 @@ import path from "node:path";
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/node";
 import { createChildLogger } from "../../logger.js";
-import type { GitAuth, GitClient, GitCloneOptions } from "../gitClient.js";
+import type { GitAuth, GitClient, GitCloneOptions, GitFileChange } from "../gitClient.js";
+import {
+  buildContentDiffPatch,
+  countPatchStats,
+  hasContentHunks,
+  isBinaryContent,
+  splitGitDiff,
+} from "../localDiff.js";
 
 /** Default timeout for all git network operations (ms). */
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 const logger = createChildLogger({ component: "IsomorphicGitClient" });
+
+/** Kinds of walker used as the "new" side of a local diff. */
+type NewSideKind = "workdir" | "stage" | "tree";
+
+/** A row collected by the tree walk. */
+interface WalkRow {
+  readonly filepath: string;
+  readonly baseOid?: string;
+  readonly newOid?: string;
+  readonly baseType?: string;
+  readonly newType?: string;
+  readonly newKind: NewSideKind;
+}
 
 /**
  * Git client backed by the pure-JS `isomorphic-git` library.
@@ -149,6 +169,143 @@ export class IsomorphicGitClient implements GitClient {
       path: "remote.origin.url",
       value: remoteUrl,
     });
+  }
+
+  async currentBranch(repoPath: string): Promise<string> {
+    const branch = await git.currentBranch({ fs, dir: repoPath });
+    return branch ?? "HEAD";
+  }
+
+  async getRemoteUrl(repoPath: string): Promise<string | undefined> {
+    const url = await git.getConfig({ fs, dir: repoPath, path: "remote.origin.url" });
+    return url?.length ? url : undefined;
+  }
+
+  async workingTreeDiff(repoPath: string, baseRef = "HEAD"): Promise<GitFileChange[]> {
+    return this.walkDiff(repoPath, baseRef, git.WORKDIR(), "workdir");
+  }
+
+  async stagedDiff(repoPath: string, baseRef = "HEAD"): Promise<GitFileChange[]> {
+    return this.walkDiff(repoPath, baseRef, git.STAGE(), "stage");
+  }
+
+  async diff(repoPath: string, baseRef: string, headRef: string): Promise<GitFileChange[]> {
+    return this.walkDiff(repoPath, baseRef, git.TREE({ ref: headRef }), "tree");
+  }
+
+  /**
+   * Compares the base ref's tree against a "new" side (working tree, index, or
+   * another ref) by walking both trees and generating unified diffs for every
+   * changed file.
+   */
+  private async walkDiff(
+    repoPath: string,
+    baseRef: string,
+    newWalker: unknown,
+    newKind: NewSideKind
+  ): Promise<GitFileChange[]> {
+    const rows = (await withTimeout(
+      git.walk({
+        fs,
+        dir: repoPath,
+        trees: [git.TREE({ ref: baseRef }), newWalker as never],
+        map: async (
+          filepath: string,
+          entries: Array<{ type(): Promise<string>; oid(): Promise<string> } | null>
+        ): Promise<WalkRow | undefined> => {
+          if (filepath === ".git" || filepath.startsWith(".git/")) return undefined;
+
+          const [baseEntry, newEntry] = entries;
+          const baseType = baseEntry ? await baseEntry.type() : undefined;
+          const newType = newEntry ? await newEntry.type() : undefined;
+
+          if (baseType !== "blob" && newType !== "blob") return undefined;
+
+          // Skip untracked files that are gitignored (matches `git diff`).
+          if (baseType !== "blob" && newType === "blob") {
+            const ignored = await git.isIgnored({ fs, dir: repoPath, filepath });
+            if (ignored) return undefined;
+          }
+
+          const baseOid = baseType === "blob" && baseEntry ? await baseEntry.oid() : undefined;
+          const newOid = newType === "blob" && newEntry ? await newEntry.oid() : undefined;
+
+          if (baseOid !== undefined && baseOid === newOid) return undefined;
+
+          return { filepath, baseOid, newOid, baseType, newType, newKind };
+        },
+      }),
+      DEFAULT_TIMEOUT_MS
+    )) as WalkRow[];
+
+    const changes: GitFileChange[] = [];
+    for (const row of rows) {
+      const oldContent = row.baseOid ? await this.readBlobText(repoPath, row.baseOid) : "";
+      const newContent = await this.readNewSideContent(repoPath, row);
+      if (newContent === undefined) {
+        // Deleted file (no new side) or unreadable new side.
+        if (row.baseType === "blob" && row.newType !== "blob") {
+          changes.push({
+            path: row.filepath,
+            status: "deleted",
+            additions: 0,
+            deletions: this.countLines(oldContent),
+          });
+        }
+        continue;
+      }
+
+      const newText = newContent.toString("utf-8");
+      if (isBinaryContent(newText) || isBinaryContent(oldContent)) continue;
+
+      const patch = buildContentDiffPatch(row.filepath, oldContent, newText);
+      const [chunk] = splitGitDiff(patch);
+      if (!chunk || !hasContentHunks(chunk)) continue;
+
+      const sha = (await git.hashBlob({ object: newContent })).oid;
+      const { additions, deletions } = countPatchStats(chunk);
+      const status: GitFileChange["status"] = row.baseType !== "blob" ? "added" : "modified";
+
+      changes.push({
+        path: row.filepath,
+        status,
+        additions,
+        deletions,
+        patch,
+        sha,
+      });
+    }
+
+    return changes;
+  }
+
+  /** Reads a blob's UTF-8 text from the object database. */
+  private async readBlobText(repoPath: string, oid: string): Promise<string> {
+    const { blob } = await git.readBlob({ fs, dir: repoPath, oid });
+    return Buffer.from(blob).toString("utf-8");
+  }
+
+  /** Reads the "new" side content for a walk row (index/ref blobs come from the object DB). */
+  private async readNewSideContent(repoPath: string, row: WalkRow): Promise<Buffer | undefined> {
+    if (row.newType !== "blob") return undefined;
+
+    if (row.newKind === "stage" || row.newKind === "tree") {
+      if (!row.newOid) return undefined;
+      const { blob } = await git.readBlob({ fs, dir: repoPath, oid: row.newOid });
+      return Buffer.from(blob);
+    }
+
+    // WORKDIR walker reads the file from the filesystem.
+    try {
+      return await fs.promises.readFile(path.join(repoPath, row.filepath));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private countLines(content: string): number {
+    if (content.length === 0) return 0;
+    return content.split("\n").filter((line) => line.length > 0).length;
   }
 }
 

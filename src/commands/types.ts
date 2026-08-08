@@ -137,6 +137,43 @@ export interface EvalCommandOptions {
   outputFile?: string;
 }
 
+export interface StageOptions {
+  dir?: string;
+  base?: string;
+  head?: string;
+  staged?: boolean;
+  reviewType?: string;
+  passes?: string;
+  strategy?: string;
+  provider?: string;
+  ignore?: string[];
+  exitCode?: boolean;
+  format?: "terminal" | "markdown" | "json";
+  output?: string;
+  noCache?: boolean;
+  tempPath?: string;
+  gitBackend?: string;
+  localWorkspacePath?: string;
+  streamingEnabled?: boolean;
+  streamLines?: number;
+  /** Commander negation default for `--no-stream` (false when passed). */
+  stream?: boolean;
+  /** Commander negation default for `--no-cache` (false when passed). */
+  cache?: boolean;
+  githubToken?: string;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  azureToken?: string;
+  azureOrg?: string;
+  azureProject?: string;
+  azureRepo?: string;
+  copilotToken?: string;
+  aiTimeout?: number;
+  aiModel?: string;
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+}
+
 export interface BuildAnalyzeOptions {
   platform?: string;
   runId?: string;

@@ -97,6 +97,16 @@ export function parsePRNumber(prIdentifier: string): number {
   return Number.parseInt(match[1], 10);
 }
 
+/**
+ * Parses the PR number from a platform-format PR identifier without throwing.
+ * Returns `0` when the identifier is not a PR identifier (e.g. a local-stage
+ * identifier such as `Local-repo-branch`).
+ */
+export function parsePRNumberSafe(prIdentifier: string): number {
+  const match = prIdentifier.match(/-PR(\d+)$/);
+  return match ? Number.parseInt(match[1], 10) : 0;
+}
+
 export function sanitizeProjectName(project: string): string {
   return project
     .replace(/[/\\:*?"<>|]/g, "_") // Replace invalid filename characters
