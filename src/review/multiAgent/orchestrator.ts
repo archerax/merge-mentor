@@ -120,7 +120,7 @@ export class MultiAgentOrchestrator {
     this.provider = provider;
     this.passes = options?.passes;
     this.minConfidence = options?.minConfidence ?? 0.7;
-    this.maxParallel = options?.maxParallel ?? 4;
+    this.maxParallel = options?.maxParallel ?? 2;
     this.output = options?.output;
   }
 

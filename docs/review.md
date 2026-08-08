@@ -146,7 +146,7 @@ With `--strategy multi-agent` and no explicit `--passes`, all four agents run wi
 
 - **Selective dispatch:** A lightweight LLM pre-classification pass selects which subagents are relevant for the PR's diff before any agent is dispatched (e.g. the Security agent is skipped on CSS/Markdown-only diffs).
 - **Confidence threshold:** The Lead Synthesizer discards findings below the config-only `minConfidence` (default `0.7`, mapping high = 1.0, medium = 0.6, low = 0.3). Configure via `MM_MULTI_AGENT_MIN_CONFIDENCE`.
-- **Concurrency:** Subagents run in parallel, bounded by the config-only `maxParallel` (default `4`). Configure via `MM_MULTI_AGENT_MAX_PARALLEL`.
+- **Concurrency:** Subagents run in parallel, bounded by the config-only `maxParallel` (default `2`). Configure via `MM_MULTI_AGENT_MAX_PARALLEL`.
 
 ### Available Passes
 

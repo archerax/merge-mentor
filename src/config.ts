@@ -118,7 +118,7 @@ const ConfigParserSchema = z.object({
       const parsed = typeof val === "string" ? Number.parseInt(val, 10) : val;
       return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
     },
-    z.custom<number>((val) => typeof val === "number").catch(4)
+    z.custom<number>((val) => typeof val === "number").catch(2)
   ),
   streamingEnabled: z.preprocess(
     (val) => val !== "false" && val !== false,
