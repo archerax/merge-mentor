@@ -124,7 +124,7 @@ merge-mentor review --pr 123 --strategy multi-agent --passes security,performanc
 
 - **`fast` (default)**: Minimizes token/credit usage and gets faster results.
 - **`deep`**: Highest issue detection rate. Uses multiple API calls. Under GitHub Copilot's usage-based billing, `deep` consumes roughly **2x the AI credits/tokens** compared to `fast`.
-- **`multi-agent`**: Deconstructs PR analysis into independent domain-specialized subagents (Security & Trust, Performance & Scalability, Test Coverage & Quality, Architecture & Style) that run concurrently, coordinated by a **Lead Synthesizer** that deduplicates overlapping findings, resolves conflicting recommendations, and discards low-confidence noise.
+- **`multi-agent`**: Deconstructs PR analysis into independent domain-specialized subagents (General Logic & Correctness, Security & Trust, Performance & Scalability, Test Coverage & Quality, Architecture & Style) that run concurrently, coordinated by a **Lead Synthesizer** that deduplicates overlapping findings, resolves conflicting recommendations, and discards low-confidence noise.
 
 ### Multi-Agent Strategy Details
 
@@ -132,19 +132,19 @@ The `multi-agent` strategy is a separate execution mode that reuses the existing
 
 - **Agent selection** is driven entirely by `--passes`. Each `ReviewPass` resolves to exactly one subagent; multiple passes can target the same agent.
 
-| ReviewPass    | Subagent                           |
-| ------------- | ---------------------------------- |
-| `security`    | 🔒 Security & Trust Agent          |
-| `performance` | ⚡ Performance & Scalability Agent |
-| `database`    | ⚡ Performance & Scalability Agent |
-| `testing`     | 🧪 Test Coverage & Quality Agent   |
-| `logic`       | 🏗️ Architecture & Style Agent      |
-| `monorepo`    | 🏗️ Architecture & Style Agent      |
-| `scan`        | 🏗️ Architecture & Style Agent      |
+| ReviewPass    | Subagent                             |
+| ------------- | ------------------------------------ |
+| `logic`       | 🧠 General Logic & Correctness Agent |
+| `scan`        | 🧠 General Logic & Correctness Agent |
+| `security`    | 🔒 Security & Trust Agent            |
+| `performance` | ⚡ Performance & Scalability Agent   |
+| `database`    | ⚡ Performance & Scalability Agent   |
+| `testing`     | 🧪 Test Coverage & Quality Agent     |
+| `monorepo`    | 🏗️ Architecture & Style Agent        |
 
-With `--strategy multi-agent` and no explicit `--passes`, all four agents run with their default lenses. Supplying e.g. `--passes security,performance,testing` limits execution to the Security, Performance, and Test Coverage agents.
+With `--strategy multi-agent` and no explicit `--passes`, all five agents run with their default lenses. Supplying e.g. `--passes security,performance,testing` limits execution to the Security, Performance, and Test Coverage agents.
 
-- **Selective dispatch:** A lightweight LLM pre-classification pass selects which subagents are relevant for the PR's diff before any agent is dispatched (e.g. the Security agent is skipped on CSS/Markdown-only diffs).
+- **Selective dispatch:** A lightweight LLM pre-classification pass selects which _specialized_ subagents are relevant for the PR's diff before they are dispatched (e.g. the Security agent is skipped on CSS/Markdown-only diffs). The 🧠 **General Logic & Correctness Agent is exempt** — it always runs on every PR as the correctness baseline, so a classifier mistake can never drop logic-bug coverage.
 - **Confidence threshold:** The Lead Synthesizer discards findings below the config-only `minConfidence` (default `0.7`, mapping high = 1.0, medium = 0.6, low = 0.3). Configure via `MM_MULTI_AGENT_MIN_CONFIDENCE`.
 - **Concurrency:** Subagents run in parallel, bounded by the config-only `maxParallel` (default `2`). Configure via `MM_MULTI_AGENT_MAX_PARALLEL`.
 

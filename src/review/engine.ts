@@ -213,7 +213,7 @@ interface ReviewEngineOptions {
   readonly reReview?: boolean;
   /** Minimum confidence threshold for multi-agent strategy findings (default: 0.7). */
   readonly multiAgentMinConfidence?: number;
-  /** Maximum concurrent subagents for the multi-agent strategy (default: 4). */
+  /** Maximum concurrent subagents for the multi-agent strategy (default: 2). */
   readonly multiAgentMaxParallel?: number;
 }
 

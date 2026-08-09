@@ -1,10 +1,10 @@
 import type { ReviewPass } from "../reviewSelection.js";
 
 /**
- * The four hardcoded specialized subagent roles used by the multi-agent
+ * The five hardcoded specialized subagent roles used by the multi-agent
  * strategy. Custom domain agents are post-MVP.
  */
-const AGENT_ROLE_IDS = ["security", "performance", "testing", "architecture"] as const;
+const AGENT_ROLE_IDS = ["general", "security", "performance", "testing", "architecture"] as const;
 
 export type AgentRoleId = (typeof AGENT_ROLE_IDS)[number];
 
@@ -22,6 +22,12 @@ export interface AgentRole {
  * same agent and that agent's prompt covers each configured lens.
  */
 export const AGENT_ROLES: readonly AgentRole[] = [
+  {
+    id: "general",
+    label: "General Logic & Correctness Agent",
+    emoji: "🧠",
+    passes: ["logic", "scan"],
+  },
   {
     id: "security",
     label: "Security & Trust Agent",
@@ -44,7 +50,7 @@ export const AGENT_ROLES: readonly AgentRole[] = [
     id: "architecture",
     label: "Architecture & Style Agent",
     emoji: "🏗️",
-    passes: ["logic", "monorepo", "scan"],
+    passes: ["monorepo"],
   },
 ];
 

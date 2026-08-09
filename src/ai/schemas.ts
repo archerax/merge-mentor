@@ -94,7 +94,13 @@ export const PBIAlignmentResponseSchema = z.object({
 // Multi-agent review schemas
 
 /** Agent ids selectable by the pre-classifier and agent registry. */
-const MultiAgentIdSchema = z.enum(["security", "performance", "testing", "architecture"]);
+const MultiAgentIdSchema = z.enum([
+  "general",
+  "security",
+  "performance",
+  "testing",
+  "architecture",
+]);
 
 /** Category union shared by multi-agent file findings and synthesized findings. */
 const MultiAgentFindingCategorySchema = z

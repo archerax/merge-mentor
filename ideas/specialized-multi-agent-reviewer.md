@@ -47,7 +47,10 @@ Resolved via spec workshop; these lock the MVP shape:
 4. **Output surfaces:** All supported **in parallel from day one** — console
    markdown preview, JSON output, and remote PR comments.
 5. **Selective dispatch:** An **LLM pre-classification pass** selects which
-   subagents run per PR (cheap classifier prompt before agent dispatch).
+   specialized subagents run per PR (cheap classifier prompt before agent
+   dispatch). The **General Logic & Correctness agent always runs** as the
+   correctness baseline and is exempt from pre-classification, so a classifier
+   mistake cannot silently drop logic-bug coverage.
 6. **Deduplication:** **Synthesizer-level LLM dedup**; the existing fingerprint
    mechanism is not extended for agent overlap.
 7. **Model routing:** **Same model everywhere** in MVP; per-role routing is
@@ -95,15 +98,17 @@ reimplemented:
 
 #### 2. Specialized Subagent Roles
 
-The review engine delegates diff analysis to four primary specialized subagents:
+The review engine delegates diff analysis to five primary specialized subagents:
 
-1. **🔒 Security & Trust Agent:**
+1. **🧠 General Logic & Correctness Agent:**
+   - Hunts logic bugs, edge cases and boundary conditions, error-handling gaps, state transitions, and contract violations across the diff.
+2. **🔒 Security & Trust Agent:**
    - Evaluates input sanitization, OWASP Top 10 vulnerabilities, authentication and authorization boundaries, secret leaks, and insecure dependency usages.
-2. **⚡ Performance & Scalability Agent:**
+3. **⚡ Performance & Scalability Agent:**
    - Evaluates algorithmic complexity ($O(N)$ vs $O(N^2)$ loops), N+1 database query patterns, memory leak risks, unindexed database queries, and async/concurrency locks.
-3. **🧪 Test Coverage & Quality Agent:**
+4. **🧪 Test Coverage & Quality Agent:**
    - Verifies whether new or modified logic is accompanied by unit/integration tests, identifies unhandled edge cases and boundary conditions, and flags brittle mock usage.
-4. **🏗️ Architecture & Style Agent:**
+5. **🏗️ Architecture & Style Agent:**
    - Inspects breaking API contract changes, project structure guidelines, design pattern consistency, naming conventions, and linting compliance.
 
 #### Pass-to-Agent Mapping
@@ -112,17 +117,17 @@ Agent selection is driven entirely by the existing `--passes` parameter. Each
 configured `ReviewPass` resolves to exactly one subagent; multiple passes can
 target the same agent, and that agent's prompt covers each configured lens:
 
-| ReviewPass    | Subagent                           |
-| ------------- | ---------------------------------- |
-| `security`    | 🔒 Security & Trust Agent          |
-| `performance` | ⚡ Performance & Scalability Agent |
-| `database`    | ⚡ Performance & Scalability Agent |
-| `testing`     | 🧪 Test Coverage & Quality Agent   |
-| `logic`       | 🏗️ Architecture & Style Agent      |
-| `monorepo`    | 🏗️ Architecture & Style Agent      |
-| `scan`        | 🏗️ Architecture & Style Agent      |
+| ReviewPass    | Subagent                             |
+| ------------- | ------------------------------------ |
+| `logic`       | 🧠 General Logic & Correctness Agent |
+| `scan`        | 🧠 General Logic & Correctness Agent |
+| `security`    | 🔒 Security & Trust Agent            |
+| `performance` | ⚡ Performance & Scalability Agent   |
+| `database`    | ⚡ Performance & Scalability Agent   |
+| `testing`     | 🧪 Test Coverage & Quality Agent     |
+| `monorepo`    | 🏗️ Architecture & Style Agent        |
 
-With `--strategy multi-agent` and no explicit `--passes`, all four agents run
+With `--strategy multi-agent` and no explicit `--passes`, all five agents run
 with the default lenses above. Supplying e.g.
 `--passes security,performance,testing` limits execution to the Security,
 Performance, and Test Coverage agents.
@@ -185,8 +190,9 @@ there is no separate agent list.
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Multi-Agent Orchestrator                     │
 │  - Resolves --passes into enabled subagents (pass-to-agent map) │
-│  - Runs LLM pre-classifier to select relevant subagents        │
-│  - Parses PR diff & filters files per subagent interest        │
+│  - Always dispatches the General Logic & Correctness baseline   │
+│  - Runs LLM pre-classifier to select relevant specialists       │
+│  - Parses PR diff & filters files per subagent interest         │
 │  - Dispatches parallel requests to enabled subagents           │
 └────┬──────────────────┬──────────────────┬──────────────────┬───┘
      │                  │                  │                  │

@@ -37,7 +37,7 @@ export interface MultiAgentOrchestratorOptions {
   readonly passes?: readonly ReviewPass[];
   /** Discard findings whose confidence score is below this threshold. Default: 0.7 */
   readonly minConfidence?: number;
-  /** Maximum number of subagents dispatched concurrently. Default: 4 */
+  /** Maximum number of subagents dispatched concurrently. Default: 2 */
   readonly maxParallel?: number;
   /** Output writer for progress/status messages. */
   readonly output?: OutputWriter;
@@ -221,18 +221,22 @@ export class MultiAgentOrchestrator {
   }
 
   /**
-   * Runs the lightweight LLM pre-classifier to select relevant subagents.
-   * Falls back to all enabled subagents on any failure or empty selection.
+   * Runs the lightweight LLM pre-classifier to select relevant specialized
+   * subagents. The `enabledAgents` passed here are the specialists only — the
+   * always-run general baseline is excluded. Falls back to all enabled
+   * specialists on any failure or empty selection.
    */
   private async classify(
     enabledAgents: readonly AgentRoleId[],
-    input: MultiAgentReviewInput
+    input: MultiAgentReviewInput,
+    generalEnabled: boolean
   ): Promise<{ agents: readonly AgentRoleId[]; tokenUsage?: TokenUsage }> {
     this.log("Running LLM pre-classifier to select relevant subagents...");
     const prompt = buildPreClassifierPrompt({
       prDetails: input.prDetails,
       files: input.manifest.files,
       enabledAgents,
+      generalAlwaysRuns: generalEnabled,
     });
 
     let selected: string[];
@@ -421,16 +425,31 @@ export class MultiAgentOrchestrator {
 
   /**
    * Runs the full multi-agent review pipeline for a stored diff manifest.
+   *
+   * The General Logic & Correctness agent is the always-run baseline: it is
+   * exempt from pre-classification and dispatches whenever enabled. Only the
+   * specialized agents are subject to the LLM pre-classifier.
    */
   async review(input: MultiAgentReviewInput): Promise<MultiAgentReviewOutput> {
     const enabledAgents = this.enabledAgents();
+    const generalEnabled = enabledAgents.includes("general");
+    const specialists = enabledAgents.filter((agent) => agent !== "general");
     this.log(
       `Multi-agent review enabled for ${enabledAgents.length} subagent role(s): ${enabledAgents.join(", ")}`
     );
 
-    const classified = await this.classify(enabledAgents, input);
-    const dispatched = classified.agents;
-    let tokenUsage = classified.tokenUsage;
+    let dispatched: readonly AgentRoleId[];
+    let tokenUsage: TokenUsage | undefined;
+
+    if (specialists.length === 0) {
+      // Only the general baseline is enabled; the pre-classifier has nothing to route.
+      dispatched = enabledAgents;
+    } else {
+      const classified = await this.classify(specialists, input, generalEnabled);
+      dispatched = generalEnabled ? ["general", ...classified.agents] : classified.agents;
+      tokenUsage = classified.tokenUsage;
+    }
+
     this.log(`Dispatching ${dispatched.length} subagent(s): ${dispatched.join(", ")}`);
 
     const { executions, tokenUsage: subAgentUsage } = await this.runSubagents(dispatched, input);

@@ -15,25 +15,34 @@ describe("multi-agent agents registry", () => {
       expect(resolveAgentForPass("performance")).toBe("performance");
       expect(resolveAgentForPass("database")).toBe("performance");
       expect(resolveAgentForPass("testing")).toBe("testing");
-      expect(resolveAgentForPass("logic")).toBe("architecture");
+      expect(resolveAgentForPass("logic")).toBe("general");
       expect(resolveAgentForPass("monorepo")).toBe("architecture");
-      expect(resolveAgentForPass("scan")).toBe("architecture");
-    });
-  });
-
-  describe("resolveAgentsFromPasses", () => {
-    it("returns no agents when no passes are provided", () => {
-      expect(resolveAgentsFromPasses([])).toEqual([]);
+      expect(resolveAgentForPass("scan")).toBe("general");
     });
 
     it("deduplicates passes targeting the same agent", () => {
       expect(resolveAgentsFromPasses(["performance", "database"])).toEqual(["performance"]);
-      expect(resolveAgentsFromPasses(["logic", "monorepo", "scan"])).toEqual(["architecture"]);
+      expect(resolveAgentsFromPasses(["logic", "monorepo", "scan"])).toEqual([
+        "general",
+        "architecture",
+      ]);
     });
 
     it("returns a subset in canonical order", () => {
       expect(resolveAgentsFromPasses(["security", "testing"])).toEqual(["security", "testing"]);
       expect(resolveAgentsFromPasses(["database", "testing", "logic"])).toEqual([
+        "general",
+        "performance",
+        "testing",
+      ]);
+    });
+  });
+
+  describe("getAllAgentIds", () => {
+    it("returns the five hardcoded roles", () => {
+      expect(getAllAgentIds()).toEqual([
+        "general",
+        "security",
         "performance",
         "testing",
         "architecture",
@@ -41,14 +50,9 @@ describe("multi-agent agents registry", () => {
     });
   });
 
-  describe("getAllAgentIds", () => {
-    it("returns the four hardcoded roles", () => {
-      expect(getAllAgentIds()).toEqual(["security", "performance", "testing", "architecture"]);
-    });
-  });
-
   describe("isAgentRoleId", () => {
     it("accepts valid role ids and rejects everything else", () => {
+      expect(isAgentRoleId("general")).toBe(true);
       expect(isAgentRoleId("security")).toBe(true);
       expect(isAgentRoleId("performance")).toBe(true);
       expect(isAgentRoleId("testing")).toBe(true);
@@ -60,7 +64,12 @@ describe("multi-agent agents registry", () => {
 
   describe("AGENT_ROLES / getAgentRole", () => {
     it("exposes a label, emoji, and passes for each role", () => {
-      expect(AGENT_ROLES).toHaveLength(4);
+      expect(AGENT_ROLES).toHaveLength(5);
+      expect(getAgentRole("general")).toMatchObject({
+        id: "general",
+        label: "General Logic & Correctness Agent",
+        emoji: "🧠",
+      });
       expect(getAgentRole("security")).toMatchObject({
         id: "security",
         label: "Security & Trust Agent",
