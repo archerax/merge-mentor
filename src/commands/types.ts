@@ -46,6 +46,8 @@ export interface ReviewOptions {
   longContext?: boolean;
   reasoning?: string;
   verifyPbi?: boolean;
+  /** Re-review all files, ignoring cached results. Fresh cache is still written afterward. */
+  reReview?: boolean;
 }
 
 export interface ReviewExecutionResult {
@@ -160,6 +162,8 @@ export interface StageOptions {
   stream?: boolean;
   /** Commander negation default for `--no-cache` (false when passed). */
   cache?: boolean;
+  /** Re-review all files, ignoring cached results. Fresh cache is still written afterward. */
+  reReview?: boolean;
   githubToken?: string;
   githubRepoOwner?: string;
   githubRepoName?: string;

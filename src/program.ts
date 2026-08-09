@@ -136,6 +136,10 @@ program
     "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
   )
   .option(
+    "--re-review",
+    "Re-review all files, ignoring cached results. Fresh cache is still written afterward."
+  )
+  .option(
     "--git-backend <backend>",
     "Git backend for cloning/fetching (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
@@ -345,6 +349,10 @@ program
     false
   )
   .option("--no-cache", "Skip reading/writing the per-file SHA cache")
+  .option(
+    "--re-review",
+    "Re-review all files, ignoring cached results. Fresh cache is still written afterward."
+  )
   .option("--no-stream", "Disable streaming output display")
   .option(
     "--stream-lines <number>",

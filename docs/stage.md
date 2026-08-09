@@ -76,13 +76,14 @@ merge-mentor stage --format json --output ./stage-review.json
 
 ### Output Options
 
-| Option              | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `--format <format>` | Output format (`terminal`, `markdown`, or `json`)          |
-| `--output <path>`   | Write the report to a file instead of stdout               |
-| `--exit-code`       | Exit `1` when critical/high findings exist (for git hooks) |
-| `--no-cache`        | Skip reading/writing the per-file SHA cache                |
-| `--no-stream`       | Disable streaming output display                           |
+| Option              | Description                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `--format <format>` | Output format (`terminal`, `markdown`, or `json`)                                    |
+| `--output <path>`   | Write the report to a file instead of stdout                                         |
+| `--exit-code`       | Exit `1` when critical/high findings exist (for git hooks)                           |
+| `--no-cache`        | Skip reading/writing the per-file SHA cache                                          |
+| `--re-review`       | Re-review all files, ignoring cached results. Fresh cache is still written afterward |
+| `--no-stream`       | Disable streaming output display                                                     |
 
 ### AI Provider Configuration
 

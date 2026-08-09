@@ -916,6 +916,38 @@ describe("ReviewEngine", () => {
       consoleSpy.mockRestore();
     });
 
+    it("re-reviews all files when reReview is set but still writes fresh cache", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: true,
+        reReview: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Assessment",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // reReview skips reading cached state entirely...
+      expect(mockCacheGetState).not.toHaveBeenCalled();
+      // ...re-runs the AI review...
+      expect(mockExecutePrompt).toHaveBeenCalled();
+      // ...and still writes fresh cache for future runs.
+      expect(mockCacheSaveState).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
     it("performs new cross-file analysis when some files changed", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,

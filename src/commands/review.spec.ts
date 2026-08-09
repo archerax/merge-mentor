@@ -264,6 +264,23 @@ describe("executeReview", () => {
     );
   });
 
+  it("passes reReview to ReviewEngine when reReview option is specified", async () => {
+    const options = createReviewOptions({
+      reReview: true,
+    });
+
+    await executeReview(options);
+
+    expect(ReviewEngine).toHaveBeenCalledWith(
+      expect.any(Object),
+      "[merge-mentor]",
+      "copilot-sdk",
+      expect.objectContaining({
+        reReview: true,
+      })
+    );
+  });
+
   it("executes review with Azure platform", async () => {
     const options = createReviewOptions({
       platform: "azure",

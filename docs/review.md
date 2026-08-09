@@ -252,6 +252,14 @@ In dry-run mode, Merge Mentor saves comprehensive markdown reports to `.mergemen
 
 Only analyzes changed files on re-reviews, saving time and cost. The cache is stored in `.mergementor/cache/`.
 
+Pass `--re-review` to re-review every file, ignoring cached results:
+
+```bash
+merge-mentor review --pr 123 --re-review
+```
+
+A fresh cache is written afterward, so subsequent reviews resume incremental behavior.
+
 ### Review Categories
 
 Findings are classified into:

@@ -184,6 +184,23 @@ describe("executeStage", () => {
     expect(providers).toHaveLength(2);
     expect(providers[1].executePrompt).toHaveBeenCalledTimes(1);
   });
+
+  it("re-reviews all files with --re-review but still writes fresh cache", async () => {
+    repo.write("src/bug.ts", "export function double(x: number) {\n  return x + 1;\n}\n");
+    repo.git("add", "src/bug.ts");
+
+    const baseOptions = { dir: repo.path, tempPath, staged: true, streamingEnabled: false };
+    const reReviewOptions = { ...baseOptions, reReview: true };
+
+    await executeStage(reReviewOptions);
+    expect(providers[0].executePrompt).toHaveBeenCalledTimes(1);
+
+    await executeStage(reReviewOptions);
+    expect(providers[1].executePrompt).toHaveBeenCalledTimes(1);
+
+    await executeStage(baseOptions);
+    expect(providers[2].executePrompt).not.toHaveBeenCalled();
+  });
 });
 
 describe("stage helpers", () => {

@@ -209,6 +209,8 @@ interface ReviewEngineOptions {
   readonly verifyPbi?: boolean;
   /** Skip reading/writing the per-file SHA review cache (default: false). */
   readonly noCache?: boolean;
+  /** Re-review all files, ignoring cached results (default: false). Fresh cache is still written afterward. */
+  readonly reReview?: boolean;
   /** Minimum confidence threshold for multi-agent strategy findings (default: 0.7). */
   readonly multiAgentMinConfidence?: number;
   /** Maximum concurrent subagents for the multi-agent strategy (default: 4). */
@@ -540,9 +542,10 @@ export class ReviewEngine {
 
     const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
     const existingComments = await this.fetchExistingComments(prNumber);
-    const cachedState = this.options.noCache
-      ? undefined
-      : await this.stateCache.getState(prIdentifier);
+    const cachedState =
+      this.options.noCache || this.options.reReview
+        ? undefined
+        : await this.stateCache.getState(prIdentifier);
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
     const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
@@ -592,9 +595,10 @@ export class ReviewEngine {
     }
 
     const existingComments: ExistingComment[] = [];
-    const cachedState = this.options.noCache
-      ? undefined
-      : await this.stateCache.getState(prIdentifier);
+    const cachedState =
+      this.options.noCache || this.options.reReview
+        ? undefined
+        : await this.stateCache.getState(prIdentifier);
 
     // Use the local checkout directly for CLI agent access (never clones).
     const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);

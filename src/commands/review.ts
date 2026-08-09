@@ -136,6 +136,7 @@ export async function executeReview(
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
     verifyPbi: config.verifyPbi,
+    reReview: resolvedOptions.reReview,
     multiAgentMinConfidence: config.multiAgentMinConfidence,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
   });

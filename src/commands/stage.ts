@@ -110,6 +110,7 @@ export async function executeStage(
     multiAgentMinConfidence: config.multiAgentMinConfidence,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
     noCache: options.noCache,
+    reReview: options.reReview,
   });
 
   output.log(`\n🔍 Starting staged review of local working tree...\n`);
