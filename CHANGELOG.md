@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-Agent Review Strategy (`--strategy multi-agent`)**: PR review can now
+  be decomposed into specialized subagents — Security, Performance, Test
+  Coverage, and Architecture — coordinated by a Lead Synthesizer. Agent
+  selection is driven by `--passes`; an LLM pre-classifier skips irrelevant
+  subagents. Subagents run concurrently, bounded by the config-only
+  `maxParallel` setting, and the synthesizer deduplicates findings, resolves
+  conflicts, and drops findings below the config-only `minConfidence`
+  threshold. Includes schemas, prompt builders, response parsers, engine
+  integration, config/env plumbing, and tests.
+- **General Logic & Correctness Subagent**: adds a general-purpose subagent to
+  the multi-agent strategy that catches logic bugs, edge cases, error-handling
+  gaps, and contract violations previously missed by the domain-scoped agents.
+  The `logic` and `scan` passes now dispatch to it (previously routed to
+  Architecture & Style), giving the strategy five subagent roles. It **always
+  runs** on every PR as the correctness baseline — it is exempt from the LLM
+  pre-classifier, which now routes only the specialized agents, so a classifier
+  mistake can never silently drop logic-bug coverage.
+- **Stage Review (`merge-mentor stage`)**: reviews the local working tree
+  against a base ref before pushing. Reviews unstaged + staged changes (or only
+  staged with `--staged`, or an arbitrary ref pair with `--base`/`--head`) using
+  the existing review pipeline. Adds diff/status operations to both git backends
+  (`cli` and `isomorphic`), a `LocalPlatformAdapter` with no-op comment methods,
+  per-branch SHA caching, `--format terminal|markdown|json`, `--output`,
+  `--no-cache`, and `--exit-code` for pre-commit/pre-push hooks. No remote
+  platform or credentials are required. Includes docs and tests.
+
 ## [3.1.1] - 2026-08-04
 
 ### Fixed

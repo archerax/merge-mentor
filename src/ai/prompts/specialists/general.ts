@@ -144,6 +144,14 @@ const CROSS_FILE_PASS_DETAILS: Record<ReviewPass, string> = {
     "Schema/query consistency, transaction coverage, migration impact, and data-integrity risks across files",
 };
 
+/**
+ * Builds the file-review "Additional Focused Passes" section listing each
+ * selected pass with its analysis lines. Returns an empty string when no
+ * passes are selected.
+ *
+ * @param selectedPasses - Optional ordered list of review passes to render.
+ * @returns Markdown section describing the additional file passes, or "" when none are selected.
+ */
 function buildAdditionalFilePassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
@@ -161,6 +169,14 @@ ${selectedPasses
 After running the additional passes above, merge the strongest findings into one final result set.`;
 }
 
+/**
+ * Builds the file-review "Additional Pass Approach" section describing each
+ * selected pass's analytical lens. Returns an empty string when no passes are
+ * selected.
+ *
+ * @param selectedPasses - Optional ordered list of review passes to render.
+ * @returns Markdown section describing the additional pass approaches, or "" when none are selected.
+ */
 function buildAdditionalReviewApproach(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
@@ -174,6 +190,14 @@ ${selectedPasses
 `;
 }
 
+/**
+ * Builds the file-review "Additional Pass Focus" section listing the
+ * deduplicated report items of the selected passes. Returns an empty string
+ * when no passes are selected.
+ *
+ * @param selectedPasses - Optional ordered list of review passes to render.
+ * @returns Markdown section of additional report focuses, or "" when none are selected.
+ */
 function buildAdditionalReportFocus(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
@@ -195,6 +219,14 @@ ${Array.from(items)
 `;
 }
 
+/**
+ * Builds the cross-file "Additional Pass Checklist" section mapping each
+ * selected pass to its cross-file focus description. Returns an empty string
+ * when no passes are selected.
+ *
+ * @param selectedPasses - Optional ordered list of review passes to render.
+ * @returns Markdown checklist of additional cross-file passes, or "" when none are selected.
+ */
 function buildAdditionalCrossFileChecklist(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
@@ -206,6 +238,13 @@ ${selectedPasses.map((pass) => `- **${pass}**: ${CROSS_FILE_PASS_DETAILS[pass]}`
 `;
 }
 
+/**
+ * Joins extra context sections into a single newline-separated markdown block.
+ * Returns an empty string when no additional sections are provided.
+ *
+ * @param additionalContextSections - Optional extra markdown sections to append.
+ * @returns The additional sections joined together, or "" when none are provided.
+ */
 function buildAdditionalContextSections(additionalContextSections?: readonly string[]): string {
   if (!additionalContextSections || additionalContextSections.length === 0) {
     return "";
@@ -214,6 +253,16 @@ function buildAdditionalContextSections(additionalContextSections?: readonly str
   return `\n${additionalContextSections.join("\n\n")}\n`;
 }
 
+/**
+ * Builds an existing-comments section wrapping the provided untrusted comment
+ * context with a heading and a focus instruction. Returns an empty string when
+ * no existing comments are provided.
+ *
+ * @param heading - Markdown heading for the section.
+ * @param existingCommentsContext - Optional markdown of already-posted PR comments.
+ * @param focusInstruction - Instruction telling the model how to treat the existing comments.
+ * @returns The existing-comments markdown section, or "" when no context is provided.
+ */
 function buildExistingCommentsSection(
   heading: string,
   existingCommentsContext: string | undefined,
@@ -231,10 +280,25 @@ IMPORTANT: ${focusInstruction}
 `;
 }
 
+/** Context for the general (baseline) cross-file review. */
 export interface GeneralCrossFileContext extends BaseCrossFileContext {
+  /** Markdown of already-posted PR comments to avoid re-reporting. */
   readonly existingCommentsContext?: string;
 }
 
+/**
+ * Builds the general (baseline) per-file review prompt with optional additive
+ * passes, existing-comments context, and the batched file results output
+ * format. Instructs the model to review every file in the manifest and return
+ * an entry for each, even with empty findings.
+ *
+ * @param manifest - Diff manifest listing the files to review.
+ * @param existingCommentsContext - Optional markdown of already-posted PR comments to avoid duplicating.
+ * @param repoPath - Optional repository root used for workspace access sections.
+ * @param selectedPasses - Optional ordered list of additive review passes.
+ * @param additionalContextSections - Optional extra markdown sections to append.
+ * @returns The complete general file review prompt.
+ */
 export function buildGeneralFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
@@ -353,6 +417,19 @@ ${buildBatchedFileResultsOutputFormat({
 `;
 }
 
+/**
+ * Builds the general (baseline) cross-file review prompt performing holistic
+ * architectural analysis across the changed files. Includes per-file finding
+ * summaries, optional additive passes, workspace access instructions, and the
+ * cross-file output format.
+ *
+ * @param prDetails - PR metadata used for the PR context section.
+ * @param context - Cross-file context with file summaries and per-file review results.
+ * @param repoPath - Optional repository root used for workspace access sections.
+ * @param selectedPasses - Optional ordered list of additive review passes.
+ * @param additionalContextSections - Optional extra markdown sections to append.
+ * @returns The complete general cross-file review prompt.
+ */
 export function buildGeneralCrossFilePrompt(
   prDetails: PRDetails,
   context: GeneralCrossFileContext,

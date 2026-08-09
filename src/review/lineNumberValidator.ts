@@ -2,6 +2,14 @@ import { createChildLogger } from "../logger.js";
 import type { FileReviewResult, PRFile } from "../platforms/types.js";
 import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
 
+/**
+ * Adjusts AI-reported finding line numbers to match actual diff lines.
+ *
+ * Builds a set of valid diff line numbers per file and remaps findings that
+ * point at non-diff lines to the nearest valid line. Findings that cannot be
+ * mapped to any valid line are filtered out, and files whose findings are all
+ * dropped are excluded from the result.
+ */
 export class LineNumberValidator {
   private readonly logger = createChildLogger({ component: "LineNumberValidator" });
 

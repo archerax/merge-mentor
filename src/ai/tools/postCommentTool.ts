@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { FileFinding } from "../../platforms/types.js";
 import { consoleOutputWriter, type OutputWriter } from "../../ports/index.js";
 
+/** Zod schema validating the arguments accepted by the postComment tool. */
 export const PostCommentArgsSchema = z.object({
   file: z.string().describe("Relative path to file in the repository"),
   line: z.coerce.number().int().positive().describe("Line number in the file (1-indexed)"),
@@ -20,10 +21,14 @@ export const PostCommentArgsSchema = z.object({
     .describe("Internal analysis/justification citing code evidence and concrete impact"),
 });
 
+/** Inferred argument type accepted by the postComment tool. */
 export type PostCommentArgs = z.infer<typeof PostCommentArgsSchema>;
 
+/** A recorded finding with its deduplication id and capture timestamp. */
 export interface PostCommentFinding extends PostCommentArgs {
+  /** Stable identifier derived from the finding's file, line, and category. */
   findingId: string;
+  /** Unix timestamp (ms) when the finding was recorded. */
   timestamp: number;
 }
 
@@ -35,25 +40,35 @@ export class FindingsCollector {
   private findings: PostCommentFinding[] = [];
   private findingsById: Map<string, PostCommentFinding> = new Map();
 
+  /** Records a finding and indexes it by its id for deduplication. */
   public addFinding(finding: PostCommentFinding): void {
     this.findings.push(finding);
     this.findingsById.set(finding.findingId, finding);
   }
 
+  /** Looks up a previously recorded finding by its id, or undefined if absent. */
   public findExistingFinding(findingId: string): PostCommentFinding | undefined {
     return this.findingsById.get(findingId);
   }
 
+  /** Returns all recorded findings in insertion order. */
   public getAllFindings(): PostCommentFinding[] {
     return this.findings;
   }
 
+  /** Clears all recorded findings and their id index. */
   public reset(): void {
     this.findings = [];
     this.findingsById.clear();
   }
 }
 
+/**
+ * Generates a stable finding id from the file, line, and category.
+ *
+ * @param args - The finding arguments to derive the id from.
+ * @returns A base64-encoded deduplication key.
+ */
 export function generateFindingId(args: PostCommentArgs): string {
   const key = `${args.file}:${args.line}:${args.category}`;
   return Buffer.from(key).toString("base64");
@@ -101,9 +116,13 @@ const postCommentSchema = {
   required: ["file", "line", "body", "severity", "category"],
 };
 
+/** Result of executing the postComment tool for a single finding. */
 export interface ExecutePostCommentResult {
+  /** Message returned to the model describing what happened. */
   message: string;
+  /** Id of the recorded (or already-existing) finding. */
   findingId: string;
+  /** Whether the finding was a duplicate of one already recorded. */
   isDuplicate: boolean;
 }
 
@@ -170,6 +189,13 @@ export function createPostCommentTool(
   });
 }
 
+/**
+ * Groups recorded findings by file, converting each into a FileFinding for the
+ * batched file-results response shape.
+ *
+ * @param findings - Recorded findings to group.
+ * @returns Map of filename to its converted findings array.
+ */
 function groupFindingsByFile(
   findings: PostCommentFinding[]
 ): Record<string, { findings: FileFinding[] }> {
@@ -192,6 +218,13 @@ function groupFindingsByFile(
   return fileResults;
 }
 
+/**
+ * Converts tool-collected findings into a fully-shaped parsed response that
+ * matches the schemas of file, fast, cross-file, and batched review responses.
+ *
+ * @param findings - Findings recorded via the postComment tool.
+ * @returns An object shaped like a parsed review response populated with the findings.
+ */
 export function convertFindingsToParsedResponse(findings: PostCommentFinding[]): unknown {
   return {
     findings: findings.map((f) => ({
@@ -211,6 +244,15 @@ export function convertFindingsToParsedResponse(findings: PostCommentFinding[]):
   };
 }
 
+/**
+ * Merges tool-collected findings into an existing parsed JSON response,
+ * appending them to whichever result shape the response uses (batched, fast,
+ * cross-file, or flat findings).
+ *
+ * @param parsed - The parsed JSON response to merge into.
+ * @param toolFindings - Findings recorded via the postComment tool.
+ * @returns The merged response object; tool findings alone when the parsed value is unusable.
+ */
 export function combineToolAndJsonFindings(
   parsed: unknown,
   toolFindings: PostCommentFinding[]

@@ -16,7 +16,9 @@ import {
 import type { AIResponse, FastReviewResult } from "../types.js";
 import { validateReasoning } from "./validateReasoning.js";
 
+/** Minimal logger surface used by the response parsers to emit warnings. */
 interface ParserLogger {
+  /** Logs a warning with structured fields and a message. */
   warn(obj: Record<string, unknown>, msg: string): void;
 }
 

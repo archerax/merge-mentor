@@ -16,9 +16,13 @@ export function createStubProcessRunner(overrides?: Partial<ProcessRunner>): Pro
 
 /** Options for configuring a stub ChildProcess. */
 interface StubChildProcessOptions {
+  /** Data emitted on the child process stdout stream. */
   readonly stdout?: string;
+  /** Data emitted on the child process stderr stream. */
   readonly stderr?: string;
+  /** Exit code emitted on the close event (default: 0). */
   readonly exitCode?: number;
+  /** Error emitted instead of close when provided. */
   readonly error?: Error;
 }
 

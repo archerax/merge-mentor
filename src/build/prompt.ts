@@ -1,5 +1,17 @@
 import type { BuildReference, BuildSummary, LogArtifact, PreparedEvidence } from "./types.js";
 
+/**
+ * Builds the system prompt used to diagnose a failed CI build.
+ *
+ * Wraps metadata, evidence blocks, and log tails in untrusted tags so the AI
+ * treats them as data, and instructs it to return a diagnosis JSON object.
+ *
+ * @param reference - The build being diagnosed.
+ * @param summary - Summary metadata of the build.
+ * @param evidence - The prepared evidence blocks.
+ * @param artifacts - Stored log artifacts whose tails are included for context.
+ * @returns The assembled prompt string.
+ */
 export function buildAnalysisPrompt(
   reference: BuildReference,
   summary: BuildSummary,

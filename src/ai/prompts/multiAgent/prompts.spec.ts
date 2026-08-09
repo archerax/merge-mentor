@@ -64,9 +64,48 @@ describe("multi-agent prompts", () => {
       expect(prompt).toContain("security, testing");
       expect(prompt).not.toContain("performance:");
     });
+
+    it("notes when the general baseline always runs and is excluded", () => {
+      const prompt = buildPreClassifierPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        enabledAgents: ["security", "performance", "testing", "architecture"],
+        generalAlwaysRuns: true,
+      });
+
+      expect(prompt).toContain("General Logic & Correctness Agent always runs");
+      expect(prompt).not.toContain("- general:");
+      expect(prompt).toContain(
+        "Use only these agent ids: security, performance, testing, architecture"
+      );
+    });
+
+    it("omits the always-run note when the general baseline is not enabled", () => {
+      const prompt = buildPreClassifierPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        enabledAgents: ["security", "testing"],
+      });
+
+      expect(prompt).not.toContain("always runs");
+    });
   });
 
   describe("buildAgentPrompt", () => {
+    it("builds a general agent prompt with its focus areas", () => {
+      const prompt = buildAgentPrompt({
+        agent: "general",
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      expect(prompt).toContain("SPECIALIZED SUBAGENT");
+      expect(prompt).toContain("General Logic & Correctness Agent");
+      expect(prompt).toContain("edge cases");
+      expect(prompt).toContain("error propagation");
+      expect(prompt).toContain("src/auth.ts");
+    });
+
     it("builds a security agent prompt with its focus areas", () => {
       const prompt = buildAgentPrompt({
         agent: "security",

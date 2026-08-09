@@ -2,9 +2,13 @@ import type { FileFinding } from "../platforms/types.js";
 
 const MAX_SUGGESTION_LINES = 9;
 
+/** A validated suggestion suitable for a native PR comment. */
 export interface NativeSuggestion {
+  /** First line (in the new file) covered by the suggestion. */
   readonly startLine: number;
+  /** Last line (in the new file) covered by the suggestion. */
   readonly endLine: number;
+  /** Replacement text applied to the target lines. */
   readonly replacement: string;
 }
 
@@ -60,18 +64,42 @@ export function validateNativeSuggestion(
   return { startLine, endLine, replacement };
 }
 
+/**
+ * Formats a validated suggestion into a fenced code-block string for PR comments.
+ *
+ * @param suggestion - The validated native suggestion to format
+ * @returns Markdown string embedding the replacement in a suggestion code block
+ */
 export function formatNativeSuggestion(suggestion: NativeSuggestion): string {
   return `\n\n\`\`\`suggestion\n${suggestion.replacement}\n\`\`\``;
 }
 
+/**
+ * Counts the number of lines in a string.
+ *
+ * @param value - The string to count lines in
+ * @returns The number of newline-delimited lines
+ */
 function lineCount(value: string): number {
   return value.split("\n").length;
 }
 
+/**
+ * Detects whether a replacement text begins with an import or re-export statement.
+ *
+ * @param value - The text to inspect
+ * @returns True when the text starts with an import or `export ... from` statement
+ */
 function containsImport(value: string): boolean {
   return /^\s*(?:import\s|export\s+[^;]*\s+from\s)/.test(value);
 }
 
+/**
+ * Builds a map of new-file line numbers to their content from a unified diff patch.
+ *
+ * @param patch - Unified diff patch string
+ * @returns Map of line number to line content for lines present in the new file
+ */
 function getDiffLineContents(patch: string): Map<number, string> {
   const lines = new Map<number, string>();
   let currentLine = 0;

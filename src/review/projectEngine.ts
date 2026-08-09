@@ -18,15 +18,32 @@ const ProjectReviewResponseSchema = z.object({
   suggestions: z.array(z.string()).default([]),
 });
 
+/** The parsed, zod-validated result of a project plan AI review. */
 export type ProjectReviewResponse = z.infer<typeof ProjectReviewResponseSchema>;
 
+/**
+ * Configuration options for the project review engine.
+ */
 export interface ProjectReviewEngineOptions {
+  /** Skip posting the review comment and only display the report (default: false). */
   readonly dryRun?: boolean;
+  /** Directory under which the markdown report is saved. */
   readonly tempPath?: string;
+  /** AI provider used for the review (default: 'copilot-sdk'). */
   readonly aiProvider?: AIProviderType;
+  /** Model identifier used by the AI provider. */
   readonly aiModel?: string;
 }
 
+/**
+ * Reviews project/feature plans for Agile planning quality.
+ *
+ * Fetches the project hierarchy (root item plus child work items and their
+ * dependency relationships), asks the AI provider to evaluate the plan against
+ * planning quality guidelines (completeness, dependency/sequencing risks,
+ * acceptance criteria alignment, estimation consistency), writes a markdown
+ * report to disk, and posts or updates a review comment on the project root.
+ */
 export class ProjectReviewEngine {
   private readonly logger = createChildLogger({ component: "ProjectReviewEngine" });
 

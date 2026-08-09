@@ -10,9 +10,14 @@ import { executePBIReview } from "./commands/pbi.js";
 import { executeProjectReview } from "./commands/project.js";
 import { executeReplyCommand } from "./commands/reply.js";
 import { executeReposCommand } from "./commands/repos.js";
-
 // Import command modules
 import { displayResults, executeReview, hasCriticalIssues } from "./commands/review.js";
+import {
+  displayStageResults,
+  executeStage,
+  hasBlockingFindings,
+  STAGE_BLOCKING_EXIT_CODE,
+} from "./commands/stage.js";
 import { loadConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { consoleOutputWriter } from "./ports/index.js";
@@ -33,6 +38,7 @@ import type {
   ProjectOptions,
   ReplyOptions,
   ReviewOptions,
+  StageOptions,
 } from "./commands/types.js";
 
 const program = new Command();
@@ -128,6 +134,10 @@ program
   .option(
     "--strategy <strategy>",
     "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
+  )
+  .option(
+    "--re-review",
+    "Re-review all files, ignoring cached results. Fresh cache is still written afterward."
   )
   .option(
     "--git-backend <backend>",
@@ -288,6 +298,137 @@ program
         },
         "Review failed"
       );
+      consoleOutputWriter.error(`\n❌ Error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Stage command: pre-push local working-tree review
+program
+  .command("stage")
+  .description("Review the local working tree against a base ref before pushing")
+  .optionsGroup("General Options")
+  .option("--dir <path>", "Repository root to operate on (default: current directory)")
+  .option("--base <ref>", "Base ref to diff against (default: HEAD). Env: MM_STAGE_BASE")
+  .option("--head <ref>", "Head ref for ref-to-ref comparison (overrides working-tree review)")
+  .option("--staged", "Review only staged changes (vs the base ref)", false)
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for diffing (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .optionsGroup("Review Configuration")
+  .option(
+    "--review-type <type>",
+    "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
+    "general"
+  )
+  .option(
+    "--passes <passNames>",
+    `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
+  )
+  .option(
+    "--strategy <strategy>",
+    "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
+  )
+  .optionsGroup("File Filtering")
+  .option(
+    "--ignore <pattern>",
+    "Glob pattern for files to ignore (repeatable). Default ignores **/generated/**",
+    (pattern: string, previous: string[] = []) => [...previous, pattern]
+  )
+  .optionsGroup("Output Options")
+  .option("--format <format>", "Output format (terminal, markdown, or json). Default: terminal")
+  .option("--output <path>", "Write the report to a file instead of stdout")
+  .option(
+    "--exit-code",
+    "Exit with code 1 when critical/high findings exist (for git hooks)",
+    false
+  )
+  .option("--no-cache", "Skip reading/writing the per-file SHA cache")
+  .option(
+    "--re-review",
+    "Re-review all files, ignoring cached results. Fresh cache is still written afterward."
+  )
+  .option("--no-stream", "Disable streaming output display")
+  .option(
+    "--stream-lines <number>",
+    "Number of lines in streaming display (1-20). Env: MM_STREAMING_LINES",
+    (value) => {
+      const parsed = parseInt(value, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 20) {
+        throw new Error("--stream-lines must be a number between 1 and 20");
+      }
+      return parsed;
+    }
+  )
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .action(async (options: StageOptions) => {
+    try {
+      if (options.staged && options.head) {
+        consoleOutputWriter.error(
+          "\n❌ Error: --staged cannot be combined with --head (ref-to-ref comparison).\n"
+        );
+        process.exit(1);
+      }
+
+      const { result } = await executeStage({
+        ...options,
+        streamingEnabled: options.stream !== false,
+        noCache: options.cache === false,
+      });
+
+      const config = loadConfig({
+        platform: "github",
+        githubToken: options.githubToken,
+        githubRepoOwner: options.githubRepoOwner,
+        githubRepoName: options.githubRepoName,
+        azureToken: options.azureToken,
+        azureOrg: options.azureOrg,
+        azureProject: options.azureProject,
+        azureRepo: options.azureRepo,
+        aiProvider: options.provider,
+        copilotToken: options.copilotToken,
+        aiTimeout: options.aiTimeout,
+        aiModel: options.aiModel,
+        aiBaseUrl: options.aiBaseUrl,
+        aiApiKey: options.aiApiKey,
+        reviewType: options.reviewType,
+        passes: options.passes,
+        reviewStrategy: options.strategy,
+        tempPath: options.tempPath,
+        gitBackend: options.gitBackend,
+      });
+      const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
+      displayStageResults(
+        result,
+        aiProvider,
+        options,
+        options.reviewType ?? config.reviewType ?? "general",
+        config.reviewPasses,
+        config.reviewStrategy,
+        config.tempPath
+      );
+
+      if (options.exitCode && hasBlockingFindings(result)) {
+        process.exit(STAGE_BLOCKING_EXIT_CODE);
+      }
+      process.exit(0);
+    } catch (error) {
+      const err = error as Error;
+      logger.error({ error: err.message, stack: err.stack }, "Stage failed");
       consoleOutputWriter.error(`\n❌ Error: ${err.message}\n`);
       process.exit(1);
     }

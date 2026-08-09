@@ -1,10 +1,16 @@
 import { execSync } from "node:child_process";
 
+/** Parsed platform context extracted from a git remote URL. */
 export interface ParsedGitRemote {
+  /** Platform the remote belongs to: github or azure. */
   readonly platform: "github" | "azure";
+  /** GitHub owner (user or organization). */
   readonly owner?: string; // github owner
+  /** Repository name (github or azure). */
   readonly repo?: string; // github/azure repo name
+  /** Azure DevOps organization. */
   readonly org?: string; // azure org
+  /** Azure DevOps project. */
   readonly project?: string; // azure project
 }
 

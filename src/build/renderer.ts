@@ -1,5 +1,17 @@
 import type { BuildDiagnosis, BuildReference, BuildSummary, PreparedEvidence } from "./types.js";
 
+/**
+ * Renders the final markdown report for a build analysis.
+ *
+ * Combines the build summary, diagnosis, evidence blocks, affected files,
+ * recommendations, and limitations into a single human-readable report.
+ *
+ * @param reference - The analyzed build.
+ * @param summary - Summary metadata of the build.
+ * @param evidence - The evidence captured from the build logs.
+ * @param diagnosis - The diagnosis reached for the build.
+ * @returns The rendered markdown report string.
+ */
 export function renderReport(
   reference: BuildReference,
   summary: BuildSummary,

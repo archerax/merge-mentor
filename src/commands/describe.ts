@@ -9,6 +9,16 @@ import { ReviewEngine } from "../review/engine.js";
 import { ensureCIContext } from "./shared/ci.js";
 import type { DescribeExecutionResult, DescribeOptions, ProgramDeps } from "./types.js";
 
+/**
+ * Executes the `describe` command: generates a title, summary, and changelog
+ * for a pull request and optionally writes it back to the platform.
+ *
+ * @param options - Describe options (PR number, suggest title, write mode, AI provider, etc.)
+ * @param deps - Dependency injection container for environment and output
+ * @returns The generated description result (suggested title and body, plus the platform adapter)
+ * @throws When no PR number is available (no `--pr` and not in CI mode) or the
+ * platform/AI provider is invalid
+ */
 export async function executeDescribe(
   options: DescribeOptions,
   deps: ProgramDeps = {}
@@ -127,6 +137,14 @@ export async function executeDescribe(
   return { title, body, adapter, platform };
 }
 
+/**
+ * Displays the generated PR description to the console.
+ *
+ * @param title - Suggested PR title, if one was generated
+ * @param body - Generated PR description body
+ * @param write - Whether the description was written to the remote platform (dry-run otherwise)
+ * @param deps - Dependency injection container for output
+ */
 export function displayDescribeResults(
   title: string | undefined,
   body: string,

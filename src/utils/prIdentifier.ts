@@ -53,29 +53,6 @@ export function generatePRIdentifier(
 }
 
 /**
- * Sanitizes a project name for use in file names and cache keys.
- * Removes or replaces characters that are invalid in NTFS or other filesystems,
- * and normalizes whitespace to hyphens for readability.
- *
- * Operations performed:
- * - Replaces filesystem-invalid chars: `/ \ : * ? " < > |` → `_`
- * - Replaces whitespace: ` \t \n` → `-`
- * - Removes trailing dots (reserved in Windows)
- * - Limits output to {@link MAX_PROJECT_NAME_LENGTH} characters to prevent overly long paths
- *
- * @param project - Raw project name that may contain special characters
- * @returns Sanitized project name safe for file system use
- *
- * @example
- * ```typescript
- * sanitizeProjectName("My Project");           // "My-Project"
- * sanitizeProjectName("project/name");         // "project_name"
- * sanitizeProjectName("repo<special>name");    // "repo_special_name"
- * sanitizeProjectName("Very Long Project Name With Many Words And Characters");
- * // Truncated to MAX_PROJECT_NAME_LENGTH chars
- * ```
- */
-/**
  * Extracts the PR number from a platform-format PR identifier.
  * The identifier format is `Platform-project-PR<number>`.
  *
@@ -97,6 +74,26 @@ export function parsePRNumber(prIdentifier: string): number {
   return Number.parseInt(match[1], 10);
 }
 
+/**
+ * Parses the PR number from a platform-format PR identifier without throwing.
+ * Returns `0` when the identifier is not a PR identifier (e.g. a local-stage
+ * identifier such as `Local-repo-branch`).
+ */
+export function parsePRNumberSafe(prIdentifier: string): number {
+  const match = prIdentifier.match(/-PR(\d+)$/);
+  return match ? Number.parseInt(match[1], 10) : 0;
+}
+
+/**
+ * Sanitizes a project name for safe use in file names and cache keys.
+ *
+ * Replaces filesystem-invalid characters with underscores, normalizes
+ * whitespace to hyphens, removes trailing dots, and truncates to
+ * `MAX_PROJECT_NAME_LENGTH` characters.
+ *
+ * @param project - Raw project name that may contain special characters
+ * @returns Sanitized project name safe for file system use
+ */
 export function sanitizeProjectName(project: string): string {
   return project
     .replace(/[/\\:*?"<>|]/g, "_") // Replace invalid filename characters

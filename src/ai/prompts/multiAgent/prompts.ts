@@ -11,11 +11,24 @@ import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSec
 
 /** Focus-area instructions for each specialized subagent role. */
 interface AgentFocus {
+  /** Concrete concern categories the agent should hunt for, rendered as a numbered list. */
   readonly domain: readonly string[];
+  /** Scope constraints telling the agent what to ignore so it stays on-topic. */
   readonly scope: string;
 }
 
 const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
+  general: {
+    domain: [
+      "Logic bugs: incorrect conditions, inverted logic, off-by-one errors, wrong operators",
+      "Edge cases and boundary conditions: empty inputs, null/undefined, zero, negative, and max values",
+      "Error handling: swallowed exceptions, missing error paths, incorrect error propagation",
+      "State transitions and concurrency: race conditions, stale state, partial updates",
+      "Contract violations: type mismatches, broken call-site assumptions, incorrect return values",
+    ],
+    scope:
+      "Only report correctness, logic, and robustness issues with a real failure scenario. Ignore pure style, readability, performance, and security concerns.",
+  },
   security: {
     domain: [
       "Input sanitization and injection (SQL, XSS, command, path traversal)",
@@ -62,6 +75,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
 };
 
 const AGENT_FOCUS_LABELS: Record<AgentRoleId, string> = {
+  general: "🧠 General Logic & Correctness Agent",
   security: "🔒 Security & Trust Agent",
   performance: "⚡ Performance & Scalability Agent",
   testing: "🧪 Test Coverage & Quality Agent",
@@ -69,6 +83,8 @@ const AGENT_FOCUS_LABELS: Record<AgentRoleId, string> = {
 };
 
 const AGENT_SUMMARIES: Record<AgentRoleId, string> = {
+  general:
+    "Hunts logic bugs, edge cases, error-handling gaps, and robustness issues across the diff.",
   security:
     "Evaluates input sanitization, OWASP Top 10, auth/authz boundaries, secret leaks, and insecure dependency usage.",
   performance:
@@ -79,6 +95,14 @@ const AGENT_SUMMARIES: Record<AgentRoleId, string> = {
     "Inspects breaking API contracts, project structure, design patterns, naming conventions, and linting compliance.",
 };
 
+/**
+ * Builds the shared PR context block: wrapped title/description plus a listing
+ * of the changed files with their addition/deletion counts.
+ *
+ * @param prDetails - PR metadata whose title and description are wrapped as untrusted input.
+ * @param files - Changed files to list, each with its line addition/deletion counts.
+ * @returns Markdown section containing the PR context and changed file listing.
+ */
 function buildFilesSummary(
   prDetails: PRDetails,
   files: readonly {
@@ -99,7 +123,9 @@ ${filesListing}`;
 
 /**
  * Builds the lightweight LLM pre-classification prompt that selects which
- * subagents are relevant for a PR's diff before any agent is dispatched.
+ * specialized subagents are relevant for a PR's diff before any agent is
+ * dispatched. The always-run General Logic & Correctness agent is excluded from
+ * this selection.
  */
 export function buildPreClassifierPrompt(options: {
   readonly prDetails: PRDetails;
@@ -109,15 +135,25 @@ export function buildPreClassifierPrompt(options: {
     readonly deletions: number;
   }[];
   readonly enabledAgents: readonly AgentRoleId[];
+  /** Whether the general baseline agent always runs (excluded from selection). */
+  readonly generalAlwaysRuns?: boolean;
 }): string {
   const agentsListing = options.enabledAgents
     .map((agent) => `- ${agent}: ${AGENT_SUMMARIES[agent]}`)
     .join("\n");
 
+  const generalNote = options.generalAlwaysRuns
+    ? `
+The 🧠 General Logic & Correctness Agent always runs on every PR and is not part
+of this selection, so it is not listed above.
+
+`
+    : "";
+
   return `${buildSecurityPreamble()}# YOUR ROLE
 SELECT RELEVANT SUBAGENTS for a pull request review.
 You are a cheap routing pass that decides which specialized reviewers are worth dispatching for this PR.
-
+${generalNote}
 # PR CONTEXT
 ${buildFilesSummary(options.prDetails, options.files)}
 
@@ -186,10 +222,12 @@ Analyze the changed code for these concerns:
 
 ${domainListing}
 
-# CRITICAL SCOPE RESTRICTIONS
+# PRIORITY SCOPE
 ${focus.scope}
 
-If an issue does not fall inside your focus areas above, DO NOT REPORT IT.
+Your focus areas above are the priority, but they are not a hard filter. If you
+notice a real, substantively important issue outside them while reviewing the
+diff, report it rather than staying silent.
 
 # VERIFICATION CHECKLIST
 
@@ -198,7 +236,7 @@ Before reporting any finding:
 - Line number is correct and points to actual problem code
 - Issue isn't already handled elsewhere in the diff
 - Severity matches actual impact
-- The issue is within your focus area
+- The issue is worth reporting (either inside your focus area or a real substantive issue outside it)
 
 For each finding, \`reasoning\` must confirm the issue is real, state its concrete impact, and justify the severity (1–2 sentences).
 
@@ -226,7 +264,7 @@ Before reporting ANY finding, ask yourself:
 1. Could this be intentional? (e.g., deliberate error swallowing in retry logic)
 2. Is this validated/handled elsewhere in the codebase?
 3. Is there framework context I'm missing?
-4. Is this genuinely within my focus area?
+4. Is this genuinely worth reporting? (Focus areas are prioritized, but a real substantive issue outside them still deserves a finding)
 5. Would a senior specialist flag this? (Is it substantive, not nitpicking?)
 
 Only report findings that survive this check.
@@ -256,12 +294,15 @@ Rules:
 - Include \`file\` and \`line\` for EVERY finding. Line numbers are pre-calculated in the diff.
 - \`category\` must be one of: bug, security, performance, quality, documentation, architecture, design, testing
 - Only report NEW issues on added lines (+). Set \`isPreExisting\` for issues existing in removed lines.
-- Return an empty \`findings\` array when nothing within your focus area survives the checks.
+- Return an empty \`findings\` array when no substantive issues survive the checks.
 `;
 }
 
+/** Summary of the findings reported by a single subagent, keyed for the synthesizer. */
 interface AgentFindingSummary {
+  /** Role id of the subagent that produced the findings. */
   readonly agent: AgentRoleId;
+  /** Findings emitted by the agent; each carries attribution metadata and review content. */
   readonly findings: readonly {
     readonly file?: string;
     readonly line: number;
@@ -274,6 +315,13 @@ interface AgentFindingSummary {
   }[];
 }
 
+/**
+ * Formats subagent finding summaries into the markdown block embedded in the
+ * synthesizer prompt. Agents without findings render as "No findings".
+ *
+ * @param agentResults - Findings grouped per subagent.
+ * @returns Markdown listing each agent's findings with severity, confidence, and reasoning.
+ */
 function formatAgentFindings(agentResults: readonly AgentFindingSummary[]): string {
   if (agentResults.length === 0) {
     return "No subagent produced findings.";

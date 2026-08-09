@@ -39,14 +39,26 @@ export class GitHubAdapter implements PlatformAdapter {
     this.logger.info({ owner: this.owner, repo: this.repo }, "GitHubAdapter initialized");
   }
 
+  /**
+   * Returns the repository name used as the project identifier.
+   * @returns Repository name
+   */
   getProjectIdentifier(): string {
     return this.repo;
   }
 
+  /**
+   * Returns the platform name for dispatching platform-specific logic.
+   * @returns "github"
+   */
   getPlatformName(): "github" {
     return "github";
   }
 
+  /**
+   * Returns repository information for context loading.
+   * @returns Repository owner, name, and platform
+   */
   getRepoInfo(): RepoInfo {
     return {
       owner: this.owner,
@@ -55,10 +67,20 @@ export class GitHubAdapter implements PlatformAdapter {
     };
   }
 
+  /**
+   * Gets the authentication token for Git operations.
+   * @returns GitHub personal access token
+   */
   getToken(): string {
     return this.token;
   }
 
+  /**
+   * Retrieves pull request details from the GitHub API.
+   * @param prNumber - The PR number to fetch
+   * @returns Details about the pull request
+   * @throws If the pull request cannot be fetched
+   */
   async getPRDetails(prNumber: number): Promise<PRDetails> {
     try {
       const { data } = await withRateLimitHandling(() =>
@@ -86,6 +108,12 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves files changed in a pull request via paginated listing.
+   * @param prNumber - The PR number
+   * @param _ignorePatterns - Optional glob patterns; unused because the GitHub API returns all changed files
+   * @returns Array of files changed in the pull request
+   */
   async getPRFiles(prNumber: number, _ignorePatterns?: string[]): Promise<PRFile[]> {
     try {
       const data = await withRateLimitHandling(() =>
@@ -120,6 +148,11 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Gets existing bot comments on a PR, including inline review comments and general issue comments.
+   * @param prNumber - The PR number
+   * @returns Comments written by the bot
+   */
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
     try {
       const comments: ExistingComment[] = [];
@@ -178,6 +211,14 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves a specific comment thread by comment or thread ID.
+   * Falls back to the REST API when the GraphQL lookup fails.
+   * @param prNumber - The PR number
+   * @param commentId - The comment or thread ID
+   * @returns The matching comment thread
+   * @throws If the thread cannot be found on the PR
+   */
   async getCommentThread(
     prNumber: number,
     commentId: string | number
@@ -327,6 +368,11 @@ export class GitHubAdapter implements PlatformAdapter {
     throw new Error(`Comment thread "${commentId}" not found on PR #${prNumber}`);
   }
 
+  /**
+   * Retrieves all unresolved/active PR comment threads via the GraphQL API.
+   * @param prNumber - The PR number
+   * @returns Array of unresolved comment threads
+   */
   async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
     try {
       const query = `
@@ -431,6 +477,13 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a reply to an existing PR comment thread.
+   * Uses the REST API for numeric comment IDs and the GraphQL mutation for thread IDs.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   * @param body - The reply message body
+   */
   async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
     const stringId = threadId.toString();
     this.logger.debug({ prNumber, threadId, stringId }, "Posting comment reply");
@@ -483,6 +536,11 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Resolves an unresolved PR comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   */
   async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
     this.logger.debug({ prNumber, threadId }, "Resolving comment thread");
 
@@ -525,6 +583,14 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts an inline comment on a specific file line of the PR head commit.
+   * @param prNumber - The PR number
+   * @param path - File path
+   * @param line - Line number
+   * @param body - Comment body
+   * @param startLine - Optional first line of a multi-line comment range
+   */
   async postInlineComment(
     prNumber: number,
     path: string,
@@ -583,6 +649,11 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a general (issue) comment on the PR.
+   * @param prNumber - The PR number
+   * @param body - Comment body
+   */
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
     try {
       await withRateLimitHandling(() =>
@@ -605,6 +676,13 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves GitHub issue details as PBI data, including comments and a MoSCoW tag,
+   * with acceptance criteria and story points parsed from the description.
+   * @param id - The issue number
+   * @returns Details about the issue
+   * @throws If the issue number is invalid
+   */
   async getPBIDetails(id: string): Promise<PBIDetails> {
     const issueNumber = Number.parseInt(id, 10);
     if (Number.isNaN(issueNumber)) {
@@ -662,6 +740,11 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Identifies issues linked to a PR by scanning its title and description for issue references.
+   * @param prNumber - The PR number
+   * @returns Array of linked issue numbers
+   */
   async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
     try {
       const pr = await this.getPRDetails(prNumber);
@@ -695,6 +778,12 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a new comment on an issue, or updates an existing one when commentId is provided.
+   * @param id - The issue number
+   * @param body - Comment body
+   * @param commentId - Optional comment ID to update an existing comment in-place
+   */
   async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
     const issueNumber = Number.parseInt(id, 10);
     if (Number.isNaN(issueNumber)) {
@@ -734,6 +823,11 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Updates the title and body of a pull request.
+   * @param prNumber - The PR number
+   * @param details - The new title and/or body to apply
+   */
   async updatePRDetails(
     prNumber: number,
     details: { readonly title?: string; readonly body?: string }
@@ -761,11 +855,21 @@ export class GitHubAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves hierarchical project details.
+   * @param _id - The root work item ID
+   * @throws Always, because GitHub project review is not yet supported
+   */
   async getProjectDetails(_id: string): Promise<ProjectDetails> {
     throw new Error("GitHub project review is not yet supported in this version.");
   }
 }
 
+/**
+ * Extracts the acceptance criteria section from an issue description.
+ * @param body - The issue description to parse
+ * @returns The trimmed acceptance criteria text, or undefined if not found
+ */
 function parseAcceptanceCriteria(body: string | null): string | undefined {
   if (!body) return undefined;
   const match = body.match(
@@ -774,6 +878,11 @@ function parseAcceptanceCriteria(body: string | null): string | undefined {
   return match ? match[1].trim() : undefined;
 }
 
+/**
+ * Extracts the story points estimate from an issue description.
+ * @param body - The issue description to parse
+ * @returns The parsed story points number, or undefined if not found
+ */
 function parseStoryPoints(body: string | null): number | undefined {
   if (!body) return undefined;
   const match = body.match(/(?:story\s+points?|sp|points?)\s*[:=-]\s*(\d+(?:\.\d+)?)/i);

@@ -6,10 +6,20 @@ import type {
   BuildSummary,
 } from "../types.js";
 
+/**
+ * Minimal HTTP client interface used to call the GitHub API.
+ */
 export interface GithubBuildHttp {
+  /** Performs an HTTP request and returns the raw response. */
   get(url: string, init?: RequestInit): Promise<Response>;
 }
 
+/**
+ * Build analysis provider backed by the GitHub REST API.
+ *
+ * Fetches workflow run summaries and the logs of failed jobs in the run via
+ * `actions/runs`, `actions/runs/{id}/jobs`, and `actions/jobs/{id}/logs`.
+ */
 export class GithubBuildProvider implements BuildAnalysisProvider {
   constructor(
     private readonly token: string,
@@ -32,6 +42,12 @@ export class GithubBuildProvider implements BuildAnalysisProvider {
       );
     return response;
   }
+  /**
+   * Fetches normalized summary metadata for the referenced workflow run.
+   *
+   * @param reference - The run to summarize.
+   * @returns Normalized build summary metadata.
+   */
   async getBuildSummary(reference: BuildReference): Promise<BuildSummary> {
     const data = (await (
       await this.request(reference, `/actions/runs/${reference.id}`)
@@ -58,6 +74,15 @@ export class GithubBuildProvider implements BuildAnalysisProvider {
       finishedAt: typeof data.updated_at === "string" ? data.updated_at : undefined,
     };
   }
+  /**
+   * Fetches the logs of the failed jobs in the referenced workflow run.
+   *
+   * Only jobs whose conclusion is `failure`, `cancelled`, or `timed_out` are
+   * collected, and only when the returned content type is textual.
+   *
+   * @param reference - The run whose failure logs are fetched.
+   * @returns The failed run's log chunks.
+   */
   async getFailedLogs(reference: BuildReference): Promise<BuildLogChunk[]> {
     const jobs = (await (
       await this.request(reference, `/actions/runs/${reference.id}/jobs?per_page=100`)

@@ -328,6 +328,59 @@ describe("CopilotSdkProvider", () => {
       expect(attempt).toBe(3);
     });
 
+    it("destroys the cached client after a failed attempt so retries use a fresh connection", async () => {
+      const provider = createProvider(2, 5000);
+      mockSession.sendAndWait.mockRejectedValue(new Error("SDK error"));
+
+      let captured: unknown;
+      const resultPromise = provider
+        .executePrompt("Review the following file test.ts")
+        .catch((error) => {
+          captured = error;
+        });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect((captured as Error).message).toContain("Failed after 2 attempts");
+      expect(mockClient.stop).toHaveBeenCalled();
+    });
+
+    it("times out when client.createSession never resolves", async () => {
+      const provider = createProvider(1, 5000);
+      mockClient.createSession.mockReturnValue(new Promise(() => {}));
+
+      let captured: unknown;
+      const resultPromise = provider
+        .executePrompt("Review the following file test.ts")
+        .catch((error) => {
+          captured = error;
+        });
+      await vi.advanceTimersByTimeAsync(5000);
+      await resultPromise;
+
+      expect((captured as Error).message).toMatch(
+        /Failed after 1 attempt: Operation timed out after 5000ms/
+      );
+    });
+
+    it("times out when the authentication status check never resolves", async () => {
+      const provider = createProvider(1, 5000);
+      mockClient.getAuthStatus.mockReturnValue(new Promise(() => {}));
+
+      let captured: unknown;
+      const resultPromise = provider
+        .executePrompt("Review the following file test.ts")
+        .catch((error) => {
+          captured = error;
+        });
+      await vi.advanceTimersByTimeAsync(5000);
+      await resultPromise;
+
+      expect((captured as Error).message).toMatch(
+        /Failed to retrieve Copilot authentication status: .*Operation timed out after 5000ms/
+      );
+    });
+
     it("recovers parseable streamed JSON after session.idle timeout", async () => {
       const provider = createProvider();
 

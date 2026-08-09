@@ -38,6 +38,7 @@ const FileFindingSchema = z.object({
 });
 
 // Single File Review Schema
+/** Zod schema validating the single-file review response, with a findings array. */
 export const FileReviewResponseSchema = z.object({
   findings: z.array(FileFindingSchema).default([]),
 });
@@ -53,6 +54,7 @@ const CrossFileFindingSchema = z.object({
 });
 
 // Cross-File Review Response Schema
+/** Zod schema validating the cross-file review response: overall assessment, findings, and recommendations. */
 export const CrossFileReviewResponseSchema = z.object({
   overall_assessment: z.coerce.string().default("Review completed"),
   findings: z.array(CrossFileFindingSchema).default([]),
@@ -60,6 +62,7 @@ export const CrossFileReviewResponseSchema = z.object({
 });
 
 // Batched File Review Schema
+/** Zod schema validating the batched file review response, keyed by filename to per-file results. */
 export const BatchedFileReviewResponseSchema = z.object({
   file_results: z.record(z.string(), FileReviewResponseSchema).default({}),
 });
@@ -69,11 +72,13 @@ const FastReviewFindingSchema = FileFindingSchema.extend({
   file: z.coerce.string().optional(),
 });
 
+/** Zod schema validating the fast review response: a summary plus a flat findings list. */
 export const FastReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
   findings: z.array(FastReviewFindingSchema).default([]),
 });
 
+/** Zod schema validating the PBI alignment review response (criteria statuses and assessment). */
 export const PBIAlignmentResponseSchema = z.object({
   pbiId: z.coerce.string(),
   title: z.coerce.string(),
@@ -94,7 +99,13 @@ export const PBIAlignmentResponseSchema = z.object({
 // Multi-agent review schemas
 
 /** Agent ids selectable by the pre-classifier and agent registry. */
-const MultiAgentIdSchema = z.enum(["security", "performance", "testing", "architecture"]);
+const MultiAgentIdSchema = z.enum([
+  "general",
+  "security",
+  "performance",
+  "testing",
+  "architecture",
+]);
 
 /** Category union shared by multi-agent file findings and synthesized findings. */
 const MultiAgentFindingCategorySchema = z

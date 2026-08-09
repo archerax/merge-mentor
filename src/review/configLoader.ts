@@ -11,6 +11,14 @@ const ProjectConfigSchema = z
   })
   .strict();
 
+/**
+ * Loads optional custom project configuration from the repository root.
+ *
+ * Reads `.mergementor.json` (if present) and validates it against a strict
+ * zod schema, returning the parsed test file patterns and test mappings.
+ * The configuration is optional: missing or unreadable files are treated as
+ * "no configuration" rather than errors, though malformed JSON is re-thrown.
+ */
 export class ConfigLoader {
   private readonly fileSystem: FileSystem;
   private readonly logger = createChildLogger({ component: "ConfigLoader" });

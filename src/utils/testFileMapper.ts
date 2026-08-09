@@ -5,7 +5,9 @@ import { detectLanguage } from "./languageDetector.js";
  * Options for customizing test file mapping.
  */
 export interface TestMapperOptions {
+  /** Custom glob patterns used to identify test files. */
   readonly testFilePatterns?: readonly string[];
+  /** Custom regex-to-replacement mappings for locating test files. */
   readonly testMapping?: Record<string, string>;
 }
 

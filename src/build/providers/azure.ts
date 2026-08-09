@@ -9,15 +9,28 @@ import type {
   BuildSummary,
 } from "../types.js";
 
+/**
+ * Authentication modes for the Azure DevOps connection.
+ */
 export type AzureBuildAuthMode = "pat" | "bearer";
 
 const FAILURE_LOG_PATTERN =
   /(?:##\[error\]|task\.logissue\s+type=error|\b(?:failed|failure|fatal|exception|timed?\s*out|timeout|cancelled|canceled)\b|\bexit\s+code\s*[:=]?\s*[1-9]\d*\b|\b(?:npm|pnpm|yarn)\s+ERR!)/i;
 
+/**
+ * Lazily supplies the Azure DevOps build API client.
+ */
 export interface AzureBuildConnection {
+  /** Resolves the authenticated build API client. */
   getBuildApi(): Promise<IBuildApi>;
 }
 
+/**
+ * Build analysis provider backed by the Azure DevOps REST API.
+ *
+ * Fetches build summaries and failure log chunks via the Azure DevOps Node
+ * API, using the build timeline to identify logs tied to failed tasks.
+ */
 export class AzureBuildProvider implements BuildAnalysisProvider {
   constructor(
     token: string,
@@ -26,6 +39,12 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
     private readonly connection: AzureBuildConnection = createConnection(token, org, authMode)
   ) {}
 
+  /**
+   * Fetches normalized summary metadata for the referenced Azure build.
+   *
+   * @param reference - The build to summarize.
+   * @returns Normalized build summary metadata.
+   */
   async getBuildSummary(reference: BuildReference): Promise<BuildSummary> {
     const buildApi = await this.connection.getBuildApi();
     const data = await buildApi.getBuild(reference.project ?? "", Number(reference.id));
@@ -57,6 +76,16 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
     };
   }
 
+  /**
+   * Fetches the log chunks most relevant to the referenced build's failure.
+   *
+   * Logs are selected either by the failed tasks in the build timeline or by a
+   * failure-signal pattern when the timeline is unavailable.
+   *
+   * @param reference - The build whose failure logs are fetched.
+   * @returns The failed build's log chunks.
+   * @throws `PlatformApiError` if a build log cannot be retrieved.
+   */
   async getFailedLogs(reference: BuildReference): Promise<BuildLogChunk[]> {
     const buildApi = await this.connection.getBuildApi();
     const logs = await buildApi.getBuildLogs(reference.project ?? "", Number(reference.id));
@@ -119,6 +148,14 @@ export class AzureBuildProvider implements BuildAnalysisProvider {
   }
 }
 
+/**
+ * Creates an Azure DevOps connection for the given organization.
+ *
+ * @param token - The PAT or bearer token used for authentication.
+ * @param org - The Azure DevOps organization name.
+ * @param authMode - How the token is interpreted.
+ * @returns A connection that can resolve the build API client.
+ */
 function createConnection(
   token: string,
   org: string,

@@ -1,10 +1,18 @@
+/** Parsed components extracted from a PR URL. */
 export interface ParsedPRUrl {
+  /** Platform the PR belongs to: github or azure. */
   platform: "github" | "azure";
+  /** PR number (GitHub) or pull request ID (Azure DevOps). */
   prNumber: number;
+  /** GitHub repository owner. */
   owner?: string;
+  /** GitHub repository name. */
   repo?: string;
+  /** Azure DevOps organization. */
   org?: string;
+  /** Azure DevOps project. */
   project?: string;
+  /** Azure DevOps repository name. */
   azureRepo?: string;
 }
 
@@ -13,6 +21,16 @@ const HELP_TEXT =
   "  GitHub:  https://github.com/{owner}/{repo}/pull/{number}\n" +
   "  Azure:   https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}";
 
+/**
+ * Parses a PR URL into its platform-specific components.
+ *
+ * Supports GitHub pull request URLs and Azure DevOps pull request URLs
+ * (both `dev.azure.com` and legacy `*.visualstudio.com` host formats).
+ *
+ * @param rawUrl - The PR URL to parse
+ * @returns Parsed components including platform and PR number
+ * @throws {Error} When the URL is empty, not HTTPS, or does not match a supported PR URL format
+ */
 export function parsePRUrl(rawUrl: string): ParsedPRUrl {
   if (!rawUrl || rawUrl.trim() === "") {
     throw new Error(`Invalid PR URL: URL is empty.\n${HELP_TEXT}`);

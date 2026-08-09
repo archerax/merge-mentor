@@ -22,6 +22,16 @@ const SIGNALS: readonly [FailureType, RegExp, number][] = [
   ],
 ];
 
+/**
+ * Classifies a log line into a failure category.
+ *
+ * Tests the text against known failure signal patterns and returns the first
+ * matching category with its confidence.
+ *
+ * @param text - The log line to classify.
+ * @returns The matched failure category and confidence, or an `"unknown"`
+ * category with low confidence when no signal matches.
+ */
 function classify(text: string): { category: FailureType; confidence: number } {
   for (const [category, pattern, confidence] of SIGNALS) {
     if (pattern.test(text)) return { category, confidence };
@@ -29,6 +39,17 @@ function classify(text: string): { category: FailureType; confidence: number } {
   return { category: "unknown", confidence: 0.25 };
 }
 
+/**
+ * Normalizes raw build log chunks into curated, deduplicated evidence.
+ *
+ * Chunks are prioritized by their failure-candidate flag, scanned for
+ * signal-bearing lines, and sliced into bounded evidence blocks that are
+ * deduplicated, redacted, and classified.
+ *
+ * @param chunks - The failed build's raw log chunks.
+ * @param maxBytes - Total byte budget for the captured evidence.
+ * @returns The prepared evidence blocks plus truncation/redaction flags.
+ */
 export function prepareEvidence(
   chunks: readonly BuildLogChunk[],
   maxBytes = 24_000

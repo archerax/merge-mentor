@@ -17,6 +17,7 @@ import type { BaseCrossFileContext } from "./types.js";
  * Context for performance cross-file analysis.
  */
 export interface PerformanceCrossFileContext extends BaseCrossFileContext {
+  /** Markdown of already-posted PR comments to avoid re-reporting. */
   readonly existingCommentsContext?: string;
 }
 

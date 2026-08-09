@@ -41,6 +41,25 @@ export interface GitCloneOptions {
   readonly depth?: number;
 }
 
+/** Status of a file within a local diff (mirrors `FileStatus`). */
+type GitFileStatus = "added" | "modified" | "deleted" | "renamed";
+
+/** A single file change produced by a local git diff. */
+export interface GitFileChange {
+  /** Path to the file relative to the repository root. */
+  readonly path: string;
+  /** Kind of change: added, modified, deleted, or renamed. */
+  readonly status: GitFileStatus;
+  /** Number of lines added in the change. */
+  readonly additions: number;
+  /** Number of lines deleted in the change. */
+  readonly deletions: number;
+  /** Unified diff hunk for this file (absent for binary or content-less changes). */
+  readonly patch?: string;
+  /** Stable content hash of the file's "new" side (absent for deletions). */
+  readonly sha?: string;
+}
+
 /**
  * Minimal git operations required by RepoManager.
  *
@@ -105,4 +124,49 @@ export interface GitClient {
    * @param remoteUrl - New public remote URL.
    */
   setRemoteUrl(repoPath: string, remoteUrl: string): Promise<void>;
+
+  /**
+   * Compares the working tree (staged + unstaged, including untracked files)
+   * against a base ref.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref to diff against (defaults to `HEAD`).
+   * @returns File changes with patches relative to the base ref.
+   */
+  workingTreeDiff(repoPath: string, baseRef?: string): Promise<GitFileChange[]>;
+
+  /**
+   * Compares the index (staged changes) against a base ref.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref to diff against (defaults to `HEAD`).
+   * @returns Staged file changes with patches relative to the base ref.
+   */
+  stagedDiff(repoPath: string, baseRef?: string): Promise<GitFileChange[]>;
+
+  /**
+   * Compares two refs against each other.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref (older side of the diff).
+   * @param headRef  - Head ref (newer side of the diff).
+   * @returns File changes between the two refs.
+   */
+  diff(repoPath: string, baseRef: string, headRef: string): Promise<GitFileChange[]>;
+
+  /**
+   * Returns the current branch name, or `"HEAD"` when the working tree is in a
+   * detached state.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   */
+  currentBranch(repoPath: string): Promise<string>;
+
+  /**
+   * Returns the configured `origin` remote URL, or `undefined` when the
+   * repository has no `origin` remote.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   */
+  getRemoteUrl(repoPath: string): Promise<string | undefined>;
 }

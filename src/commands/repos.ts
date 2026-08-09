@@ -4,6 +4,13 @@ import { loadConfig } from "../config.js";
 import { logger } from "../logger.js";
 import { consoleOutputWriter } from "../ports/index.js";
 
+/**
+ * Executes the `repos` command: lists or removes cloned repositories from the
+ * temporary repos directory, or prints usage when no option is given.
+ *
+ * @param options - Repo management options (`list`, `clean`, `cleanRepo`, `tempPath`)
+ * @returns Resolves once the requested action has been performed
+ */
 export function executeReposCommand(options: {
   list?: boolean;
   clean?: boolean;

@@ -27,6 +27,19 @@ const DiagnosisSchema = z.object({
   limitations: z.array(z.string()),
 });
 
+/**
+ * Parses and validates a raw AI diagnosis response.
+ *
+ * Expects a JSON object matching the diagnosis schema, filters the cited
+ * evidence to only blocks and artifact citations that were actually supplied,
+ * and reports validation gaps as limitations.
+ *
+ * @param raw - The raw AI response text.
+ * @param evidence - The evidence that was supplied to the AI provider.
+ * @param artifacts - Log artifacts that were available, used to validate citations.
+ * @returns The validated diagnosis with only valid evidence citations.
+ * @throws A Zod error if the raw response does not match the diagnosis schema.
+ */
 export function parseDiagnosis(
   raw: string,
   evidence: PreparedEvidence,
@@ -54,6 +67,16 @@ export function parseDiagnosis(
   return { ...parsed, evidence: cited, limitations };
 }
 
+/**
+ * Produces a deterministic diagnosis when AI analysis is unavailable or invalid.
+ *
+ * Derives the failure category and confidence from the first evidence block and
+ * explains that the failure could not be confirmed automatically.
+ *
+ * @param evidence - The evidence captured from the build logs.
+ * @param reason - Explanation of why the fallback was used.
+ * @returns A low-confidence diagnosis that cites the first evidence block.
+ */
 export function fallbackDiagnosis(evidence: PreparedEvidence, reason: string): BuildDiagnosis {
   const first = evidence.blocks[0];
   return {

@@ -916,6 +916,38 @@ describe("ReviewEngine", () => {
       consoleSpy.mockRestore();
     });
 
+    it("re-reviews all files when reReview is set but still writes fresh cache", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: true,
+        reReview: true,
+      });
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Assessment",
+        findings: [],
+        recommendations: [],
+      });
+
+      await engine.reviewPR(123);
+
+      // reReview skips reading cached state entirely...
+      expect(mockCacheGetState).not.toHaveBeenCalled();
+      // ...re-runs the AI review...
+      expect(mockExecutePrompt).toHaveBeenCalled();
+      // ...and still writes fresh cache for future runs.
+      expect(mockCacheSaveState).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
     it("performs new cross-file analysis when some files changed", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
@@ -1250,9 +1282,41 @@ describe("ReviewEngine", () => {
       expect(result.crossFileResult.overallAssessment).toBe("Fast review complete");
     });
 
+    it("fast review counts analyzed files even when no findings are reported", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewType: "fast",
+      });
+      const prDetails = createPRDetails();
+      const files = [
+        createPRFile({ filename: "file1.ts" }),
+        createPRFile({ filename: "file2.ts" }),
+      ];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFastReview.mockReturnValue({
+        fileResults: [],
+        crossFileResult: {
+          overallAssessment: "Clean",
+          findings: [],
+          recommendations: [],
+        },
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.filesReviewed).toBe(2);
+      expect(result.fileResults).toHaveLength(2);
+      expect(result.fileResults.every((r) => r.findings.length === 0)).toBe(true);
+    });
+
     it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
+        streamingEnabled: false,
         reviewStrategy: "multi-agent",
         multiAgentMinConfidence: 0.7,
         multiAgentMaxParallel: 2,
@@ -1330,6 +1394,52 @@ describe("ReviewEngine", () => {
       expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
       const totalFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
       expect(totalFindings).toBe(1);
+    });
+
+    it("multi-agent review counts analyzed files even when no findings survive", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        streamingEnabled: false,
+        reviewStrategy: "multi-agent",
+        multiAgentMinConfidence: 0.7,
+        multiAgentMaxParallel: 2,
+      });
+      const prDetails = createPRDetails();
+      const files = [
+        createPRFile({ filename: "file1.ts" }),
+        createPRFile({ filename: "file2.ts" }),
+      ];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      mockExecutePrompt.mockImplementation(async (_prompt: string, options: unknown) => {
+        const promptType = (options as { promptType?: string } | undefined)?.promptType;
+        if (promptType === "multi-agent-classifier") {
+          return { raw: "{}", parsed: { agents: ["security"] } };
+        }
+        if (promptType === "multi-agent-subagent") {
+          return { raw: "{}", parsed: { findings: [] } };
+        }
+        if (promptType === "multi-agent-synthesizer") {
+          return {
+            raw: "{}",
+            parsed: {
+              overall_assessment: "Clean",
+              findings: [],
+              recommendations: [],
+            },
+          };
+        }
+        return { raw: "{}", parsed: {} };
+      });
+
+      const result = await engine.reviewPR(123);
+
+      expect(result.filesReviewed).toBe(2);
+      expect(result.fileResults).toHaveLength(2);
+      expect(result.fileResults.every((r) => r.findings.length === 0)).toBe(true);
     });
 
     it("uses ordered additive passes when reviewType is custom", async () => {
