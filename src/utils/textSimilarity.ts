@@ -1,3 +1,14 @@
+/**
+ * Calculates the similarity between two strings using bigram (Dice) coefficient.
+ *
+ * Normalizes both inputs (lowercase, punctuation stripped) and returns 1.0 for
+ * identical strings, 0.0 for very short inputs, otherwise the Dice coefficient
+ * of shared character bigrams in the range 0.0 - 1.0.
+ *
+ * @param str1 - First string to compare
+ * @param str2 - Second string to compare
+ * @returns Similarity score between 0.0 (no overlap) and 1.0 (identical)
+ */
 export function calculateTextSimilarity(str1: string, str2: string): number {
   const norm1 = str1
     .toLowerCase()

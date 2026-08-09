@@ -11,7 +11,9 @@ import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSec
 
 /** Focus-area instructions for each specialized subagent role. */
 interface AgentFocus {
+  /** Concrete concern categories the agent should hunt for, rendered as a numbered list. */
   readonly domain: readonly string[];
+  /** Scope constraints telling the agent what to ignore so it stays on-topic. */
   readonly scope: string;
 }
 
@@ -93,6 +95,14 @@ const AGENT_SUMMARIES: Record<AgentRoleId, string> = {
     "Inspects breaking API contracts, project structure, design patterns, naming conventions, and linting compliance.",
 };
 
+/**
+ * Builds the shared PR context block: wrapped title/description plus a listing
+ * of the changed files with their addition/deletion counts.
+ *
+ * @param prDetails - PR metadata whose title and description are wrapped as untrusted input.
+ * @param files - Changed files to list, each with its line addition/deletion counts.
+ * @returns Markdown section containing the PR context and changed file listing.
+ */
 function buildFilesSummary(
   prDetails: PRDetails,
   files: readonly {
@@ -288,8 +298,11 @@ Rules:
 `;
 }
 
+/** Summary of the findings reported by a single subagent, keyed for the synthesizer. */
 interface AgentFindingSummary {
+  /** Role id of the subagent that produced the findings. */
   readonly agent: AgentRoleId;
+  /** Findings emitted by the agent; each carries attribution metadata and review content. */
   readonly findings: readonly {
     readonly file?: string;
     readonly line: number;
@@ -302,6 +315,13 @@ interface AgentFindingSummary {
   }[];
 }
 
+/**
+ * Formats subagent finding summaries into the markdown block embedded in the
+ * synthesizer prompt. Agents without findings render as "No findings".
+ *
+ * @param agentResults - Findings grouped per subagent.
+ * @returns Markdown listing each agent's findings with severity, confidence, and reasoning.
+ */
 function formatAgentFindings(agentResults: readonly AgentFindingSummary[]): string {
   if (agentResults.length === 0) {
     return "No subagent produced findings.";

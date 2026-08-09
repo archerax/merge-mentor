@@ -21,15 +21,30 @@ const PBIReviewResponseSchema = z.object({
   suggestions: z.array(z.string()).default([]),
 });
 
+/** The parsed, zod-validated result of a PBI AI review. */
 export type PBIReviewResponse = z.infer<typeof PBIReviewResponseSchema>;
 
+/**
+ * Configuration options for the PBI review engine.
+ */
 export interface PBIReviewEngineOptions {
+  /** Skip posting the review comment and only display the report (default: false). */
   readonly dryRun?: boolean;
+  /** Directory under which the markdown report is saved. */
   readonly tempPath?: string;
+  /** AI provider used for the review (default: 'copilot-sdk'). */
   readonly aiProvider?: AIProviderType;
+  /** Model identifier used by the AI provider. */
   readonly aiModel?: string;
 }
 
+/**
+ * Reviews Product Backlog Items / user stories for backlog quality.
+ *
+ * Fetches the PBI details from the platform, asks the AI provider to evaluate
+ * it against the INVEST-style quality guidelines, writes a markdown report to
+ * disk, and posts or updates a review comment on the PBI.
+ */
 export class PBIReviewEngine {
   private readonly logger = createChildLogger({ component: "PBIReviewEngine" });
 

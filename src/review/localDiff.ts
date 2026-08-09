@@ -12,7 +12,9 @@ import { createTwoFilesPatch } from "diff";
 
 /** A parsed hunk of a unified diff. */
 interface DiffHunk {
+  /** The `@@ -l,c +l,c @@` header line for the hunk. */
   readonly header: string;
+  /** The diff content lines belonging to this hunk, in order. */
   readonly lines: readonly string[];
 }
 

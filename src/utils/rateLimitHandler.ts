@@ -36,6 +36,7 @@ const DEFAULT_MAX_DELAY_MS = 30000;
 
 const logger = createChildLogger({ component: "RateLimitHandler" });
 
+/** Configuration options for rate limit handling and retry logic. */
 interface RateLimitOptions {
   /** Maximum number of retry attempts. Default: 3 */
   readonly maxRetries?: number;
@@ -51,8 +52,11 @@ interface RateLimitOptions {
   readonly clock?: Clock;
 }
 
+/** Result of analyzing an error for rate limit / transient information. */
 interface RateLimitInfo {
+  /** Milliseconds to wait before retrying (0 when not known). */
   readonly retryAfterMs: number;
+  /** Whether the error was determined to be a rate limit error. */
   readonly isRateLimit: boolean;
 }
 

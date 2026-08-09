@@ -1,6 +1,17 @@
 import { ValidationError } from "../errors/index.js";
 import type { BuildPlatform, BuildReference } from "./types.js";
 
+/**
+ * Builds and validates a {@link BuildReference} from CLI-style options.
+ *
+ * Resolves the platform-specific build ID (GitHub workflow run ID or Azure
+ * build ID) and repository context, and validates that the provided inputs
+ * form a complete, consistent reference.
+ *
+ * @param options - Platform, build IDs, and repository context.
+ * @returns The validated build reference.
+ * @throws `ValidationError` if the platform, build ID, or repository context is invalid.
+ */
 export function createBuildReference(options: {
   platform?: string;
   runId?: string | number;

@@ -1,3 +1,4 @@
+/** MoSCoW priority tags recognized by {@link extractMoSCoWTag}. */
 export type MoSCoWTag = "Must" | "Should" | "Could" | "Won't";
 
 /**

@@ -1,9 +1,16 @@
+/** Parsed components extracted from a work item URL. */
 export interface ParsedWorkItemUrl {
+  /** Platform the work item belongs to: github or azure. */
   platform: "github" | "azure";
+  /** Work item identifier (issue number or work item ID). */
   id: string;
+  /** GitHub repository owner. */
   owner?: string;
+  /** GitHub repository name. */
   repo?: string;
+  /** Azure DevOps organization. */
   org?: string;
+  /** Azure DevOps project. */
   project?: string;
 }
 
@@ -12,6 +19,16 @@ const HELP_TEXT =
   "  GitHub:  https://github.com/{owner}/{repo}/issues/{number}\n" +
   "  Azure:   https://dev.azure.com/{org}/{project}/_workitems/edit/{id}";
 
+/**
+ * Parses a work item URL into its platform-specific components.
+ *
+ * Supports GitHub issue URLs and Azure DevOps work item URLs (both
+ * `dev.azure.com` and legacy `*.visualstudio.com` host formats).
+ *
+ * @param rawUrl - The work item URL to parse
+ * @returns Parsed components including platform and work item ID
+ * @throws {Error} When the URL is empty, not HTTPS, or does not match a supported work item URL format
+ */
 export function parseWorkItemUrl(rawUrl: string): ParsedWorkItemUrl {
   if (!rawUrl || rawUrl.trim() === "") {
     throw new Error(`Invalid work item URL: URL is empty.\n${HELP_TEXT}`);

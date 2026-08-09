@@ -1,15 +1,23 @@
 import { PBIAlignmentResponseSchema } from "./schemas.js";
 
+/** Normalized result of a PBI alignment review extracted from raw AI output. */
 export interface PBIAlignmentResult {
+  /** Identifier of the product backlog item the review belongs to. */
   readonly pbiId: string;
+  /** Title of the reviewed product backlog item. */
   readonly title: string;
+  /** Acceptance criteria that are fully satisfied by the implementation. */
   readonly metCriteria: readonly string[];
+  /** Acceptance criteria that are only partially satisfied, with an explanation per criterion. */
   readonly partialCriteria: readonly {
     readonly criterion: string;
     readonly explanation: string;
   }[];
+  /** Acceptance criteria that are not satisfied by the implementation. */
   readonly missingCriteria: readonly string[];
+  /** Changes or additions that go beyond the scope of the work item. */
   readonly scopeCreep: readonly string[];
+  /** Free-form overall verdict on how well the work item aligns with the review. */
   readonly overallAssessment: string;
 }
 

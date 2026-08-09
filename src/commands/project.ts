@@ -9,6 +9,14 @@ import { ProjectReviewEngine } from "../review/projectEngine.js";
 import { detectGitRemoteUrl, parseGitRemoteUrl } from "../utils/gitRemote.js";
 import type { ProjectOptions } from "./types.js";
 
+/**
+ * Executes the `project` command: reviews a project/feature plan hierarchy
+ * against planning guidelines.
+ *
+ * @param id - Root planning item or Epic ID to review
+ * @param options - Project options (platform, write mode, AI provider, etc.)
+ * @returns Resolves once the project review has been posted or printed
+ */
 export async function executeProjectReview(id: string, options: ProjectOptions): Promise<void> {
   // 1. Auto-detect platform and repository from git remote if possible
   let detectedPlatform: Platform | undefined;

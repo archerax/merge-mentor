@@ -2,7 +2,9 @@ import type { OutputWriter } from "./outputWriter.js";
 
 /** Captured output entry. */
 interface CapturedOutput {
+  /** Which writer method captured the entry (log, error, or write). */
   readonly type: "log" | "error" | "write";
+  /** The captured message or data written to the writer. */
   readonly data: string;
 }
 

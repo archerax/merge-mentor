@@ -10,6 +10,7 @@ import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types
 import type { FileSystem } from "../ports/fileSystem.js";
 import { nodeFs } from "../ports/fileSystem.js";
 
+/** Options for configuring a MockAIProvider. */
 export interface MockAIProviderOptions {
   /** Directory of the scenario containing mock-response.json. */
   readonly scenarioDir?: string;
@@ -41,6 +42,18 @@ export class MockAIProvider implements AIProviderClient {
     this.mockResponse = response;
   }
 
+  /**
+   * Executes a prompt and returns a mock AI response.
+   *
+   * Returns the configured in-memory mock response when set, otherwise loads
+   * and parses `mock-response.json` from the scenario directory (or the
+   * working directory in options). Makes no external API calls.
+   *
+   * @param _prompt - The prompt text (ignored by the mock provider)
+   * @param options - Execution options providing the working directory
+   * @returns The formatted mock AI response
+   * @throws {CorpusEvalError} When no mock response is configured and none can be loaded
+   */
   public async executePrompt(_prompt: string, options?: ExecutePromptOptions): Promise<AIResponse> {
     if (this.mockResponse !== undefined) {
       return this.formatResponse(this.mockResponse);
@@ -70,6 +83,16 @@ export class MockAIProvider implements AIProviderClient {
     }
   }
 
+  /**
+   * Extracts the file review result for a given filename from a mock response.
+   *
+   * Looks up the file in `parsed.fileResults`, falling back to `parsed.findings`
+   * for single-file responses, and an empty findings list when neither is present.
+   *
+   * @param filename - The file to extract a review result for
+   * @param response - The mock AI response
+   * @returns The file review result for the requested filename
+   */
   public parseFileReview(filename: string, response: AIResponse): FileReviewResult {
     const parsed = response.parsed as Record<string, unknown> | null;
     if (parsed && Array.isArray(parsed.fileResults)) {
@@ -96,6 +119,15 @@ export class MockAIProvider implements AIProviderClient {
     };
   }
 
+  /**
+   * Extracts the cross-file review result from a mock response.
+   *
+   * Returns the parsed `overallAssessment` and `findings` when present, otherwise
+   * a default result indicating no cross-file issues.
+   *
+   * @param response - The mock AI response
+   * @returns The cross-file review result
+   */
   public parseCrossFileReview(response: AIResponse): CrossFileReviewResult {
     const parsed = response.parsed as Record<string, unknown> | null;
     if (parsed && typeof parsed.overallAssessment === "string" && Array.isArray(parsed.findings)) {
@@ -114,6 +146,15 @@ export class MockAIProvider implements AIProviderClient {
     };
   }
 
+  /**
+   * Extracts the batched file review results from a mock response.
+   *
+   * Reads `parsed.fileResults` when present, or treats the parsed payload as a
+   * direct array of file results, falling back to an empty list.
+   *
+   * @param response - The mock AI response
+   * @returns The list of file review results
+   */
   public parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
     const parsed = response.parsed as Record<string, unknown> | null;
     if (parsed && Array.isArray(parsed.fileResults)) {
@@ -125,6 +166,15 @@ export class MockAIProvider implements AIProviderClient {
     return [];
   }
 
+  /**
+   * Extracts the fast review result from a mock response.
+   *
+   * Reads `parsed.fileResults` and `parsed.crossFileResult` when present, using
+   * defaults for missing parts.
+   *
+   * @param response - The mock AI response
+   * @returns The fast review result with file and cross-file results
+   */
   public parseFastReview(response: AIResponse): FastReviewResult {
     const parsed = response.parsed as Record<string, unknown> | null;
     if (parsed) {

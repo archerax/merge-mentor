@@ -46,9 +46,13 @@ type GitFileStatus = "added" | "modified" | "deleted" | "renamed";
 
 /** A single file change produced by a local git diff. */
 export interface GitFileChange {
+  /** Path to the file relative to the repository root. */
   readonly path: string;
+  /** Kind of change: added, modified, deleted, or renamed. */
   readonly status: GitFileStatus;
+  /** Number of lines added in the change. */
   readonly additions: number;
+  /** Number of lines deleted in the change. */
   readonly deletions: number;
   /** Unified diff hunk for this file (absent for binary or content-less changes). */
   readonly patch?: string;

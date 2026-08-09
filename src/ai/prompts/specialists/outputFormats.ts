@@ -1,24 +1,51 @@
+/** Options controlling the JSON schema and surrounding instructions of the batched file results output format. */
 interface BatchedFileResultsOutputFormatOptions {
+  /** Optional step-by-step analysis instruction prepended to the RESPONSE directive. */
   readonly analysisInstruction?: string;
+  /** Example severity value shown in the JSON schema. */
   readonly severityExample: string;
+  /** Example category value shown in the JSON schema. */
   readonly categoryExample: string;
+  /** Example finding message shown in the JSON schema. */
   readonly messageExample: string;
+  /** Example suggestion value shown in the JSON schema. */
   readonly suggestionExample: string;
+  /** Example reasoning value shown in the JSON schema. */
   readonly reasoningExample: string;
+  /** Footer text appended after the JSON schema, typically category and completeness rules. */
   readonly footer: string;
 }
 
+/** Options controlling the JSON schema and surrounding instructions of the cross-file output format. */
 interface CrossFileOutputFormatOptions {
+  /** Intro line leading into the JSON schema. */
   readonly intro: string;
+  /** Example severity value shown in the JSON schema. */
   readonly severityExample: string;
+  /** Example category value shown in the JSON schema. */
   readonly categoryExample: string;
+  /** Example finding message shown in the JSON schema. */
   readonly messageExample: string;
+  /** Example reasoning value shown in the JSON schema. */
   readonly reasoningExample: string;
+  /** Example overall assessment value shown in the JSON schema. */
   readonly overallAssessmentExample: string;
+  /** Example recommendation value shown in the JSON schema. */
   readonly recommendationExample: string;
+  /** Footer text appended after the JSON schema, typically category and scope rules. */
   readonly footer: string;
 }
 
+/**
+ * Builds the shared "# OUTPUT FORMAT" section wrapping an intro, JSON schema,
+ * and footer, optionally appending native suggestion rules.
+ *
+ * @param intro - Intro line preceding the JSON code block.
+ * @param schema - JSON schema rendered inside the markdown code block.
+ * @param footer - Footer text appended after the code block.
+ * @param includeNativeSuggestionRules - Whether to append the native inline-replacement rules.
+ * @returns The assembled output format markdown section.
+ */
 function buildOutputFormatSection(
   intro: string,
   schema: string,
@@ -46,6 +73,13 @@ ${schema}
 ${footer}${nativeSuggestionRules}`;
 }
 
+/**
+ * Builds the batched file results output format section with a file_results
+ * JSON schema containing a per-file findings array.
+ *
+ * @param options - Options providing the example values and footer text.
+ * @returns The batched file results output format markdown section.
+ */
 export function buildBatchedFileResultsOutputFormat(
   options: BatchedFileResultsOutputFormatOptions
 ): string {
@@ -86,6 +120,13 @@ export function buildBatchedFileResultsOutputFormat(
   );
 }
 
+/**
+ * Builds the cross-file output format section with a flat findings array plus
+ * overall assessment and recommendations in JSON.
+ *
+ * @param options - Options providing the intro, example values, and footer text.
+ * @returns The cross-file output format markdown section.
+ */
 export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions): string {
   const {
     intro,
@@ -120,6 +161,12 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
+/**
+ * Builds the fast review output format section describing the combined
+ * summary/findings JSON schema, attribution rules, and native suggestion rules.
+ *
+ * @returns The fast review output format markdown section.
+ */
 export function buildFastReviewOutputFormat(): string {
   return buildOutputFormatSection(
     "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",

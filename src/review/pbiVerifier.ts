@@ -10,6 +10,14 @@ import { createChildLogger } from "../logger.js";
 import type { CrossFileReviewResult, PlatformAdapter, PRFile } from "../platforms/types.js";
 import type { OutputWriter } from "../ports/index.js";
 
+/**
+ * Verifies that a PR's changes align with its linked backlog items/issues.
+ *
+ * Fetches the linked work items from the platform and, for each one, asks the
+ * AI provider whether the PR diff satisfies the item's description and
+ * acceptance criteria. Alignment reports are appended to the cross-file review
+ * result's overall assessment.
+ */
 export class PbiVerifier {
   private readonly platform: PlatformAdapter;
   private readonly provider: AIProviderClient;

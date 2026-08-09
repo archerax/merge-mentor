@@ -9,7 +9,9 @@ type SupportedLanguage = "csharp" | "typescript" | "unknown";
  * Base context shared by all cross-file specialist reviews.
  */
 export interface BaseCrossFileContext {
+  /** Summary listing of the changed files embedded in the PR context section. */
   readonly filesSummary: string;
+  /** Per-file review results whose findings are summarized for the cross-file prompt. */
   readonly fileReviewResults: readonly FileReviewResult[];
 }
 

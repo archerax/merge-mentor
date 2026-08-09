@@ -39,11 +39,17 @@ type NewSideKind = "workdir" | "stage" | "tree";
 
 /** A row collected by the tree walk. */
 interface WalkRow {
+  /** File path relative to the repository root. */
   readonly filepath: string;
+  /** OID of the base-side blob, absent when the file was added. */
   readonly baseOid?: string;
+  /** OID of the new-side blob, absent when the file was deleted. */
   readonly newOid?: string;
+  /** Base-side git object type (e.g. "blob"), absent if not present. */
   readonly baseType?: string;
+  /** New-side git object type (e.g. "blob"), absent if not present. */
   readonly newType?: string;
+  /** Which walker produced the new side: workdir, stage, or tree. */
   readonly newKind: NewSideKind;
 }
 
@@ -61,6 +67,17 @@ interface WalkRow {
  * ```
  */
 export class IsomorphicGitClient implements GitClient {
+  /**
+   * Clones a remote repository into a new directory at `targetPath`.
+   *
+   * Uses a shallow, single-branch clone of `opts.branch`, passing credentials
+   * through the isomorphic-git `onAuth` callback.
+   *
+   * @param url        - Public remote URL (no embedded credentials).
+   * @param targetPath - Absolute path for the new working tree.
+   * @param auth       - Authentication context.
+   * @param opts       - Clone options (branch, depth).
+   */
   async clone(
     url: string,
     targetPath: string,
@@ -87,6 +104,14 @@ export class IsomorphicGitClient implements GitClient {
     );
   }
 
+  /**
+   * Fetches the latest state of `branch` from `origin` into an existing clone.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Remote branch name to fetch.
+   * @param auth     - Authentication context.
+   * @param depth    - Shallow fetch depth (defaults to 1).
+   */
   async fetch(repoPath: string, branch: string, auth: GitAuth, depth = 1): Promise<void> {
     const onAuth = buildOnAuth(auth);
     await withTimeout(
@@ -108,6 +133,16 @@ export class IsomorphicGitClient implements GitClient {
     );
   }
 
+  /**
+   * Checks out `branch` in an existing clone, resetting tracked files.
+   *
+   * Points the local branch at the freshly fetched remote tip and updates
+   * HEAD before checking out, so the working tree reflects the latest remote
+   * state even after force-pushes.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Branch name to check out.
+   */
   async checkout(repoPath: string, branch: string): Promise<void> {
     // Point the local branch at the freshly fetched remote tip so the working
     // tree reflects the latest remote state (e.g. after a force-push). Without
@@ -162,6 +197,12 @@ export class IsomorphicGitClient implements GitClient {
     }
   }
 
+  /**
+   * Updates the `origin` remote URL in an existing clone.
+   *
+   * @param repoPath  - Absolute path to the working tree.
+   * @param remoteUrl - New public remote URL.
+   */
   async setRemoteUrl(repoPath: string, remoteUrl: string): Promise<void> {
     await git.setConfig({
       fs,
@@ -171,24 +212,58 @@ export class IsomorphicGitClient implements GitClient {
     });
   }
 
+  /**
+   * Returns the current branch name, or `"HEAD"` when detached.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   */
   async currentBranch(repoPath: string): Promise<string> {
     const branch = await git.currentBranch({ fs, dir: repoPath });
     return branch ?? "HEAD";
   }
 
+  /**
+   * Returns the configured `origin` remote URL, or `undefined` when the
+   * repository has no `origin` remote.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   */
   async getRemoteUrl(repoPath: string): Promise<string | undefined> {
     const url = await git.getConfig({ fs, dir: repoPath, path: "remote.origin.url" });
     return url?.length ? url : undefined;
   }
 
+  /**
+   * Compares the working tree (staged + unstaged, including untracked files)
+   * against a base ref.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref to diff against (defaults to `HEAD`).
+   * @returns File changes with patches relative to the base ref.
+   */
   async workingTreeDiff(repoPath: string, baseRef = "HEAD"): Promise<GitFileChange[]> {
     return this.walkDiff(repoPath, baseRef, git.WORKDIR(), "workdir");
   }
 
+  /**
+   * Compares the index (staged changes) against a base ref.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref to diff against (defaults to `HEAD`).
+   * @returns Staged file changes with patches relative to the base ref.
+   */
   async stagedDiff(repoPath: string, baseRef = "HEAD"): Promise<GitFileChange[]> {
     return this.walkDiff(repoPath, baseRef, git.STAGE(), "stage");
   }
 
+  /**
+   * Compares two refs against each other.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param baseRef  - Base ref (older side of the diff).
+   * @param headRef  - Head ref (newer side of the diff).
+   * @returns File changes between the two refs.
+   */
   async diff(repoPath: string, baseRef: string, headRef: string): Promise<GitFileChange[]> {
     return this.walkDiff(repoPath, baseRef, git.TREE({ ref: headRef }), "tree");
   }

@@ -6,9 +6,13 @@ import { executePostComment, PostCommentArgsSchema } from "./postCommentTool.js"
  * Interface representing a provider-agnostic custom tool definition compatible with OpenCode.
  */
 export interface OpencodeToolDefinition {
+  /** Name of the tool exposed to the model. */
   name: string;
+  /** Description telling the model when and how to invoke the tool. */
   description: string;
+  /** JSON schema describing the tool's accepted parameters. */
   parameters: Record<string, unknown>;
+  /** Async function executing the tool and returning its result text for the LLM. */
   handler: (
     args: Record<string, unknown>
   ) => Promise<{ textResultForLlm: string; resultType: string }>;

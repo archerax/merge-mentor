@@ -25,6 +25,7 @@
  * ```
  */
 
+/** A single diff line with its calculated line number in the new file. */
 interface NumberedLine {
   /** Line number in the new file (undefined for deleted lines) */
   newLineNumber: number | undefined;
@@ -34,6 +35,7 @@ interface NumberedLine {
   content: string;
 }
 
+/** A diff hunk with its header and the numbered lines it contains. */
 interface NumberedHunk {
   /** Header showing line range info */
   header: string;
@@ -41,6 +43,7 @@ interface NumberedHunk {
   lines: NumberedLine[];
 }
 
+/** A parsed unified diff containing all of its hunks. */
 interface NumberedDiff {
   /** All hunks in the diff */
   hunks: NumberedHunk[];

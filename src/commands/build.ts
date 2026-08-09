@@ -16,11 +16,24 @@ import {
 } from "../ports/index.js";
 import type { BuildAnalyzeOptions } from "./types.js";
 
+/** Dependency injection container for the build analysis command. */
 interface BuildDeps {
+  /** Environment abstraction. Defaults to `processEnvironment`. */
   env?: Environment;
+  /** Output writer for console logging. Defaults to `consoleOutputWriter`. */
   output?: OutputWriter;
 }
 
+/**
+ * Executes the `build` command: analyzes a failed CI build and generates a
+ * read-only Markdown diagnosis.
+ *
+ * @param options - Build analysis options (platform, run/build ID, AI provider, etc.)
+ * @param deps - Dependency injection container for environment and output
+ * @returns The generated Markdown report
+ * @throws When `--write` or a non-markdown `--format` is requested, when `--ci`
+ * is set outside a supported CI environment, or when no platform token is available
+ */
 export async function executeBuildAnalyze(
   options: BuildAnalyzeOptions,
   deps: BuildDeps = {}

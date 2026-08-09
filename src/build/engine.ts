@@ -12,6 +12,19 @@ import type {
   BuildReference,
 } from "./types.js";
 
+/**
+ * Runs a full analysis of a failed CI build.
+ *
+ * Fetches the build summary and failure logs from the provider, normalizes the
+ * evidence, persists log artifacts, and produces a diagnosis either via the
+ * configured AI provider or a deterministic fallback.
+ *
+ * @param reference - The build to analyze.
+ * @param provider - Platform adapter used to fetch build metadata and logs.
+ * @param options - Tuning knobs for evidence size, artifact storage, and AI analysis.
+ * @returns The complete analysis result, including summary, evidence, diagnosis, and report.
+ * @throws `BuildAnalysisError` if the build is still running or succeeded.
+ */
 export async function analyzeBuild(
   reference: BuildReference,
   provider: BuildAnalysisProvider,

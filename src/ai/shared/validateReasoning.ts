@@ -6,6 +6,15 @@ const evidencePattern =
 const impactPattern =
   /crash|error|fail|incorrect|wrong|stale|leak|latency|slow|outage|risk|vulnerab|expos|bypass|break|corrupt|deadlock|race|allow|cause|impact|inconsistent|timeout/i;
 
+/**
+ * Sanity-checks a finding's reasoning text, warning when it is too short or
+ * lacks evidence and impact cues. Emits warnings only; it never throws.
+ *
+ * @param logger - Logger used to emit the warnings.
+ * @param reasoning - The finding's reasoning text to validate.
+ * @param filename - File the finding relates to, included in warning context.
+ * @param lineOrLocation - Line number or location string of the finding.
+ */
 export function validateReasoning(
   logger: { warn: (obj: Record<string, unknown>, msg: string) => void },
   reasoning: string,

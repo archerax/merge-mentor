@@ -84,14 +84,23 @@ type AuditSeverity = "info" | "warn" | "error";
  * Represents a single auditable action with its context, result, and any errors.
  */
 interface AuditEvent {
+  /** Type of audit event (e.g. "pr.details.fetch", "review.start"). */
   readonly eventType: AuditEventType;
+  /** ISO timestamp of when the event occurred. */
   readonly timestamp: string;
+  /** Severity derived from the result: info, warn, or error. */
   readonly severity: AuditSeverity;
+  /** Actor identifier (user or service) that performed the action. */
   readonly actor: string;
+  /** Resource that was acted upon. */
   readonly resource: AuditResource;
+  /** Human-readable description of the action performed. */
   readonly action: string;
+  /** Outcome of the action: success, failure, or partial. */
   readonly result: "success" | "failure" | "partial";
+  /** Optional key-value metadata providing additional context. */
   readonly metadata?: Record<string, unknown>;
+  /** Optional error message when the action failed. */
   readonly error?: string;
 }
 
@@ -102,8 +111,11 @@ interface AuditEvent {
  * with optional details about the resource.
  */
 interface AuditResource {
+  /** Kind of resource being acted upon. */
   readonly type: "pr" | "file" | "comment" | "ai" | "review";
+  /** Unique identifier for the resource (PR number, file path, etc.). */
   readonly id: string;
+  /** Optional additional details about the resource. */
   readonly details?: Record<string, unknown>;
 }
 

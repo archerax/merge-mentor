@@ -78,14 +78,26 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     );
   }
 
+  /**
+   * Returns the project identifier for this platform instance.
+   * @returns Organization/project/repository path
+   */
   getProjectIdentifier(): string {
     return `${this.org}/${this.project}/${this.repoName}`;
   }
 
+  /**
+   * Returns the platform name for dispatching platform-specific logic.
+   * @returns "azure"
+   */
   getPlatformName(): "azure" {
     return "azure";
   }
 
+  /**
+   * Returns repository information for context loading.
+   * @returns Repository owner (organization), name, and platform
+   */
   getRepoInfo(): RepoInfo {
     return {
       owner: this.org,
@@ -96,10 +108,19 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     };
   }
 
+  /**
+   * Gets the authentication token for API calls.
+   * @returns Azure DevOps personal access token
+   */
   getToken(): string {
     return this.token;
   }
 
+  /**
+   * Retrieves pull request details from Azure DevOps.
+   * @param prNumber - The PR number to fetch
+   * @returns Details about the pull request
+   */
   async getPRDetails(prNumber: number): Promise<PRDetails> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -124,6 +145,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves files changed in a pull request, generating diffs from blob content at both commits.
+   * @param prNumber - The PR number
+   * @param ignorePatterns - Optional glob patterns to skip fetching file content/diffs early
+   * @returns Array of files changed in the pull request
+   */
   async getPRFiles(prNumber: number, ignorePatterns?: string[]): Promise<PRFile[]> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -624,6 +651,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     return `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n`;
   }
 
+  /**
+   * Gets existing bot comments on a PR from its comment threads.
+   * @param prNumber - The PR number
+   * @returns Comments written by the bot
+   */
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -661,6 +693,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves a specific comment thread by thread or comment ID.
+   * @param prNumber - The PR number
+   * @param commentId - The thread or comment ID
+   * @returns The matching comment thread
+   * @throws If the thread cannot be found on the PR
+   */
   async getCommentThread(
     prNumber: number,
     commentId: string | number
@@ -714,6 +753,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves all unresolved/active PR comment threads.
+   * @param prNumber - The PR number
+   * @returns Array of unresolved comment threads
+   */
   async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -763,6 +807,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a reply to an existing PR comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   * @param body - The reply message body
+   */
   async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -801,6 +851,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Resolves an unresolved PR comment thread by closing it.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   */
   async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -829,6 +884,14 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts an inline comment on a specific file line.
+   * @param prNumber - The PR number
+   * @param path - File path
+   * @param line - Line number
+   * @param body - Comment body
+   * @param startLine - Optional first line of a multi-line comment range
+   */
   async postInlineComment(
     prNumber: number,
     path: string,
@@ -871,6 +934,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a general (top-level) comment thread on the PR.
+   * @param prNumber - The PR number
+   * @param body - Comment body
+   */
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -900,6 +968,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves Azure DevOps work item details as PBI data, including comments, a MoSCoW tag,
+   * story points, and backlog priority. Task details are merged with the parent PBI when available.
+   * @param id - The work item ID
+   * @returns Details about the work item
+   * @throws If the work item ID is invalid or the work item is not found
+   */
   async getPBIDetails(id: string): Promise<PBIDetails> {
     const workItemId = Number.parseInt(id, 10);
     if (Number.isNaN(workItemId)) {
@@ -1039,6 +1114,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Posts a new comment on a work item, or updates an existing one when commentId is provided.
+   * @param id - The work item ID
+   * @param body - Comment body
+   * @param commentId - Optional comment ID to update an existing comment in-place
+   */
   async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
     const workItemId = Number.parseInt(id, 10);
     if (Number.isNaN(workItemId)) {
@@ -1138,6 +1219,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Identifies work items linked to a PR via Azure DevOps link relationships.
+   * @param prNumber - The PR number
+   * @returns Array of linked work item IDs
+   */
   async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
     try {
       const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
@@ -1174,6 +1260,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Updates the title and description of a pull request.
+   * @param prNumber - The PR number
+   * @param details - The new title and/or description to apply
+   */
   async updatePRDetails(
     prNumber: number,
     details: { readonly title?: string; readonly body?: string }
@@ -1202,6 +1293,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Retrieves hierarchical project details (Epics, Features, child stories/PBIs, and dependencies)
+   * by walking the work item hierarchy starting at the root work item.
+   * @param id - The root work item ID
+   * @returns The project hierarchy and its dependencies
+   */
   async getProjectDetails(id: string): Promise<ProjectDetails> {
     const workItemId = Number.parseInt(id, 10);
     if (Number.isNaN(workItemId)) {
@@ -1390,6 +1487,12 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
   }
 }
 
+/**
+ * Strips HTML tags from text, converting block elements to newlines and decoding basic
+ * HTML entities while preserving HTML comments.
+ * @param html - The HTML text to strip
+ * @returns The plain text version of the input
+ */
 function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
 
@@ -1422,6 +1525,11 @@ function stripHtml(html: string | null | undefined): string {
 
 const ContainerWorkItemTypes = new Set(["Project", "Epic", "Feature"]);
 
+/**
+ * Normalizes a platform-specific work item state into a canonical status.
+ * @param state - The raw work item state
+ * @returns "todo", "inprogress", "done", or "unknown"
+ */
 function normalizeState(state: string | null | undefined): WorkItemState {
   if (!state) return "unknown";
   const lower = state.toLowerCase().replace(/\s+/g, "");

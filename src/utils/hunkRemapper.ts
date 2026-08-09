@@ -1,3 +1,14 @@
+/**
+ * Remaps a line number from the old file version to the new file version.
+ *
+ * Tracks hunk headers and added/removed lines in the patch to compute the
+ * offset for a given original line. Returns the original line unchanged when
+ * the line was removed or the patch does not contain enough context.
+ *
+ * @param originalLine - Line number in the old file version
+ * @param patch - Unified diff patch string
+ * @returns The corresponding line number in the new file version
+ */
 export function remapLineNumber(originalLine: number, patch: string | undefined): number {
   if (!patch || originalLine <= 0) return originalLine;
 

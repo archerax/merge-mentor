@@ -1,5 +1,14 @@
 import { JsonParseError } from "../../errors/index.js";
 
+/**
+ * Extracts and parses JSON from a raw AI response. Tries markdown code blocks,
+ * a direct parse, then object/array substrings before falling back to a final
+ * brace-matching attempt.
+ *
+ * @param raw - The raw response text from the AI model.
+ * @returns The parsed JSON value.
+ * @throws {JsonParseError} When no valid JSON can be extracted from the response.
+ */
 export function parseJsonResponse(raw: string): unknown {
   // 1. Try markdown code block with json tag
   const markdownMatches = raw.matchAll(/```(?:json)?\s*\n([\s\S]*?)\n```/gi);

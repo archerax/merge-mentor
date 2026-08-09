@@ -9,6 +9,14 @@ import { PBIReviewEngine } from "../review/pbiEngine.js";
 import { detectGitRemoteUrl, parseGitRemoteUrl } from "../utils/gitRemote.js";
 import type { PBIOptions } from "./types.js";
 
+/**
+ * Executes the `pbi` command: reviews a Product Backlog Item / User Story /
+ * Issue against the INVEST model.
+ *
+ * @param id - Work item ID to review
+ * @param options - PBI options (platform, write mode, AI provider, etc.)
+ * @returns Resolves once the PBI review has been posted or printed
+ */
 export async function executePBIReview(id: string, options: PBIOptions): Promise<void> {
   // 1. Auto-detect platform and repository from git remote if possible
   let detectedPlatform: Platform | undefined;

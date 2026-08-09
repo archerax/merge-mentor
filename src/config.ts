@@ -22,29 +22,41 @@ export type { ReviewPass, ReviewStrategy } from "./review/reviewSelection.js";
 
 /** GitHub-specific configuration. */
 interface GitHubConfig {
+  /** GitHub personal access token used to authenticate API requests. */
   readonly token: string;
+  /** GitHub repository owner (user or organization). */
   readonly owner: string;
+  /** GitHub repository name. */
   readonly repo: string;
 }
 
 /** Azure DevOps-specific configuration. */
 interface AzureConfig {
+  /** Azure DevOps personal access token used to authenticate API requests. */
   readonly token: string;
+  /** Azure DevOps organization name. */
   readonly org: string;
+  /** Azure DevOps project name. */
   readonly project: string;
+  /** Azure DevOps repository name. */
   readonly repo: string;
 }
 
 /** Application configuration loaded from environment variables. */
 export interface Config {
+  /** Platform used when none is explicitly specified. */
   readonly defaultPlatform: Platform;
+  /** GitHub-specific configuration (token, owner, repo). */
   readonly github: GitHubConfig;
+  /** Azure DevOps-specific configuration (token, org, project, repo). */
   readonly azure: AzureConfig;
+  /** Identifier string used to recognize bot comments on PRs. */
   readonly botCommentIdentifier: string;
   /** AI provider to use for code reviews. Default: copilot-sdk */
   readonly aiProvider: AIProviderType;
   /** Git backend to use for cloning and fetching repositories. Default: cli */
   readonly gitBackend: GitBackendType;
+  /** Copilot token used for the copilot-sdk provider. */
   readonly copilotToken?: string;
   /** Shared timeout for all AI providers. Preferred over provider-specific timeout aliases. */
   readonly aiTimeoutMs?: number;
@@ -238,30 +250,55 @@ export function loadConfig(
 
 /** CLI parameter overrides for configuration. */
 interface CliOverrides {
+  /** Override for the default platform (github or azure). */
   readonly platform?: string;
+  /** Override for GitHub token. */
   readonly githubToken?: string;
+  /** Override for GitHub repository owner. */
   readonly githubRepoOwner?: string;
+  /** Override for GitHub repository name. */
   readonly githubRepoName?: string;
+  /** Override for Azure DevOps token. */
   readonly azureToken?: string;
+  /** Override for Azure DevOps organization. */
   readonly azureOrg?: string;
+  /** Override for Azure DevOps project. */
   readonly azureProject?: string;
+  /** Override for Azure DevOps repository. */
   readonly azureRepo?: string;
+  /** Override for the AI provider name. */
   readonly aiProvider?: string;
+  /** Override for the Copilot token. */
   readonly copilotToken?: string;
+  /** Override for the AI provider timeout (milliseconds). */
   readonly aiTimeout?: number;
+  /** Override for the AI model identifier. */
   readonly aiModel?: string;
+  /** Override for the OpenAI-compatible base URL. */
   readonly aiBaseUrl?: string;
+  /** Override for the BYOK API key. */
   readonly aiApiKey?: string;
+  /** Override for the review type. */
   readonly reviewType?: string;
+  /** Override for the review passes. */
   readonly passes?: string;
+  /** Override for the review strategy. */
   readonly reviewStrategy?: string;
+  /** Override for streaming output of AI providers. */
   readonly streamingEnabled?: boolean;
+  /** Override for the number of streaming display lines. */
   readonly streamingLines?: number;
+  /** Override for the base temporary file path. */
   readonly tempPath?: string;
+  /** Override for the git backend (cli or isomorphic). */
   readonly gitBackend?: string;
+  /** Override for long-context tier pinning. */
   readonly longContext?: boolean;
+  /** Override for the reasoning effort level. */
   readonly reasoning?: string;
+  /** Override for experimental structured output via tool calls. */
   readonly experimentalTools?: boolean;
+  /** Override for verifying PR changes against linked work items. */
   readonly verifyPbi?: boolean;
 }
 

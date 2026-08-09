@@ -5,13 +5,28 @@ import type { FileSystem, OutputWriter } from "../ports/index.js";
 import type { DiffManifest } from "./diffStorage.js";
 import type { RepoManager } from "./repoManager.js";
 
+/**
+ * Options for the workspace manager.
+ */
 export interface WorkspaceManagerOptions {
+  /** Base path for temporary clone storage (defaults to `.mergementor`). */
   readonly tempPath?: string;
+  /** Pre-existing local checkout to use instead of cloning (e.g. in CI). */
   readonly localWorkspacePath?: string;
+  /** Enable verbose progress logging (default: true). */
   readonly verbose?: boolean;
+  /** CI mode: plain-text non-interactive output. */
   readonly ciMode?: boolean;
 }
 
+/**
+ * Resolves and prepares the repository workspace used by CLI agents.
+ *
+ * Prefers a pre-existing local checkout (`localWorkspacePath`, e.g. from a CI
+ * pipeline) and otherwise clones the repository via the injected
+ * {@link RepoManager}. Also copies stored diff files into the repository's
+ * `.mergementor/diffs` directory so the AI provider can attach them.
+ */
 export class WorkspaceManager {
   private readonly platform: PlatformAdapter;
   private readonly repoManager: RepoManager;

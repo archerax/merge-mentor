@@ -17,6 +17,7 @@ import type { BaseCrossFileContext } from "./types.js";
  * Context for security cross-file analysis.
  */
 export interface SecurityCrossFileContext extends BaseCrossFileContext {
+  /** Markdown of already-posted PR comments to avoid re-reporting. */
   readonly existingCommentsContext?: string;
 }
 

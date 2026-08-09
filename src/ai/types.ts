@@ -7,7 +7,9 @@ import type { ProcessRunner } from "../ports/processRunner.js";
 
 /** Combined result from fast review (single-pass file + cross-file analysis). */
 export interface FastReviewResult {
+  /** Per-file review results split from the flat findings list. */
   readonly fileResults: FileReviewResult[];
+  /** Cross-file review result built from the non-file findings and summary. */
   readonly crossFileResult: CrossFileReviewResult;
 }
 
@@ -19,27 +21,41 @@ export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {
+  /** Number of input (prompt) tokens consumed. */
   readonly inputTokens: number;
+  /** Number of output (completion) tokens produced. */
   readonly outputTokens: number;
+  /** Tokens served from cache across read and write cache events, when reported. */
   readonly cachedTokens?: number;
+  /** Number of premium (enhanced) requests made, when reported. */
   readonly premiumRequests?: number;
+  /** Model identifier the usage report corresponds to, when reported. */
   readonly model?: string;
+  /** API-side duration of the call in seconds, when reported. */
   readonly durationApiSeconds?: number;
+  /** Wall-clock duration of the call in seconds, when measured locally. */
   readonly durationWallSeconds?: number;
 }
 
 /** Response from executing an AI prompt. */
 export interface AIResponse {
+  /** Raw text returned by the AI provider. */
   readonly raw: string;
+  /** Parsed JSON extracted from the raw response, or null when parsing failed. */
   readonly parsed: unknown;
+  /** Token usage statistics accumulated across attempts, when available. */
   readonly tokenUsage?: TokenUsage;
 }
 
 /** Options for configuring AI providers. */
 export interface AIProviderOptions {
+  /** Maximum number of attempts per prompt execution. Defaults to DEFAULT_MAX_RETRIES. */
   readonly maxRetries?: number;
+  /** Per-operation timeout in milliseconds. Defaults to DEFAULT_TIMEOUT_MS. */
   readonly timeoutMs?: number;
+  /** Model identifier; defaults to provider-specific auto-selection. */
   readonly model?: string;
+  /** Optional authentication token (e.g. a GitHub PAT) for the provider. */
   readonly token?: string;
   /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
   readonly aiBaseUrl?: string;

@@ -6,11 +6,21 @@ import type { ReviewPass } from "../reviewSelection.js";
  */
 const AGENT_ROLE_IDS = ["general", "security", "performance", "testing", "architecture"] as const;
 
+/** Union of the five hardcoded specialized subagent role identifiers. */
 export type AgentRoleId = (typeof AGENT_ROLE_IDS)[number];
 
+/**
+ * A specialized subagent role in the multi-agent strategy.
+ *
+ * Defines a stable identifier, a human-readable label, an emoji used in
+ * progress output, and the ReviewPass values that dispatch to this agent.
+ */
 export interface AgentRole {
+  /** Stable identifier for the agent role (e.g. "security"). */
   readonly id: AgentRoleId;
+  /** Human-readable agent name shown in logs and streaming output. */
   readonly label: string;
+  /** Emoji glyph used to decorate progress messages for this agent. */
   readonly emoji: string;
   /** ReviewPass values that dispatch to this agent. */
   readonly passes: readonly ReviewPass[];
@@ -61,6 +71,12 @@ for (const agent of AGENT_ROLES) {
   }
 }
 
+/**
+ * Type guard that checks whether a string is a known agent role identifier.
+ *
+ * @param value - Arbitrary string to test.
+ * @returns `true` when the value matches one of the defined agent role ids.
+ */
 export function isAgentRoleId(value: string): value is AgentRoleId {
   return (AGENT_ROLE_IDS as readonly string[]).includes(value);
 }
@@ -91,6 +107,13 @@ export function getAllAgentIds(): AgentRoleId[] {
   return [...AGENT_ROLE_IDS];
 }
 
+/**
+ * Returns the role definition for a given agent id, or `undefined` if the id
+ * is not a known agent role.
+ *
+ * @param id - Agent role identifier to look up.
+ * @returns The matching {@link AgentRole}, or `undefined` when not found.
+ */
 export function getAgentRole(id: AgentRoleId): AgentRole | undefined {
   return AGENT_ROLES.find((role) => role.id === id);
 }

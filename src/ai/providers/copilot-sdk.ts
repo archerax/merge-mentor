@@ -46,10 +46,15 @@ import type {
   TokenUsage,
 } from "../types.js";
 
+/** Configuration for a bring-your-own-key OpenAI-compatible provider session. */
 interface CopilotSdkByokProviderConfig {
+  /** Provider family; only "openai" is supported. */
   readonly type: "openai";
+  /** Base URL of the OpenAI-compatible endpoint. */
   readonly baseUrl: string;
+  /** Optional API key used to authenticate against the endpoint. */
   readonly apiKey?: string;
+  /** Optional wire API variant; "responses" is used for models requiring it. */
   readonly wireApi?: "responses";
 }
 

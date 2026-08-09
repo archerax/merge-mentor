@@ -42,6 +42,14 @@ const FAST_PASS_DETAILS: Record<ReviewPass, readonly string[]> = {
   ],
 };
 
+/**
+ * Builds the "Additional Focused Passes" section detailing each selected pass
+ * with its concrete re-analysis instructions. Returns an empty string when no
+ * passes are selected.
+ *
+ * @param selectedPasses - Optional ordered list of review passes to render.
+ * @returns Markdown section describing the additional focused passes, or "" when none are selected.
+ */
 function buildAdditionalPassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
   if (!selectedPasses || selectedPasses.length === 0) {
     return "";
@@ -58,6 +66,13 @@ ${selectedPasses
 `;
 }
 
+/**
+ * Joins extra context sections into a single newline-separated markdown block.
+ * Returns an empty string when no additional sections are provided.
+ *
+ * @param additionalContextSections - Optional extra markdown sections to append.
+ * @returns The additional sections joined together, or "" when none are provided.
+ */
 function buildAdditionalContextSections(additionalContextSections?: readonly string[]): string {
   if (!additionalContextSections || additionalContextSections.length === 0) {
     return "";
@@ -66,6 +81,19 @@ function buildAdditionalContextSections(additionalContextSections?: readonly str
   return `\n${additionalContextSections.join("\n\n")}\n`;
 }
 
+/**
+ * Builds the single-pass fast review prompt combining file-level analysis,
+ * cross-file architectural analysis, optional additive passes, and the fast
+ * review output format specification.
+ *
+ * @param prDetails - PR metadata used for the PR context section.
+ * @param manifest - Diff manifest listing the files to review.
+ * @param existingCommentsContext - Optional markdown of already-posted PR comments to avoid duplicating.
+ * @param repoPath - Optional repository root used for workspace access sections.
+ * @param selectedPasses - Optional ordered list of additive review passes.
+ * @param additionalContextSections - Optional extra markdown sections to append.
+ * @returns The complete fast review prompt.
+ */
 export function buildFastReviewPrompt(
   prDetails: PRDetails,
   manifest: DiffManifest,

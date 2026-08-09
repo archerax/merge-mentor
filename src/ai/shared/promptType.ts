@@ -10,6 +10,12 @@ export type PromptType =
   | "multi-agent-synthesizer"
   | "unknown";
 
+/**
+ * Infers the prompt type by scanning the prompt text for known marker phrases.
+ *
+ * @param prompt - The prompt text to classify.
+ * @returns The detected prompt type, or "unknown" when no marker matches.
+ */
 export function inferPromptType(prompt: string): PromptType {
   if (prompt.includes("failed CI build")) return "build-analysis";
   if (prompt.includes("file_results")) return "batched-file-review";

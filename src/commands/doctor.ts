@@ -6,6 +6,13 @@ import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
 import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
 
+/**
+ * Executes the `doctor` command: runs system, AI provider, and configuration
+ * diagnostics and prints the results to the console.
+ *
+ * @param options - Doctor options, optionally limiting checks to a specific provider
+ * @returns Resolves once all diagnostics have been printed
+ */
 export async function executeDoctorCommand(options: { provider?: string }): Promise<void> {
   const output = consoleOutputWriter;
   const env = processEnvironment;

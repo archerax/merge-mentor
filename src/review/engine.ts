@@ -250,12 +250,34 @@ interface ReviewEngineOptions {
  * ```
  */
 export interface DescribePrOptions {
+  /** PR number to generate the description for. */
   readonly prNumber: number;
+  /** Whether to also generate and return a suggested PR title. */
   readonly suggestTitle?: boolean;
+  /** Whether to push the generated title/body back to the platform. */
   readonly write?: boolean;
+  /** Whether to stream AI output live while generating (default: true). */
   readonly streamingEnabled?: boolean;
 }
 
+/**
+ * Main PR review orchestrator.
+ *
+ * Coordinates the full review lifecycle: fetching PR data from the platform,
+ * running the resolved review profile (per-file review, cross-file analysis,
+ * fast or multi-agent strategies), validating finding line numbers, posting or
+ * updating PR comments, and caching review state. Depends on injected
+ * platform, AI provider, filesystem, and output abstractions.
+ *
+ * @example
+ * ```typescript
+ * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
+ *   reviewType: 'security',
+ *   dryRun: false,
+ * });
+ * const result = await engine.reviewPR(123);
+ * ```
+ */
 export class ReviewEngine {
   private readonly platform: PlatformAdapter;
   private readonly provider: AIProviderClient;
@@ -507,6 +529,18 @@ export class ReviewEngine {
     return { title, body };
   }
 
+  /**
+   * Reviews a pull request end to end and posts or updates comments.
+   *
+   * Fetches PR details and files, resolves the repository workspace, and runs
+   * the full review pipeline for the configured profile. Findings are posted
+   * as PR comments (unless in dry-run mode) and the per-file review state is
+   * cached for subsequent runs.
+   *
+   * @param prNumber - The pull request number to review.
+   * @returns Complete review results including findings and comment stats.
+   * @throws {ValidationError} When prNumber is not a positive integer.
+   */
   async reviewPR(prNumber: number): Promise<ReviewResult> {
     if (prNumber <= 0 || !Number.isInteger(prNumber)) {
       this.logger.error({ prNumber }, "Invalid PR number");

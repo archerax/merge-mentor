@@ -32,6 +32,9 @@ const CONFIDENCE_SCORES: Record<string, number> = {
   low: 0.3,
 };
 
+/**
+ * Configuration options for the multi-agent review orchestrator.
+ */
 export interface MultiAgentOrchestratorOptions {
   /** ReviewPasses that resolve to the enabled subagent set. Default: all agents. */
   readonly passes?: readonly ReviewPass[];
@@ -49,40 +52,75 @@ export interface MultiAgentOrchestratorOptions {
   };
 }
 
+/**
+ * Inputs required to run a multi-agent review over a stored diff manifest.
+ */
 export interface MultiAgentReviewInput {
+  /** Pull request details used to build agent and classifier prompts. */
   readonly prDetails: PRDetails;
+  /** Diff manifest describing the files and stored diffs being reviewed. */
   readonly manifest: DiffManifest;
   /** Absolute paths to the numbered diff files for @file attachment. */
   readonly diffFiles?: readonly string[];
+  /** Existing bot comments to give subagents context and avoid repeats. */
   readonly existingComments?: readonly ExistingComment[];
+  /** Repository working directory for the AI provider's tool access. */
   readonly repoPath?: string;
 }
 
+/** A single subagent's raw output before synthesis. */
 interface AgentRunResult {
+  /** Agent role that produced the findings. */
   readonly agent: AgentRoleId;
+  /** Raw findings reported by this subagent before synthesis. */
   readonly findings: readonly FileFinding[];
 }
 
+/**
+ * The synthesized result of a multi-agent review run.
+ */
 export interface MultiAgentReviewOutput {
+  /** Final per-file review results after synthesis and confidence filtering. */
   readonly fileResults: readonly FileReviewResult[];
+  /** Cross-file architectural assessment produced by the synthesizer. */
   readonly crossFileResult: CrossFileReviewResult;
   /** Subagents that were actually dispatched (after pre-classification). */
   readonly dispatchedAgents: readonly AgentRoleId[];
   /** Findings each subagent produced before synthesis. */
   readonly agentResults: readonly AgentRunResult[];
+  /** Aggregated token usage across all AI calls in the run. */
   readonly tokenUsage?: TokenUsage;
 }
 
+/** A subagent execution tracked by the concurrency pool. */
 interface AgentExecution {
+  /** Agent role that was executed. */
   readonly agent: AgentRoleId;
+  /** Findings parsed from the agent's AI response. */
   readonly findings: readonly FileFinding[];
+  /** Token usage reported by the agent's AI call. */
   readonly tokenUsage?: TokenUsage;
 }
 
+/**
+ * Maps a confidence string to a numeric score used for minConfidence filtering.
+ *
+ * @param confidence - Confidence label (e.g. "high", "medium", "low").
+ * @returns The numeric score, or 0 for unknown labels.
+ */
 function scoreConfidence(confidence: string): number {
   return CONFIDENCE_SCORES[confidence] ?? 0;
 }
 
+/**
+ * Runs `fn` over `items` concurrently, processing at most `limit` items at a
+ * time while preserving input order in the results.
+ *
+ * @param items - Values to process.
+ * @param limit  - Maximum number of concurrent executions.
+ * @param fn     - Async function applied to each item and its index.
+ * @returns Results in the same order as `items`.
+ */
 async function runWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,
