@@ -234,7 +234,7 @@ merge-mentor review --pr 123 --ignore '*.test.ts' --ignore 'dist/**' --ignore 'c
 
 Shows the last N lines of AI model output in real-time, providing feedback during long reviews. Automatically disables in non-TTY environments (CI/CD).
 
-In **multi-agent** reviews, the pre-classifier and lead synthesizer stream live output, and every subagent reports plain-text progress (`⏳ [security] analyzing…` → `✓ [security] done — 3 finding(s) in 41s`). When streaming is inactive, periodic `still working: security (12s)…` lines keep you informed in any environment, including piped or captured output.
+In **multi-agent** reviews, the pre-classifier and lead synthesizer stream live output. Every subagent streams its output into a shared live display prefixed per agent (`[security] …`), and reports plain-text progress (`⏳ [security] analyzing…` → `✓ [security] done — 3 finding(s) in 41s`). When streaming is active but no tokens arrive for a while (the model is "thinking" in silence) — or when streaming is inactive — periodic `still working: security (12s)…` lines keep you informed in any environment, including piped or captured output.
 
 ```bash
 # Disable streaming output

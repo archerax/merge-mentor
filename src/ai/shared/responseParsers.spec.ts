@@ -176,6 +176,7 @@ describe("responseParsers", () => {
     const findings = parseAgentReview(mockLogger, response);
 
     expect(findings).toHaveLength(1);
+    expect(findings[0].file).toBe("auth.ts");
     expect(findings[0].line).toBe(12);
     expect(findings[0].category).toBe("security");
     expect(mockLogger.warn).toHaveBeenCalled();

@@ -52,6 +52,8 @@ type FindingConfidence = "high" | "medium" | "low";
 
 /** A finding from reviewing a specific file. */
 export interface FileFinding {
+  /** Path of the file the finding refers to, when known (e.g. subagent output). */
+  readonly file?: string;
   /** Line number in the file where the issue occurs. */
   readonly line: number;
   /** Optional first line of a native replacement suggestion. */

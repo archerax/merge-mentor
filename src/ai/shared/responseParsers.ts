@@ -235,6 +235,7 @@ export function parseAgentReview(logger: ParserLogger, response: AIResponse): Fi
 
     validateReasoning(logger, finding.reasoning, finding.file, finding.line);
     findings.push({
+      file: finding.file,
       line: finding.line,
       startLine: finding.start_line,
       endLine: finding.end_line,

@@ -20,6 +20,7 @@ import type {
 } from "../../platforms/types.js";
 import type { OutputWriter } from "../../ports/index.js";
 import { StreamingDisplay } from "../../utils/streamingDisplay.js";
+import { calculateTextSimilarity } from "../../utils/textSimilarity.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import type { DiffManifest } from "../diffStorage.js";
 import type { ReviewPass } from "../reviewSelection.js";
@@ -31,6 +32,15 @@ const CONFIDENCE_SCORES: Record<string, number> = {
   medium: 0.6,
   low: 0.3,
 };
+
+/** Heartbeat check interval in ms. */
+const HEARTBEAT_INTERVAL_MS = 1000;
+
+/** Minimum gap between two emitted "still working" lines, in ms. */
+const HEARTBEAT_LOG_GAP_MS = 10_000;
+
+/** While streaming, emit a "still working" line only after this much silence. */
+const SILENCE_THRESHOLD_MS = 15_000;
 
 /**
  * Configuration options for the multi-agent review orchestrator.
@@ -190,14 +200,24 @@ export class MultiAgentOrchestrator {
 
   /**
    * Creates a streaming display and returns a callback for streaming data.
-   * Returns undefined callback when streaming output is not active.
+   * When streaming output is active, also exposes a `pushLine` helper that
+   * routes a status line into the display (used by the silence heartbeat) and
+   * a `lastChunkAt` getter tracking when model tokens last arrived.
+   * Returns undefined callbacks when streaming output is not active.
    */
   private createStreaming(context: string): {
     callback: ((chunk: string) => void) | undefined;
     finish: () => void;
+    pushLine: ((line: string) => void) | undefined;
+    lastChunkAt: (() => number | undefined) | undefined;
   } {
     if (!this.streamingActive) {
-      return { callback: undefined, finish: () => {} };
+      return {
+        callback: undefined,
+        finish: () => {},
+        pushLine: undefined,
+        lastChunkAt: undefined,
+      };
     }
 
     const display = new StreamingDisplay({
@@ -208,30 +228,56 @@ export class MultiAgentOrchestrator {
       ...(this.output ? { output: this.output } : {}),
     });
 
+    let lastChunkAt: number | undefined;
     return {
-      callback: (chunk: string) => display.push(chunk),
+      callback: (chunk: string) => {
+        lastChunkAt = Date.now();
+        display.push(chunk);
+      },
       finish: () => display.finish(),
+      pushLine: (line: string) => display.push(`${line}\n`),
+      lastChunkAt: () => lastChunkAt,
     };
   }
 
   /**
-   * Returns a stop function for a plain-text "still working" heartbeat shown
-   * while a long-running phase runs. Used when streaming output is not active
-   * so the user always sees progress regardless of terminal support.
+   * Returns a stop function for a "still working" heartbeat shown while a
+   * long-running phase runs, so the user always sees progress regardless of
+   * terminal support. When streaming is active, the heartbeat only fires when
+   * no model tokens have arrived for {@link SILENCE_THRESHOLD_MS} (the model
+   * is "thinking" in silence); otherwise it emits plain-text lines every
+   * {@link HEARTBEAT_LOG_GAP_MS}.
    */
-  private heartbeat(label: string): () => void {
-    if (this.streamingActive) {
-      return () => {};
+  private heartbeat(
+    label: string,
+    streaming?: {
+      pushLine: ((line: string) => void) | undefined;
+      lastChunkAt: (() => number | undefined) | undefined;
     }
+  ): () => void {
     const started = Date.now();
     let lastLogged = 0;
     const timer = setInterval(() => {
       const elapsed = Math.round((Date.now() - started) / 1000);
-      if (elapsed >= 10 && elapsed - lastLogged >= 10) {
-        lastLogged = elapsed;
-        this.log(`  ⏳ ${label} still working… (${elapsed}s)`);
+      if (elapsed - lastLogged < HEARTBEAT_LOG_GAP_MS / 1000) {
+        return;
       }
-    }, 1000);
+      const lastChunk = streaming?.lastChunkAt?.();
+      if (
+        streaming?.pushLine &&
+        lastChunk !== undefined &&
+        Date.now() - lastChunk < SILENCE_THRESHOLD_MS
+      ) {
+        return;
+      }
+      lastLogged = elapsed;
+      const line = `  ⏳ ${label} still working… (${elapsed}s)`;
+      if (streaming?.pushLine) {
+        streaming.pushLine(line);
+      } else {
+        this.log(line);
+      }
+    }, HEARTBEAT_INTERVAL_MS);
     return () => clearInterval(timer);
   }
 
@@ -280,7 +326,7 @@ export class MultiAgentOrchestrator {
     let selected: string[];
     let tokenUsage: TokenUsage | undefined;
     const streaming = this.createStreaming("Running pre-classifier…");
-    const stopHeartbeat = this.heartbeat("pre-classifier");
+    const stopHeartbeat = this.heartbeat("pre-classifier", streaming);
     try {
       const response = await this.provider.executePrompt(prompt, {
         workingDirectory: input.repoPath,
@@ -311,7 +357,8 @@ export class MultiAgentOrchestrator {
 
   private async runAgent(
     agent: AgentRoleId,
-    input: MultiAgentReviewInput
+    input: MultiAgentReviewInput,
+    onStreamData?: (chunk: string) => void
   ): Promise<AgentExecution> {
     const prompt = buildAgentPrompt({
       agent,
@@ -323,6 +370,7 @@ export class MultiAgentOrchestrator {
 
     const response = await this.provider.executePrompt(prompt, {
       workingDirectory: input.repoPath,
+      ...(onStreamData ? { onStreamData } : {}),
       ...(input.diffFiles && input.diffFiles.length > 0 ? { diffFiles: [...input.diffFiles] } : {}),
       promptType: "multi-agent-subagent",
     });
@@ -355,7 +403,7 @@ export class MultiAgentOrchestrator {
     });
 
     const streaming = this.createStreaming("Running Lead Synthesizer…");
-    const stopHeartbeat = this.heartbeat("Lead Synthesizer");
+    const stopHeartbeat = this.heartbeat("Lead Synthesizer", streaming);
     let response: AIResponse;
     try {
       response = await this.provider.executePrompt(prompt, {
@@ -373,12 +421,23 @@ export class MultiAgentOrchestrator {
 
     // Hard noise-threshold backstop: the synthesizer is instructed to apply
     // minConfidence, but we also enforce it locally to protect developer trust.
-    const fileResults: FileReviewResult[] = parsed.fileResults.map((result) => ({
+    const filteredResults: FileReviewResult[] = parsed.fileResults.map((result) => ({
       filename: result.filename,
       findings: result.findings.filter(
         (finding) => scoreConfidence(finding.confidence) >= this.minConfidence
       ),
     }));
+
+    // Location reconciliation: the synthesizer frequently drops `line` (and
+    // sometimes `file`) from consolidated findings. Recover accurate locations
+    // by matching each synthesized finding back to the subagent finding it was
+    // derived from (via message similarity), so inline comments land on the
+    // correct file:line instead of defaulting to line 1.
+    const fileResults = this.reconcileFindingLocations(
+      filteredResults,
+      executions,
+      new Set(input.manifest.files.map((file) => file.filename))
+    );
 
     const crossFileResult: CrossFileReviewResult = {
       overallAssessment: parsed.overallAssessment,
@@ -398,8 +457,125 @@ export class MultiAgentOrchestrator {
   }
 
   /**
+   * Minimum message similarity required before adopting a subagent finding's
+   * location for a synthesized finding.
+   */
+  private static readonly LOCATION_MATCH_THRESHOLD = 0.55;
+
+  /**
+   * Recovers accurate file/line locations for synthesized findings.
+   *
+   * The Lead Synthesizer is asked to consolidate subagent findings, but it often
+   * omits `line` (defaulting to 0) or `file` entirely. This step rebuilds the
+   * location by matching each synthesized finding to the subagent finding with
+   * the highest message similarity and inheriting its file/line. Findings that
+   * already carry a valid location on a manifest file are left untouched.
+   */
+  private reconcileFindingLocations(
+    fileResults: readonly FileReviewResult[],
+    executions: readonly AgentExecution[],
+    manifestFiles: ReadonlySet<string>
+  ): FileReviewResult[] {
+    // Flatten all subagent findings that have a usable location as candidates.
+    const candidates: (FileFinding & { file: string })[] = executions.flatMap((execution) =>
+      execution.findings
+        .filter(
+          (finding) =>
+            finding.file !== undefined && finding.line > 0 && manifestFiles.has(finding.file)
+        )
+        .map((finding) => finding as FileFinding & { file: string })
+    );
+
+    if (candidates.length === 0) {
+      return [...fileResults];
+    }
+
+    const byFilename = new Map<string, FileFinding[]>();
+
+    const pushFinding = (filename: string, finding: FileFinding): void => {
+      const existing = byFilename.get(filename);
+      if (existing) {
+        existing.push(finding);
+      } else {
+        byFilename.set(filename, [finding]);
+      }
+    };
+
+    for (const result of fileResults) {
+      for (const finding of result.findings) {
+        const hasValidLocation = finding.line > 0 && manifestFiles.has(result.filename);
+
+        if (hasValidLocation) {
+          pushFinding(result.filename, finding);
+          continue;
+        }
+
+        const match = this.findBestLocationMatch(finding, candidates);
+        if (match) {
+          this.logger.info(
+            {
+              synthesizedFile: result.filename,
+              synthesizedLine: finding.line,
+              recoveredFile: match.file,
+              recoveredLine: match.line,
+              category: finding.category,
+              similarity: match.similarity,
+            },
+            "Recovered location for synthesized finding from subagent output"
+          );
+          pushFinding(match.file, {
+            ...finding,
+            file: match.file,
+            line: match.line,
+          });
+        } else {
+          // No confident match: keep the synthesized attribution as-is so the
+          // engine's line-number validator can still attempt placement.
+          pushFinding(result.filename, finding);
+        }
+      }
+    }
+
+    return Array.from(byFilename.entries()).map(([filename, findings]) => ({
+      filename,
+      findings,
+    }));
+  }
+
+  /**
+   * Returns the subagent finding whose message most closely matches the
+   * synthesized finding, or undefined when no candidate exceeds the threshold.
+   * Candidates from the same file as the synthesized finding receive a small
+   * similarity bonus, since the synthesizer often keeps `file` but drops `line`.
+   */
+  private findBestLocationMatch(
+    finding: FileFinding,
+    candidates: readonly (FileFinding & {
+      file: string;
+    })[]
+  ): { file: string; line: number; similarity: number } | undefined {
+    let best: { file: string; line: number; similarity: number } | undefined;
+
+    for (const candidate of candidates) {
+      let similarity = calculateTextSimilarity(finding.message, candidate.message);
+      if (finding.file && candidate.file === finding.file) {
+        similarity += 0.1;
+      }
+      if (best && similarity <= best.similarity) continue;
+      best = { file: candidate.file, line: candidate.line, similarity };
+    }
+
+    if (!best || best.similarity < MultiAgentOrchestrator.LOCATION_MATCH_THRESHOLD) {
+      return undefined;
+    }
+
+    return best;
+  }
+
+  /**
    * Dispatches the selected subagents concurrently (bounded by maxParallel),
-   * reporting each agent's start and completion with a plain-text progress line.
+   * reporting each agent's start and completion with a plain-text progress line
+   * and streaming live output into a shared display when streaming is active.
    * Plain text (via output.log) is used so progress is visible in every
    * environment — TTY, CI, piped, or captured output — regardless of streaming.
    */
@@ -411,7 +587,8 @@ export class MultiAgentOrchestrator {
     const running = new Set<AgentRoleId>();
     let tokenUsage: TokenUsage | undefined;
 
-    const stopHeartbeat = this.subagentHeartbeat(dispatched, running, startedAt);
+    const streaming = this.createStreaming("Running subagents…");
+    const stopHeartbeat = this.subagentHeartbeat(dispatched, running, startedAt, streaming);
     try {
       const executions = await runWithConcurrency(dispatched, this.maxParallel, async (agent) => {
         running.add(agent);
@@ -419,7 +596,12 @@ export class MultiAgentOrchestrator {
         this.log(`  ⏳ [${agent}] analyzing…`);
 
         const started = Date.now();
-        const execution = await this.runAgent(agent, input);
+        // Concurrent agents share one display; each agent's chunks are prefixed
+        // so the user can tell whose output is streaming.
+        const onStreamData = streaming.callback
+          ? (chunk: string) => streaming.callback?.(`[${agent}] ${chunk}`)
+          : undefined;
+        const execution = await this.runAgent(agent, input, onStreamData);
         running.delete(agent);
 
         const duration = Math.max(0, Math.round((Date.now() - started) / 1000));
@@ -431,33 +613,55 @@ export class MultiAgentOrchestrator {
       return { executions, tokenUsage };
     } finally {
       stopHeartbeat();
+      streaming.finish();
     }
   }
 
   /**
    * Returns a stop function for a heartbeat that lists which subagents are
-   * still running. Only used when streaming output is not active.
+   * still running. Always active: when streaming, the line is routed into the
+   * shared display (only when no tokens have arrived for a while, so live
+   * output stays the primary signal); otherwise it is emitted as plain text.
    */
   private subagentHeartbeat(
     dispatched: readonly AgentRoleId[],
     running: Set<AgentRoleId>,
-    startedAt: Map<AgentRoleId, number>
-  ): () => void {
-    if (this.streamingActive) {
-      return () => {};
+    startedAt: Map<AgentRoleId, number>,
+    streaming?: {
+      pushLine: ((line: string) => void) | undefined;
+      lastChunkAt: (() => number | undefined) | undefined;
     }
+  ): () => void {
+    let lastLogged = Date.now();
     const timer = setInterval(() => {
       const active = dispatched.filter((agent) => running.has(agent));
       if (active.length === 0) {
         return;
       }
       const now = Date.now();
+      if (now - lastLogged < HEARTBEAT_LOG_GAP_MS) {
+        return;
+      }
+      const lastChunk = streaming?.lastChunkAt?.();
+      if (
+        streaming?.pushLine &&
+        lastChunk !== undefined &&
+        now - lastChunk < SILENCE_THRESHOLD_MS
+      ) {
+        return;
+      }
+      lastLogged = now;
       const parts = active.map((agent) => {
         const elapsed = Math.round((now - (startedAt.get(agent) ?? now)) / 1000);
         return `${agent} (${elapsed}s)`;
       });
-      this.log(`  ⏳ still working: ${parts.join(", ")}…`);
-    }, 10000);
+      const line = `  ⏳ still working: ${parts.join(", ")}…`;
+      if (streaming?.pushLine) {
+        streaming.pushLine(line);
+      } else {
+        this.log(line);
+      }
+    }, HEARTBEAT_INTERVAL_MS);
     return () => clearInterval(timer);
   }
 

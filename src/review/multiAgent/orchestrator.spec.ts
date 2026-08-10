@@ -453,18 +453,22 @@ describe("MultiAgentOrchestrator", () => {
 
     expect(result.dispatchedAgents).toEqual(["general", "security", "performance"]);
 
-    // Classifier and synthesizer calls receive onStreamData; subagents report
-    // progress as plain-text lines instead.
+    // Every phase receives onStreamData: classifier and synthesizer stream
+    // into their own display, subagents stream into the shared display.
     const calls = getCalls();
     expect(calls.find((c) => c.promptType === "multi-agent-classifier")?.streamed).toBe(true);
     expect(calls.find((c) => c.promptType === "multi-agent-synthesizer")?.streamed).toBe(true);
     for (const call of calls.filter((c) => c.promptType === "multi-agent-subagent")) {
-      expect(call.streamed).toBe(false);
+      expect(call.streamed).toBe(true);
     }
 
     // Streamed model output reaches the output writer in CI mode.
     const allWritten = written.join("");
     expect(allWritten).toContain('{"streamed":');
+
+    // Subagent chunks are prefixed with their agent id in the shared display.
+    expect(allWritten).toContain('[general] {"streamed":');
+    expect(allWritten).toContain('[security] {"streamed":');
 
     // Plain-text subagent progress reports agent activity.
     expect(logLines).toContain("  ⏳ [general] analyzing…");
@@ -567,5 +571,244 @@ describe("MultiAgentOrchestrator", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("emits a still-working heartbeat for silent subagents when streaming is active", async () => {
+    vi.useFakeTimers();
+    try {
+      const { provider, setResponder } = createMockProvider();
+
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+        switch (options?.promptType) {
+          case "multi-agent-classifier":
+            return createResponse({ agents: ["security"] });
+          case "multi-agent-subagent":
+            await gate;
+            return createResponse({ findings: [] });
+          case "multi-agent-synthesizer":
+            return createResponse({
+              overall_assessment: "Review completed",
+              findings: [],
+              recommendations: [],
+            });
+          default:
+            return createResponse({});
+        }
+      });
+
+      const written: string[] = [];
+      const output: OutputWriter = {
+        log: (message) => written.push(message),
+        error: (message) => written.push(`ERROR: ${message}`),
+        write: (data) => {
+          written.push(data);
+          return true;
+        },
+      };
+
+      const orchestrator = new MultiAgentOrchestrator(provider, {
+        output,
+        streaming: { enabled: true, lines: 9, ciMode: true },
+      });
+      const reviewPromise = orchestrator.review({
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      // The gated subagents emit no tokens; the silence detector should
+      // surface a "still working" line inside the shared display output.
+      await vi.advanceTimersByTimeAsync(20_000);
+      const displayOutput = written.join("");
+      expect(displayOutput).toContain("still working:");
+      expect(displayOutput).toContain("general");
+      expect(displayOutput).toContain("security");
+
+      release?.();
+      const result = await reviewPromise;
+      expect(result.dispatchedAgents).toEqual(["general", "security"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits a still-working heartbeat for a silent classifier when streaming is active", async () => {
+    vi.useFakeTimers();
+    try {
+      const { provider, setResponder } = createMockProvider();
+
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+        switch (options?.promptType) {
+          case "multi-agent-classifier":
+            await gate;
+            return createResponse({ agents: ["security"] });
+          case "multi-agent-subagent":
+            return createResponse({ findings: [] });
+          case "multi-agent-synthesizer":
+            return createResponse({
+              overall_assessment: "Review completed",
+              findings: [],
+              recommendations: [],
+            });
+          default:
+            return createResponse({});
+        }
+      });
+
+      const written: string[] = [];
+      const output: OutputWriter = {
+        log: (message) => written.push(message),
+        error: (message) => written.push(`ERROR: ${message}`),
+        write: (data) => {
+          written.push(data);
+          return true;
+        },
+      };
+
+      const orchestrator = new MultiAgentOrchestrator(provider, {
+        output,
+        streaming: { enabled: true, lines: 9, ciMode: true },
+      });
+      const reviewPromise = orchestrator.review({
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      // The gated classifier emits no tokens; the silence detector should
+      // surface a "still working" line inside its display output.
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(written.join("")).toContain("pre-classifier still working");
+
+      release?.();
+      const result = await reviewPromise;
+      expect(result.dispatchedAgents).toEqual(["general", "security"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconciles synthesized findings that lost line numbers back to subagent locations", async () => {
+    const { provider, setResponder } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      switch (options?.promptType) {
+        case "multi-agent-classifier":
+          return createResponse({ agents: ["security"] });
+        case "multi-agent-subagent":
+          return createResponse({
+            findings: [
+              createFinding({
+                file: "src/auth.ts",
+                line: 12,
+                message: "SQL injection risk via string interpolation",
+              }),
+              createFinding({
+                file: "src/db.ts",
+                line: 45,
+                category: "performance",
+                message: "N+1 query pattern in user listing",
+              }),
+            ],
+          });
+        case "multi-agent-synthesizer":
+          // The synthesizer drops the line number (defaults to 0) on one finding.
+          return createResponse({
+            overall_assessment: "Review completed",
+            findings: [
+              {
+                file: "src/auth.ts",
+                line: 0,
+                severity: "high",
+                confidence: "high",
+                category: "security",
+                message: "SQL injection risk via string interpolation",
+                suggestion: "Use parameterized queries",
+                reasoning: "User input is concatenated into a SQL query.",
+                isPreExisting: false,
+              },
+              {
+                file: "src/db.ts",
+                line: 45,
+                severity: "high",
+                confidence: "high",
+                category: "performance",
+                message: "N+1 query pattern in user listing",
+                suggestion: "Batch the queries",
+                reasoning: "The listing triggers one query per user.",
+                isPreExisting: false,
+              },
+            ],
+            recommendations: [],
+          });
+        default:
+          return createResponse({});
+      }
+    });
+
+    const orchestrator = new MultiAgentOrchestrator(provider);
+    const output = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    const authFindings = output.fileResults.find((r) => r.filename === "src/auth.ts");
+    const dbFindings = output.fileResults.find((r) => r.filename === "src/db.ts");
+
+    // The line was recovered from the subagent finding by message similarity.
+    expect(authFindings?.findings[0].line).toBe(12);
+    // The finding that already carried a valid location is untouched.
+    expect(dbFindings?.findings[0].line).toBe(45);
+  });
+
+  it("keeps synthesized findings that cannot be reconciled to a confident location", async () => {
+    const { provider, setResponder } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      switch (options?.promptType) {
+        case "multi-agent-classifier":
+          return createResponse({ agents: ["security"] });
+        case "multi-agent-subagent":
+          return createResponse({ findings: [] });
+        case "multi-agent-synthesizer":
+          return createResponse({
+            overall_assessment: "Review completed",
+            findings: [
+              {
+                file: "src/auth.ts",
+                line: 0,
+                severity: "high",
+                confidence: "high",
+                category: "security",
+                message: "Something completely unrelated to subagent output",
+                suggestion: "Fix it",
+                reasoning: "No matching subagent finding exists.",
+                isPreExisting: false,
+              },
+            ],
+            recommendations: [],
+          });
+        default:
+          return createResponse({});
+      }
+    });
+
+    const orchestrator = new MultiAgentOrchestrator(provider);
+    const output = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    // No confident match: the synthesized finding survives with its original line.
+    expect(output.fileResults[0].filename).toBe("src/auth.ts");
+    expect(output.fileResults[0].findings).toHaveLength(1);
   });
 });
