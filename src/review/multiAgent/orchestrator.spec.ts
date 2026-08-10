@@ -146,6 +146,75 @@ describe("MultiAgentOrchestrator", () => {
     expect(output.tokenUsage).toBeDefined();
   });
 
+  it("carries subagent cross-file findings into the synthesizer and surfaces them in the cross-file report", async () => {
+    const { provider, getCalls, setResponder } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      switch (options?.promptType) {
+        case "multi-agent-classifier":
+          return createResponse({ agents: ["architecture"] });
+        case "multi-agent-subagent":
+          return createResponse({
+            findings: [
+              {
+                severity: "high",
+                confidence: "high",
+                category: "architecture",
+                message: "Layering violation spans modules",
+                suggestion: "Move shared types into a common package",
+                reasoning:
+                  "Callers across multiple modules break the API contract; system-level impact.",
+                affected_files: ["src/auth.ts", "src/api.ts"],
+              },
+            ],
+          });
+        case "multi-agent-synthesizer":
+          return createResponse({
+            overall_assessment: "Architecture concerns found.",
+            findings: [
+              {
+                severity: "high",
+                confidence: "high",
+                category: "architecture",
+                message: "Layering violation spans modules",
+                reasoning:
+                  "Callers across multiple modules break the API contract; system-level impact.",
+                affected_files: ["src/auth.ts", "src/api.ts"],
+              },
+            ],
+            recommendations: ["Restructure the modules"],
+          });
+        default:
+          return createResponse({});
+      }
+    });
+
+    const orchestrator = new MultiAgentOrchestrator(provider, {
+      minConfidence: 0.7,
+      maxParallel: 2,
+    });
+
+    const output = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    const synthesizerPrompt = getCalls().find(
+      (c) => c.promptType === "multi-agent-synthesizer"
+    )?.prompt;
+    expect(synthesizerPrompt).toContain("PR-level (files: src/auth.ts, src/api.ts)");
+    expect(synthesizerPrompt).toContain("Layering violation spans modules");
+
+    expect(output.fileResults).toEqual([]);
+    expect(output.crossFileResult.findings).toEqual([
+      expect.objectContaining({
+        message: "Layering violation spans modules",
+        affectedFiles: ["src/auth.ts", "src/api.ts"],
+      }),
+    ]);
+    expect(output.agentResults[0].findings[0].affectedFiles).toEqual(["src/auth.ts", "src/api.ts"]);
+  });
+
   it("runs all five agents with no passes and falls back to all when classifier fails", async () => {
     const { provider, getCalls, setResponder } = createMockProvider();
 

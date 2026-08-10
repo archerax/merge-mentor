@@ -285,13 +285,22 @@ Return ONLY the JSON object below in a markdown code block:
       "suggestion": "Specific fix with code example",
       "reasoning": "Why this is a real issue and its concrete impact",
       "isPreExisting": false
+    },
+    {
+      "severity": "high",
+      "confidence": "high",
+      "category": "architecture",
+      "message": "Cross-file concern spanning multiple files",
+      "reasoning": "System-level impact and verification",
+      "affected_files": ["file1.ts", "file2.ts"]
     }
   ]
 }
 \`\`\`
 
 Rules:
-- Include \`file\` and \`line\` for EVERY finding. Line numbers are pre-calculated in the diff.
+- Every FILE-LEVEL finding must include \`file\` and \`line\`. Line numbers are pre-calculated in the diff.
+- For a CROSS-FILE / PR-LEVEL concern that spans multiple files, omit \`file\` and \`line\` and list every affected file in \`affected_files\`. Use this only for genuine overarching issues (e.g. an API contract broken across call sites, a layering violation spanning modules) — not for a problem that lives in one file.
 - \`category\` must be one of: bug, security, performance, quality, documentation, architecture, design, testing
 - Only report NEW issues on added lines (+). Set \`isPreExisting\` for issues existing in removed lines.
 - Return an empty \`findings\` array when no substantive issues survive the checks.
@@ -312,6 +321,8 @@ interface AgentFindingSummary {
     readonly message: string;
     readonly suggestion: string;
     readonly reasoning: string;
+    /** Files affected by a cross-file (pr-level) finding, when `file` is unset. */
+    readonly affectedFiles?: readonly string[];
   }[];
 }
 
@@ -334,7 +345,9 @@ function formatAgentFindings(agentResults: readonly AgentFindingSummary[]): stri
 
     const findingsBlock = result.findings
       .map((finding) => {
-        const location = finding.file ? `${finding.file}:${finding.line || "general"}` : "PR-level";
+        const location = finding.file
+          ? `${finding.file}:${finding.line || "general"}`
+          : `PR-level (files: ${finding.affectedFiles?.join(", ") || "unknown"})`;
         return `- [${location}] ${finding.message}
   severity: ${finding.severity} | confidence: ${finding.confidence} | category: ${finding.category}
   suggestion: ${finding.suggestion}
@@ -401,6 +414,7 @@ ${formatAgentFindings(options.agentResults)}
    - Line-specific finding → include \`file\` and \`line\`.
    - File-level finding → include \`file\`, omit \`line\`.
    - Cross-file / PR-level finding → omit \`file\` and \`line\`, list \`affected_files\`.
+6. **PR-LEVEL SUBAGENT FINDINGS:** Subagents may report cross-file / PR-level concerns (rendered above as \`PR-level\` with affected files). Evaluate them like any other finding: deduplicate against file-level findings when they cover the same issue, resolve conflicts, and apply the confidence threshold. Surviving ones must be emitted in the cross-file shape — omit \`file\` and \`line\`, list \`affected_files\`. Do not attach them to a single file.
 
 # OUTPUT FORMAT
 

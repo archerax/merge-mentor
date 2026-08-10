@@ -169,6 +169,18 @@ describe("multi-agent prompts", () => {
       expect(prompt).toContain("EXISTING PR COMMENTS");
       expect(prompt).toContain("SQL injection risk");
     });
+
+    it("allows cross-file findings via affected_files", () => {
+      const prompt = buildAgentPrompt({
+        agent: "architecture",
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      expect(prompt).toContain('"affected_files": ["file1.ts", "file2.ts"]');
+      expect(prompt).toContain("Every FILE-LEVEL finding must include");
+      expect(prompt).toContain("CROSS-FILE / PR-LEVEL concern");
+    });
   });
 
   describe("buildSynthesizerPrompt", () => {
@@ -214,6 +226,35 @@ describe("multi-agent prompts", () => {
       });
 
       expect(prompt).toContain("No subagent produced findings.");
+    });
+
+    it("renders subagent PR-level findings with affected files", () => {
+      const prompt = buildSynthesizerPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        agentResults: [
+          {
+            agent: "architecture",
+            findings: [
+              {
+                line: 0,
+                severity: "high",
+                confidence: "high",
+                category: "architecture",
+                message: "Layering violation spans modules",
+                suggestion: "Move shared types into a common package",
+                reasoning: "Callers in src/api and src/auth both import from a ui layer.",
+                affectedFiles: ["src/api.ts", "src/auth.ts"],
+              },
+            ],
+          },
+        ],
+        minConfidence: 0.7,
+      });
+
+      expect(prompt).toContain("PR-level (files: src/api.ts, src/auth.ts)");
+      expect(prompt).toContain("Layering violation spans modules");
+      expect(prompt).toContain("PR-LEVEL SUBAGENT FINDINGS");
     });
   });
 });

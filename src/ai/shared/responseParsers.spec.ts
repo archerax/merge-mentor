@@ -145,7 +145,7 @@ describe("responseParsers", () => {
     expect(result).toEqual([]);
   });
 
-  it("parseAgentReview parses subagent findings and requires file attribution", () => {
+  it("parseAgentReview splits file and cross-file findings", () => {
     const response = {
       raw: "",
       parsed: {
@@ -165,9 +165,10 @@ describe("responseParsers", () => {
             severity: "high",
             confidence: "high",
             category: "architecture",
-            message: "PR-level concern without a file",
+            message: "PR-level concern spanning multiple files",
             reasoning:
-              "This cross-file concern is reserved for the lead synthesizer and has enough context.",
+              "Callers across multiple modules break the API contract; system-level impact.",
+            affected_files: ["auth.ts", "api.ts"],
           },
         ],
       },
@@ -175,11 +176,17 @@ describe("responseParsers", () => {
 
     const findings = parseAgentReview(mockLogger, response);
 
-    expect(findings).toHaveLength(1);
+    expect(findings).toHaveLength(2);
     expect(findings[0].file).toBe("auth.ts");
     expect(findings[0].line).toBe(12);
     expect(findings[0].category).toBe("security");
-    expect(mockLogger.warn).toHaveBeenCalled();
+    expect(findings[1].file).toBeUndefined();
+    expect(findings[1].affectedFiles).toEqual(["auth.ts", "api.ts"]);
+    expect(findings[1].category).toBe("architecture");
+    expect(mockLogger.warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: "PR-level concern spanning multiple files" }),
+      "Subagent finding missing file attribution - dropped from agent output"
+    );
   });
 
   it("parseSynthesizedReview splits file and cross-file findings", () => {

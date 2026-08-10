@@ -54,6 +54,8 @@ type FindingConfidence = "high" | "medium" | "low";
 export interface FileFinding {
   /** Path of the file the finding refers to, when known (e.g. subagent output). */
   readonly file?: string;
+  /** Files affected by a cross-file (pr-level) finding, when `file` is unset. */
+  readonly affectedFiles?: readonly string[];
   /** Line number in the file where the issue occurs. */
   readonly line: number;
   /** Optional first line of a native replacement suggestion. */

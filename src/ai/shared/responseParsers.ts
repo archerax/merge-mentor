@@ -209,9 +209,10 @@ export function parsePreClassifier(logger: ParserLogger, response: AIResponse): 
 }
 
 /**
- * Parses a single subagent's response into file-level findings.
- * Findings without a `file` are treated as cross-file/pr-level and dropped,
- * since only the Lead Synthesizer is allowed to emit cross-file concerns.
+ * Parses a single subagent's response into file-level and cross-file findings.
+ * Findings with a \`file\` are returned as file-level findings. Findings without
+ * one are cross-file / PR-level concerns and are preserved with \`affectedFiles\`
+ * so the Lead Synthesizer can consolidate them into the cross-file report.
  */
 export function parseAgentReview(logger: ParserLogger, response: AIResponse): FileFinding[] {
   const result = AgentReviewResponseSchema.safeParse(response.parsed);
@@ -223,17 +224,28 @@ export function parseAgentReview(logger: ParserLogger, response: AIResponse): Fi
   const findings: FileFinding[] = [];
 
   for (const finding of data.findings) {
+    const context = finding.file
+      ? finding.line
+        ? `${finding.file}:${finding.line}`
+        : finding.file
+      : "cross-file";
+    validateReasoning(logger, finding.reasoning, context, finding.line || "general");
+
     if (!finding.file) {
-      logger.warn(
-        {
-          message: finding.message.substring(0, 100),
-        },
-        "Subagent finding missing file attribution - dropped from agent output"
-      );
+      findings.push({
+        line: 0,
+        severity: finding.severity,
+        confidence: finding.confidence,
+        category: finding.category as FileFinding["category"],
+        message: finding.message,
+        suggestion: finding.suggestion,
+        reasoning: finding.reasoning,
+        isPreExisting: finding.isPreExisting,
+        affectedFiles: finding.affected_files,
+      });
       continue;
     }
 
-    validateReasoning(logger, finding.reasoning, finding.file, finding.line);
     findings.push({
       file: finding.file,
       line: finding.line,
