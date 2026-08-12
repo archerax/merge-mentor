@@ -361,12 +361,12 @@ describe("Config", () => {
       expect(config.reviewProfile.strategy).toBe("multi-agent");
     });
 
-    it("should default multiAgentMinConfidence to 0.7 and maxParallel to 2", () => {
+    it("should default multiAgentMinConfidence to 0.3 and maxParallel to 2", () => {
       const env = createStubEnvironment();
 
       const config = loadConfig(undefined, env);
 
-      expect(config.multiAgentMinConfidence).toBe(0.7);
+      expect(config.multiAgentMinConfidence).toBe(0.3);
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 
@@ -390,7 +390,7 @@ describe("Config", () => {
 
       const config = loadConfig(undefined, env);
 
-      expect(config.multiAgentMinConfidence).toBe(0.7);
+      expect(config.multiAgentMinConfidence).toBe(0.3);
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 

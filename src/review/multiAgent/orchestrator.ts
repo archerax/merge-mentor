@@ -1,14 +1,6 @@
 import { formatExistingCommentsContext } from "../../ai/prompts/commentContext.js";
-import {
-  buildAgentPrompt,
-  buildPreClassifierPrompt,
-  buildSynthesizerPrompt,
-} from "../../ai/prompts/multiAgent/prompts.js";
-import {
-  parseAgentReview,
-  parsePreClassifier,
-  parseSynthesizedReview,
-} from "../../ai/shared/responseParsers.js";
+import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
+import { parseAgentReview, parseSynthesizedReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
 import { createChildLogger } from "../../logger.js";
 import type {
@@ -48,7 +40,7 @@ const SILENCE_THRESHOLD_MS = 15_000;
 export interface MultiAgentOrchestratorOptions {
   /** ReviewPasses that resolve to the enabled subagent set. Default: all agents. */
   readonly passes?: readonly ReviewPass[];
-  /** Discard findings whose confidence score is below this threshold. Default: 0.7 */
+  /** Discard findings whose confidence score is below this threshold. Default: 0.3 */
   readonly minConfidence?: number;
   /** Maximum number of subagents dispatched concurrently. Default: 2 */
   readonly maxParallel?: number;
@@ -158,9 +150,8 @@ async function runWithConcurrency<T, R>(
  *
  * Flow:
  * 1. Resolves --passes into the enabled subagent set (pass-to-agent map).
- * 2. Runs a lightweight LLM pre-classifier to select relevant subagents.
- * 3. Dispatches the selected subagents concurrently (bounded by maxParallel).
- * 4. Runs the Lead Synthesizer to deduplicate, resolve conflicts, and filter
+ * 2. Dispatches the enabled subagents concurrently (bounded by maxParallel).
+ * 3. Runs the Lead Synthesizer to deduplicate, resolve conflicts, and filter
  *    findings below the configured minConfidence.
  */
 export class MultiAgentOrchestrator {
@@ -175,7 +166,7 @@ export class MultiAgentOrchestrator {
   constructor(provider: AIProviderClient, options?: MultiAgentOrchestratorOptions) {
     this.provider = provider;
     this.passes = options?.passes;
-    this.minConfidence = options?.minConfidence ?? 0.7;
+    this.minConfidence = options?.minConfidence ?? 0.3;
     this.maxParallel = options?.maxParallel ?? 2;
     this.output = options?.output;
     this.streaming = options?.streaming;
@@ -305,56 +296,8 @@ export class MultiAgentOrchestrator {
   }
 
   /**
-   * Runs the lightweight LLM pre-classifier to select relevant specialized
-   * subagents. The `enabledAgents` passed here are the specialists only — the
-   * always-run general baseline is excluded. Falls back to all enabled
-   * specialists on any failure or empty selection.
+   * Runs a single specialized subagent and parses its findings.
    */
-  private async classify(
-    enabledAgents: readonly AgentRoleId[],
-    input: MultiAgentReviewInput,
-    generalEnabled: boolean
-  ): Promise<{ agents: readonly AgentRoleId[]; tokenUsage?: TokenUsage }> {
-    this.log("Running LLM pre-classifier to select relevant subagents...");
-    const prompt = buildPreClassifierPrompt({
-      prDetails: input.prDetails,
-      files: input.manifest.files,
-      enabledAgents,
-      generalAlwaysRuns: generalEnabled,
-    });
-
-    let selected: string[];
-    let tokenUsage: TokenUsage | undefined;
-    const streaming = this.createStreaming("Running pre-classifier…");
-    const stopHeartbeat = this.heartbeat("pre-classifier", streaming);
-    try {
-      const response = await this.provider.executePrompt(prompt, {
-        workingDirectory: input.repoPath,
-        promptType: "multi-agent-classifier",
-        ...(streaming.callback ? { onStreamData: streaming.callback } : {}),
-      });
-      tokenUsage = response.tokenUsage;
-      selected = parsePreClassifier(this.logger, response);
-    } catch (error) {
-      this.logger.warn(
-        { error: (error as Error).message },
-        "Pre-classifier failed; running all enabled subagents"
-      );
-      return { agents: enabledAgents };
-    } finally {
-      stopHeartbeat();
-      streaming.finish();
-    }
-
-    const filtered = enabledAgents.filter((agent) => selected.includes(agent));
-    if (filtered.length === 0) {
-      this.logger.info("Pre-classifier selected no subagents; running all enabled subagents");
-      return { agents: enabledAgents, tokenUsage };
-    }
-
-    return { agents: filtered, tokenUsage };
-  }
-
   private async runAgent(
     agent: AgentRoleId,
     input: MultiAgentReviewInput,
@@ -668,35 +611,19 @@ export class MultiAgentOrchestrator {
   /**
    * Runs the full multi-agent review pipeline for a stored diff manifest.
    *
-   * The General Logic & Correctness agent is the always-run baseline: it is
-   * exempt from pre-classification and dispatches whenever enabled. Only the
-   * specialized agents are subject to the LLM pre-classifier.
+   * Recall-first: every enabled subagent is dispatched on every run — no
+   * pre-classification step may prune coverage. The synthesizer is still the
+   * final arbiter that deduplicates genuine duplicates and applies the
+   * configured confidence threshold.
    */
   async review(input: MultiAgentReviewInput): Promise<MultiAgentReviewOutput> {
-    const enabledAgents = this.enabledAgents();
-    const generalEnabled = enabledAgents.includes("general");
-    const specialists = enabledAgents.filter((agent) => agent !== "general");
+    const dispatched = this.enabledAgents();
     this.log(
-      `Multi-agent review enabled for ${enabledAgents.length} subagent role(s): ${enabledAgents.join(", ")}`
+      `Multi-agent review enabled for ${dispatched.length} subagent role(s): ${dispatched.join(", ")}`
     );
-
-    let dispatched: readonly AgentRoleId[];
-    let tokenUsage: TokenUsage | undefined;
-
-    if (specialists.length === 0) {
-      // Only the general baseline is enabled; the pre-classifier has nothing to route.
-      dispatched = enabledAgents;
-    } else {
-      const classified = await this.classify(specialists, input, generalEnabled);
-      dispatched = generalEnabled ? ["general", ...classified.agents] : classified.agents;
-      tokenUsage = classified.tokenUsage;
-    }
-
     this.log(`Dispatching ${dispatched.length} subagent(s): ${dispatched.join(", ")}`);
 
     const { executions, tokenUsage: subAgentUsage } = await this.runSubagents(dispatched, input);
-    tokenUsage = mergeTokenUsage(tokenUsage, subAgentUsage);
-
-    return this.synthesize(input, executions, tokenUsage);
+    return this.synthesize(input, executions, subAgentUsage);
   }
 }

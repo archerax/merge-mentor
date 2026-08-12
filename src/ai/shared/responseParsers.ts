@@ -10,7 +10,6 @@ import {
   CrossFileReviewResponseSchema,
   FastReviewResponseSchema,
   FileReviewResponseSchema,
-  PreClassifierResponseSchema,
   SynthesizedReviewResponseSchema,
 } from "../schemas.js";
 import type { AIResponse, FastReviewResult } from "../types.js";
@@ -191,21 +190,6 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
   };
 
   return { fileResults, crossFileResult };
-}
-
-/**
- * Parses the LLM pre-classification response into the list of subagent ids
- * selected for this PR. Falls back to an empty list on schema drift; the
- * orchestrator treats an empty list as "no selection" and runs all enabled
- * agents.
- */
-export function parsePreClassifier(logger: ParserLogger, response: AIResponse): string[] {
-  const result = PreClassifierResponseSchema.safeParse(response.parsed);
-  if (!result.success) {
-    logger.warn({ error: result.error.format() }, "Pre-classifier schema drift detected");
-  }
-
-  return result.success ? result.data.agents : [];
 }
 
 /**

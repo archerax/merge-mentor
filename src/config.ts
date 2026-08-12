@@ -93,7 +93,7 @@ export interface Config {
   /**
    * Minimum confidence threshold for findings produced by the multi-agent
    * strategy. Findings whose confidence scores below this value are discarded
-   * by the Lead Synthesizer. Config-only (no CLI flag). Default: 0.7
+   * by the Lead Synthesizer. Config-only (no CLI flag). Default: 0.3
    */
   readonly multiAgentMinConfidence: number;
   /**
@@ -122,7 +122,7 @@ const ConfigParserSchema = z.object({
         ? parsed
         : undefined;
     },
-    z.custom<number>((val) => typeof val === "number").catch(0.7)
+    z.custom<number>((val) => typeof val === "number").catch(0.3)
   ),
   multiAgentMaxParallel: z.preprocess(
     (val) => {

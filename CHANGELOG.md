@@ -7,25 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Multi-Agent Review Is Recall-First**: the multi-agent strategy now
+  delivers more extensive results than the single-pass `fast` review. All
+  enabled subagents are dispatched on every run — the LLM pre-classifier that
+  could skip specialists has been removed. Specialist prompts no longer
+  restrict findings to their domain, and the Lead Synthesizer merges findings
+  only when they describe the same underlying issue, preserving distinct
+  findings that share a category. Removes the pre-classifier prompt, parser,
+  and schema.
+
 ### Added
 
 - **Multi-Agent Review Strategy (`--strategy multi-agent`)**: PR review can now
   be decomposed into specialized subagents — Security, Performance, Test
   Coverage, and Architecture — coordinated by a Lead Synthesizer. Agent
-  selection is driven by `--passes`; an LLM pre-classifier skips irrelevant
-  subagents. Subagents run concurrently, bounded by the config-only
-  `maxParallel` setting, and the synthesizer deduplicates findings, resolves
-  conflicts, and drops findings below the config-only `minConfidence`
-  threshold. Includes schemas, prompt builders, response parsers, engine
-  integration, config/env plumbing, and tests.
+  selection is driven by `--passes`. Subagents run concurrently, bounded by the
+  config-only `maxParallel` setting, and the synthesizer merges genuine
+  duplicates, resolves conflicts, and drops findings below the config-only
+  `minConfidence` threshold. Includes schemas, prompt builders, response
+  parsers, engine integration, config/env plumbing, and tests.
 - **General Logic & Correctness Subagent**: adds a general-purpose subagent to
   the multi-agent strategy that catches logic bugs, edge cases, error-handling
   gaps, and contract violations previously missed by the domain-scoped agents.
   The `logic` and `scan` passes now dispatch to it (previously routed to
-  Architecture & Style), giving the strategy five subagent roles. It **always
-  runs** on every PR as the correctness baseline — it is exempt from the LLM
-  pre-classifier, which now routes only the specialized agents, so a classifier
-  mistake can never silently drop logic-bug coverage.
+  Architecture & Style), giving the strategy five subagent roles.
 - **Stage Review (`merge-mentor stage`)**: reviews the local working tree
   against a base ref before pushing. Reviews unstaged + staged changes (or only
   staged with `--staged`, or an arbitrary ref pair with `--base`/`--head`) using

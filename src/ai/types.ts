@@ -105,7 +105,6 @@ export interface ExecutePromptOptions {
     | "batched-file-review"
     | "fast-review"
     | "build-analysis"
-    | "multi-agent-classifier"
     | "multi-agent-subagent"
     | "multi-agent-synthesizer";
 }

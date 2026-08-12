@@ -27,7 +27,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
       "Contract violations: type mismatches, broken call-site assumptions, incorrect return values",
     ],
     scope:
-      "Only report correctness, logic, and robustness issues with a real failure scenario. Ignore pure style, readability, performance, and security concerns.",
+      "Report any correctness, logic, or robustness issue with a real failure scenario. Do not suppress substantive issues in other categories — when in doubt, report.",
   },
   security: {
     domain: [
@@ -38,7 +38,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
       "Insecure dependency usage and unsafe deserialization",
     ],
     scope:
-      "Only report issues with a clear security impact and a realistic attack scenario. Ignore pure style, readability, testing, and performance concerns.",
+      "Report any issue with security impact and a realistic attack scenario. Do not suppress substantive issues in other categories — when in doubt, report.",
   },
   performance: {
     domain: [
@@ -49,7 +49,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
       "Redundant recomputation and missed caching",
     ],
     scope:
-      "Only report issues with a measurable performance or scalability impact. Ignore pure style, readability, testing, and security concerns.",
+      "Report any issue with measurable performance or scalability impact. Do not suppress substantive issues in other categories — when in doubt, report.",
   },
   testing: {
     domain: [
@@ -59,7 +59,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
       "Production-code testability problems",
     ],
     scope:
-      "Only report testing coverage, quality, and testability concerns. Line numbers must reference the production file, not the test file.",
+      "Report testing coverage, quality, and testability concerns. Line numbers must reference the production file, not the test file. Do not suppress substantive issues in other categories — when in doubt, report.",
   },
   architecture: {
     domain: [
@@ -70,7 +70,7 @@ const AGENT_FOCUS: Record<AgentRoleId, AgentFocus> = {
       "Monorepo package boundaries and dependency placement",
     ],
     scope:
-      "Only report architecture, structure, style, and contract concerns that would matter to a senior engineer or tech lead. Ignore isolated logic bugs with no architectural impact.",
+      "Report architecture, structure, style, and contract concerns that would matter to a senior engineer or tech lead. Do not suppress substantive issues in other categories — when in doubt, report.",
   },
 };
 
@@ -119,63 +119,6 @@ function buildFilesSummary(
 
 Changed Files:
 ${filesListing}`;
-}
-
-/**
- * Builds the lightweight LLM pre-classification prompt that selects which
- * specialized subagents are relevant for a PR's diff before any agent is
- * dispatched. The always-run General Logic & Correctness agent is excluded from
- * this selection.
- */
-export function buildPreClassifierPrompt(options: {
-  readonly prDetails: PRDetails;
-  readonly files: readonly {
-    readonly filename: string;
-    readonly additions: number;
-    readonly deletions: number;
-  }[];
-  readonly enabledAgents: readonly AgentRoleId[];
-  /** Whether the general baseline agent always runs (excluded from selection). */
-  readonly generalAlwaysRuns?: boolean;
-}): string {
-  const agentsListing = options.enabledAgents
-    .map((agent) => `- ${agent}: ${AGENT_SUMMARIES[agent]}`)
-    .join("\n");
-
-  const generalNote = options.generalAlwaysRuns
-    ? `
-The 🧠 General Logic & Correctness Agent always runs on every PR and is not part
-of this selection, so it is not listed above.
-
-`
-    : "";
-
-  return `${buildSecurityPreamble()}# YOUR ROLE
-SELECT RELEVANT SUBAGENTS for a pull request review.
-You are a cheap routing pass that decides which specialized reviewers are worth dispatching for this PR.
-${generalNote}
-# PR CONTEXT
-${buildFilesSummary(options.prDetails, options.files)}
-
-# ENABLED SUBAGENTS
-${agentsListing}
-
-# TASK
-Choose which of the enabled subagents are relevant to analyze this PR's diff.
-Skip an agent when the changed files clearly contain nothing in its domain
-(e.g. skip Security & Trust on pure CSS/Markdown/README changes, skip
-Performance & Scalability on documentation-only edits).
-When in doubt, keep an agent enabled — dispatching a focused reviewer is cheap.
-
-Return ONLY the JSON object below in a markdown code block:
-\`\`\`json
-{
-  "agents": ["security", "performance"]
-}
-\`\`\`
-
-Use only these agent ids: ${options.enabledAgents.join(", ")}
-`;
 }
 
 /**
@@ -389,7 +332,8 @@ IMPORTANT: Be aware of issues already flagged. Avoid re-reporting them.
   return `${buildSecurityPreamble()}# YOUR ROLE
 LEAD SYNTHESIZER for a multi-agent code review.
 You are the final arbiter that consolidates findings from specialized subagents
-into a single high-precision, low-noise review report.
+into a single review report. Preserve as much signal as possible — err on the
+side of keeping a real finding rather than dropping it.
 
 # PR CONTEXT
 ${buildFilesSummary(options.prDetails, options.files)}
@@ -399,16 +343,18 @@ ${formatAgentFindings(options.agentResults)}
 
 # SYNTHESIS RULES
 
-1. **DEDUPLICATE (LLM judgment):** Merge overlapping or near-duplicate findings
-   from different subagents into a single finding. Keep the strongest, most
-   specific version and fold the subagents' evidence into its reasoning.
+1. **DEDUPLICATE (only true duplicates):** Merge findings ONLY when they describe
+   the same underlying issue — the same root cause on the same location.
+   Do not merge distinct issues merely because they are similar or share a
+   category. Each distinct issue keeps its own finding. Keep the strongest, most
+   specific version and fold the other subagents' evidence into its reasoning.
 2. **CONFLICT RESOLUTION:** When subagent recommendations conflict (e.g. a style
    suggestion vs. a performance optimization), decide which finding wins via your
    judgment and explain the winning reasoning in the finding's \`reasoning\`.
 3. **CONFIDENCE THRESHOLD:** Discard any finding below the configured minimum
    confidence of ${options.minConfidence}. Map confidence levels to numbers:
    high = 1.0, medium = 0.6, low = 0.3. Keep only findings that score at least
-   the threshold.
+   the threshold. When a finding is close to the threshold, err toward keeping it.
 4. **PRIORITIZE:** Order findings by severity (critical first, then high, medium, low).
 5. **ATTRIBUTION:**
    - Line-specific finding → include \`file\` and \`line\`.
@@ -449,7 +395,7 @@ Return ONLY the JSON object below in a markdown code block:
 
 Rules:
 - \`category\` must be one of: bug, security, performance, quality, documentation, architecture, design, testing
-- Only report findings that survive the dedup, conflict, and confidence checks above.
-- Return an empty \`findings\` array and a brief \`overall_assessment\` when nothing survives.
+- Preserve every real finding that is not a true duplicate and meets the confidence threshold. Do not drop a genuine finding to keep the report short.
+- Return an empty \`findings\` array and a brief \`overall_assessment\` only when no real findings survive.
 `;
 }

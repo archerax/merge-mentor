@@ -98,15 +98,6 @@ export const PBIAlignmentResponseSchema = z.object({
 
 // Multi-agent review schemas
 
-/** Agent ids selectable by the pre-classifier and agent registry. */
-const MultiAgentIdSchema = z.enum([
-  "general",
-  "security",
-  "performance",
-  "testing",
-  "architecture",
-]);
-
 /** Category union shared by multi-agent file findings and synthesized findings. */
 const MultiAgentFindingCategorySchema = z
   .enum([
@@ -137,11 +128,6 @@ const MultiAgentFindingSchema = z.object({
   isPreExisting: z.boolean().default(false),
   /** Files affected by a cross-file (pr-level) finding. Only used by the synthesizer. */
   affected_files: z.array(z.coerce.string()).default([]),
-});
-
-/** Response from the LLM pre-classification pass. */
-export const PreClassifierResponseSchema = z.object({
-  agents: z.array(MultiAgentIdSchema).default([]),
 });
 
 /** Response from a single specialized subagent. */

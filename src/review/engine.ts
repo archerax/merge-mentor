@@ -211,7 +211,7 @@ interface ReviewEngineOptions {
   readonly noCache?: boolean;
   /** Re-review all files, ignoring cached results (default: false). Fresh cache is still written afterward. */
   readonly reReview?: boolean;
-  /** Minimum confidence threshold for multi-agent strategy findings (default: 0.7). */
+  /** Minimum confidence threshold for multi-agent strategy findings (default: 0.3). */
   readonly multiAgentMinConfidence?: number;
   /** Maximum concurrent subagents for the multi-agent strategy (default: 2). */
   readonly multiAgentMaxParallel?: number;
@@ -1593,7 +1593,7 @@ During the database pass, pay extra attention to query correctness, transaction 
 
       const orchestrator = new MultiAgentOrchestrator(this.provider, {
         passes: this.reviewProfile.passes,
-        minConfidence: this.options.multiAgentMinConfidence ?? 0.7,
+        minConfidence: this.options.multiAgentMinConfidence ?? 0.3,
         maxParallel: this.options.multiAgentMaxParallel ?? 2,
         output: this.output,
         streaming: {

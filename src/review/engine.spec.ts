@@ -1330,9 +1330,6 @@ describe("ReviewEngine", () => {
 
       mockExecutePrompt.mockImplementation(async (_prompt: string, options: unknown) => {
         const promptType = (options as { promptType?: string } | undefined)?.promptType;
-        if (promptType === "multi-agent-classifier") {
-          return { raw: "{}", parsed: { agents: ["security"] } };
-        }
         if (promptType === "multi-agent-subagent") {
           return {
             raw: "{}",
@@ -1387,7 +1384,6 @@ describe("ReviewEngine", () => {
       const promptTypes = mockExecutePrompt.mock.calls.map(
         (call) => (call[1] as { promptType?: string } | undefined)?.promptType
       );
-      expect(promptTypes).toContain("multi-agent-classifier");
       expect(promptTypes).toContain("multi-agent-subagent");
       expect(promptTypes).toContain("multi-agent-synthesizer");
       expect(result.crossFileResult.overallAssessment).toBe("Multi-agent review complete");
@@ -1416,9 +1412,6 @@ describe("ReviewEngine", () => {
 
       mockExecutePrompt.mockImplementation(async (_prompt: string, options: unknown) => {
         const promptType = (options as { promptType?: string } | undefined)?.promptType;
-        if (promptType === "multi-agent-classifier") {
-          return { raw: "{}", parsed: { agents: ["security"] } };
-        }
         if (promptType === "multi-agent-subagent") {
           return { raw: "{}", parsed: { findings: [] } };
         }

@@ -5,7 +5,6 @@ import {
   parseCrossFileReview,
   parseFastReview,
   parseFileReview,
-  parsePreClassifier,
   parseSynthesizedReview,
 } from "./responseParsers.js";
 
@@ -125,24 +124,6 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.overallAssessment).toBe("Fast review completed");
     expect(result.fileResults).toHaveLength(1);
     expect(result.fileResults[0].filename).toBe("main.ts");
-  });
-
-  it("parsePreClassifier returns selected agent ids", () => {
-    const result = parsePreClassifier(mockLogger, {
-      raw: "",
-      parsed: { agents: ["security", "testing"] },
-    });
-
-    expect(result).toEqual(["security", "testing"]);
-  });
-
-  it("parsePreClassifier falls back to an empty list on schema drift", () => {
-    const result = parsePreClassifier(mockLogger, {
-      raw: "",
-      parsed: { agents: "security" },
-    });
-
-    expect(result).toEqual([]);
   });
 
   it("parseAgentReview splits file and cross-file findings", () => {

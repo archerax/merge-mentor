@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
-import { buildAgentPrompt, buildPreClassifierPrompt, buildSynthesizerPrompt } from "./prompts.js";
+import { buildAgentPrompt, buildSynthesizerPrompt } from "./prompts.js";
 
 function createPRDetails(): PRDetails {
   return {
@@ -38,59 +38,6 @@ function createManifest(): DiffManifest {
 }
 
 describe("multi-agent prompts", () => {
-  describe("buildPreClassifierPrompt", () => {
-    it("asks the model to select relevant subagents", () => {
-      const prompt = buildPreClassifierPrompt({
-        prDetails: createPRDetails(),
-        files: createManifest().files,
-        enabledAgents: ["security", "performance", "testing", "architecture"],
-      });
-
-      expect(prompt).toContain("SELECT RELEVANT SUBAGENTS");
-      expect(prompt).toContain("src/auth.ts");
-      expect(prompt).toContain("src/api.ts");
-      expect(prompt).toContain("security");
-      expect(prompt).toContain("performance");
-      expect(prompt).toContain('"agents"');
-    });
-
-    it("only lists enabled agents as selectable ids", () => {
-      const prompt = buildPreClassifierPrompt({
-        prDetails: createPRDetails(),
-        files: createManifest().files,
-        enabledAgents: ["security", "testing"],
-      });
-
-      expect(prompt).toContain("security, testing");
-      expect(prompt).not.toContain("performance:");
-    });
-
-    it("notes when the general baseline always runs and is excluded", () => {
-      const prompt = buildPreClassifierPrompt({
-        prDetails: createPRDetails(),
-        files: createManifest().files,
-        enabledAgents: ["security", "performance", "testing", "architecture"],
-        generalAlwaysRuns: true,
-      });
-
-      expect(prompt).toContain("General Logic & Correctness Agent always runs");
-      expect(prompt).not.toContain("- general:");
-      expect(prompt).toContain(
-        "Use only these agent ids: security, performance, testing, architecture"
-      );
-    });
-
-    it("omits the always-run note when the general baseline is not enabled", () => {
-      const prompt = buildPreClassifierPrompt({
-        prDetails: createPRDetails(),
-        files: createManifest().files,
-        enabledAgents: ["security", "testing"],
-      });
-
-      expect(prompt).not.toContain("always runs");
-    });
-  });
-
   describe("buildAgentPrompt", () => {
     it("builds a general agent prompt with its focus areas", () => {
       const prompt = buildAgentPrompt({
