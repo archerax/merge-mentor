@@ -104,7 +104,7 @@ describe("MultiAgentOrchestrator", () => {
           return createResponse({ findings: [createFinding()] });
         case "multi-agent-synthesizer":
           return createResponse({
-            overall_assessment: "Solid PR with minor concerns.",
+            summary: "Solid PR with minor concerns.",
             findings: [createFinding()],
             recommendations: ["Add integration tests"],
           });
@@ -114,7 +114,6 @@ describe("MultiAgentOrchestrator", () => {
     });
 
     const orchestrator = new MultiAgentOrchestrator(provider, {
-      minConfidence: 0.7,
       maxParallel: 2,
     });
 
@@ -146,8 +145,40 @@ describe("MultiAgentOrchestrator", () => {
       },
     ]);
     expect(output.crossFileResult.overallAssessment).toBe("Solid PR with minor concerns.");
-    expect(output.crossFileResult.recommendations).toEqual(["Add integration tests"]);
+    expect(output.crossFileResult.recommendations).toEqual([]);
     expect(output.tokenUsage).toBeDefined();
+  });
+
+  it("passes diff attachments and workspace access to the synthesizer", async () => {
+    const { provider, getCalls, setResponder } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      if (options?.promptType === "multi-agent-synthesizer") {
+        return createResponse({ summary: "No concerns.", findings: [] });
+      }
+      return createResponse({ findings: [] });
+    });
+
+    await new MultiAgentOrchestrator(provider).review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+      repoPath: "/workspace/repo",
+      diffFiles: ["/workspace/repo/.mergementor/diffs/src__auth.ts.diff"],
+    });
+
+    const synthesizerCall = getCalls().find(
+      (call) => call.promptType === "multi-agent-synthesizer"
+    );
+    expect(synthesizerCall).toBeDefined();
+    expect(synthesizerCall?.prompt).toContain("@workspace /search");
+    expect(provider.executePrompt).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        workingDirectory: "/workspace/repo",
+        diffFiles: ["/workspace/repo/.mergementor/diffs/src__auth.ts.diff"],
+        promptType: "multi-agent-synthesizer",
+      })
+    );
   });
 
   it("carries subagent cross-file findings into the synthesizer and surfaces them in the cross-file report", async () => {
@@ -172,7 +203,7 @@ describe("MultiAgentOrchestrator", () => {
           });
         case "multi-agent-synthesizer":
           return createResponse({
-            overall_assessment: "Architecture concerns found.",
+            summary: "Architecture concerns found.",
             findings: [
               {
                 severity: "high",
@@ -192,7 +223,6 @@ describe("MultiAgentOrchestrator", () => {
     });
 
     const orchestrator = new MultiAgentOrchestrator(provider, {
-      minConfidence: 0.7,
       maxParallel: 2,
     });
 
@@ -204,14 +234,14 @@ describe("MultiAgentOrchestrator", () => {
     const synthesizerPrompt = getCalls().find(
       (c) => c.promptType === "multi-agent-synthesizer"
     )?.prompt;
-    expect(synthesizerPrompt).toContain("PR-level (files: src/auth.ts, src/api.ts)");
+    expect(synthesizerPrompt).toContain('"affectedFiles": [');
     expect(synthesizerPrompt).toContain("Layering violation spans modules");
 
     expect(output.fileResults).toEqual([]);
     expect(output.crossFileResult.findings).toEqual([
       expect.objectContaining({
         message: "Layering violation spans modules",
-        affectedFiles: ["src/auth.ts", "src/api.ts"],
+        affectedFiles: [],
       }),
     ]);
     expect(output.agentResults[0].findings[0].affectedFiles).toEqual(["src/auth.ts", "src/api.ts"]);
@@ -299,7 +329,7 @@ describe("MultiAgentOrchestrator", () => {
     expect(promptTypes).not.toContain("multi-agent-classifier");
   });
 
-  it("drops findings below the configured minConfidence", async () => {
+  it("keeps findings regardless of confidence", async () => {
     const { provider, setResponder } = createMockProvider();
 
     setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
@@ -321,17 +351,17 @@ describe("MultiAgentOrchestrator", () => {
       }
     });
 
-    const orchestrator = new MultiAgentOrchestrator(provider, { minConfidence: 0.7 });
+    const orchestrator = new MultiAgentOrchestrator(provider);
     const output = await orchestrator.review({
       prDetails: createPRDetails(),
       manifest: createManifest(),
     });
 
-    expect(output.fileResults[0].findings).toHaveLength(1);
+    expect(output.fileResults[0].findings).toHaveLength(3);
     expect(output.fileResults[0].findings[0].message).toBe("high confidence issue");
   });
 
-  it("applies the confidence threshold to cross-file findings as well", async () => {
+  it("keeps medium-confidence cross-file findings", async () => {
     const { provider, setResponder } = createMockProvider();
 
     setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
@@ -358,16 +388,16 @@ describe("MultiAgentOrchestrator", () => {
       }
     });
 
-    const orchestrator = new MultiAgentOrchestrator(provider, { minConfidence: 0.7 });
+    const orchestrator = new MultiAgentOrchestrator(provider);
     const output = await orchestrator.review({
       prDetails: createPRDetails(),
       manifest: createManifest(),
     });
 
-    expect(output.crossFileResult.findings).toHaveLength(0);
+    expect(output.crossFileResult.findings).toHaveLength(1);
   });
 
-  it("keeps cross-file findings above the confidence threshold", async () => {
+  it("parses cross-file findings using the fast-review contract", async () => {
     const { provider, setResponder } = createMockProvider();
 
     setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
@@ -394,15 +424,15 @@ describe("MultiAgentOrchestrator", () => {
       }
     });
 
-    const orchestrator = new MultiAgentOrchestrator(provider, { minConfidence: 0.7 });
+    const orchestrator = new MultiAgentOrchestrator(provider);
     const output = await orchestrator.review({
       prDetails: createPRDetails(),
       manifest: createManifest(),
     });
 
     expect(output.crossFileResult.findings).toHaveLength(1);
-    expect(output.crossFileResult.findings[0].affectedFiles).toEqual(["src/auth.ts"]);
-    expect(output.crossFileResult.recommendations).toEqual(["Restructure the module"]);
+    expect(output.crossFileResult.findings[0].affectedFiles).toEqual([]);
+    expect(output.crossFileResult.recommendations).toEqual([]);
   });
 
   it("aggregates token usage across agent and synthesizer calls", async () => {

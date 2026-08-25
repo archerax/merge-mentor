@@ -1355,7 +1355,7 @@ describe("ReviewEngine", () => {
           return {
             raw: "{}",
             parsed: {
-              overall_assessment: "Multi-agent review complete",
+              summary: "Multi-agent review complete",
               findings: [
                 {
                   file: "test.ts",
@@ -1370,7 +1370,6 @@ describe("ReviewEngine", () => {
                   isPreExisting: false,
                 },
               ],
-              recommendations: ["Add integration tests"],
             },
           };
         }
@@ -1387,7 +1386,7 @@ describe("ReviewEngine", () => {
       expect(promptTypes).toContain("multi-agent-subagent");
       expect(promptTypes).toContain("multi-agent-synthesizer");
       expect(result.crossFileResult.overallAssessment).toBe("Multi-agent review complete");
-      expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
+      expect(result.crossFileResult.recommendations).toEqual([]);
       const totalFindings = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
       expect(totalFindings).toBe(1);
     });

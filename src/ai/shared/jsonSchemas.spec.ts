@@ -26,6 +26,10 @@ describe("jsonSchemas", () => {
       expect(getJsonSchema("fast-review")).toBe(FAST_REVIEW_SCHEMA);
     });
 
+    it("returns FAST_REVIEW_SCHEMA for the multi-agent synthesizer", () => {
+      expect(getJsonSchema("multi-agent-synthesizer")).toBe(FAST_REVIEW_SCHEMA);
+    });
+
     it("returns undefined for 'unknown'", () => {
       expect(getJsonSchema("unknown")).toBeUndefined();
     });

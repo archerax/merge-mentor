@@ -1593,7 +1593,6 @@ During the database pass, pay extra attention to query correctness, transaction 
 
       const orchestrator = new MultiAgentOrchestrator(this.provider, {
         passes: this.reviewProfile.passes,
-        minConfidence: this.options.multiAgentMinConfidence ?? 0.3,
         maxParallel: this.options.multiAgentMaxParallel ?? 2,
         output: this.output,
         streaming: {

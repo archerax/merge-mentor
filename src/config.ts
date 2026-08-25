@@ -91,9 +91,8 @@ export interface Config {
   /** Verify pull request changes against linked Product Backlog Items/Issues */
   readonly verifyPbi: boolean;
   /**
-   * Minimum confidence threshold for findings produced by the multi-agent
-   * strategy. Findings whose confidence scores below this value are discarded
-   * by the Lead Synthesizer. Config-only (no CLI flag). Default: 0.3
+   * Legacy multi-agent confidence setting. Retained for config compatibility;
+   * confidence filtering is currently disabled. Config-only (no CLI flag).
    */
   readonly multiAgentMinConfidence: number;
   /**

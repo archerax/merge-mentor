@@ -1,6 +1,6 @@
 import { formatExistingCommentsContext } from "../../ai/prompts/commentContext.js";
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
-import { parseAgentReview, parseSynthesizedReview } from "../../ai/shared/responseParsers.js";
+import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
 import { createChildLogger } from "../../logger.js";
 import type {
@@ -18,13 +18,6 @@ import type { DiffManifest } from "../diffStorage.js";
 import type { ReviewPass } from "../reviewSelection.js";
 import { type AgentRoleId, getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
-/** Confidence level → numeric score used for minConfidence filtering. */
-const CONFIDENCE_SCORES: Record<string, number> = {
-  high: 1.0,
-  medium: 0.6,
-  low: 0.3,
-};
-
 /** Heartbeat check interval in ms. */
 const HEARTBEAT_INTERVAL_MS = 1000;
 
@@ -40,8 +33,6 @@ const SILENCE_THRESHOLD_MS = 15_000;
 export interface MultiAgentOrchestratorOptions {
   /** ReviewPasses that resolve to the enabled subagent set. Default: all agents. */
   readonly passes?: readonly ReviewPass[];
-  /** Discard findings whose confidence score is below this threshold. Default: 0.3 */
-  readonly minConfidence?: number;
   /** Maximum number of subagents dispatched concurrently. Default: 2 */
   readonly maxParallel?: number;
   /** Output writer for progress/status messages. */
@@ -82,7 +73,7 @@ interface AgentRunResult {
  * The synthesized result of a multi-agent review run.
  */
 export interface MultiAgentReviewOutput {
-  /** Final per-file review results after synthesis and confidence filtering. */
+  /** Final per-file review results after synthesis. */
   readonly fileResults: readonly FileReviewResult[];
   /** Cross-file architectural assessment produced by the synthesizer. */
   readonly crossFileResult: CrossFileReviewResult;
@@ -102,16 +93,6 @@ interface AgentExecution {
   readonly findings: readonly FileFinding[];
   /** Token usage reported by the agent's AI call. */
   readonly tokenUsage?: TokenUsage;
-}
-
-/**
- * Maps a confidence string to a numeric score used for minConfidence filtering.
- *
- * @param confidence - Confidence label (e.g. "high", "medium", "low").
- * @returns The numeric score, or 0 for unknown labels.
- */
-function scoreConfidence(confidence: string): number {
-  return CONFIDENCE_SCORES[confidence] ?? 0;
 }
 
 /**
@@ -151,13 +132,11 @@ async function runWithConcurrency<T, R>(
  * Flow:
  * 1. Resolves --passes into the enabled subagent set (pass-to-agent map).
  * 2. Dispatches the enabled subagents concurrently (bounded by maxParallel).
- * 3. Runs the Lead Synthesizer to deduplicate, resolve conflicts, and filter
- *    findings below the configured minConfidence.
+ * 3. Runs the Lead Synthesizer to deduplicate and resolve conflicts.
  */
 export class MultiAgentOrchestrator {
   private readonly provider: AIProviderClient;
   private readonly passes?: readonly ReviewPass[];
-  private readonly minConfidence: number;
   private readonly maxParallel: number;
   private readonly output?: OutputWriter;
   private readonly streaming?: MultiAgentOrchestratorOptions["streaming"];
@@ -166,7 +145,6 @@ export class MultiAgentOrchestrator {
   constructor(provider: AIProviderClient, options?: MultiAgentOrchestratorOptions) {
     this.provider = provider;
     this.passes = options?.passes;
-    this.minConfidence = options?.minConfidence ?? 0.3;
     this.maxParallel = options?.maxParallel ?? 2;
     this.output = options?.output;
     this.streaming = options?.streaming;
@@ -341,8 +319,8 @@ export class MultiAgentOrchestrator {
       prDetails: input.prDetails,
       files: input.manifest.files,
       agentResults,
-      minConfidence: this.minConfidence,
       existingCommentsContext: this.existingCommentsContext(input),
+      repoPath: input.repoPath,
     });
 
     const streaming = this.createStreaming("Running Lead Synthesizer…");
@@ -351,6 +329,9 @@ export class MultiAgentOrchestrator {
     try {
       response = await this.provider.executePrompt(prompt, {
         workingDirectory: input.repoPath,
+        ...(input.diffFiles && input.diffFiles.length > 0
+          ? { diffFiles: [...input.diffFiles] }
+          : {}),
         promptType: "multi-agent-synthesizer",
         ...(streaming.callback ? { onStreamData: streaming.callback } : {}),
       });
@@ -360,16 +341,7 @@ export class MultiAgentOrchestrator {
     }
 
     const mergedUsage = mergeTokenUsage(tokenUsage, response.tokenUsage);
-    const parsed = parseSynthesizedReview(this.logger, response);
-
-    // Hard noise-threshold backstop: the synthesizer is instructed to apply
-    // minConfidence, but we also enforce it locally to protect developer trust.
-    const filteredResults: FileReviewResult[] = parsed.fileResults.map((result) => ({
-      filename: result.filename,
-      findings: result.findings.filter(
-        (finding) => scoreConfidence(finding.confidence) >= this.minConfidence
-      ),
-    }));
+    const parsed = parseFastReview(this.logger, response);
 
     // Location reconciliation: the synthesizer frequently drops `line` (and
     // sometimes `file`) from consolidated findings. Recover accurate locations
@@ -377,16 +349,14 @@ export class MultiAgentOrchestrator {
     // derived from (via message similarity), so inline comments land on the
     // correct file:line instead of defaulting to line 1.
     const fileResults = this.reconcileFindingLocations(
-      filteredResults,
+      parsed.fileResults,
       executions,
       new Set(input.manifest.files.map((file) => file.filename))
     );
 
     const crossFileResult: CrossFileReviewResult = {
-      overallAssessment: parsed.overallAssessment,
-      findings: parsed.crossFileResult.findings.filter(
-        (finding) => scoreConfidence(finding.confidence) >= this.minConfidence
-      ),
+      overallAssessment: parsed.crossFileResult.overallAssessment,
+      findings: parsed.crossFileResult.findings,
       recommendations: parsed.crossFileResult.recommendations,
     };
 

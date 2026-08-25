@@ -146,7 +146,7 @@ With `--strategy multi-agent` and no explicit `--passes`, all five agents run wi
 
 - **Full coverage dispatch:** Every enabled subagent runs on every review. There is no pre-classification pass that can skip agents, so the 🧠 **General Logic & Correctness Agent**, 🔒 **Security & Trust Agent**, ⚡ **Performance & Scalability Agent**, 🧪 **Test Coverage & Quality Agent**, and 🏗️ **Architecture & Style Agent** all analyze the diff. Each specialist reports its domain focus areas as well as any other substantive issue it notices — the focus areas are a priority, not a filter.
 - **Synthesizer dedup:** The Lead Synthesizer merges findings only when they describe the _same_ underlying issue (same root cause on the same location). Distinct issues are kept as separate findings even when they are similar or share a category, maximizing recall.
-- **Confidence threshold:** The Lead Synthesizer discards findings below the config-only `minConfidence` (default `0.3`, mapping high = 1.0, medium = 0.6, low = 0.3). Configure via `MM_MULTI_AGENT_MIN_CONFIDENCE`.
+- **Confidence metadata:** Findings retain confidence labels for observability, but multi-agent confidence filtering is currently disabled.
 - **Concurrency:** Subagents run in parallel, bounded by the config-only `maxParallel` (default `2`). Configure via `MM_MULTI_AGENT_MAX_PARALLEL`.
 
 ### Available Passes

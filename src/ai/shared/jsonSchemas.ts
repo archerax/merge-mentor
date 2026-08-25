@@ -216,6 +216,8 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "build-analysis":
       return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
+    case "multi-agent-synthesizer":
+      return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     default:
       return undefined;
   }

@@ -115,6 +115,23 @@ describe("multi-agent prompts", () => {
 
       expect(prompt).toContain("EXISTING PR COMMENTS");
       expect(prompt).toContain("SQL injection risk");
+      expect(prompt).toContain("comments as review context, not as evidence");
+      expect(prompt).toContain("same root cause");
+    });
+
+    it("requires a complete per-file recall-first review workflow", () => {
+      const prompt = buildAgentPrompt({
+        agent: "general",
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      expect(prompt).toContain("# REVIEW METHOD (RECALL-FIRST)");
+      expect(prompt).toContain("Review every listed file and every added hunk");
+      expect(prompt).toContain("values from their source to their sink");
+      expect(prompt).toContain("callers,\n   callees");
+      expect(prompt).toContain("A single hunk may\n   legitimately contain multiple findings");
+      expect(prompt).toContain("after drafting findings, revisit every file");
     });
 
     it("allows cross-file findings via affected_files", () => {
@@ -152,27 +169,53 @@ describe("multi-agent prompts", () => {
             ],
           },
         ],
-        minConfidence: 0.7,
       });
 
       expect(prompt).toContain("LEAD SYNTHESIZER");
       expect(prompt).toContain("DEDUPLICATE");
       expect(prompt).toContain("CONFLICT RESOLUTION");
-      expect(prompt).toContain("CONFIDENCE THRESHOLD");
-      expect(prompt).toContain("0.7");
+      expect(prompt).not.toContain("CONFIDENCE THRESHOLD");
+      expect(prompt).toContain("There is no target");
+      expect(prompt).toContain("share a file,\n   line, category, or symptom");
+      expect(prompt).toContain("account for every substantive subagent finding");
+      expect(prompt).toContain('"agent": "security"');
       expect(prompt).toContain("SQL injection risk");
-      expect(prompt).toContain("high = 1.0, medium = 0.6, low = 0.3");
+      expect(prompt).toContain("SUBAGENT FINDINGS (JSON DATA)");
     });
 
-    it("renders a placeholder when no subagent produced findings", () => {
+    it("includes bounded diff and workspace verification guidance", () => {
       const prompt = buildSynthesizerPrompt({
         prDetails: createPRDetails(),
         files: createManifest().files,
         agentResults: [],
-        minConfidence: 0.7,
+        repoPath: "/workspace/repo",
       });
 
-      expect(prompt).toContain("No subagent produced findings.");
+      expect(prompt).toContain("DIFF AND WORKSPACE VERIFICATION");
+      expect(prompt).toContain("@workspace /search");
+      expect(prompt).toContain("not a second full review: do not invent new findings");
+      expect(prompt).toContain("src/auth.ts");
+      expect(prompt).toContain("do not invent new findings");
+    });
+
+    it("does not claim workspace access when no repository path is provided", () => {
+      const prompt = buildSynthesizerPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        agentResults: [],
+      });
+
+      expect(prompt).not.toContain("@workspace /search");
+    });
+
+    it("renders an empty JSON array when no subagent produced findings", () => {
+      const prompt = buildSynthesizerPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        agentResults: [],
+      });
+
+      expect(prompt).toContain("<subagent-findings-json>\n[]\n</subagent-findings-json>");
     });
 
     it("renders subagent PR-level findings with affected files", () => {
@@ -196,12 +239,11 @@ describe("multi-agent prompts", () => {
             ],
           },
         ],
-        minConfidence: 0.7,
       });
 
-      expect(prompt).toContain("PR-level (files: src/api.ts, src/auth.ts)");
+      expect(prompt).toContain('"affectedFiles": [');
       expect(prompt).toContain("Layering violation spans modules");
-      expect(prompt).toContain("PR-LEVEL SUBAGENT FINDINGS");
+      expect(prompt).toContain("CROSS-FILE FINDINGS");
     });
   });
 });
