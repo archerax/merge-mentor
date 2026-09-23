@@ -19,13 +19,13 @@ merge-mentor plan 1024 --base main
 merge-mentor plan 1024 --base main --write
 
 # Use a specific planning model for this run
-merge-mentor plan 1024 --base main --plan-model gpt-5.6-sol
+merge-mentor plan 1024 --base main --plan-model gpt-6-sol
 
 # Allow planning with uncommitted local changes
 merge-mentor plan 1024 --base main --allow-dirty
 ```
 
-The generated plan is saved under `.mergementor/reports/plan-<id>-<slug>.md`.
+The generated plan is saved under `.mergementor/reports/`. Files are named `merge-mentor-plan-<id>.md`, and the version is derived from the plan files already attached to the work item (falling back to locally saved plans). Running the command again for the same work item therefore produces `merge-mentor-plan-<id>-v2.md`, `-v3`, … instead of colliding with an existing plan.
 
 ---
 
@@ -56,13 +56,15 @@ The generated plan is saved under `.mergementor/reports/plan-<id>-<slug>.md`.
 
 ### AI Provider Configuration
 
-| Option                  | Description                                 | Env Variable       | Default       |
-| ----------------------- | ------------------------------------------- | ------------------ | ------------- |
-| `--provider <provider>` | AI provider (`copilot-sdk`, `opencode-sdk`) | `MM_AI_PROVIDER`   | `copilot-sdk` |
-| `--plan-model <model>`  | Higher-tier model used to generate the plan | `MM_AI_PLAN_MODEL` | `MM_AI_MODEL` |
-| `--ai-base-url <url>`   | OpenAI-compatible API base URL for BYOK     | `MM_AI_BASE_URL`   | -             |
-| `--ai-api-key <key>`    | API key for BYOK                            | `MM_AI_API_KEY`    | -             |
-| `--ai-timeout <ms>`     | Timeout in ms for all AI providers          | `MM_AI_TIMEOUT`    | -             |
+| Option                    | Description                                 | Env Variable       | Default                              |
+| ------------------------- | ------------------------------------------- | ------------------ | ------------------------------------ |
+| `--provider <provider>`   | AI provider (`copilot-sdk`, `opencode-sdk`) | `MM_AI_PROVIDER`   | `copilot-sdk`                        |
+| `--copilot-token <token>` | Copilot GitHub token                        | `MM_COPILOT_TOKEN` | -                                    |
+| `--ai-model <model>`      | Model name for the active AI provider       | `MM_AI_MODEL`      | provider default                     |
+| `--plan-model <model>`    | Higher-tier model used to generate the plan | `MM_AI_PLAN_MODEL` | `MM_AI_MODEL`, else provider default |
+| `--ai-base-url <url>`     | OpenAI-compatible API base URL for BYOK     | `MM_AI_BASE_URL`   | -                                    |
+| `--ai-api-key <key>`      | API key for BYOK                            | `MM_AI_API_KEY`    | -                                    |
+| `--ai-timeout <ms>`       | Timeout in ms for all AI providers          | `MM_AI_TIMEOUT`    | -                                    |
 
 ---
 
@@ -71,9 +73,11 @@ The generated plan is saved under `.mergementor/reports/plan-<id>-<slug>.md`.
 The generated Markdown document contains:
 
 - A heading with the work item ID and title.
-- One `## Phase N: <name>` section per phase, each with a goal and `- [ ]` task checkboxes (acceptance criteria are indented beneath each task).
-- `## Assumptions` and `## Unresolved Questions` sections.
-- An HTML signature comment (`<!-- merge-mentor-plan -->`) for future idempotent updates.
+- An `## Overview` section stating what the plan is trying to achieve (objective and outcome).
+- One `## Phase N: <name>` section per phase, each with a goal and `- [ ]` task checkboxes. The repo-relative files each task touches and its acceptance criteria are indented beneath each task.
+- `## Assumptions`, `## Risks`, `## Out of Scope`, and `## Unresolved Questions` sections.
+
+Tasks are expected to cite only file paths that exist in the repository, and each phase should identify the tests or verification steps that prove the work is done.
 
 If the work item lacks enough information for a trustworthy plan, the document reports the status as `insufficient_information` and lists the missing information instead of tasks.
 
@@ -84,3 +88,4 @@ If the work item lacks enough information for a trustworthy plan, the document r
 - The command operates on the **current working directory**.
 - Unless `--allow-dirty` is passed, it aborts when the working tree has uncommitted changes.
 - It switches to `--base` and runs a **fast-forward-only** pull. If the base branch has diverged, the pull fails safely and leaves your working tree untouched.
+- Work item titles, descriptions, acceptance criteria, and comments are treated as untrusted data. They are wrapped in explicit delimiters and the model is instructed never to follow instructions embedded in them.

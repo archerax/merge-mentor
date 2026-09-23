@@ -56,11 +56,11 @@
   "dependencies": {
     "@github/copilot-sdk": "^1.0.14",
     "@octokit/rest": "^22.0.1",
-    "@opencode-ai/sdk": "^1.18.31",
+    "@opencode-ai/sdk": "^1.18.32",
     "azure-devops-node-api": "^17.0.1",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
-    "dotenv": "^18.0.1",
+    "dotenv": "^18.0.3",
     "isomorphic-git": "^1.42.2",
     "micromatch": "^4.0.8",
     "pino": "^10.3.1",

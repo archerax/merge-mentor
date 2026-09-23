@@ -1041,6 +1041,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         body: stripHtml(c.text || ""),
       }));
 
+      const attachments = (workItem.relations || [])
+        .filter((rel) => rel.rel === "AttachedFile")
+        .map((rel) => rel.attributes?.name)
+        .filter((name): name is string => typeof name === "string" && name.length > 0);
+
       const workItemType = workItem.fields["System.WorkItemType"] as string;
 
       if (workItemType === "Task") {
@@ -1085,6 +1090,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
                 comments: combinedComments,
                 moscowTag: moscowTag ?? parentDetails.moscowTag,
                 backlogPriority: backlogPriority ?? parentDetails.backlogPriority,
+                attachments,
               };
             } catch (parentError) {
               this.logger.warn(
@@ -1106,6 +1112,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         comments,
         moscowTag,
         backlogPriority,
+        attachments,
       };
     } catch (error) {
       this.logger.error(

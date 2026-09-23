@@ -136,6 +136,14 @@ describe("Config", () => {
       expect(config.aiPlanModel).toBe("cli-plan-model");
     });
 
+    it("should leave the plan model undefined when nothing is configured so the provider can default it", () => {
+      const env = createStubEnvironment();
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiPlanModel).toBeUndefined();
+    });
+
     it("should load MM_AI_PROVIDER from environment", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "opencode-sdk",

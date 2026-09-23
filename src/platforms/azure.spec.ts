@@ -1302,6 +1302,31 @@ describe("AzureDevOpsAdapter", () => {
         expect(result.comments[0].body).toBe("Comment 1");
       });
 
+      it("extracts attached file names from work item relations", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+        mockWitApiInstance.getWorkItem.mockResolvedValue({
+          fields: {
+            "System.Title": "Test Work Item",
+          },
+          relations: [
+            {
+              rel: "AttachedFile",
+              url: "https://dev.azure.com/test-org/test-project/_apis/wit/attachments/abc",
+              attributes: { name: "merge-mentor-plan-123.md" },
+            },
+            {
+              rel: "System.LinkTypes.Hierarchy-Forward",
+              url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/456",
+            },
+          ],
+        });
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getPBIDetails("123");
+
+        expect(result.attachments).toEqual(["merge-mentor-plan-123.md"]);
+      });
+
       it("preserves HTML comments (like review signatures) when stripping HTML from comments", async () => {
         const adapter = new AzureDevOpsAdapter(createTestConfig());
         mockWitApiInstance.getWorkItem.mockResolvedValue({

@@ -7,6 +7,7 @@ export type PromptType =
   | "build-analysis"
   | "multi-agent-subagent"
   | "multi-agent-synthesizer"
+  | "plan"
   | "unknown";
 
 /**
@@ -16,6 +17,7 @@ export type PromptType =
  * @returns The detected prompt type, or "unknown" when no marker matches.
  */
 export function inferPromptType(prompt: string): PromptType {
+  if (prompt.includes("phased implementation plan")) return "plan";
   if (prompt.includes("failed CI build")) return "build-analysis";
   if (prompt.includes("file_results")) return "batched-file-review";
   if (prompt.includes("cross-file")) return "cross-file-review";

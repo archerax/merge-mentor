@@ -106,7 +106,8 @@ export interface ExecutePromptOptions {
     | "fast-review"
     | "build-analysis"
     | "multi-agent-subagent"
-    | "multi-agent-synthesizer";
+    | "multi-agent-synthesizer"
+    | "plan";
 }
 
 /**

@@ -41,6 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-branch SHA caching, `--format terminal|markdown|json`, `--output`,
   `--no-cache`, and `--exit-code` for pre-commit/pre-push hooks. No remote
   platform or credentials are required. Includes docs and tests.
+- **Implementation Plan Generation (`merge-mentor plan`)**: generates a phased,
+  codebase-grounded implementation plan for an Azure DevOps work item. The
+  command fetches the work item, switches the local repository to a clean,
+  fast-forwarded base branch (`--base`, required), and asks a higher-tier
+  planning model to produce an `## Overview`, ordered phases with checkbox
+  tasks and acceptance criteria, assumptions, and unresolved questions. The
+  Markdown plan uses the name `merge-mentor-plan-<id>.md`; repeat runs version
+  it as `-v2`, `-v3`, … based on the plan files already attached to the work
+  item instead of overwriting, and it can be attached to the work item with
+  `--write`; `--allow-dirty` permits planning
+  with uncommitted changes. Adds the `aiPlanModel` config
+  (`MM_AI_PLAN_MODEL`/`--plan-model`, falling back to `MM_AI_MODEL` then the
+  provider default), a zod-validated `PlanEngine` with a regex fallback and
+  deterministic Markdown rendering, `hasUncommittedChanges`/`switchBranch`/`pull`
+  to both git backends, and `attachWorkItemFile` to the platform adapters.
+  Azure DevOps only — GitHub issues are rejected. Includes docs and tests.
 
 ## [3.1.1] - 2026-08-04
 

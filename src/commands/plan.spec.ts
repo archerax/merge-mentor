@@ -31,7 +31,7 @@ const mockGeneratePlan = vi.fn().mockResolvedValue({
   markdown: "# Plan",
   status: "ready",
   planData: { status: "ready", title: "t", phases: [] },
-  fileName: "plan-42-thing.md",
+  fileName: "merge-mentor-plan-42.md",
 });
 
 vi.mock("../config.js", () => ({
@@ -125,7 +125,7 @@ describe("plan command", () => {
       markdown: "# Plan",
       status: "ready",
       planData: { status: "ready", title: "t", phases: [] },
-      fileName: "plan-42-thing.md",
+      fileName: "merge-mentor-plan-42.md",
     });
     mockAdapter.attachWorkItemFile.mockResolvedValue(undefined);
   });
@@ -148,7 +148,11 @@ describe("plan command", () => {
   it("attaches the plan to the work item with --write", async () => {
     await program.parseAsync(["node", "test", "plan", "42", "--base", "main", "--write"]);
 
-    expect(mockAdapter.attachWorkItemFile).toHaveBeenCalledWith("42", "plan-42-thing.md", "# Plan");
+    expect(mockAdapter.attachWorkItemFile).toHaveBeenCalledWith(
+      "42",
+      "merge-mentor-plan-42.md",
+      "# Plan"
+    );
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 

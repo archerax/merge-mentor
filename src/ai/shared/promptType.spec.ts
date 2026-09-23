@@ -18,6 +18,10 @@ describe("inferPromptType", () => {
     expect(inferPromptType("Run a fast review of this PR")).toBe("fast-review");
   });
 
+  it("should detect plan from 'phased implementation plan'", () => {
+    expect(inferPromptType("Produce a phased implementation plan for the work item")).toBe("plan");
+  });
+
   it("should fall back to unknown for unrecognized prompts", () => {
     expect(inferPromptType("Generate a summary of changes")).toBe("unknown");
   });

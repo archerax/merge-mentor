@@ -63,8 +63,9 @@ export interface Config {
   /** Generic model identifier for the active AI provider. */
   readonly aiModel?: string;
   /**
-   * Higher-tier model used by the `plan` command. Falls back to `aiModel` when
-   * unset. Env: `MM_AI_PLAN_MODEL` / CLI: `--plan-model`.
+   * Higher-tier model used by the `plan` command. Falls back to `aiModel`, then
+   * leaves the provider to apply its own default (e.g. `Auto` for Copilot SDK)
+   * when unset. Env: `MM_AI_PLAN_MODEL` / CLI: `--plan-model`.
    */
   readonly aiPlanModel?: string;
   /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */

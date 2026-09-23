@@ -371,6 +371,8 @@ export interface PBIDetails {
   readonly moscowTag?: "Must" | "Should" | "Could" | "Won't";
   /** Backlog priority/rank, when available. */
   readonly backlogPriority?: number;
+  /** File names attached to the work item, when available. */
+  readonly attachments?: readonly string[];
 }
 
 /** A simple representation of a work item state/status. */

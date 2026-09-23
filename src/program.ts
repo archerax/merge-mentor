@@ -737,6 +737,7 @@ program
   .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
   .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
   .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
   .option(
     "--plan-model <model>",
     "Higher-tier model used to generate the plan. Env: MM_AI_PLAN_MODEL"

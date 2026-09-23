@@ -66,17 +66,14 @@ export MM_AI_PROVIDER=copilot-sdk
 export MM_AI_TIMEOUT=3600000
 
 # AI Model Name (optional, defaults depend on active provider)
-export MM_AI_MODEL=gpt-4o
+export MM_AI_MODEL=gpt-6-sol
 ```
 
 ### Available Models
 
-Configure the active provider model via `MM_AI_MODEL` or `--ai-model`. Examples:
+Configure the active provider model via `MM_AI_MODEL` or `--ai-model`. Example:
 
-- `gpt-4o`
-- `claude-sonnet-4.6`
-- `claude-haiku-4.5`
-- `claude-opus-4.8`
+- `gpt-6-sol`
 
 Check provider documentation for all supported models.
 
@@ -86,8 +83,8 @@ The `plan` command uses a higher-tier planning model, configured separately:
 
 ```bash
 # Higher-tier model used to generate phased implementation plans.
-# Falls back to MM_AI_MODEL when unset.
-export MM_AI_PLAN_MODEL=gpt-5.6-sol
+# Falls back to MM_AI_MODEL when unset, then defaults to the provider default.
+export MM_AI_PLAN_MODEL=gpt-6-sol
 ```
 
 Override per invocation with `--plan-model <model>`.
@@ -104,7 +101,7 @@ You can use `MM_AI_BASE_URL` and `MM_AI_API_KEY` to configure custom OpenAI-comp
 export MM_AI_PROVIDER=copilot-sdk
 export MM_AI_BASE_URL=http://localhost:11434/v1/
 export MM_AI_API_KEY=ollama             # Some clients require a non-empty key
-export MM_AI_MODEL=llama3.1             # Your local model name
+export MM_AI_MODEL=gpt-6-sol             # Your local model name
 ```
 
 ### 2. Azure OpenAI
@@ -113,7 +110,7 @@ export MM_AI_MODEL=llama3.1             # Your local model name
 export MM_AI_PROVIDER=copilot-sdk
 export MM_AI_BASE_URL=https://your-resource-name.openai.azure.com/openai/deployments/your-deployment-name/
 export MM_AI_API_KEY=your_azure_api_key
-export MM_AI_MODEL=gpt-4o               # Your deployed model name
+export MM_AI_MODEL=gpt-6-sol            # Your deployed model name
 ```
 
 BYOK settings are currently supported by `copilot-sdk` only. When
