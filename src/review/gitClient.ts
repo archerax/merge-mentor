@@ -103,6 +103,38 @@ export interface GitClient {
   checkout(repoPath: string, branch: string): Promise<void>;
 
   /**
+   * Reports whether the working tree has uncommitted or untracked changes.
+   *
+   * Equivalent to checking for a non-empty `git status --porcelain`.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @returns `true` when there are staged, unstaged, or untracked changes.
+   */
+  hasUncommittedChanges(repoPath: string): Promise<boolean>;
+
+  /**
+   * Switches to an existing local branch without moving it.
+   *
+   * Unlike {@link checkout}, this performs a plain `git checkout <branch>` and
+   * never resets the branch to `origin/<branch>`.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Branch name to switch to.
+   */
+  switchBranch(repoPath: string, branch: string): Promise<void>;
+
+  /**
+   * Fast-forwards the current branch from `origin/<branch>`.
+   *
+   * Equivalent to `git pull --ff-only origin <branch>`. Fails when the local
+   * branch has diverged from the remote, leaving the working tree untouched.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Remote branch name to pull.
+   */
+  pull(repoPath: string, branch: string): Promise<void>;
+
+  /**
    * Removes untracked and ignored files from the working tree.
    *
    * Equivalent to `git clean -fdx`.

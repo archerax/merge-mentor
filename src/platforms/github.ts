@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
+import { PlatformApiError } from "../errors/index.js";
 import { createChildLogger } from "../logger.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
@@ -821,6 +822,25 @@ export class GitHubAdapter implements PlatformAdapter {
       );
       throw error;
     }
+  }
+
+  /**
+   * Attaches a file to a GitHub issue.
+   *
+   * GitHub's REST API does not support attaching arbitrary files to issues, so
+   * this always throws.
+   *
+   * @param _id - The issue number
+   * @param _fileName - Name to give the attached file
+   * @param _content - UTF-8 file content
+   * @throws {PlatformApiError} Always, since GitHub issues cannot accept attachments
+   */
+  async attachWorkItemFile(_id: string, _fileName: string, _content: string): Promise<void> {
+    throw new PlatformApiError(
+      "github",
+      "attach-work-item-file",
+      "Attaching files to issues is not supported by the GitHub adapter."
+    );
   }
 
   /**

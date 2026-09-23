@@ -179,6 +179,53 @@ export class IsomorphicGitClient implements GitClient {
   }
 
   /**
+   * Reports whether the working tree has uncommitted or untracked changes.
+   *
+   * A file row is clean when the HEAD, workdir, and stage columns are all `1`.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @returns `true` when any staged, unstaged, or untracked change exists.
+   */
+  async hasUncommittedChanges(repoPath: string): Promise<boolean> {
+    const status = await withTimeout(git.statusMatrix({ fs, dir: repoPath }), DEFAULT_TIMEOUT_MS);
+    return status.some(([, head, workdir, stage]) => !(head === 1 && workdir === 1 && stage === 1));
+  }
+
+  /**
+   * Switches to an existing local branch without resetting it.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Branch name to switch to.
+   */
+  async switchBranch(repoPath: string, branch: string): Promise<void> {
+    await withTimeout(git.checkout({ fs, dir: repoPath, ref: branch }), DEFAULT_TIMEOUT_MS);
+  }
+
+  /**
+   * Fast-forwards the current branch from `origin/<branch>`.
+   *
+   * Fetches the remote branch and performs a fast-forward-only merge; a
+   * divergent local branch causes isomorphic-git to reject the merge.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Remote branch name to pull.
+   */
+  async pull(repoPath: string, branch: string): Promise<void> {
+    await withTimeout(
+      git.pull({
+        fs,
+        http,
+        dir: repoPath,
+        ref: branch,
+        remoteRef: branch,
+        singleBranch: true,
+        fastForwardOnly: true,
+      }),
+      DEFAULT_TIMEOUT_MS
+    );
+  }
+
+  /**
    * Approximates `git clean -fdx` by removing every ignored or untracked path
    * reported by isomorphic-git's status matrix.
    */

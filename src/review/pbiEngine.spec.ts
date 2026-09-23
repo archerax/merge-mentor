@@ -78,6 +78,7 @@ describe("PBIReviewEngine", () => {
       .mockResolvedValue({ ...mockPbiDetails, comments, ...pbiDetailsOverride }),
     getProjectDetails: vi.fn(),
     postPBIComment: vi.fn(),
+    attachWorkItemFile: vi.fn(),
     updatePRDetails: vi.fn(),
     getCommentThread: vi.fn(),
     postCommentReply: vi.fn(),

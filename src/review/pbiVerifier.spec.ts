@@ -47,6 +47,7 @@ describe("PbiVerifier", () => {
       getPBIDetails: vi.fn(),
       getProjectDetails: vi.fn(),
       postPBIComment: vi.fn(),
+      attachWorkItemFile: vi.fn(),
       updatePRDetails: vi.fn(),
       ...overrides,
     };

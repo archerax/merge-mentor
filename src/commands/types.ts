@@ -213,6 +213,48 @@ export interface ProjectOptions {
   gitBackend?: string;
 }
 
+/** Options for the `plan` command. */
+export interface PlanOptions {
+  /** Work item ID. */
+  id?: string;
+  /** Work item URL (Azure DevOps work-item URLs are supported). */
+  url?: string;
+  /** Platform ('github' or 'azure'). Only 'azure' is supported by `plan`. */
+  platform?: string;
+  /** Base branch to switch to and fast-forward before planning. */
+  base?: string;
+  /** Attach the generated plan file to the work item. Default: `false` (local save only). */
+  write?: boolean;
+  /** Allow execution even if the local Git workspace has uncommitted changes. Default: `false`. */
+  allowDirty?: boolean;
+  /** Higher-tier AI model used to generate the plan. Env: `MM_AI_PLAN_MODEL`. */
+  planModel?: string;
+  /** Generic model identifier for the active AI provider. Env: `MM_AI_MODEL`. */
+  aiModel?: string;
+  /** Azure DevOps personal access token. Env: `MM_AZURE_TOKEN`. */
+  azureToken?: string;
+  /** Azure DevOps organization. Env: `MM_AZURE_ORG`. */
+  azureOrg?: string;
+  /** Azure DevOps project. Env: `MM_AZURE_PROJECT`. */
+  azureProject?: string;
+  /** Azure DevOps repository. Env: `MM_AZURE_REPO`. */
+  azureRepo?: string;
+  /** AI provider ('copilot-sdk' or 'opencode-sdk'). Env: `MM_AI_PROVIDER`. */
+  provider?: string;
+  /** Copilot GitHub token. Env: `MM_COPILOT_TOKEN`. */
+  copilotToken?: string;
+  /** Timeout in milliseconds for all AI providers. Env: `MM_AI_TIMEOUT`. */
+  aiTimeout?: number;
+  /** OpenAI-compatible API base URL for AI providers that support BYOK. Env: `MM_AI_BASE_URL`. */
+  aiBaseUrl?: string;
+  /** API key for AI providers that support BYOK. Env: `MM_AI_API_KEY`. */
+  aiApiKey?: string;
+  /** Base path for temporary files (cache, diffs, logs, repos, etc.). Env: `MM_TEMP_PATH`. */
+  tempPath?: string;
+  /** Git backend for repository operations ('cli' or 'isomorphic'). Default: 'cli'. */
+  gitBackend?: string;
+}
+
 /** Options for the `reply` command. Extends `ReviewOptions` with reply and thread settings. */
 export interface ReplyOptions extends ReviewOptions {
   /** Specific comment or thread ID to reply to. */

@@ -323,6 +323,16 @@ export interface PlatformAdapter {
   postPBIComment(id: string, body: string, commentId?: number | string): Promise<void>;
 
   /**
+   * Attaches a file to a work item / issue.
+   *
+   * @param id       - The work item ID or issue number
+   * @param fileName - Name to give the attached file
+   * @param content  - UTF-8 file content
+   * @throws When the platform does not support file attachments
+   */
+  attachWorkItemFile(id: string, fileName: string, content: string): Promise<void>;
+
+  /**
    * Updates the title and description body of a pull request.
    * @param prNumber - The PR number
    * @param details - The new title and/or description to apply

@@ -126,6 +126,37 @@ export class CliGitClient implements GitClient {
   }
 
   /**
+   * Reports whether the working tree has uncommitted or untracked changes.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @returns `true` when `git status --porcelain` reports any change.
+   */
+  async hasUncommittedChanges(repoPath: string): Promise<boolean> {
+    const out = await this.execFile(["-C", repoPath, "status", "--porcelain"], this.timeoutMs);
+    return out.trim().length > 0;
+  }
+
+  /**
+   * Switches to an existing local branch without resetting it.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Branch name to switch to.
+   */
+  async switchBranch(repoPath: string, branch: string): Promise<void> {
+    await this.execFile(["-C", repoPath, "checkout", branch], this.timeoutMs);
+  }
+
+  /**
+   * Fast-forwards the current branch from `origin/<branch>`.
+   *
+   * @param repoPath - Absolute path to the working tree.
+   * @param branch   - Remote branch name to pull.
+   */
+  async pull(repoPath: string, branch: string): Promise<void> {
+    await this.execFile(["-C", repoPath, "pull", "--ff-only", "origin", branch], this.timeoutMs);
+  }
+
+  /**
    * Removes untracked and ignored files from the working tree.
    *
    * Equivalent to `git clean -fdx`.

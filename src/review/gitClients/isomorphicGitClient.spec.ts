@@ -11,6 +11,7 @@ vi.mock("isomorphic-git", () => ({
     resolveRef: vi.fn().mockResolvedValue("a".repeat(40)),
     statusMatrix: vi.fn().mockResolvedValue([]),
     setConfig: vi.fn().mockResolvedValue(undefined),
+    pull: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -294,6 +295,66 @@ describe("IsomorphicGitClient", () => {
         ref: string;
       };
       expect(resolveRefCall.ref).toBe("refs/remotes/origin/main");
+    });
+  });
+
+  // ── hasUncommittedChanges ──────────────────────────────────────────────────
+
+  describe("hasUncommittedChanges", () => {
+    it("returns false when every row is clean", async () => {
+      mockedGit.statusMatrix.mockResolvedValueOnce([
+        ["README.md", 1, 1, 1],
+        ["src/index.ts", 1, 1, 1],
+      ]);
+
+      await expect(client.hasUncommittedChanges("/tmp/repo")).resolves.toBe(false);
+    });
+
+    it("returns true when a file is modified or untracked", async () => {
+      mockedGit.statusMatrix.mockResolvedValueOnce([
+        ["README.md", 1, 1, 1],
+        ["src/index.ts", 1, 2, 1],
+        ["new.txt", 0, 2, 0],
+      ]);
+
+      await expect(client.hasUncommittedChanges("/tmp/repo")).resolves.toBe(true);
+    });
+  });
+
+  // ── switchBranch ───────────────────────────────────────────────────────────
+
+  describe("switchBranch", () => {
+    it("checks out the branch without forcing or resetting refs", async () => {
+      await client.switchBranch("/tmp/repo", "develop");
+
+      expect(mockedGit.checkout).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dir: "/tmp/repo",
+          ref: "develop",
+        })
+      );
+      const call = (mockedGit.checkout as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        force?: boolean;
+      };
+      expect(call.force).toBeUndefined();
+    });
+  });
+
+  // ── pull ───────────────────────────────────────────────────────────────────
+
+  describe("pull", () => {
+    it("pulls the remote branch fast-forward only", async () => {
+      await client.pull("/tmp/repo", "main");
+
+      expect(mockedGit.pull).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dir: "/tmp/repo",
+          ref: "main",
+          remoteRef: "main",
+          singleBranch: true,
+          fastForwardOnly: true,
+        })
+      );
     });
   });
 

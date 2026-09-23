@@ -229,6 +229,67 @@ describe("CliGitClient", () => {
     });
   });
 
+  // ── hasUncommittedChanges ──────────────────────────────────────────────────
+
+  describe("hasUncommittedChanges", () => {
+    it("returns false when 'status --porcelain' is empty", async () => {
+      const { client, runner } = makeClient();
+      (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mockResolvedValue({
+        stdout: "",
+        stderr: "",
+      });
+
+      await expect(client.hasUncommittedChanges("/tmp/repo")).resolves.toBe(false);
+      expect(runner.execFile).toHaveBeenCalledWith(
+        "git",
+        ["-C", "/tmp/repo", "status", "--porcelain"],
+        expect.any(Object)
+      );
+    });
+
+    it("returns true when 'status --porcelain' reports changes", async () => {
+      const { client, runner } = makeClient();
+      (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mockResolvedValue({
+        stdout: " M README.md\n",
+        stderr: "",
+      });
+
+      await expect(client.hasUncommittedChanges("/tmp/repo")).resolves.toBe(true);
+    });
+  });
+
+  // ── switchBranch ───────────────────────────────────────────────────────────
+
+  describe("switchBranch", () => {
+    it("runs a plain 'checkout <branch>' (no reset to origin)", async () => {
+      const { client, runner } = makeClient();
+
+      await client.switchBranch("/tmp/repo", "develop");
+
+      expect(runner.execFile).toHaveBeenCalledWith(
+        "git",
+        ["-C", "/tmp/repo", "checkout", "develop"],
+        expect.any(Object)
+      );
+    });
+  });
+
+  // ── pull ───────────────────────────────────────────────────────────────────
+
+  describe("pull", () => {
+    it("runs 'pull --ff-only origin <branch>'", async () => {
+      const { client, runner } = makeClient();
+
+      await client.pull("/tmp/repo", "main");
+
+      expect(runner.execFile).toHaveBeenCalledWith(
+        "git",
+        ["-C", "/tmp/repo", "pull", "--ff-only", "origin", "main"],
+        expect.any(Object)
+      );
+    });
+  });
+
   // ── clean ──────────────────────────────────────────────────────────────────
 
   describe("clean", () => {

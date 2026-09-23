@@ -1,4 +1,6 @@
+import { Readable } from "node:stream";
 import * as azdev from "azure-devops-node-api";
+import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
 import type {
   Comment,
   GitPullRequestCommentThread,
@@ -1214,6 +1216,56 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       this.logger.error(
         { id, commentId, error: (error as Error).message },
         "Failed to post/update Azure DevOps comment"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Attaches a UTF-8 file to an Azure DevOps work item.
+   *
+   * Uploads the content as a work item attachment and links it to the work item
+   * with an `AttachedFile` relation.
+   *
+   * @param id - The work item ID
+   * @param fileName - Name to give the attached file
+   * @param content - UTF-8 file content
+   */
+  async attachWorkItemFile(id: string, fileName: string, content: string): Promise<void> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+
+      const attachment = await withRateLimitHandling(() =>
+        witApi.createAttachment({}, Readable.from([content]), fileName, "simple", this.project)
+      );
+
+      if (!attachment?.url) {
+        throw new Error(`Failed to upload attachment "${fileName}" to work item #${id}.`);
+      }
+
+      const patch: JsonPatchDocument = [
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "AttachedFile",
+            url: attachment.url,
+          },
+        },
+      ];
+
+      await withRateLimitHandling(() => witApi.updateWorkItem({}, patch, workItemId, this.project));
+
+      this.logger.info({ id, fileName }, "Work item attachment created successfully");
+    } catch (error) {
+      this.logger.error(
+        { id, fileName, error: (error as Error).message },
+        "Failed to attach file to Azure DevOps work item"
       );
       throw error;
     }

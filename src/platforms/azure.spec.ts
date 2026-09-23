@@ -8,6 +8,8 @@ const mockWitApiInstance = {
   getComments: vi.fn(),
   addComment: vi.fn(),
   updateComment: vi.fn(),
+  createAttachment: vi.fn(),
+  updateWorkItem: vi.fn(),
   vsoClient: {
     getVersioningData: vi.fn(),
   },
@@ -1849,6 +1851,58 @@ describe("AzureDevOpsAdapter", () => {
       expect(files[0].patch).toBe("");
       expect(files[0].additions).toBe(0);
       expect(files[0].deletions).toBe(0);
+    });
+  });
+
+  describe("attachWorkItemFile", () => {
+    it("uploads the content and links it with an AttachedFile relation", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockWitApiInstance.createAttachment.mockResolvedValue({
+        id: "att-1",
+        url: "https://dev.azure.com/org/project/_apis/wit/attachments/att-1",
+      });
+      mockWitApiInstance.updateWorkItem.mockResolvedValue({});
+
+      await adapter.attachWorkItemFile("42", "plan-42.md", "# Plan");
+
+      expect(mockWitApiInstance.createAttachment).toHaveBeenCalledWith(
+        {},
+        expect.anything(),
+        "plan-42.md",
+        "simple",
+        "test-project"
+      );
+
+      const [, patch, workItemId, project] = mockWitApiInstance.updateWorkItem.mock.calls[0];
+      expect(workItemId).toBe(42);
+      expect(project).toBe("test-project");
+      expect(patch).toEqual([
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "AttachedFile",
+            url: "https://dev.azure.com/org/project/_apis/wit/attachments/att-1",
+          },
+        },
+      ]);
+    });
+
+    it("throws for an invalid work item ID", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      await expect(adapter.attachWorkItemFile("not-a-number", "f.md", "x")).rejects.toThrow(
+        "Invalid Azure DevOps work item ID"
+      );
+    });
+
+    it("throws when the upload does not return a URL", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockWitApiInstance.createAttachment.mockResolvedValue({ id: "att-1" });
+
+      await expect(adapter.attachWorkItemFile("42", "f.md", "x")).rejects.toThrow(
+        "Failed to upload attachment"
+      );
     });
   });
 });

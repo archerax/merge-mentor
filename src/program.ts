@@ -7,6 +7,7 @@ import { executeDoctorCommand } from "./commands/doctor.js";
 import { executeEval } from "./commands/eval.js";
 import { executeFixCommand } from "./commands/fix.js";
 import { executePBIReview } from "./commands/pbi.js";
+import { executePlan } from "./commands/plan.js";
 import { executeProjectReview } from "./commands/project.js";
 import { executeReplyCommand } from "./commands/reply.js";
 import { executeReposCommand } from "./commands/repos.js";
@@ -35,6 +36,7 @@ import type {
   EvalCommandOptions,
   FixOptions,
   PBIOptions,
+  PlanOptions,
   ProjectOptions,
   ReplyOptions,
   ReviewOptions,
@@ -684,6 +686,77 @@ program
     try {
       const reference = resolveWorkItemReference({ positionalId, ...options });
       await executeProjectReview(reference.id, {
+        ...options,
+        ...reference,
+      });
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Implementation Plan command
+program
+  .command("plan [id]")
+  .description(
+    "Generate a phased implementation plan for an Azure DevOps work item, grounded in the local repository"
+  )
+  .optionsGroup("General Options")
+  .option("--id <id>", "Work item ID")
+  .option("--url <url>", "Work item URL (Azure DevOps work-item URLs are supported)")
+  .option("--platform <platform>", "Platform (Azure DevOps only)")
+  .requiredOption(
+    "--base <branch>",
+    "Base branch to switch to and fast-forward from origin before planning"
+  )
+  .option(
+    "--write",
+    "Attach the generated plan file to the work item (default is dry-run mode)",
+    false
+  )
+  .option(
+    "--allow-dirty",
+    "Allow execution even if the local Git workspace has uncommitted changes",
+    false
+  )
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .option(
+    "--git-backend <backend>",
+    "Git backend for repository operations (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
+  )
+  .optionsGroup("Azure DevOps Configuration")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option(
+    "--plan-model <model>",
+    "Higher-tier model used to generate the plan. Env: MM_AI_PLAN_MODEL"
+  )
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .action(async (positionalId: string | undefined, options: PlanOptions) => {
+    try {
+      const reference = resolveWorkItemReference({ positionalId, ...options });
+
+      if (reference.platform === "github") {
+        throw new Error(
+          "The plan command only supports Azure DevOps. GitHub issues are not supported."
+        );
+      }
+
+      await executePlan(reference.id, {
         ...options,
         ...reference,
       });

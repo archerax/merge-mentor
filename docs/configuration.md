@@ -80,6 +80,18 @@ Configure the active provider model via `MM_AI_MODEL` or `--ai-model`. Examples:
 
 Check provider documentation for all supported models.
 
+### Planning Model
+
+The `plan` command uses a higher-tier planning model, configured separately:
+
+```bash
+# Higher-tier model used to generate phased implementation plans.
+# Falls back to MM_AI_MODEL when unset.
+export MM_AI_PLAN_MODEL=gpt-5.6-sol
+```
+
+Override per invocation with `--plan-model <model>`.
+
 ---
 
 ## Bring Your Own Key (BYOK) Examples

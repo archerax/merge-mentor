@@ -104,6 +104,38 @@ describe("Config", () => {
       expect(config.aiModel).toBe("gpt-5.2-codex");
     });
 
+    it("should load MM_AI_PLAN_MODEL from environment", () => {
+      const env = createStubEnvironment({
+        MM_AI_MODEL: "gpt-5.2-codex",
+        MM_AI_PLAN_MODEL: "gpt-5.6-sol",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiPlanModel).toBe("gpt-5.6-sol");
+    });
+
+    it("should fall back to MM_AI_MODEL for the plan model when unset", () => {
+      const env = createStubEnvironment({
+        MM_AI_MODEL: "gpt-5.2-codex",
+      });
+
+      const config = loadConfig(undefined, env);
+
+      expect(config.aiPlanModel).toBe("gpt-5.2-codex");
+    });
+
+    it("should accept a CLI plan model override that beats the environment", () => {
+      const env = createStubEnvironment({
+        MM_AI_MODEL: "gpt-5.2-codex",
+        MM_AI_PLAN_MODEL: "env-plan-model",
+      });
+
+      const config = loadConfig({ planModel: "cli-plan-model", aiModel: "cli-model" }, env);
+
+      expect(config.aiPlanModel).toBe("cli-plan-model");
+    });
+
     it("should load MM_AI_PROVIDER from environment", () => {
       const env = createStubEnvironment({
         MM_AI_PROVIDER: "opencode-sdk",

@@ -62,6 +62,11 @@ export interface Config {
   readonly aiTimeoutMs?: number;
   /** Generic model identifier for the active AI provider. */
   readonly aiModel?: string;
+  /**
+   * Higher-tier model used by the `plan` command. Falls back to `aiModel` when
+   * unset. Env: `MM_AI_PLAN_MODEL` / CLI: `--plan-model`.
+   */
+  readonly aiPlanModel?: string;
   /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
   readonly aiBaseUrl?: string;
   /** Generic BYOK API key for AI providers that support it. */
@@ -228,6 +233,11 @@ export function loadConfig(
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
     aiTimeoutMs: parsed.aiTimeoutMs,
     aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
+    aiPlanModel:
+      cliOverrides?.planModel ??
+      env.get("MM_AI_PLAN_MODEL") ??
+      cliOverrides?.aiModel ??
+      env.get("MM_AI_MODEL"),
     aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
     aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
     skipPreExisting: true,
@@ -273,6 +283,8 @@ interface CliOverrides {
   readonly aiTimeout?: number;
   /** Override for the AI model identifier. */
   readonly aiModel?: string;
+  /** Override for the higher-tier planning model used by the `plan` command. */
+  readonly planModel?: string;
   /** Override for the OpenAI-compatible base URL. */
   readonly aiBaseUrl?: string;
   /** Override for the BYOK API key. */

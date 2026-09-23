@@ -10,6 +10,7 @@
  */
 
 import path from "node:path";
+import { PlatformApiError } from "../errors/index.js";
 import type { GitClient, GitFileChange } from "../review/gitClient.js";
 import type {
   ExistingComment,
@@ -284,6 +285,21 @@ export class LocalPlatformAdapter implements PlatformAdapter {
    */
   async postPBIComment(_id: string, _body: string, _commentId?: string | number): Promise<void> {
     // No remote to post to.
+  }
+
+  /**
+   * Attaches a file to a work item. Unsupported in local mode.
+   * @param _id - Unused
+   * @param _fileName - Unused
+   * @param _content - Unused
+   * @throws {PlatformApiError} Always, since local mode has no remote work items
+   */
+  async attachWorkItemFile(_id: string, _fileName: string, _content: string): Promise<void> {
+    throw new PlatformApiError(
+      "github",
+      "attach-work-item-file",
+      "Attaching files is not supported by the local adapter."
+    );
   }
 
   /**
