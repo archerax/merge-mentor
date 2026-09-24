@@ -53,6 +53,8 @@ describe("ProjectReviewEngine", () => {
         state: "In Progress",
         normalizedState: "inprogress",
         comments: [],
+        parentId: "100",
+        depth: 1,
       },
     ],
     dependencies: [
@@ -71,6 +73,23 @@ describe("ProjectReviewEngine", () => {
     acceptance_criteria_alignment: "AC feedback",
     estimation_consistency: "Estimation feedback",
     overall_assessment: "Good overall project review.",
+    confidence: "high",
+    findings: [
+      {
+        work_item_id: "101",
+        dimension: "dependency",
+        severity: "high",
+        issue: "Successor #101 is In Progress while predecessor #100 is To Do.",
+        recommendation: "Complete #100 before starting #101.",
+      },
+      {
+        work_item_id: "100",
+        dimension: "completeness",
+        severity: "medium",
+        issue: "Root scope is not fully covered by child stories.",
+        recommendation: "Break the remaining scope into child stories.",
+      },
+    ],
     suggestions: ["Add more story details"],
   };
 
@@ -216,7 +235,7 @@ describe("ProjectReviewEngine", () => {
     const adapter = createMockAdapter();
     const invalidParsedResponse: AIResponse = {
       raw: "This is completely invalid JSON text",
-      parsed: { invalid: true },
+      parsed: null,
     };
     const aiClient = createMockAiClient(invalidParsedResponse);
     const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
@@ -252,10 +271,151 @@ describe("ProjectReviewEngine", () => {
     await engine.reviewProject("100");
 
     expect(aiClient.executePrompt).toHaveBeenCalledWith(
-      expect.stringContaining("MoSCoW Tag:** Must")
+      expect.stringContaining("MoSCoW Tag:** Must"),
+      { promptType: "project" }
     );
     expect(aiClient.executePrompt).toHaveBeenCalledWith(
-      expect.stringContaining("Backlog Priority:** 1.25")
+      expect.stringContaining("Backlog Priority:** 1.25"),
+      { promptType: "project" }
     );
+  });
+
+  it("should pass the project prompt type hint to executePrompt", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+
+    await engine.reviewProject("100");
+
+    expect(aiClient.executePrompt).toHaveBeenCalledWith(expect.any(String), {
+      promptType: "project",
+    });
+  });
+
+  it("should round-trip structured findings and confidence from the AI response", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+
+    const result = await engine.reviewProject("100");
+
+    expect(result.confidence).toBe("high");
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings[0]).toMatchObject({
+      work_item_id: "101",
+      dimension: "dependency",
+      severity: "high",
+    });
+  });
+
+  it("should fall back to empty findings when the AI returns invalid findings", async () => {
+    const malformed = {
+      ...mockAiOutput,
+      findings: [{ dimension: "bogus-dimension", severity: "bogus-severity" }],
+    };
+    const malformedResponse: AIResponse = {
+      raw: JSON.stringify(malformed),
+      parsed: malformed,
+    };
+    const adapter = createMockAdapter();
+    const engine = new ProjectReviewEngine(adapter, createMockAiClient(malformedResponse), {
+      dryRun: true,
+      tempPath,
+    });
+
+    const result = await engine.reviewProject("100");
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it("should preserve prose and valid findings when only some findings are malformed", async () => {
+    const mixed = {
+      ...mockAiOutput,
+      findings: [
+        mockAiOutput.findings[0],
+        { dimension: "bogus-dimension", severity: "bogus-severity", issue: "bad" },
+      ],
+    };
+    const mixedResponse: AIResponse = {
+      raw: JSON.stringify(mixed),
+      parsed: mixed,
+    };
+    const adapter = createMockAdapter();
+    const engine = new ProjectReviewEngine(adapter, createMockAiClient(mixedResponse), {
+      dryRun: true,
+      tempPath,
+    });
+
+    const result = await engine.reviewProject("100");
+
+    expect(result.completeness_assessment).toBe("Completeness feedback");
+    expect(result.overall_assessment).toBe("Good overall project review.");
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].work_item_id).toBe("101");
+  });
+
+  it("should render findings grouped by severity in the posted report", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: false, tempPath });
+
+    await engine.reviewProject("100");
+
+    const posted = vi.mocked(adapter.postPBIComment).mock.calls[0][1] as string;
+    expect(posted).toContain("### 🧭 Findings");
+    expect(posted).toContain("| Work Item | Dimension | Severity | Issue | Recommendation |");
+    expect(posted).toContain("Confidence: high");
+    expect(posted.indexOf("HIGH")).toBeLessThan(posted.indexOf("MEDIUM"));
+  });
+
+  it("should render a fallback line when there are no findings", async () => {
+    const noFindings = { ...mockAiOutput, findings: [] };
+    const response: AIResponse = { raw: JSON.stringify(noFindings), parsed: noFindings };
+    const adapter = createMockAdapter();
+    const engine = new ProjectReviewEngine(adapter, createMockAiClient(response), {
+      dryRun: false,
+      tempPath,
+    });
+
+    await engine.reviewProject("100");
+
+    const posted = vi.mocked(adapter.postPBIComment).mock.calls[0][1] as string;
+    expect(posted).toContain("_No structured findings were reported._");
+  });
+
+  it("should print findings to the terminal", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let output = "";
+
+    try {
+      await engine.reviewProject("100");
+      output = consoleSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    } finally {
+      consoleSpy.mockRestore();
+    }
+
+    expect(output).toContain("🧭 Findings:");
+    expect(output).toContain("[high] Dependency (#101)");
+  });
+
+  it("should include a security boundary, hierarchy tree, and dependency direction in the prompt", async () => {
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+
+    await engine.reviewProject("100");
+
+    const prompt = vi.mocked(aiClient.executePrompt).mock.calls[0][0] as string;
+    expect(prompt.startsWith("<!-- MERGE MENTOR SECURITY BOUNDARY")).toBe(true);
+    expect(prompt).toContain("<untrusted-project-root>");
+    expect(prompt).toContain("<untrusted-project-work-items>");
+    expect(prompt).toContain("<untrusted-project-dependencies>");
+    expect(prompt).toContain("<untrusted-project-comments>");
+    expect(prompt).toContain("  - #101 [User Story]");
+    expect(prompt).toContain("is the **successor** and depends on");
+    expect(prompt).not.toContain('"title": "Test Feature"');
   });
 });

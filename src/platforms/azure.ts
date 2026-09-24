@@ -1370,17 +1370,19 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       const workItemsMap = new Map<string, ProjectWorkItem>();
       const dependenciesList: ProjectDependency[] = [];
 
-      const queue: string[] = [id];
+      const queue: { id: string }[] = [{ id }];
       const visited = new Set<string>([id]);
       const hierarchyIds = new Set<string>([id]);
+      const hierarchyParent = new Map<string, string>();
 
       this.logger.info({ rootId }, "Fetching project details hierarchy starting at root work item");
 
       while (queue.length > 0) {
-        const currentId = queue.shift();
-        if (currentId === undefined) {
+        const current = queue.shift();
+        if (current === undefined) {
           continue;
         }
+        const currentId = current.id;
         const workItemId = Number.parseInt(currentId, 10);
         if (Number.isNaN(workItemId)) {
           this.logger.warn(
@@ -1489,10 +1491,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           const targetId = match[1];
 
           if (rel.rel === "System.LinkTypes.Hierarchy-Forward" && shouldFollowHierarchy) {
+            if (!hierarchyParent.has(targetId)) {
+              hierarchyParent.set(targetId, currentId);
+            }
             if (!visited.has(targetId)) {
               visited.add(targetId);
               hierarchyIds.add(targetId);
-              queue.push(targetId);
+              queue.push({ id: targetId });
             }
           } else if (
             rel.rel === "System.LinkTypes.Dependency-Reverse" ||
@@ -1508,7 +1513,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
 
             if (!visited.has(targetId)) {
               visited.add(targetId);
-              queue.push(targetId);
+              queue.push({ id: targetId });
             }
           }
         }
@@ -1527,13 +1532,35 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         return true;
       });
 
+      // Resolve hierarchy parent/depth after traversal so an item first reached
+      // through a dependency link is still attributed to its hierarchy parent.
+      const computeDepth = (itemId: string): number | undefined => {
+        let depth = 0;
+        let cursor = hierarchyParent.get(itemId);
+        const seen = new Set<string>();
+        while (cursor !== undefined && !seen.has(cursor)) {
+          seen.add(cursor);
+          depth += 1;
+          cursor = hierarchyParent.get(cursor);
+        }
+        return depth === 0 ? undefined : depth;
+      };
+
+      const workItems = Array.from(workItemsMap.values()).map((item) => {
+        const parentId = hierarchyParent.get(item.id);
+        if (parentId === undefined) {
+          return item;
+        }
+        return { ...item, parentId, depth: computeDepth(item.id) };
+      });
+
       return {
         rootId,
         rootTitle: rootItemDetails.title,
         rootType: rootItemDetails.type,
         rootDescription: rootItemDetails.description,
         platform: "azure",
-        workItems: Array.from(workItemsMap.values()),
+        workItems,
         dependencies,
       };
     } catch (error) {

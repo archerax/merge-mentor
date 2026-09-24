@@ -1702,6 +1702,15 @@ describe("AzureDevOpsAdapter", () => {
         // Verify moscowTag and backlogPriority extraction
         expect(item101?.moscowTag).toBe("Could");
         expect(item101?.backlogPriority).toBe(100.5);
+
+        // Verify hierarchy metadata: root has neither, children carry parent/depth
+        expect(item100?.parentId).toBeUndefined();
+        expect(item100?.depth).toBeUndefined();
+        expect(item101?.parentId).toBe("100");
+        expect(item101?.depth).toBe(1);
+        // 103 was reached only via a dependency link
+        expect(item103?.parentId).toBeUndefined();
+        expect(item103?.depth).toBeUndefined();
       });
 
       it("successfully fetches hierarchy starting from Project down to Epic, Feature, and PBI", async () => {
@@ -1791,6 +1800,83 @@ describe("AzureDevOpsAdapter", () => {
         expect(itemIds).toContain("202");
         expect(itemIds).toContain("203");
         expect(itemIds).not.toContain("204");
+
+        // Verify parent/depth across the multi-level hierarchy
+        const root = result.workItems.find((wi) => wi.id === "200");
+        const epic = result.workItems.find((wi) => wi.id === "201");
+        const feature = result.workItems.find((wi) => wi.id === "202");
+        const story = result.workItems.find((wi) => wi.id === "203");
+        expect(root?.parentId).toBeUndefined();
+        expect(root?.depth).toBeUndefined();
+        expect(epic?.parentId).toBe("200");
+        expect(epic?.depth).toBe(1);
+        expect(feature?.parentId).toBe("201");
+        expect(feature?.depth).toBe(2);
+        expect(story?.parentId).toBe("202");
+        expect(story?.depth).toBe(3);
+      });
+
+      it("attributes a hierarchy child that was first reached through a dependency link", async () => {
+        const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+        mockWitApiInstance.getWorkItem.mockImplementation((id: number) => {
+          if (id === 300) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Root Feature",
+                "System.WorkItemType": "Feature",
+                "System.Description": "Root description",
+                "System.State": "New",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Dependency-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/302",
+                },
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/301",
+                },
+              ],
+            });
+          }
+          if (id === 301) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Child Feature",
+                "System.WorkItemType": "Feature",
+                "System.Description": "Child description",
+                "System.State": "Active",
+              },
+              relations: [
+                {
+                  rel: "System.LinkTypes.Hierarchy-Forward",
+                  url: "https://dev.azure.com/test-org/test-project/_apis/wit/workItems/302",
+                },
+              ],
+            });
+          }
+          if (id === 302) {
+            return Promise.resolve({
+              fields: {
+                "System.Title": "Deep Story",
+                "System.WorkItemType": "User Story",
+                "System.State": "New",
+              },
+              relations: [],
+            });
+          }
+          return Promise.resolve(null);
+        });
+
+        mockWitApiInstance.getComments.mockResolvedValue({ comments: [] });
+
+        const result = await adapter.getProjectDetails("300");
+
+        expect(result.workItems).toHaveLength(3);
+        const item302 = result.workItems.find((wi) => wi.id === "302");
+        expect(item302?.parentId).toBe("301");
+        expect(item302?.depth).toBe(2);
       });
     });
   });

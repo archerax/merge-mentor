@@ -402,6 +402,10 @@ export interface ProjectWorkItem {
   readonly moscowTag?: "Must" | "Should" | "Could" | "Won't";
   /** Backlog priority/rank, when available. */
   readonly backlogPriority?: number;
+  /** Parent work item ID within the hierarchy, when known. */
+  readonly parentId?: string;
+  /** Depth from the root (root = 0), when known. */
+  readonly depth?: number;
 }
 
 /** A link representing a dependency relationship. */
@@ -410,7 +414,12 @@ export interface ProjectDependency {
   readonly sourceId: string;
   /** ID of the work item the dependency points to. */
   readonly targetId: string;
-  /** Whether the source depends on the target or vice versa. */
+  /**
+   * Dependency semantics from the perspective of `sourceId`:
+   * - `successor`: the source is the successor and depends on the target, so the
+   *   target must complete first.
+   * - `predecessor`: the source must complete before the target.
+   */
   readonly type: "predecessor" | "successor";
 }
 

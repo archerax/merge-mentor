@@ -107,7 +107,8 @@ export interface ExecutePromptOptions {
     | "build-analysis"
     | "multi-agent-subagent"
     | "multi-agent-synthesizer"
-    | "plan";
+    | "plan"
+    | "project";
 }
 
 /**

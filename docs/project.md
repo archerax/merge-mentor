@@ -63,9 +63,34 @@ merge-mentor project 5432 --platform azure --write
 
 ## Plan Verification
 
-The AI provider parses the entire work item hierarchy to check for:
+The AI provider parses the entire work item hierarchy, including parent/child
+relationships and dependency links, and produces a severity-ranked, traceable
+review. Untrusted work-item content is wrapped in explicit security boundaries so
+it is analysed as data, never followed as instructions.
 
-- **Completeness**: Ensures that all child items (Epics -> Features -> Stories) have description, scope, and test requirements defined.
-- **Scope Creep**: Detects items that expand scope beyond the root project intent.
-- **Logical Ordering**: Verifies dependencies between work items are structured logically.
-- **Risk & Architecture alignment**: Highlights architectural risks, data boundary concerns, or external integration friction.
+It evaluates four non-overlapping dimensions:
+
+- **Completeness**: Whether child items fully cover the root's scope — missing
+  requirements, orphaned items, empty containers, and duplicate coverage.
+- **Dependency**: Ordering and state conflicts from the dependency links (e.g. a
+  successor "In Progress" while its predecessor is not done) and priority
+  inversions. Dependency direction is explicit: a `successor` source depends on
+  its target (target completes first); a `predecessor` source completes before
+  its target.
+- **Acceptance Criteria**: Missing, vague, or untestable acceptance criteria on
+  child stories.
+- **Estimation**: Missing estimates, oversized items that need splitting, and
+  inconsistent MoSCoW/priority.
+
+Each review reports structured `findings` (work item ID, dimension, severity
+`critical`/`high`/`medium`/`low`, issue, and recommendation) alongside the four
+prose summaries and an overall confidence level. The findings are grouped by
+severity in the posted report and terminal output.
+
+**Notes:**
+
+- Items in a `Done`/completed state are kept in full — delivered scope is treated
+  as evidence when checking completeness.
+- Comments are capped at the latest 5 per item and 500 characters each, with an
+  omission marker when content is elided.
+- GitHub project review is not yet supported.

@@ -22,6 +22,12 @@ describe("inferPromptType", () => {
     expect(inferPromptType("Produce a phased implementation plan for the work item")).toBe("plan");
   });
 
+  it("should detect project from the project/feature plan structure marker", () => {
+    expect(
+      inferPromptType("You are reviewing a project/feature plan structure against guidelines")
+    ).toBe("project");
+  });
+
   it("should fall back to unknown for unrecognized prompts", () => {
     expect(inferPromptType("Generate a summary of changes")).toBe("unknown");
   });

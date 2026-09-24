@@ -6,6 +6,7 @@ import {
   FAST_REVIEW_SCHEMA,
   FILE_REVIEW_SCHEMA,
   getJsonSchema,
+  PROJECT_REVIEW_SCHEMA,
 } from "./jsonSchemas.js";
 
 describe("jsonSchemas", () => {
@@ -28,6 +29,10 @@ describe("jsonSchemas", () => {
 
     it("returns FAST_REVIEW_SCHEMA for the multi-agent synthesizer", () => {
       expect(getJsonSchema("multi-agent-synthesizer")).toBe(FAST_REVIEW_SCHEMA);
+    });
+
+    it("returns PROJECT_REVIEW_SCHEMA for 'project'", () => {
+      expect(getJsonSchema("project")).toBe(PROJECT_REVIEW_SCHEMA);
     });
 
     it("returns undefined for 'unknown'", () => {

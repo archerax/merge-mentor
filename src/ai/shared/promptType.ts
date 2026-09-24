@@ -8,6 +8,7 @@ export type PromptType =
   | "multi-agent-subagent"
   | "multi-agent-synthesizer"
   | "plan"
+  | "project"
   | "unknown";
 
 /**
@@ -18,6 +19,7 @@ export type PromptType =
  */
 export function inferPromptType(prompt: string): PromptType {
   if (prompt.includes("phased implementation plan")) return "plan";
+  if (prompt.includes("reviewing a project/feature plan structure")) return "project";
   if (prompt.includes("failed CI build")) return "build-analysis";
   if (prompt.includes("file_results")) return "batched-file-review";
   if (prompt.includes("cross-file")) return "cross-file-review";

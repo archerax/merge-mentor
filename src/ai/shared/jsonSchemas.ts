@@ -200,6 +200,77 @@ const BUILD_ANALYSIS_SCHEMA = {
   ],
 } as const;
 
+/** JSON schema for project/feature plan review structured output. */
+export const PROJECT_REVIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string", description: "Plan title" },
+    completeness_assessment: {
+      type: "string",
+      description: "Prose rollup for plan completeness and scope coverage of the root",
+    },
+    dependency_risks: {
+      type: "string",
+      description: "Prose rollup for dependency and sequencing risks",
+    },
+    acceptance_criteria_alignment: {
+      type: "string",
+      description: "Prose rollup for acceptance criteria presence and quality",
+    },
+    estimation_consistency: {
+      type: "string",
+      description: "Prose rollup for estimation, sizing, and MoSCoW consistency",
+    },
+    overall_assessment: {
+      type: "string",
+      description: "Holistic assessment of the project plan health, readiness, and risks",
+    },
+    confidence: {
+      type: "string",
+      enum: ["high", "medium", "low"],
+      description: "Overall confidence in the review",
+    },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          work_item_id: {
+            type: "string",
+            description:
+              "ID of the work item the finding refers to, or empty for plan-level findings",
+          },
+          dimension: {
+            type: "string",
+            enum: ["completeness", "dependency", "acceptance_criteria", "estimation"],
+            description: "Planning dimension the finding belongs to",
+          },
+          severity: {
+            type: "string",
+            enum: ["critical", "high", "medium", "low"],
+            description: "Finding severity",
+          },
+          issue: { type: "string", description: "Description of the issue" },
+          recommendation: { type: "string", description: "Actionable recommendation" },
+        },
+      },
+    },
+    suggestions: {
+      type: "array",
+      items: { type: "string" },
+      description: "Actionable suggestions",
+    },
+  },
+  required: [
+    "completeness_assessment",
+    "dependency_risks",
+    "acceptance_criteria_alignment",
+    "estimation_consistency",
+    "overall_assessment",
+    "findings",
+  ],
+} as const;
+
 /**
  * Returns the structured JSON schema corresponding to the prompt type,
  * or undefined if structured schema output is not used for that prompt type.
@@ -216,6 +287,8 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "build-analysis":
       return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
+    case "project":
+      return PROJECT_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "multi-agent-synthesizer":
       return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     default:
