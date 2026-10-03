@@ -44,10 +44,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run mutation tests
+        env:
+          STRYKER_BREAK_THRESHOLD: ${{ github.event.inputs.break_threshold || '0' }}
         run: |
           pnpm exec stryker run \
-            --mutate "${{ github.event.inputs.mutate || 'src/**/*.ts' }}" \
-            --thresholds.break "${{ github.event.inputs.break_threshold || '0' }}"
+            --mutate "${{ github.event.inputs.mutate || 'src/**/*.ts' }}"
 
       - name: Upload mutation report
         if: always()
