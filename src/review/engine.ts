@@ -83,15 +83,10 @@ import {
   sanitizeProjectName,
 } from "../utils/prIdentifier.js";
 import { StreamingDisplay } from "../utils/streamingDisplay.js";
-import {
-  findTestFileForProduction,
-  isTestFile,
-  type TestMapperOptions,
-} from "../utils/testFileMapper.js";
+import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
 import { mergeTokenUsage } from "../utils/tokenUsage.js";
 
 import { CommentManager } from "./commentManager.js";
-import { ConfigLoader } from "./configLoader.js";
 import { DiffStorage } from "./diffStorage.js";
 import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
@@ -285,7 +280,6 @@ export class ReviewEngine {
   private readonly stateCache: ReviewStateCache;
   private readonly repoManager: RepoManager;
   private readonly workspaceManager: WorkspaceManager;
-  private readonly configLoader: ConfigLoader;
   private readonly pbiVerifier: PbiVerifier;
   private readonly lineNumberValidator: LineNumberValidator;
   private readonly output: OutputWriter;
@@ -297,7 +291,6 @@ export class ReviewEngine {
   private platformName = "unknown";
   private readonly streamingEnabled: boolean;
   private readonly streamingLines: number;
-  private projectConfig: TestMapperOptions = {};
 
   /**
    * Creates a new ReviewEngine.
@@ -377,7 +370,6 @@ export class ReviewEngine {
         ciMode: options?.ciMode,
       }
     );
-    this.configLoader = new ConfigLoader(this.fileSystem);
     this.pbiVerifier = new PbiVerifier(platform, this.provider, this.output, {
       verbose: options?.verbose,
     });
@@ -677,8 +669,6 @@ export class ReviewEngine {
       saveState,
     } = params;
 
-    this.projectConfig = await this.configLoader.loadProjectConfig(repoPath ?? process.cwd());
-
     const linesAdded = files.reduce((sum, f) => sum + f.additions, 0);
     const linesDeleted = files.reduce((sum, f) => sum + f.deletions, 0);
 
@@ -948,23 +938,19 @@ export class ReviewEngine {
   }
 
   private buildTestingPassContextSection(filenames: readonly string[]): string {
-    const productionFiles = filenames.filter(
-      (filename) => !isTestFile(filename, this.projectConfig)
-    );
+    const productionFiles = filenames.filter((filename) => !isTestFile(filename));
     const language = productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
     const mappedTests = productionFiles
       .map((productionFile) => ({
         productionFile,
-        testFile: findTestFileForProduction(productionFile, filenames, this.projectConfig),
+        testFile: findTestFileForProduction(productionFile, filenames),
       }))
       .filter((entry) => entry.testFile !== undefined)
       .map((entry) => `${entry.productionFile} -> ${entry.testFile}`);
     const missingTests = productionFiles.filter(
-      (productionFile) => !findTestFileForProduction(productionFile, filenames, this.projectConfig)
+      (productionFile) => !findTestFileForProduction(productionFile, filenames)
     );
-    const changedTestFiles = filenames.filter((filename) =>
-      isTestFile(filename, this.projectConfig)
-    );
+    const changedTestFiles = filenames.filter((filename) => isTestFile(filename));
 
     return `# TESTING PASS CONTEXT
 - Detected language: ${language}

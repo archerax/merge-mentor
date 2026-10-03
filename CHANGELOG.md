@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Existing-Comment Dedup Moved to the Lead Synthesizer**: multi-agent
+  subagents no longer receive existing PR comments, so they report purely for
+  recall. The Lead Synthesizer now owns de-duplication against already-flagged
+  issues and receives the full content of existing inline comments (issue and
+  suggestion text plus resolution status) instead of truncated summaries. It
+  suppresses an output finding only when a comment covers the same root cause,
+  and treats comments as context rather than proof an issue is fixed.
 - **Multi-Agent Review Is Recall-First**: the multi-agent strategy now
   delivers more extensive results than the single-pass `fast` review. All
   enabled subagents are dispatched on every run — the LLM pre-classifier that

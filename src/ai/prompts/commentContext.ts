@@ -1,5 +1,29 @@
 import type { ExistingComment } from "../../platforms/types.js";
 
+/** Sentinels returned when there are no inline comments to include. */
+export const NO_COMMENTS = "No existing comments on this PR.";
+export const NO_INLINE_COMMENTS = "No existing inline comments on this PR.";
+
+/**
+ * Groups inline comments by file, discarding summary comments without a
+ * file/line location and preserving insertion order of files.
+ */
+function groupInlineComments(
+  existingComments: readonly ExistingComment[]
+): Map<string, ExistingComment[]> {
+  const byFile = new Map<string, ExistingComment[]>();
+  for (const comment of existingComments) {
+    if (!comment.path || !comment.line) continue;
+    const comments = byFile.get(comment.path);
+    if (comments) {
+      comments.push(comment);
+    } else {
+      byFile.set(comment.path, [comment]);
+    }
+  }
+  return byFile;
+}
+
 /**
  * Formats existing comments into a concise context string for LLM prompts.
  * Groups comments by file and line to provide structured awareness.
@@ -21,27 +45,13 @@ export function formatExistingCommentsContext(
   existingComments: readonly ExistingComment[]
 ): string {
   if (existingComments.length === 0) {
-    return "No existing comments on this PR.";
+    return NO_COMMENTS;
   }
 
-  // Filter out summary comments (no file/line)
-  const inlineComments = existingComments.filter((c) => c.path && c.line);
+  const byFile = groupInlineComments(existingComments);
 
-  if (inlineComments.length === 0) {
-    return "No existing inline comments on this PR.";
-  }
-
-  // Group by file
-  const byFile = new Map<string, ExistingComment[]>();
-  for (const comment of inlineComments) {
-    if (!comment.path) continue;
-    if (!byFile.has(comment.path)) {
-      byFile.set(comment.path, []);
-    }
-    const comments = byFile.get(comment.path);
-    if (comments) {
-      comments.push(comment);
-    }
+  if (byFile.size === 0) {
+    return NO_INLINE_COMMENTS;
   }
 
   // Format as structured list
@@ -59,6 +69,54 @@ export function formatExistingCommentsContext(
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Formats existing comments with their full content for the Lead Synthesizer,
+ * which owns de-duplication against already-flagged issues. Unlike
+ * {@link formatExistingCommentsContext}, this preserves the complete
+ * issue/suggestion text (stripping only bot boilerplate) so the synthesizer can
+ * judge root-cause overlap accurately.
+ *
+ * @param existingComments - Array of existing bot comments on the PR
+ * @returns Formatted string with full comment content, or message if no comments
+ */
+export function formatFullCommentsContext(existingComments: readonly ExistingComment[]): string {
+  if (existingComments.length === 0) {
+    return NO_COMMENTS;
+  }
+
+  const byFile = groupInlineComments(existingComments);
+
+  if (byFile.size === 0) {
+    return NO_INLINE_COMMENTS;
+  }
+
+  const lines: string[] = ["EXISTING COMMENTS ON THIS PR:"];
+  for (const [file, comments] of byFile) {
+    lines.push(`\nFile: ${file}`);
+    for (const comment of comments.sort((a, b) => (a.line ?? 0) - (b.line ?? 0))) {
+      const category = extractCategory(comment.body);
+      const resolved = comment.isResolved ? " [RESOLVED]" : "";
+      lines.push(`  - Line ${comment.line}: [${category}]${resolved}`);
+      for (const contentLine of stripCommentBoilerplate(comment.body).split("\n")) {
+        lines.push(`    ${contentLine}`.trimEnd());
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Removes bot-generated boilerplate from a comment body: the trailing footer
+ * separator (and everything after it) plus HTML comment markers such as the
+ * finding-id and bot-attribution tags.
+ */
+function stripCommentBoilerplate(body: string): string {
+  const footerIndex = body.lastIndexOf("\n---");
+  const withoutFooter = footerIndex === -1 ? body : body.slice(0, footerIndex);
+  return withoutFooter.replace(/<!--[\s\S]*?-->/g, "").trim();
 }
 
 /**

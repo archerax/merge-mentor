@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AIProviderClient, AIResponse, ExecutePromptOptions } from "../../ai/types.js";
-import type { PRDetails } from "../../platforms/types.js";
+import type { ExistingComment, PRDetails } from "../../platforms/types.js";
 import type { OutputWriter } from "../../ports/index.js";
 import type { DiffManifest } from "../diffStorage.js";
 import { MultiAgentOrchestrator } from "./orchestrator.js";
@@ -147,6 +147,42 @@ describe("MultiAgentOrchestrator", () => {
     expect(output.crossFileResult.overallAssessment).toBe("Solid PR with minor concerns.");
     expect(output.crossFileResult.recommendations).toEqual([]);
     expect(output.tokenUsage).toBeDefined();
+  });
+
+  it("gives existing comments to the synthesizer only, not to subagents", async () => {
+    const { provider, getCalls, setResponder } = createMockProvider();
+
+    setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
+      if (options?.promptType === "multi-agent-synthesizer") {
+        return createResponse({ summary: "No concerns.", findings: [] });
+      }
+      return createResponse({ findings: [] });
+    });
+
+    const existingComments: ExistingComment[] = [
+      {
+        id: 1,
+        path: "src/auth.ts",
+        line: 12,
+        body: "### 🔒 Security Issue\n\n**Issue**: DISTINCTIVE_FLAGGED_ROOT_CAUSE\n\n**Suggestion**: Fix it\n\n---\nMerge Mentor v1.0.0\n<!-- [AI Code Review Bot] -->",
+        isResolved: false,
+      },
+    ];
+
+    await new MultiAgentOrchestrator(provider, {
+      passes: ["security"],
+    }).review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+      existingComments,
+    });
+
+    const subagentCall = getCalls().find((c) => c.promptType === "multi-agent-subagent");
+    const synthesizerCall = getCalls().find((c) => c.promptType === "multi-agent-synthesizer");
+
+    expect(subagentCall?.prompt).not.toContain("DISTINCTIVE_FLAGGED_ROOT_CAUSE");
+    expect(synthesizerCall?.prompt).toContain("DISTINCTIVE_FLAGGED_ROOT_CAUSE");
+    expect(synthesizerCall?.prompt).not.toContain("Merge Mentor v1.0.0");
   });
 
   it("passes diff attachments and workspace access to the synthesizer", async () => {

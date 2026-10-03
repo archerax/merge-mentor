@@ -1,4 +1,8 @@
-import { formatExistingCommentsContext } from "../../ai/prompts/commentContext.js";
+import {
+  formatFullCommentsContext,
+  NO_COMMENTS,
+  NO_INLINE_COMMENTS,
+} from "../../ai/prompts/commentContext.js";
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
 import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
@@ -55,7 +59,7 @@ export interface MultiAgentReviewInput {
   readonly manifest: DiffManifest;
   /** Absolute paths to the numbered diff files for @file attachment. */
   readonly diffFiles?: readonly string[];
-  /** Existing bot comments to give subagents context and avoid repeats. */
+  /** Existing bot comments used by the Lead Synthesizer to avoid duplicate findings. */
   readonly existingComments?: readonly ExistingComment[];
   /** Repository working directory for the AI provider's tool access. */
   readonly repoPath?: string;
@@ -262,11 +266,8 @@ export class MultiAgentOrchestrator {
       return undefined;
     }
 
-    const context = formatExistingCommentsContext(input.existingComments);
-    if (
-      context === "No existing comments on this PR." ||
-      context === "No existing inline comments on this PR."
-    ) {
+    const context = formatFullCommentsContext(input.existingComments);
+    if (context === NO_COMMENTS || context === NO_INLINE_COMMENTS) {
       return undefined;
     }
 
@@ -285,7 +286,6 @@ export class MultiAgentOrchestrator {
       agent,
       prDetails: input.prDetails,
       manifest: input.manifest,
-      existingCommentsContext: this.existingCommentsContext(input),
       repoPath: input.repoPath,
     });
 

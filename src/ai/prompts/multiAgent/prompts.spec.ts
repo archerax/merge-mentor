@@ -105,18 +105,15 @@ describe("multi-agent prompts", () => {
       expect(prompt).toContain("naming conventions");
     });
 
-    it("includes existing comments context when provided", () => {
+    it("does not include existing comments context (dedup is synthesized)", () => {
       const prompt = buildAgentPrompt({
         agent: "security",
         prDetails: createPRDetails(),
         manifest: createManifest(),
-        existingCommentsContext: "src/auth.ts:12 - SQL injection risk",
       });
 
-      expect(prompt).toContain("EXISTING PR COMMENTS");
-      expect(prompt).toContain("SQL injection risk");
-      expect(prompt).toContain("comments as review context, not as evidence");
-      expect(prompt).toContain("same root cause");
+      expect(prompt).not.toContain("EXISTING PR COMMENTS");
+      expect(prompt).not.toContain("existing comments");
     });
 
     it("requires a complete per-file recall-first review workflow", () => {
@@ -244,6 +241,22 @@ describe("multi-agent prompts", () => {
       expect(prompt).toContain('"affectedFiles": [');
       expect(prompt).toContain("Layering violation spans modules");
       expect(prompt).toContain("CROSS-FILE FINDINGS");
+    });
+
+    it("includes full existing-comment context and root-cause suppression rule", () => {
+      const prompt = buildSynthesizerPrompt({
+        prDetails: createPRDetails(),
+        files: createManifest().files,
+        agentResults: [],
+        existingCommentsContext: "File: src/auth.ts\n  - Line 12: [Security] SQL injection risk",
+      });
+
+      expect(prompt).toContain("EXISTING PR COMMENTS (FULL CONTENT)");
+      expect(prompt).toContain("SQL injection risk");
+      expect(prompt).toContain("same root cause");
+      expect(prompt).toContain("not as evidence that the");
+      expect(prompt).toContain("underlying issue is fixed");
+      expect(prompt).toContain("SUPPRESS ALREADY-FLAGGED ISSUES");
     });
   });
 });

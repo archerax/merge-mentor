@@ -129,23 +129,11 @@ export function buildAgentPrompt(options: {
   readonly agent: AgentRoleId;
   readonly prDetails: PRDetails;
   readonly manifest: DiffManifest;
-  readonly existingCommentsContext?: string;
   readonly repoPath?: string;
 }): string {
-  const { agent, prDetails, manifest, existingCommentsContext, repoPath } = options;
+  const { agent, prDetails, manifest, repoPath } = options;
   const focus = AGENT_FOCUS[agent];
   const filesListing = buildFilesListing(manifest, repoPath);
-
-  const commentsSection = existingCommentsContext
-    ? `
-# EXISTING PR COMMENTS
-${wrapUntrustedExistingComments(existingCommentsContext)}
-
-IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already covered.
-Treat comments as review context, not as evidence that the underlying issue is
-fixed. Suppress a finding only when the comment covers the same root cause.
-`
-    : "";
 
   const domainListing = focus.domain.map((item, index) => `${index + 1}. ${item}`).join("\n");
 
@@ -162,7 +150,7 @@ Each file's diff is stored separately - read using @filename syntax.
 
 Files to Review:
 ${filesListing}
-${commentsSection}
+
 # FOCUS AREAS
 Analyze the changed code for these concerns:
 
@@ -204,8 +192,6 @@ Before reporting any finding:
 - Issue exists in ADDED lines (+), not removed lines (-)
 - Line number is correct and points to actual problem code
 - Issue isn't already handled elsewhere in the diff
-- Related existing comments do not cover the same root cause (comments alone do
-  not prove the issue is fixed)
 - Severity matches actual impact
 - The issue is worth reporting (either inside your focus area or a real substantive issue outside it)
 
@@ -328,10 +314,14 @@ export function buildSynthesizerPrompt(options: {
   const filesListing = options.files.map((file) => `- ${file.filename}`).join("\n");
   const commentsSection = options.existingCommentsContext
     ? `
-# EXISTING PR COMMENTS
+# EXISTING PR COMMENTS (FULL CONTENT)
 ${wrapUntrustedExistingComments(options.existingCommentsContext)}
 
-IMPORTANT: Be aware of issues already flagged. Avoid re-reporting them.
+These are issues already flagged on this PR (full comment content, including
+resolution status). Treat comments as review context, not as evidence that the
+underlying issue is fixed. Suppress an output finding only when an existing
+comment covers the SAME root cause; keep a finding when the comment is merely
+related.
 `
     : "";
 
@@ -373,15 +363,19 @@ ${formatAgentFindings(options.agentResults)}
    line, category, or symptom. Each distinct issue keeps its own finding. Keep
    the strongest, most specific version and fold the other subagents' evidence
    into its reasoning.
-2. **CONFLICT RESOLUTION:** When subagent recommendations conflict (e.g. a style
+2. **SUPPRESS ALREADY-FLAGGED ISSUES (only true matches):** When existing PR
+   comments are provided above, drop a finding ONLY when an existing comment
+   covers the same root cause. Comments are context, not proof the issue is
+   fixed; keep any finding that is merely related to or near an existing comment.
+3. **CONFLICT RESOLUTION:** When subagent recommendations conflict (e.g. a style
    suggestion vs. a performance optimization), decide which finding wins via your
    judgment and explain the winning reasoning in the finding's \`reasoning\`.
-3. **PRIORITIZE:** Order findings by severity (critical first, then high, medium, low).
-4. **ATTRIBUTION:**
+4. **PRIORITIZE:** Order findings by severity (critical first, then high, medium, low).
+5. **ATTRIBUTION:**
    - Line-specific finding → include \`file\` and \`line\`.
    - File-level finding → include \`file\`, omit \`line\`.
    - Cross-file / PR-level finding → omit \`file\` and \`line\`, list \`affected_files\`.
-5. **CROSS-FILE FINDINGS:** This pass uses the fast-review flat findings contract. A genuine cross-file finding may omit \`file\` and \`line\`; do not add an \`affected_files\` field.
+6. **CROSS-FILE FINDINGS:** This pass uses the fast-review flat findings contract. A genuine cross-file finding may omit \`file\` and \`line\`; do not add an \`affected_files\` field.
 
 Before finalizing, account for every substantive subagent finding. Re-check the
 actual diff only to validate location, impact, and conflicts; do not discard a

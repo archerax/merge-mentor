@@ -34,9 +34,8 @@ are re-fetched.
 - The `repos` command manages clone-cache hygiene (`--list`, `--clean`,
   `--clean-repo`) and is the model for history-cache management.
 - Review prompts accept a `repoContext` string of coding standards, but there is
-  **no AGENTS.md loader** — only `.mergementor.json` is parsed
-  (`src/review/configLoader.ts`). Generated rules only take effect if this gap
-  is closed.
+  **no AGENTS.md loader** and no per-repo configuration loader. Generated rules
+  only take effect if this gap is closed.
 
 ---
 
