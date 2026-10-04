@@ -33,6 +33,7 @@ This command runs Prettier, Biome, and Knip.
 
 - **To fix formatting and lint errors automatically:** Run `pnpm lint:fix`.
 - **To resolve Knip errors (unused files/exports):** Remove unused files, delete unused exports, or configure `knip.json` if the export is intentionally public.
+- **Optional second linter:** Run `pnpm lint:oxlint` for an additional oxlint pass. It is not part of `pnpm check`/CI; findings are advisory warnings (configure via `.oxlintrc.json`).
 
 ### 3. Build Verification
 

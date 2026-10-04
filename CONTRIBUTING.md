@@ -33,6 +33,14 @@ pnpm install
    pnpm lint:fix
    ```
 
+   An **optional** additional linter, [oxlint](https://oxc.rs/docs/guide/usage/linter), is available for a second opinion:
+
+   ```bash
+   pnpm lint:oxlint
+   ```
+
+   It is not part of `pnpm check`/CI (its existing findings are advisory warnings only). Configure it via `.oxlintrc.json`.
+
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/) (see below).
 5. **Open a pull request.** A pre-push hook runs `pnpm check` locally, so pushes of failing code will be rejected before CI sees them.
 

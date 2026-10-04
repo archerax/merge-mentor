@@ -5,7 +5,7 @@
     "type": "git",
     "url": "git+https://github.com/archerax/merge-mentor.git"
   },
-  "description": "Automated code review bot powered by AI CLI tools (Copilot, OpenCode, Cursor)",
+  "description": "Automated code review bot powered by AI CLI tools (Copilot, OpenCode)",
   "main": "dist/cli.js",
   "bin": {
     "merge-mentor": "dist/cli.js"
@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "prettier --check \"**/*.{md,yml}\" && biome check && knip",
     "lint:fix": "prettier --write \"**/*.{md,yml}\" && biome check --write && knip --fix",
+    "lint:oxlint": "oxlint",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "docs:site": "typedoc --options typedoc.site.json",
@@ -77,6 +78,7 @@
     "esbuild": "^0.28.2",
     "husky": "^9.1.7",
     "knip": "^6.39.0",
+    "oxlint": "^1.86.0",
     "prettier": "^3.9.9",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.13.1",
