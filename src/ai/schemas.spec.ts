@@ -53,6 +53,6 @@ describe("AI response schemas", () => {
       overallAssessment: "",
     });
 
-    expect(() => PBIAlignmentResponseSchema.parse({ title: "Missing id" })).toThrow();
+    expect(() => PBIAlignmentResponseSchema.parse({ title: "Missing id" })).toThrow("pbiId");
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDescribePrompt, buildSuggestTitlePrompt } from "./describe.js";
 
-describe("describe prompts", () => {
+describe("prompt builders", () => {
   describe("buildDescribePrompt", () => {
     it("wraps diff content in untrusted section and includes output guidelines", () => {
       const diff = "diff --git a/index.ts b/index.ts\n+console.log('hello');";

@@ -577,10 +577,9 @@ describe("StreamingDisplay", () => {
       // Second render should contain ANSI clear codes
       const allWrites = writes(output);
       const secondRenderIndex = allWrites.findIndex((s, i) => i > 0 && s.includes("line2"));
-      if (secondRenderIndex > 0) {
-        // The render should clear previous lines first
-        expect(allWrites.slice(1).join("")).toContain("\x1B[1A");
-      }
+      expect(secondRenderIndex).toBeGreaterThan(0);
+      // The render should clear previous lines first
+      expect(allWrites.slice(1).join("")).toContain("\x1B[1A");
     });
 
     it("renders partial content even when there are no complete lines yet", () => {

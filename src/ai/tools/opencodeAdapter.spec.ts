@@ -57,7 +57,7 @@ describe("opencodeAdapter", () => {
         category: "quality",
       };
 
-      await expect(tool.handler(invalidArgs)).rejects.toThrow();
+      await expect(tool.handler(invalidArgs)).rejects.toThrow("line");
       expect(collector.getAllFindings()).toHaveLength(0);
     });
   });

@@ -266,7 +266,7 @@ describe("RepoManager", () => {
       fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
       gitClient.clone.mockRejectedValue(new Error("Clone failed"));
 
-      await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow();
+      await expect(repoManager.ensureRepo(repoInfo, branch, token)).rejects.toThrow("Clone failed");
       expect(fileSystem.rm).toHaveBeenCalledWith(
         expect.stringContaining("github-testowner-testrepo"),
         expect.objectContaining({ recursive: true, force: true })

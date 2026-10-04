@@ -188,23 +188,14 @@ describe("parsePRUrl", () => {
     });
 
     it("includes help text in error messages", () => {
-      try {
-        parsePRUrl("");
-      } catch (error) {
-        const msg = (error as Error).message;
-        expect(msg).toContain("Expected format");
-        expect(msg).toContain("github.com");
-        expect(msg).toContain("dev.azure.com");
-      }
+      expect(() => parsePRUrl("")).toThrow("Expected format");
+      expect(() => parsePRUrl("")).toThrow("github.com");
+      expect(() => parsePRUrl("")).toThrow("dev.azure.com");
 
-      try {
-        parsePRUrl("https://gitlab.com/org/repo/merge_requests/42");
-      } catch (error) {
-        const msg = (error as Error).message;
-        expect(msg).toContain("Supported platforms");
-        expect(msg).toContain("github.com");
-        expect(msg).toContain("dev.azure.com");
-      }
+      const gitlabUrl = "https://gitlab.com/org/repo/merge_requests/42";
+      expect(() => parsePRUrl(gitlabUrl)).toThrow("Supported platforms");
+      expect(() => parsePRUrl(gitlabUrl)).toThrow("github.com");
+      expect(() => parsePRUrl(gitlabUrl)).toThrow("dev.azure.com");
     });
   });
 });

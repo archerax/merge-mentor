@@ -755,7 +755,7 @@ describe("ReviewEngine", () => {
       );
     });
 
-    it("warns when all findings filtered out due to invalid line numbers", async () => {
+    it("remaps findings with out-of-range line numbers to the nearest valid diff line", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
       });
@@ -775,30 +775,38 @@ describe("ReviewEngine", () => {
       vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
       vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseFileReview.mockReturnValue({
-        filename: "test.ts",
-        findings: [
-          {
-            line: 999, // Invalid line number
-            severity: "high",
-            category: "bug",
-            message: "Issue on invalid line",
-            suggestion: "Fix it",
+      mockParseBatchedFileReview.mockReturnValue([
+        {
+          filename: "test.ts",
+          findings: [
+            {
+              line: 999, // Invalid line number
+              severity: "high",
+              category: "bug",
+              message: "Issue on invalid line",
+              suggestion: "Fix it",
 
-            isPreExisting: false,
-          },
-        ],
-      });
+              isPreExisting: false,
+            },
+          ],
+        },
+      ]);
       mockParseCrossFileReview.mockReturnValue({
         overallAssessment: "Good",
         findings: [],
         recommendations: [],
       });
 
-      await engine.reviewPR(123);
+      const result = await engine.reviewPR(123);
 
-      // File review result should be excluded entirely since all findings filtered out
-      // This tests the warning path at line 463
+      // Line 999 is remapped to the nearest valid diff line (3) and posted inline
+      expect(mockPlatform.postInlineComment).toHaveBeenCalledWith(
+        123,
+        "test.ts",
+        3,
+        expect.any(String)
+      );
+      expect(result.fileResults).toHaveLength(1);
     });
 
     it("reuses cached cross-file analysis when all files unchanged", async () => {
@@ -1068,24 +1076,20 @@ describe("ReviewEngine", () => {
   });
 
   describe("executeCommentAction error handling", () => {
-    it("throws error for create action without body", async () => {
+    it("records an error when a create action has no body", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
       });
-      const prDetails = createPRDetails();
 
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      const executeCommentActions = engine["executeCommentActions"].bind(engine);
+      const stats = await executeCommentActions(123, [{ type: "create" }]);
 
-      // Force engine to execute an invalid create action
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      // We need to trigger this through the review flow
-      // The commentManager should not create actions without body, but test the guard
-      await engine.reviewPR(123);
-
-      consoleSpy.mockRestore();
+      expect(stats.commentErrors).toEqual([
+        "Failed to create comment: Create action requires body",
+      ]);
+      expect(stats.commentsCreated).toBe(0);
+      expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
+      expect(mockPlatform.postGeneralComment).not.toHaveBeenCalled();
     });
   });
 

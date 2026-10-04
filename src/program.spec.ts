@@ -296,7 +296,7 @@ describe("CLI Options & Parsing", () => {
     });
   });
 
-  describe("describe command", () => {
+  describe("description command", () => {
     it("successfully generates PR description in dry-run mode", async () => {
       vi.mocked(execSync).mockReturnValue("https://github.com/owner/repo.git\n");
 

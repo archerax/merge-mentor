@@ -24,13 +24,15 @@ describe("postCommentTool", () => {
       };
 
       const result = PostCommentArgsSchema.safeParse(validArgs);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.file).toBe("src/index.ts");
-        expect(result.data.line).toBe(42);
-        expect(result.data.severity).toBe("high");
-        expect(result.data.category).toBe("bug");
-      }
+      expect(result).toMatchObject({
+        success: true,
+        data: {
+          file: "src/index.ts",
+          line: 42,
+          severity: "high",
+          category: "bug",
+        },
+      });
     });
 
     it("should accept minimum required arguments", () => {

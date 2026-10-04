@@ -142,9 +142,9 @@ describe("IsomorphicGitClient", () => {
           { type: "ci" },
           { branch: "main" }
         );
-        const rejection = expect(clonePromise).rejects.toThrow(
-          "git operation timed out after 120000ms"
-        );
+        const rejection = (async () => {
+          await expect(clonePromise).rejects.toThrow("git operation timed out after 120000ms");
+        })();
 
         await vi.advanceTimersByTimeAsync(120_000);
 

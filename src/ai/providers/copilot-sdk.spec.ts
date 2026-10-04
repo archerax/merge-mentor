@@ -834,12 +834,9 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      const lastCallArgs = MockCopilotClient.mock.calls[MockCopilotClient.mock.calls.length - 1][0];
-      if (lastCallArgs !== undefined) {
-        expect(lastCallArgs.gitHubToken).toBeUndefined();
-      } else {
-        expect(lastCallArgs).toBeUndefined();
-      }
+      const lastCallArgs = MockCopilotClient.mock.calls.at(-1)?.[0];
+      expect(lastCallArgs).toBeDefined();
+      expect(lastCallArgs?.gitHubToken).toBeUndefined();
     });
 
     it("disables sub-agent streaming deltas to preserve JSON-only output", async () => {
@@ -1542,6 +1539,8 @@ describe("createReviewPermissionHandler", () => {
     const handler = createReviewPermissionHandler(logger);
 
     handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
+
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   describe("write/shell tool availability", () => {
