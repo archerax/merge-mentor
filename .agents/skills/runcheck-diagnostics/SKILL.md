@@ -1,6 +1,6 @@
 ---
 name: runcheck-diagnostics
-description: Runbook for diagnosing TypeScript errors, Biome linter warnings, Knip unused exports, and Vitest runs.
+description: Runbook for diagnosing TypeScript errors, Oxlint warnings, Knip unused exports, and Vitest runs.
 ---
 
 # Runcheck Diagnostics Runbook
