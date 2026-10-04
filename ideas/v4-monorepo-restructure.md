@@ -35,7 +35,7 @@ Both apps are thin shells: the majority of the functionality — review engines,
 - **pnpm workspaces:** Set `pnpm-workspace.yaml` to include both `apps/*` and `libs/*`.
 - **Shared TypeScript base:** A root `tsconfig.base.json` extended per package, using TypeScript project references for fast, dependency-aware typechecking.
 - **Root orchestration:** Top-level `pnpm -r` scripts (`build`, `test`, `typecheck`, `lint`) so the existing `pnpm check` workflow keeps working unchanged.
-- **Quality gates preserved:** Biome, Prettier, Knip, Husky hooks, and Vitest continue to run across the whole workspace.
+- **Quality gates preserved:** Oxfmt, Oxlint, Knip, Husky hooks, and Vitest continue to run across the whole workspace.
 
 ### 2. Shared Library Extraction (`libs/*`)
 
@@ -120,7 +120,7 @@ merge-mentor/
                 └─────────────────────┘
 ```
 
-Strict layering rule: **apps may depend on libs; libs may never depend on apps.** Enforced via Knip/Biome boundaries plus code review.
+Strict layering rule: **apps may depend on libs; libs may never depend on apps.** Enforced via Knip/Oxlint boundaries plus code review.
 
 ### Command Interface
 
