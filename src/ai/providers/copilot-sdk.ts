@@ -1,4 +1,5 @@
 import path from "node:path";
+
 import type {
   GetAuthStatusResponse,
   PermissionHandler,
@@ -6,6 +7,7 @@ import type {
   SessionEvent,
 } from "@github/copilot-sdk";
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
+
 import { getAuditLogger } from "../../audit/index.js";
 import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
 import { AIProviderError, ValidationError } from "../../errors/index.js";

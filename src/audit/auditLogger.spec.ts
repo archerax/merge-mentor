@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AuditLogger, getAuditLogger, resetAuditLogger } from "./auditLogger.js";
 
 vi.mock("../logger.js", () => ({

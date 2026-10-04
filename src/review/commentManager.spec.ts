@@ -1,4 +1,5 @@
 import { describe, expect, it, test, vi } from "vitest";
+
 import packageJson from "../../package.json" with { type: "json" };
 import { APP_NAME_LINK } from "../constants.js";
 import type {

@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { executeBuildAnalyze } from "./build.js";
 
 const {

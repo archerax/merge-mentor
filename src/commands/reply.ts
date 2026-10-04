@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
+
 import { createAIProvider } from "../ai/providerFactory.js";
 import type { AIProviderType } from "../ai/types.js";
 import { type Config, loadConfig, type Platform, validateConfig } from "../config.js";

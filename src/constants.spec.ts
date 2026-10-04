@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   APP_NAME_LINK,
   CATEGORY_EMOJI,

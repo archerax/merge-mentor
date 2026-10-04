@@ -1,6 +1,7 @@
 import type { IBuildApi } from "azure-devops-node-api/BuildApi.js";
 import { BuildResult, BuildStatus } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { describe, expect, it, vi } from "vitest";
+
 import { type AzureBuildConnection, AzureBuildProvider } from "./azure.js";
 
 const reference = {

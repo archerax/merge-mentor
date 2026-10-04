@@ -17,8 +17,10 @@
 import fs from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
+
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/node";
+
 import { createChildLogger } from "../../logger.js";
 import type { GitAuth, GitClient, GitCloneOptions, GitFileChange } from "../gitClient.js";
 import {

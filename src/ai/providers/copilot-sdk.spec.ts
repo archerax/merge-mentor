@@ -50,6 +50,7 @@ vi.mock("../../ports/index.js", async (importOriginal) => {
 });
 
 import { type PermissionRequest, RuntimeConnection } from "@github/copilot-sdk";
+
 import { AIProviderError, ValidationError } from "../../errors/index.js";
 import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";

@@ -1,5 +1,6 @@
 import type { ToolInvocation, ToolResultObject } from "@github/copilot-sdk";
 import { describe, expect, it } from "vitest";
+
 import { createCapturingOutputWriter } from "../../ports/outputWriter.test-helper.js";
 import {
   createPostCommentTool,

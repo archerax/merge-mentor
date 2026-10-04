@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import type { Environment } from "../ports/environment.js";
 import type { CIContext } from "./types.js";
 

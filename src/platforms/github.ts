@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";

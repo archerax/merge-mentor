@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { generatePRIdentifier, parsePRNumber, sanitizeProjectName } from "./prIdentifier.js";
 
 describe("generatePRIdentifier", () => {

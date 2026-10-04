@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildReplyPrompt } from "./reply/prompt.js";
+
 import { executeReplyCommand, getCodeSnippetAtHead, parseReplyResponse } from "./reply.js";
+import { buildReplyPrompt } from "./reply/prompt.js";
 
 // Mock AI Provider Factory
 const mockExecutePrompt = vi.fn();

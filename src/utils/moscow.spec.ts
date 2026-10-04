@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { extractMoSCoWTag } from "./moscow.js";
 
 describe("extractMoSCoWTag", () => {

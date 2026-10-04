@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseDiagnosis } from "./parser.js";
 import type { PreparedEvidence } from "./types.js";
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { createFixedClock } from "../ports/clock.test-helper.js";
 import { createCapturingOutputWriter } from "../ports/outputWriter.test-helper.js";
 import { StreamingDisplay, type StreamingDisplayOptions } from "./streamingDisplay.js";

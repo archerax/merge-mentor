@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildDescribePrompt, buildSuggestTitlePrompt } from "./describe.js";
 
 describe("prompt builders", () => {

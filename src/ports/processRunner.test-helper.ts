@@ -1,6 +1,8 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
+
 import { vi } from "vitest";
+
 import type { ProcessRunner } from "./processRunner.js";
 
 /** Creates a stub ProcessRunner for testing. */

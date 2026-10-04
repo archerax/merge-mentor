@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { cleanupLogger, createChildLogger, getLogger, initLogger, logger } from "./logger.js";
 import { createFixedClock } from "./ports/clock.test-helper.js";
 import { createStubEnvironment } from "./ports/environment.test-helper.js";

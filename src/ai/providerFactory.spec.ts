@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ConfigurationError } from "../errors/index.js";
 import { createAIProvider } from "./providerFactory.js";
 import { CopilotSdkProvider } from "./providers/copilot-sdk.js";

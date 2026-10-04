@@ -1,5 +1,7 @@
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { loadConfig } from "../config.js";
 import { program } from "../program.js";
 

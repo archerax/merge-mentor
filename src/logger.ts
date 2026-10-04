@@ -1,6 +1,8 @@
 import path from "node:path";
+
 import type { Logger } from "pino";
 import pino from "pino";
+
 import { type Clock, type Environment, processEnvironment, systemClock } from "./ports/index.js";
 
 let loggerInstance: Logger | undefined;

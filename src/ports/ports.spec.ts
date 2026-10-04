@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+
 import { systemClock } from "./clock.js";
 import { processEnvironment } from "./environment.js";
 import { createSystemExecutableFinder } from "./executableFinder.js";

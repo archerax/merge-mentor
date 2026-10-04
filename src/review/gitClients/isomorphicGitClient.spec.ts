@@ -1,4 +1,5 @@
 import path from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock isomorphic-git before importing the client under test
@@ -24,7 +25,9 @@ vi.mock("isomorphic-git/http/node", () => ({
 }));
 
 import { rm } from "node:fs/promises";
+
 import git from "isomorphic-git";
+
 import { IsomorphicGitClient } from "./isomorphicGitClient.js";
 
 const mockedGit = vi.mocked(git);

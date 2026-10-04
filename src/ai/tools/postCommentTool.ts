@@ -1,6 +1,7 @@
 import type { ToolInvocation, ToolResultObject } from "@github/copilot-sdk";
 import { defineTool } from "@github/copilot-sdk";
 import { z } from "zod";
+
 import type { FileFinding } from "../../platforms/types.js";
 import { consoleOutputWriter, type OutputWriter } from "../../ports/index.js";
 

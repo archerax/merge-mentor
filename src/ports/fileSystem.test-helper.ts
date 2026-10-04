@@ -1,5 +1,7 @@
 import type { Stats } from "node:fs";
+
 import { vi } from "vitest";
+
 import type { FileSystem } from "./fileSystem.js";
 
 /** Creates a stub FileSystem for testing. All methods are vi.fn() stubs. */

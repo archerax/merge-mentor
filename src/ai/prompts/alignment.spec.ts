@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildPBIAlignmentPrompt } from "./alignment.js";
 
 describe("buildPBIAlignmentPrompt", () => {

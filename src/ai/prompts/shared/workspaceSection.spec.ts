@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildFilesListing, buildWorkspaceSection } from "./workspaceSection.js";
 

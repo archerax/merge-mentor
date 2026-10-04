@@ -1,5 +1,7 @@
 import type { Dirent, Stats } from "node:fs";
+
 import { describe, expect, it } from "vitest";
+
 import type { FileFinding } from "../platforms/types.js";
 import type { FileSystem } from "../ports/fileSystem.js";
 import {

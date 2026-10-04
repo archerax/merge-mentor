@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { UnresolvedCommentThread } from "../../platforms/types.js";
 import { buildReplyPrompt, type ReplyPromptInput } from "./prompt.js";
 

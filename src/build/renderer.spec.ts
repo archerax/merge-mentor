@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { renderReport } from "./renderer.js";
 import type { BuildDiagnosis, BuildReference, BuildSummary, PreparedEvidence } from "./types.js";
 

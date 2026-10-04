@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import packageJson from "../../package.json" with { type: "json" };
 import { createAIProvider } from "../ai/index.js";
 import type { AIProviderType } from "../ai/types.js";

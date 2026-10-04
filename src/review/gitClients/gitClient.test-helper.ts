@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 import type { GitClient } from "../gitClient.js";
 
 /** Creates a stub GitClient for testing. All methods resolve successfully by default. */

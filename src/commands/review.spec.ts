@@ -1,5 +1,7 @@
 import { mkdirSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { loadConfig, validateConfig } from "../config.js";
 import { AzureDevOpsAdapter } from "../platforms/azure.js";
 import { GitHubAdapter } from "../platforms/github.js";

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import path from "node:path";
+
 import dotenv from "dotenv";
 
 // Load .env from current working directory (supports both local and global usage)

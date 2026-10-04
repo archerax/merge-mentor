@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { z } from "zod";
+
 import packageJson from "../../package.json" with { type: "json" };
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";

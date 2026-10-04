@@ -1,6 +1,8 @@
 import type { Stats } from "node:fs";
 import path from "node:path";
+
 import { beforeEach, describe, expect, it, type Mocked } from "vitest";
+
 import type { Clock } from "../ports/clock.js";
 import { createFixedClock } from "../ports/clock.test-helper.js";
 import type { FileSystem } from "../ports/fileSystem.js";

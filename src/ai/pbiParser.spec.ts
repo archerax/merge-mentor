@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { formatPBIAlignmentReport, parsePBIAlignmentResponse } from "./pbiParser.js";
 
 describe("pbiParser", () => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Config } from "../config.js";
 import { resolveReviewProfile } from "../review/reviewSelection.js";
 import { GitHubAdapter } from "./github.js";

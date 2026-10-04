@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { delay } from "./delay.js";
 
 describe("delay", () => {

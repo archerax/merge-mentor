@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+
 import * as azdev from "azure-devops-node-api";
 import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
 import type {
@@ -6,6 +7,7 @@ import type {
   GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import * as Diff from "diff";
+
 import { getAuditLogger } from "../audit/index.js";
 import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";

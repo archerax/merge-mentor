@@ -1,5 +1,7 @@
 import { execSync } from "node:child_process";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Config } from "../config.js";
 import { loadConfig } from "../config.js";
 import { AzureDevOpsAdapter } from "../platforms/azure.js";

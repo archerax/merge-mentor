@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { inferPromptType } from "./promptType.js";
 
 describe("inferPromptType", () => {

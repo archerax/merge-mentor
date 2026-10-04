@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { CliGitClient } from "./cliGitClient.js";
 import { createGitClient } from "./factory.js";
 import { IsomorphicGitClient } from "./isomorphicGitClient.js";

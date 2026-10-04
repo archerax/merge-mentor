@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Config } from "../config.js";
 import { loadConfig, validateConfig } from "../config.js";
 import { GitHubAdapter } from "../platforms/github.js";

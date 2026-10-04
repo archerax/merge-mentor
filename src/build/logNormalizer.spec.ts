@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { prepareEvidence } from "./logNormalizer.js";
 
 describe("prepareEvidence", () => {

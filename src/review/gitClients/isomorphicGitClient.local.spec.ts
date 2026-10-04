@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createScratchRepo } from "./gitRepo.test-helper.js";
 import { IsomorphicGitClient } from "./isomorphicGitClient.js";
 

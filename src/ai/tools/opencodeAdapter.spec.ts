@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createCapturingOutputWriter } from "../../ports/outputWriter.test-helper.js";
 import { createOpencodePostCommentTool } from "./opencodeAdapter.js";
 import { FindingsCollector } from "./postCommentTool.js";

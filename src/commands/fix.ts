@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
+
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import { createAIProvider } from "../ai/providerFactory.js";
 import type { AIProviderType } from "../ai/types.js";

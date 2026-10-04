@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { CIContext } from "../../ci/index.js";
 import { createStubEnvironment } from "../../ports/environment.test-helper.js";
 import { createCapturingOutputWriter } from "../../ports/outputWriter.test-helper.js";

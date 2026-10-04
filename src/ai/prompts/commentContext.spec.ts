@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { ExistingComment } from "../../platforms/types.js";
 import { formatExistingCommentsContext, formatFullCommentsContext } from "./commentContext.js";
 

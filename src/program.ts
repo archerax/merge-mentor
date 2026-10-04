@@ -1,4 +1,5 @@
 import { Command } from "commander";
+
 import packageJson from "../package.json" with { type: "json" };
 import type { AIProviderType } from "./ai/types.js";
 import { executeBuildAnalyze } from "./commands/build.js";

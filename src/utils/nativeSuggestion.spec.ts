@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { FileFinding } from "../platforms/types.js";
 import { formatNativeSuggestion, validateNativeSuggestion } from "./nativeSuggestion.js";
 

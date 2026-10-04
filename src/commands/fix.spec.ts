@@ -1,5 +1,7 @@
 import { execSync } from "node:child_process";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createAIProvider } from "../ai/providerFactory.js";
 import { executeFixCommand, validateGitWorkspace } from "./fix.js";
 
