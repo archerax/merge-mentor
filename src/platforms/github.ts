@@ -299,17 +299,15 @@ export class GitHubAdapter implements PlatformAdapter {
 
       if (match?.path && match.line) {
         const mappedComments: UnresolvedComment[] =
-          match.comments?.nodes?.map(
-            (c): UnresolvedComment => ({
-              id: c.databaseId ?? c.id,
-              author: c.author?.login ?? "unknown",
-              body: c.body || "",
-              createdAt: c.createdAt,
-              isBot:
-                (c.author?.login ?? "").endsWith("[bot]") ||
-                (c.body || "").includes(this.botIdentifier),
-            })
-          ) ?? [];
+          match.comments?.nodes?.map((c): UnresolvedComment => ({
+            id: c.databaseId ?? c.id,
+            author: c.author?.login ?? "unknown",
+            body: c.body || "",
+            createdAt: c.createdAt,
+            isBot:
+              (c.author?.login ?? "").endsWith("[bot]") ||
+              (c.body || "").includes(this.botIdentifier),
+          })) ?? [];
 
         const firstComment = mappedComments[0];
 

@@ -29,7 +29,6 @@ const { mockClient, MockCopilotClient } = vi.hoisted(() => {
       .fn()
       .mockResolvedValue({ isAuthenticated: true, login: "mock-user", authType: "token" }),
   };
-  // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
   const ClientCtor = vi.fn().mockImplementation(function () {
     return client;
   });

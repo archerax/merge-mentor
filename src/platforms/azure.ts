@@ -736,15 +736,13 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
             ? "active"
             : "resolved",
         botInitiated: (firstComment?.content || "").includes(this.botIdentifier),
-        comments: validComments.map(
-          (c): UnresolvedComment => ({
-            id: c.id,
-            author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
-            body: c.content || "",
-            createdAt: c.publishedDate ? c.publishedDate.toISOString() : undefined,
-            isBot: (c.content || "").includes(this.botIdentifier),
-          })
-        ),
+        comments: validComments.map((c): UnresolvedComment => ({
+          id: c.id,
+          author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+          body: c.content || "",
+          createdAt: c.publishedDate ? c.publishedDate.toISOString() : undefined,
+          isBot: (c.content || "").includes(this.botIdentifier),
+        })),
       };
     } catch (error) {
       this.logger.error(

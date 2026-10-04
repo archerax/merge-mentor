@@ -14,8 +14,7 @@ Use this skill when implementing a new AI client provider or modifying existing 
 Add the new provider name to the `AIProviderType` union in [src/ai/types.ts](file:///root/merge-mentor/src/ai/types.ts):
 
 ```typescript
-export type AIProviderType =
-  "copilot-sdk" | "opencode-sdk" | "your-new-provider";
+export type AIProviderType = "copilot-sdk" | "opencode-sdk" | "your-new-provider";
 ```
 
 ### 2. Implement the Provider Client

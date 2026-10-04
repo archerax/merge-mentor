@@ -1007,7 +1007,6 @@ describe("ReviewEngine", () => {
         verbose: false,
       });
 
-      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
       await expect(executeAction(123, { type: "create" })).rejects.toThrow(
         "Create action requires body"
@@ -1022,7 +1021,6 @@ describe("ReviewEngine", () => {
         verbose: false,
       });
 
-      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
       await executeAction(123, {
         type: "create",
@@ -1039,7 +1037,6 @@ describe("ReviewEngine", () => {
         verbose: false,
       });
 
-      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
       await executeAction(123, {
         type: "create",
@@ -1057,7 +1054,6 @@ describe("ReviewEngine", () => {
         verbose: false,
       });
 
-      // biome-ignore lint/complexity/useLiteralKeys: accessing private method for testing
       const executeAction = engine["executeAction"].bind(engine);
       await executeAction(123, {
         type: "create",

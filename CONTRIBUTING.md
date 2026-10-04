@@ -25,21 +25,13 @@ pnpm install
    pnpm check
    ```
 
-   This chains `pnpm typecheck` (strict TypeScript), `pnpm lint` (Prettier + Biome + Knip), `pnpm build`, and `pnpm test` (Vitest). All four must pass.
+   This chains `pnpm typecheck` (strict TypeScript), `pnpm lint` (Oxfmt + Oxlint + Knip), `pnpm build`, and `pnpm test` (Vitest). All four must pass.
 
    To auto-fix formatting/lint issues:
 
    ```bash
    pnpm lint:fix
    ```
-
-   An **optional** additional linter, [oxlint](https://oxc.rs/docs/guide/usage/linter), is available for a second opinion:
-
-   ```bash
-   pnpm lint:oxlint
-   ```
-
-   It is not part of `pnpm check`/CI (its existing findings are advisory warnings only). Configure it via `.oxlintrc.json`.
 
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/) (see below).
 5. **Open a pull request.** A pre-push hook runs `pnpm check` locally, so pushes of failing code will be rejected before CI sees them.
@@ -48,7 +40,7 @@ pnpm install
 
 ### Code Style
 
-- **Strict TypeScript** — no explicit `any` in production code (Biome enforces `noExplicitAny` and `noNonNullAssertion` as errors).
+- **Strict TypeScript** — no explicit `any` in production code (Oxlint enforces `no-explicit-any` and `no-non-null-assertion` as errors).
 - **Relative imports must end with `.js`** (ESM), e.g. `import { foo } from "./bar.js"`.
 - **Hexagonal architecture** — core logic depends on ports (`src/ports/`), not concrete I/O. Use the existing `FileSystem`, `ProcessRunner`, `Clock`, and `OutputWriter` ports instead of calling `node:fs`/`child_process` directly; each port has a `*.test-helper.ts` fake for tests.
 - **Errors** — throw the typed errors from `src/errors/` (e.g. `AIProviderError`, `ConfigurationError`), not raw `Error`, and preserve the original error via `cause`.

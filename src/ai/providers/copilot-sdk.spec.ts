@@ -13,7 +13,6 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
   };
-  // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
   const ClientCtor = vi.fn().mockImplementation(function () {
     return client;
   });
@@ -722,7 +721,6 @@ describe("CopilotSdkProvider", () => {
 
     it("resets cached client and retries when CopilotClient constructor throws", async () => {
       const provider = createProvider(2);
-      // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with new
       MockCopilotClient.mockImplementationOnce(function () {
         throw new Error("client startup failed");
       });

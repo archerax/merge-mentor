@@ -194,7 +194,6 @@ describe("pbi command", () => {
 
   it("errors and exits when executePBIReview throws", async () => {
     const mockPbiEngine = await import("../review/pbiEngine.js");
-    // biome-ignore lint/complexity/useArrowFunction: regular function required so it can be constructible when called with new
     vi.mocked(mockPbiEngine.PBIReviewEngine).mockImplementationOnce(function () {
       throw new Error("PBI Review Failed");
     });

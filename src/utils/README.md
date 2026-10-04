@@ -19,7 +19,7 @@ This module provides automatic rate limit handling with exponential backoff for 
 import { withRateLimitHandling } from "./utils/rateLimitHandler";
 
 const data = await withRateLimitHandling(() =>
-  octokit.pulls.get({ owner, repo, pull_number: 123 }),
+  octokit.pulls.get({ owner, repo, pull_number: 123 })
 );
 ```
 
@@ -29,7 +29,7 @@ const data = await withRateLimitHandling(() =>
 import { withRateLimit } from "./utils/rateLimitHandler";
 
 const getPullRequest = withRateLimit((prNumber: number) =>
-  octokit.pulls.get({ owner, repo, pull_number: prNumber }),
+  octokit.pulls.get({ owner, repo, pull_number: prNumber })
 );
 
 // Use it

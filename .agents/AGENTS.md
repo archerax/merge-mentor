@@ -6,7 +6,7 @@
 pnpm typecheck        # Check TypeScript compilation (fast, no-emit)
 pnpm build            # Compile TypeScript
 pnpm test             # Run unit tests with Vitest
-pnpm lint             # Check formatting (Prettier/Biome) + unused code (Knip)
+pnpm lint             # Check formatting (Oxfmt) + linting (Oxlint) + unused code (Knip)
 pnpm lint:fix         # Auto-fix formatting and linting errors
 pnpm check            # Full validation suite (typecheck + lint + build + test)
 ```
@@ -26,7 +26,7 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 ## Tech Stack
 
-TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Biome linter, Prettier, Knip
+TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Oxlint linter, Oxfmt formatter, Knip
 
 ## Code Style
 
@@ -34,7 +34,7 @@ TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Biome linter, 
 
 - Because this project is an ES Module (`"type": "module"`), all internal imports **MUST** include the `.js` extension (e.g., `import { logger } from "./logger.js"`). Do not omit extensions or use `.ts`.
 
-**Biome Rules:**
+**Oxlint Rules:**
 
 - **No Unused Variables:** Treated as errors. Remove unused imports and local variables.
 - **No Non-null Assertions:** Do not use `!` to bypass TypeScript checks.
@@ -46,10 +46,7 @@ TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Biome linter, 
 import { ValidationError } from "../errors/index.js";
 import type { File } from "./types.js";
 
-async function fetchPullRequestFiles(
-  owner: string,
-  repo: string,
-): Promise<File[]> {
+async function fetchPullRequestFiles(owner: string, repo: string): Promise<File[]> {
   if (!owner) throw new ValidationError("owner", "Required");
   return api.getFiles(owner, repo);
 }
@@ -65,7 +62,7 @@ function calculateScore(factors: Factor[]): "high" | "medium" | "low" {
 **Bad:**
 
 ```typescript
-// Missing .js extension, uses any, and fails Biome/strict rules
+// Missing .js extension, uses any, and fails Oxlint/strict rules
 import { getFiles } from "./api";
 
 async function get(x: any): any {
