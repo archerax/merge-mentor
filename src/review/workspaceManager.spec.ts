@@ -7,40 +7,40 @@ import type { DiffManifest } from "./diffStorage.js";
 import type { RepoManager } from "./repoManager.js";
 import { WorkspaceManager } from "./workspaceManager.js";
 
+function createMockPlatform(): PlatformAdapter {
+  return {
+    getProjectIdentifier: vi.fn().mockReturnValue("Hello-World"),
+    getPlatformName: vi.fn().mockReturnValue("github"),
+    getRepoInfo: vi
+      .fn()
+      .mockReturnValue({ owner: "octocat", repo: "Hello-World", platform: "github" }),
+    getToken: vi.fn().mockReturnValue("github_pat_12345"),
+    getPRDetails: vi.fn(),
+    getPRFiles: vi.fn(),
+    getExistingBotComments: vi.fn(),
+    getCommentThread: vi.fn(),
+    getUnresolvedCommentThreads: vi.fn(),
+    postCommentReply: vi.fn(),
+    resolveCommentThread: vi.fn(),
+    postInlineComment: vi.fn(),
+    postGeneralComment: vi.fn(),
+    getLinkedPBIIds: vi.fn(),
+    getPBIDetails: vi.fn(),
+    getProjectDetails: vi.fn(),
+    postPBIComment: vi.fn(),
+    attachWorkItemFile: vi.fn(),
+    updatePRDetails: vi.fn(),
+  };
+}
+
+function createMockRepoManager(): RepoManager {
+  return {
+    ensureRepo: vi.fn().mockResolvedValue("/tmp/mergementor/clones/octocat-Hello-World"),
+    cleanupStaleRepos: vi.fn(),
+  } as unknown as RepoManager;
+}
+
 describe("WorkspaceManager", () => {
-  function createMockPlatform(): PlatformAdapter {
-    return {
-      getProjectIdentifier: vi.fn().mockReturnValue("Hello-World"),
-      getPlatformName: vi.fn().mockReturnValue("github"),
-      getRepoInfo: vi
-        .fn()
-        .mockReturnValue({ owner: "octocat", repo: "Hello-World", platform: "github" }),
-      getToken: vi.fn().mockReturnValue("github_pat_12345"),
-      getPRDetails: vi.fn(),
-      getPRFiles: vi.fn(),
-      getExistingBotComments: vi.fn(),
-      getCommentThread: vi.fn(),
-      getUnresolvedCommentThreads: vi.fn(),
-      postCommentReply: vi.fn(),
-      resolveCommentThread: vi.fn(),
-      postInlineComment: vi.fn(),
-      postGeneralComment: vi.fn(),
-      getLinkedPBIIds: vi.fn(),
-      getPBIDetails: vi.fn(),
-      getProjectDetails: vi.fn(),
-      postPBIComment: vi.fn(),
-      attachWorkItemFile: vi.fn(),
-      updatePRDetails: vi.fn(),
-    };
-  }
-
-  function createMockRepoManager(): RepoManager {
-    return {
-      ensureRepo: vi.fn().mockResolvedValue("/tmp/mergementor/clones/octocat-Hello-World"),
-      cleanupStaleRepos: vi.fn(),
-    } as unknown as RepoManager;
-  }
-
   describe("resolveWorkspace", () => {
     it("returns localWorkspacePath if provided and accessible", async () => {
       const platform = createMockPlatform();

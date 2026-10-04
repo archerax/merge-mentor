@@ -22,7 +22,7 @@ vi.mock("node:child_process", async (importOriginal) => {
 });
 
 const { mockClient, MockCopilotClient } = vi.hoisted(() => {
-  const mockClient = {
+  const client = {
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi
@@ -30,10 +30,10 @@ const { mockClient, MockCopilotClient } = vi.hoisted(() => {
       .mockResolvedValue({ isAuthenticated: true, login: "mock-user", authType: "token" }),
   };
   // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
-  const MockCopilotClient = vi.fn().mockImplementation(function () {
-    return mockClient;
+  const ClientCtor = vi.fn().mockImplementation(function () {
+    return client;
   });
-  return { mockClient, MockCopilotClient };
+  return { mockClient: client, MockCopilotClient: ClientCtor };
 });
 
 vi.mock("@github/copilot-sdk", () => ({

@@ -26,7 +26,7 @@ vi.mock("../config.js", () => ({
 
 vi.mock("../platforms/github.js", () => {
   return {
-    GitHubAdapter: vi.fn(function GitHubAdapter() {
+    GitHubAdapter: vi.fn(function GitHubAdapterMock() {
       return mockAdapter;
     }),
   };
@@ -42,7 +42,7 @@ vi.mock("../platforms/azure.js", () => {
 
 vi.mock("../review/engine.js", () => {
   return {
-    ReviewEngine: vi.fn(function ReviewEngine() {
+    ReviewEngine: vi.fn(function ReviewEngineMock() {
       return { reviewPR: mockReviewPR, describePR: mockDescribePR };
     }),
   };

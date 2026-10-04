@@ -97,7 +97,7 @@ export class WorkspaceManager {
         { error: (error as Error).message, branch },
         "Repository cloning failed, aborting review"
       );
-      throw new Error(errorMsg);
+      throw new Error(errorMsg, { cause: error });
     }
   }
 

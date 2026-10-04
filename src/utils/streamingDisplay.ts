@@ -109,7 +109,7 @@ export class StreamingDisplay {
     this.output = options.output ?? consoleOutputWriter;
     this.clock = options.clock ?? systemClock;
     this.terminalColumns = options.columns ?? (process.stdout.columns || 80);
-    this.lineBuffer = new Array<string>(this.maxLines).fill("");
+    this.lineBuffer = Array.from({ length: this.maxLines }, () => "");
   }
 
   /**
@@ -371,9 +371,7 @@ export class StreamingDisplay {
    * Filter out control characters except newlines.
    */
   private filterControlChars(text: string): string {
-    // Remove control characters (0x00-0x1F) except newline (0x0A) and tab (0x09)
-    // Also remove DEL (0x7F)
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally filtering control chars
-    return text.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+    // Remove Unicode control characters (category Cc) except newline and tab
+    return text.replace(/[^\P{Cc}\t\n]/gu, "");
   }
 }

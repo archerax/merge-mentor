@@ -720,7 +720,7 @@ describe("Validator functions", () => {
 
     it("should default to copilot-sdk for invalid providers", () => {
       expect(validateAIProvider("invalid")).toBe("copilot-sdk");
-      expect(validateAIProvider("cursor")).toBe("copilot-sdk");
+      expect(validateAIProvider("nonexistent-provider")).toBe("copilot-sdk");
       expect(validateAIProvider("")).toBe("copilot-sdk");
       expect(validateAIProvider(undefined)).toBe("copilot-sdk");
     });

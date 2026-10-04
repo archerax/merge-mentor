@@ -7,6 +7,16 @@ import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { createStubGitClient } from "./gitClients/gitClient.test-helper.js";
 import { PlanEngine } from "./planEngine.js";
 
+function createMockAi(response: AIResponse): AIProviderClient {
+  return {
+    executePrompt: vi.fn().mockResolvedValue(response),
+    parseFileReview: vi.fn(),
+    parseCrossFileReview: vi.fn(),
+    parseBatchedFileReview: vi.fn(),
+    parseFastReview: vi.fn(),
+  } as unknown as AIProviderClient;
+}
+
 describe("PlanEngine", () => {
   let tempPath: string;
 
@@ -79,16 +89,6 @@ describe("PlanEngine", () => {
       postCommentReply: vi.fn(),
       resolveCommentThread: vi.fn(),
     };
-  }
-
-  function createMockAi(response: AIResponse): AIProviderClient {
-    return {
-      executePrompt: vi.fn().mockResolvedValue(response),
-      parseFileReview: vi.fn(),
-      parseCrossFileReview: vi.fn(),
-      parseBatchedFileReview: vi.fn(),
-      parseFastReview: vi.fn(),
-    } as unknown as AIProviderClient;
   }
 
   it("guards the dirty tree, switches, pulls, and generates a ready plan", async () => {

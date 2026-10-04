@@ -621,7 +621,7 @@ export class AuditLogger {
 }
 
 /** Singleton audit logger instance. */
-let _auditLogger: AuditLogger | undefined;
+let auditLoggerInstance: AuditLogger | undefined;
 
 /**
  * Gets or creates the singleton audit logger instance.
@@ -642,10 +642,10 @@ let _auditLogger: AuditLogger | undefined;
  * ```
  */
 export function getAuditLogger(options?: AuditLoggerOptions): AuditLogger {
-  if (!_auditLogger) {
-    _auditLogger = new AuditLogger(options);
+  if (!auditLoggerInstance) {
+    auditLoggerInstance = new AuditLogger(options);
   }
-  return _auditLogger;
+  return auditLoggerInstance;
 }
 
 /**
@@ -667,5 +667,5 @@ export function getAuditLogger(options?: AuditLoggerOptions): AuditLogger {
  * ```
  */
 export function resetAuditLogger(): void {
-  _auditLogger = undefined;
+  auditLoggerInstance = undefined;
 }

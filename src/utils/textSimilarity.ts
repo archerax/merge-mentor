@@ -9,6 +9,14 @@
  * @param str2 - Second string to compare
  * @returns Similarity score between 0.0 (no overlap) and 1.0 (identical)
  */
+function getBigrams(str: string): Set<string> {
+  const bigrams = new Set<string>();
+  for (let i = 0; i < str.length - 1; i++) {
+    bigrams.add(str.slice(i, i + 2));
+  }
+  return bigrams;
+}
+
 export function calculateTextSimilarity(str1: string, str2: string): number {
   const norm1 = str1
     .toLowerCase()
@@ -21,14 +29,6 @@ export function calculateTextSimilarity(str1: string, str2: string): number {
 
   if (norm1 === norm2) return 1.0;
   if (norm1.length < 2 || norm2.length < 2) return 0.0;
-
-  const getBigrams = (str: string): Set<string> => {
-    const bigrams = new Set<string>();
-    for (let i = 0; i < str.length - 1; i++) {
-      bigrams.add(str.slice(i, i + 2));
-    }
-    return bigrams;
-  };
 
   const bg1 = getBigrams(norm1);
   const bg2 = getBigrams(norm2);

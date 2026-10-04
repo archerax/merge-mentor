@@ -1383,8 +1383,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           continue;
         }
         const currentId = current.id;
-        const workItemId = Number.parseInt(currentId, 10);
-        if (Number.isNaN(workItemId)) {
+        const currentWorkItemId = Number.parseInt(currentId, 10);
+        if (Number.isNaN(currentWorkItemId)) {
           this.logger.warn(
             { currentId },
             "Skipping invalid work item ID in project details fetching"
@@ -1393,7 +1393,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         }
 
         const workItem = await withRateLimitHandling(
-          () => witApi.getWorkItem(workItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
+          () => witApi.getWorkItem(currentWorkItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
         ).catch((error) => {
           this.logger.error(
             { currentId, error: (error as Error).message },
@@ -1452,7 +1452,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         let comments: PBIComment[] = [];
         try {
           const commentsList = await withRateLimitHandling(() =>
-            witApi.getComments(this.project, workItemId)
+            witApi.getComments(this.project, currentWorkItemId)
           );
           comments = (commentsList.comments || []).map((c) => ({
             id: c.id ?? "",

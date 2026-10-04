@@ -13,16 +13,17 @@ import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
  * @param options - Doctor options, optionally limiting checks to a specific provider
  * @returns Resolves once all diagnostics have been printed
  */
+function cleanVersion(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !line.includes("copilot update") && !line.includes("check for updates"))
+    .join("\n")
+    .trim();
+}
+
 export async function executeDoctorCommand(options: { provider?: string }): Promise<void> {
   const output = consoleOutputWriter;
   const env = processEnvironment;
-  const cleanVersion = (text: string): string => {
-    return text
-      .split("\n")
-      .filter((line) => !line.includes("copilot update") && !line.includes("check for updates"))
-      .join("\n")
-      .trim();
-  };
   output.log("\n🔍 merge-mentor diagnostics\n");
   output.log(`Platform: ${process.platform}`);
   output.log(`Architecture: ${process.arch}`);

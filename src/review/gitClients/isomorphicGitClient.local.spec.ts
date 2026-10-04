@@ -37,7 +37,7 @@ describe("IsomorphicGitClient local diffs (real repo)", () => {
       expect(staged.map((c) => c.path)).toEqual(["README.md"]);
 
       const worktree = await client.workingTreeDiff(repo.path);
-      const paths = worktree.map((c) => c.path).sort();
+      const paths = worktree.map((c) => c.path).toSorted();
       expect(paths).toContain("README.md");
       expect(paths).toContain("tracked.txt");
     } finally {

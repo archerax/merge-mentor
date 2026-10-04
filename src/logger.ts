@@ -3,10 +3,10 @@ import type { Logger } from "pino";
 import pino from "pino";
 import { type Clock, type Environment, processEnvironment, systemClock } from "./ports/index.js";
 
-let _logger: Logger | undefined;
-let _tempPath: string | undefined;
-let _clock: Clock = systemClock;
-let _env: Environment = processEnvironment;
+let loggerInstance: Logger | undefined;
+let cachedTempPath: string | undefined;
+let configuredClock: Clock = systemClock;
+let configuredEnv: Environment = processEnvironment;
 
 /**
  * Initialize the logger with a specific temp path.
@@ -15,10 +15,10 @@ let _env: Environment = processEnvironment;
  * @param tempPath - Base path for temporary files
  */
 export function initLogger(tempPath: string, clock?: Clock, env?: Environment): void {
-  _tempPath = tempPath;
-  if (clock) _clock = clock;
-  if (env) _env = env;
-  _logger = undefined; // Reset logger to force recreation with new path
+  cachedTempPath = tempPath;
+  if (clock) configuredClock = clock;
+  if (env) configuredEnv = env;
+  loggerInstance = undefined; // Reset logger to force recreation with new path
 }
 
 /**
@@ -26,11 +26,11 @@ export function initLogger(tempPath: string, clock?: Clock, env?: Environment): 
  * Lazy initialization ensures log directory is created only when actually needed.
  */
 export function getLogger(): Logger {
-  if (!_logger) {
+  if (!loggerInstance) {
     // Use configured temp path or fallback to default
-    const basePath = _tempPath || path.join(process.cwd(), ".mergementor");
+    const basePath = cachedTempPath || path.join(process.cwd(), ".mergementor");
     const logDir = path.join(basePath, "logs");
-    const timestamp = _clock
+    const timestamp = configuredClock
       .now()
       .toISOString()
       .replace(/[:.]/g, "-")
@@ -38,8 +38,8 @@ export function getLogger(): Logger {
       .slice(0, -5);
     const logFile = path.join(logDir, `merge-mentor_${timestamp}.log`);
 
-    _logger = pino({
-      level: _env.get("LOG_LEVEL") || "info",
+    loggerInstance = pino({
+      level: configuredEnv.get("LOG_LEVEL") || "info",
       transport: {
         target: "pino/file",
         options: {
@@ -49,7 +49,7 @@ export function getLogger(): Logger {
       },
     });
   }
-  return _logger;
+  return loggerInstance;
 }
 
 // Export a proxy logger that lazily initializes
@@ -80,11 +80,11 @@ export function createChildLogger(context: Record<string, unknown>) {
  * Primarily used for testing to prevent worker thread issues.
  */
 export async function cleanupLogger(): Promise<void> {
-  if (_logger) {
+  if (loggerInstance) {
     // Only flush if the flush method exists (it won't in mocked pino)
-    if (typeof _logger.flush === "function") {
-      await _logger.flush();
+    if (typeof loggerInstance.flush === "function") {
+      await loggerInstance.flush();
     }
-    _logger = undefined;
+    loggerInstance = undefined;
   }
 }

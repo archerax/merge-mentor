@@ -3,56 +3,56 @@ import { describe, expect, it, vi } from "vitest";
 import type { Clock, FileSystem } from "../../ports/index.js";
 import { type SaveTranscriptDeps, saveTranscript } from "./saveTranscript.js";
 
-describe("saveTranscript", () => {
-  const createMockDeps = (overrides?: Partial<SaveTranscriptDeps>) => {
-    const writtenFiles: Record<string, string> = {};
-    const createdDirs: string[] = [];
+const createMockDeps = (overrides?: Partial<SaveTranscriptDeps>) => {
+  const writtenFiles: Record<string, string> = {};
+  const createdDirs: string[] = [];
 
-    const fileSystem: FileSystem = {
-      mkdir: vi.fn().mockImplementation(async (dir: string) => {
-        createdDirs.push(dir);
-      }),
-      writeFile: vi.fn().mockImplementation(async (filePath: string, content: string) => {
-        writtenFiles[filePath] = content;
-      }),
-      readFile: vi.fn(),
-      rm: vi.fn(),
-      readdir: vi.fn(),
-      access: vi.fn(),
-      stat: vi.fn(),
-      unlink: vi.fn(),
-    };
-
-    const clock: Clock = {
-      timestamp: () => "2026-07-24T12:00:00.000Z",
-      now: () => new Date(1700000000000),
-      epochMs: () => 1700000000000,
-    };
-
-    const logger = {
-      debug: vi.fn(),
-      warn: vi.fn(),
-    };
-
-    return {
-      deps: {
-        fileSystem,
-        clock,
-        logger,
-        tempPath: "/tmp/test",
-        providerLabel: "TEST PROVIDER TRANSCRIPT",
-        filePrefix: "transcript-test",
-        displayName: "Test Provider",
-        model: "test-model",
-        ...overrides,
-      },
-      writtenFiles,
-      createdDirs,
-      logger,
-      fileSystem,
-    };
+  const fileSystem: FileSystem = {
+    mkdir: vi.fn().mockImplementation(async (dir: string) => {
+      createdDirs.push(dir);
+    }),
+    writeFile: vi.fn().mockImplementation(async (filePath: string, content: string) => {
+      writtenFiles[filePath] = content;
+    }),
+    readFile: vi.fn(),
+    rm: vi.fn(),
+    readdir: vi.fn(),
+    access: vi.fn(),
+    stat: vi.fn(),
+    unlink: vi.fn(),
   };
 
+  const clock: Clock = {
+    timestamp: () => "2026-07-24T12:00:00.000Z",
+    now: () => new Date(1700000000000),
+    epochMs: () => 1700000000000,
+  };
+
+  const logger = {
+    debug: vi.fn(),
+    warn: vi.fn(),
+  };
+
+  return {
+    deps: {
+      fileSystem,
+      clock,
+      logger,
+      tempPath: "/tmp/test",
+      providerLabel: "TEST PROVIDER TRANSCRIPT",
+      filePrefix: "transcript-test",
+      displayName: "Test Provider",
+      model: "test-model",
+      ...overrides,
+    },
+    writtenFiles,
+    createdDirs,
+    logger,
+    fileSystem,
+  };
+};
+
+describe("saveTranscript", () => {
   it("creates transcript directory and writes transcript file on success", async () => {
     const { deps, writtenFiles, logger } = createMockDeps();
 

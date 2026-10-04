@@ -95,7 +95,7 @@ function generateFindingFingerprint(filename: string, finding: FileFinding): str
  */
 function generateCrossFileFindingFingerprint(finding: CrossFileFinding): string {
   const firstWords = finding.message.split(/\s+/).slice(0, 10).join(" ").toLowerCase();
-  const filesKey = [...finding.affectedFiles].sort().join(",");
+  const filesKey = finding.affectedFiles.toSorted().join(",");
   return `${finding.category}:${filesKey}:${firstWords}`;
 }
 

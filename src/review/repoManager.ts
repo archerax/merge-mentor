@@ -274,7 +274,8 @@ export class RepoManager {
       // Clean up partial clone on failure
       await this.fileSystem.rm(repoPath, { recursive: true, force: true }).catch(() => {});
       throw new Error(
-        `Failed to clone repository: ${redactToken((error as Error).message, token)}`
+        `Failed to clone repository: ${redactToken((error as Error).message, token)}`,
+        { cause: error }
       );
     }
   }
@@ -324,7 +325,8 @@ export class RepoManager {
         this.logger.info({ repoPath, branch }, "Repository re-cloned successfully");
       } catch (cloneError) {
         throw new Error(
-          `Failed to update repository: ${redactToken((cloneError as Error).message, token)}`
+          `Failed to update repository: ${redactToken((cloneError as Error).message, token)}`,
+          { cause: cloneError }
         );
       }
     }

@@ -1823,12 +1823,12 @@ describe("ReviewEngine", () => {
   });
 
   describe("describePR", () => {
-    let mockPlatform: ReturnType<typeof createMockPlatform>;
+    let describePlatform: ReturnType<typeof createMockPlatform>;
     let engine: ReviewEngine;
 
     beforeEach(() => {
-      mockPlatform = createMockPlatform();
-      engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+      describePlatform = createMockPlatform();
+      engine = new ReviewEngine(describePlatform, "[Bot]", "copilot-sdk", {
         tempPath: "/tmp/mergementor",
         localWorkspacePath: "/tmp/workspace",
       });
@@ -1847,8 +1847,8 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [{ ...createPRFile(), patch: "some patch data" }];
 
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(describePlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(describePlatform.getPRFiles).mockResolvedValue(files);
 
       const result = await engine.describePR({
         prNumber: 123,
@@ -1865,8 +1865,8 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [{ ...createPRFile(), patch: "some patch data" }];
 
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(describePlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(describePlatform.getPRFiles).mockResolvedValue(files);
 
       const result = await engine.describePR({
         prNumber: 123,
@@ -1882,8 +1882,8 @@ describe("ReviewEngine", () => {
       const prDetails = createPRDetails();
       const files = [{ ...createPRFile(), patch: "some patch data" }];
 
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(describePlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(describePlatform.getPRFiles).mockResolvedValue(files);
 
       await engine.describePR({
         prNumber: 123,
@@ -1891,7 +1891,7 @@ describe("ReviewEngine", () => {
         write: true,
       });
 
-      expect(mockPlatform.updatePRDetails).toHaveBeenCalledWith(123, {
+      expect(describePlatform.updatePRDetails).toHaveBeenCalledWith(123, {
         title: "feat: add mock feature",
         body: expect.stringContaining("This is a mock description body."),
       });
@@ -1900,8 +1900,8 @@ describe("ReviewEngine", () => {
     it("exits early with a warning if there are no changes", async () => {
       const prDetails = createPRDetails();
 
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(describePlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(describePlatform.getPRFiles).mockResolvedValue([]);
 
       const result = await engine.describePR({
         prNumber: 123,

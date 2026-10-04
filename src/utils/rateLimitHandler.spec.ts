@@ -7,6 +7,27 @@ import {
   withRateLimitHandling,
 } from "./rateLimitHandler.js";
 
+function customCheck(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "CUSTOM_RATE_LIMIT"
+  );
+}
+
+function customExtract(err: unknown): number | undefined {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "customRetryAfter" in err &&
+    typeof err.customRetryAfter === "number"
+  ) {
+    return err.customRetryAfter * 1000;
+  }
+  return undefined;
+}
+
 describe("rateLimitHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -336,15 +357,6 @@ describe("rateLimitHandler", () => {
       const customError = { code: "CUSTOM_RATE_LIMIT" };
       const fn = vi.fn().mockRejectedValueOnce(customError).mockResolvedValue("success");
 
-      const customCheck = (error: unknown): boolean => {
-        return (
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "CUSTOM_RATE_LIMIT"
-        );
-      };
-
       const promise = withRateLimitHandling(fn, {
         isRateLimitError: customCheck,
         baseDelayMs: 100,
@@ -365,18 +377,6 @@ describe("rateLimitHandler", () => {
 
       const error = { status: 429, customRetryAfter: 3 };
       const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue("success");
-
-      const customExtract = (err: unknown): number | undefined => {
-        if (
-          typeof err === "object" &&
-          err !== null &&
-          "customRetryAfter" in err &&
-          typeof err.customRetryAfter === "number"
-        ) {
-          return err.customRetryAfter * 1000;
-        }
-        return undefined;
-      };
 
       const promise = withRateLimitHandling(fn, {
         extractRetryAfter: customExtract,

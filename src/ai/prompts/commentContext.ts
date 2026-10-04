@@ -58,7 +58,7 @@ export function formatExistingCommentsContext(
   const lines: string[] = ["EXISTING COMMENTS ON THIS PR:"];
   for (const [file, comments] of byFile) {
     lines.push(`\nFile: ${file}`);
-    for (const comment of comments.sort((a, b) => (a.line ?? 0) - (b.line ?? 0))) {
+    for (const comment of comments.toSorted((a, b) => (a.line ?? 0) - (b.line ?? 0))) {
       // Extract key info: line, category, issue summary
       const lineNum = comment.line;
       const category = extractCategory(comment.body);
@@ -95,7 +95,7 @@ export function formatFullCommentsContext(existingComments: readonly ExistingCom
   const lines: string[] = ["EXISTING COMMENTS ON THIS PR:"];
   for (const [file, comments] of byFile) {
     lines.push(`\nFile: ${file}`);
-    for (const comment of comments.sort((a, b) => (a.line ?? 0) - (b.line ?? 0))) {
+    for (const comment of comments.toSorted((a, b) => (a.line ?? 0) - (b.line ?? 0))) {
       const category = extractCategory(comment.body);
       const resolved = comment.isResolved ? " [RESOLVED]" : "";
       lines.push(`  - Line ${comment.line}: [${category}]${resolved}`);

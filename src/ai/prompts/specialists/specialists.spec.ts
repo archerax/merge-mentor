@@ -11,6 +11,64 @@ import {
 import type { SecurityCrossFileContext } from "./security.js";
 import { buildSecurityCrossFilePrompt, buildSecurityFileReviewPrompt } from "./security.js";
 
+function createSecurityContext(
+  overrides?: Partial<SecurityCrossFileContext>
+): SecurityCrossFileContext {
+  return {
+    filesSummary: "src/auth.ts (modified, +25/-10)\nsrc/utils.ts (added, +50/-0)",
+    fileReviewResults: [
+      {
+        filename: "src/auth.ts",
+        findings: [
+          {
+            line: 10,
+            severity: "high",
+            confidence: "high",
+            category: "security",
+            message: "Hardcoded secret",
+            suggestion: "Use env variable",
+            reasoning: "Secret exposed in source",
+          },
+        ],
+      },
+      {
+        filename: "src/utils.ts",
+        findings: [],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createPerformanceContext(
+  overrides?: Partial<PerformanceCrossFileContext>
+): PerformanceCrossFileContext {
+  return {
+    filesSummary: "src/fetcher.ts (modified, +30/-5)\nsrc/aggregator.ts (added, +60/-0)",
+    fileReviewResults: [
+      {
+        filename: "src/fetcher.ts",
+        findings: [
+          {
+            line: 22,
+            severity: "medium",
+            confidence: "high",
+            category: "performance",
+            message: "N+1 query pattern",
+            suggestion: "Use batch loading",
+            reasoning: "Queries inside loop",
+          },
+        ],
+      },
+      {
+        filename: "src/aggregator.ts",
+        findings: [],
+      },
+    ],
+    ...overrides,
+  };
+}
+
 describe("Specialized Review Prompts", () => {
   const mockManifest: DiffManifest = {
     prIdentifier: "test-pr-123",
@@ -367,35 +425,6 @@ describe("Specialized Review Prompts", () => {
   };
 
   describe("buildSecurityCrossFilePrompt", () => {
-    function createSecurityContext(
-      overrides?: Partial<SecurityCrossFileContext>
-    ): SecurityCrossFileContext {
-      return {
-        filesSummary: "src/auth.ts (modified, +25/-10)\nsrc/utils.ts (added, +50/-0)",
-        fileReviewResults: [
-          {
-            filename: "src/auth.ts",
-            findings: [
-              {
-                line: 10,
-                severity: "high",
-                confidence: "high",
-                category: "security",
-                message: "Hardcoded secret",
-                suggestion: "Use env variable",
-                reasoning: "Secret exposed in source",
-              },
-            ],
-          },
-          {
-            filename: "src/utils.ts",
-            findings: [],
-          },
-        ],
-        ...overrides,
-      };
-    }
-
     it("should return string containing PR context", () => {
       const prompt = buildSecurityCrossFilePrompt(mockPRDetails, createSecurityContext());
 
@@ -528,35 +557,6 @@ describe("Specialized Review Prompts", () => {
   });
 
   describe("buildPerformanceCrossFilePrompt", () => {
-    function createPerformanceContext(
-      overrides?: Partial<PerformanceCrossFileContext>
-    ): PerformanceCrossFileContext {
-      return {
-        filesSummary: "src/fetcher.ts (modified, +30/-5)\nsrc/aggregator.ts (added, +60/-0)",
-        fileReviewResults: [
-          {
-            filename: "src/fetcher.ts",
-            findings: [
-              {
-                line: 22,
-                severity: "medium",
-                confidence: "high",
-                category: "performance",
-                message: "N+1 query pattern",
-                suggestion: "Use batch loading",
-                reasoning: "Queries inside loop",
-              },
-            ],
-          },
-          {
-            filename: "src/aggregator.ts",
-            findings: [],
-          },
-        ],
-        ...overrides,
-      };
-    }
-
     it("should return string containing PR context", () => {
       const prompt = buildPerformanceCrossFilePrompt(mockPRDetails, createPerformanceContext());
 

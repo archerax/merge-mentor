@@ -297,7 +297,7 @@ export class ReviewEngine {
    *
    * @param platform - GitHub or Azure DevOps platform adapter
    * @param botIdentifier - Identifier for bot comments (e.g., '[Merge Mentor]')
-   * @param providerType - AI provider type ('copilot', 'opencode', 'cursor', etc.)
+   * @param providerType - AI provider type ('copilot-sdk' or 'opencode-sdk')
    * @param options - Configuration options
    *
    * @example
@@ -482,7 +482,7 @@ export class ReviewEngine {
     const describePrompt = buildDescribePrompt(prDiff);
 
     let streamingCallback: ((chunk: string) => void) | undefined;
-    let finishStreaming = () => {};
+    let finishStreaming: (() => void) | undefined;
 
     if (options.streamingEnabled) {
       const stream = this.createStreamingCallback("Generating PR Description");
@@ -494,7 +494,7 @@ export class ReviewEngine {
       onStreamData: streamingCallback,
       promptType: "cross-file-review",
     });
-    finishStreaming();
+    finishStreaming?.();
 
     let body = bodyResponse.raw.trim();
 
@@ -788,7 +788,7 @@ export class ReviewEngine {
       const filePatches = new Map<string, string>(
         files
           .map((f): [string, string] => [f.filename, f.patch ?? ""])
-          .filter(([_, p]) => p.length > 0)
+          .filter(([, p]) => p.length > 0)
       );
 
       const actions = this.commentManager.determineActions(
@@ -1740,8 +1740,8 @@ During the database pass, pay extra attention to query correctness, transaction 
         }
         break;
       default: {
-        const _exhaustive: never = action.type;
-        throw new Error(`Unknown comment action type: ${_exhaustive}`);
+        const exhaustive: never = action.type;
+        throw new Error(`Unknown comment action type: ${exhaustive}`);
       }
     }
   }

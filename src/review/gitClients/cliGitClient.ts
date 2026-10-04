@@ -385,7 +385,7 @@ export class CliGitClient implements GitClient {
       return result.stdout;
     } catch (error) {
       if ((error as Error).name === "AbortError") {
-        throw new Error(`git command timed out after ${timeoutMs}ms`);
+        throw new Error(`git command timed out after ${timeoutMs}ms`, { cause: error });
       }
       throw error;
     } finally {

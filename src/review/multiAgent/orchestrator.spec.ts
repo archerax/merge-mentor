@@ -55,6 +55,8 @@ function createResponse(parsed: unknown): AIResponse {
   };
 }
 
+const defaultResponder = async (): Promise<AIResponse> => createResponse({});
+
 function createMockProvider(): {
   provider: AIProviderClient;
   execute: ReturnType<typeof vi.fn>;
@@ -65,7 +67,7 @@ function createMockProvider(): {
 } {
   const calls: { promptType: string; prompt: string; streamed: boolean }[] = [];
   let responder: (prompt: string, options?: ExecutePromptOptions) => Promise<AIResponse> =
-    async () => createResponse({});
+    defaultResponder;
 
   const execute = vi.fn(async (prompt: string, options?: ExecutePromptOptions) => {
     calls.push({

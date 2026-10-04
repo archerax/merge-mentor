@@ -113,7 +113,7 @@ async function runWithConcurrency<T, R>(
   limit: number,
   fn: (item: T, index: number) => Promise<R>
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results: R[] = Array.from<R>({ length: items.length });
   let nextIndex = 0;
 
   const worker = async (): Promise<void> => {

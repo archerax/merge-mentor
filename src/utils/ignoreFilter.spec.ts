@@ -2,6 +2,39 @@ import { describe, expect, it } from "vitest";
 import type { PRFile } from "../platforms/types.js";
 import { filterPRFiles, getIgnorePatterns, shouldIgnoreFile } from "./ignoreFilter.js";
 
+const mockFiles = (): PRFile[] => [
+  {
+    filename: "src/main.ts",
+    status: "modified",
+    additions: 10,
+    deletions: 5,
+  },
+  {
+    filename: "src/generated/api.ts",
+    status: "added",
+    additions: 50,
+    deletions: 0,
+  },
+  {
+    filename: "src/utils.test.ts",
+    status: "modified",
+    additions: 20,
+    deletions: 10,
+  },
+  {
+    filename: "src/config.ts",
+    status: "modified",
+    additions: 5,
+    deletions: 2,
+  },
+  {
+    filename: "README.md",
+    status: "modified",
+    additions: 15,
+    deletions: 5,
+  },
+];
+
 describe("ignoreFilter", () => {
   describe("getIgnorePatterns", () => {
     it("returns default patterns when no user patterns provided", () => {
@@ -103,39 +136,6 @@ describe("ignoreFilter", () => {
   });
 
   describe("filterPRFiles", () => {
-    const mockFiles = (): PRFile[] => [
-      {
-        filename: "src/main.ts",
-        status: "modified",
-        additions: 10,
-        deletions: 5,
-      },
-      {
-        filename: "src/generated/api.ts",
-        status: "added",
-        additions: 50,
-        deletions: 0,
-      },
-      {
-        filename: "src/utils.test.ts",
-        status: "modified",
-        additions: 20,
-        deletions: 10,
-      },
-      {
-        filename: "src/config.ts",
-        status: "modified",
-        additions: 5,
-        deletions: 2,
-      },
-      {
-        filename: "README.md",
-        status: "modified",
-        additions: 15,
-        deletions: 5,
-      },
-    ];
-
     it("filters out files matching ignore patterns", () => {
       const files = mockFiles();
       const patterns = getIgnorePatterns(["**/*.test.ts"]);

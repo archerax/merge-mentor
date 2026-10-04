@@ -19,6 +19,13 @@ function makeGitHubEnv(overrides: Record<string, string> = {}) {
   });
 }
 
+const readTopLevelNumber = () => JSON.stringify({ number: 55 });
+const readPullRequestNumber = () => JSON.stringify({ pull_request: { number: 88 } });
+const readFailingEventFile = () => {
+  throw new Error("file not found");
+};
+const readNumber77 = () => JSON.stringify({ number: 77 });
+
 function makeAzureEnv(overrides: Record<string, string> = {}) {
   return createStubEnvironment({
     TF_BUILD: "True",
@@ -91,8 +98,7 @@ describe("resolveGitHubActionsContext", () => {
       GITHUB_REPOSITORY: "myorg/myrepo",
       GITHUB_EVENT_PATH: "/tmp/event.json",
     });
-    const fileReader = () => JSON.stringify({ number: 55 });
-    const ctx = resolveGitHubActionsContext(env, fileReader);
+    const ctx = resolveGitHubActionsContext(env, readTopLevelNumber);
     expect(ctx?.prNumber).toBe(55);
   });
 
@@ -103,8 +109,7 @@ describe("resolveGitHubActionsContext", () => {
       GITHUB_REPOSITORY: "myorg/myrepo",
       GITHUB_EVENT_PATH: "/tmp/event.json",
     });
-    const fileReader = () => JSON.stringify({ pull_request: { number: 88 } });
-    const ctx = resolveGitHubActionsContext(env, fileReader);
+    const ctx = resolveGitHubActionsContext(env, readPullRequestNumber);
     expect(ctx?.prNumber).toBe(88);
   });
 
@@ -113,10 +118,7 @@ describe("resolveGitHubActionsContext", () => {
       GITHUB_EVENT_PATH: "/tmp/event.json",
       GITHUB_REF: "refs/pull/12/merge",
     });
-    const fileReader = () => {
-      throw new Error("file not found");
-    };
-    const ctx = resolveGitHubActionsContext(env, fileReader);
+    const ctx = resolveGitHubActionsContext(env, readFailingEventFile);
     expect(ctx?.prNumber).toBe(12);
   });
 
@@ -333,8 +335,7 @@ describe("detectCIEnvironment", () => {
       GITHUB_REPOSITORY: "myorg/myrepo",
       GITHUB_EVENT_PATH: "/tmp/event.json",
     });
-    const fileReader = () => JSON.stringify({ number: 77 });
-    const ctx = detectCIEnvironment(env, fileReader);
+    const ctx = detectCIEnvironment(env, readNumber77);
     expect(ctx?.prNumber).toBe(77);
   });
 });

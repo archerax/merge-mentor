@@ -59,7 +59,7 @@ export function prepareEvidence(
   let redacted = false;
   let truncated = false;
   const seen = new Set<string>();
-  const ordered = [...chunks].sort(
+  const ordered = chunks.toSorted(
     (a, b) => Number(b.isFailureCandidate) - Number(a.isFailureCandidate)
   );
   for (const chunk of ordered) {

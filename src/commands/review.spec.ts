@@ -25,7 +25,7 @@ vi.mock("../config.js", () => ({
 
 vi.mock("../platforms/github.js", () => {
   return {
-    GitHubAdapter: vi.fn(function GitHubAdapter() {
+    GitHubAdapter: vi.fn(function GitHubAdapterMock() {
       return mockAdapter;
     }),
   };
@@ -33,7 +33,7 @@ vi.mock("../platforms/github.js", () => {
 
 vi.mock("../platforms/azure.js", () => {
   return {
-    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
+    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;
     }),
   };
@@ -41,7 +41,7 @@ vi.mock("../platforms/azure.js", () => {
 
 vi.mock("../review/engine.js", () => {
   return {
-    ReviewEngine: vi.fn(function ReviewEngine() {
+    ReviewEngine: vi.fn(function ReviewEngineMock() {
       return { reviewPR: mockReviewPR, describePR: mockDescribePR };
     }),
   };
@@ -186,6 +186,10 @@ function createReviewOptions(overrides: Partial<ReviewOptions> = {}): ReviewOpti
     verbose: true,
     ...overrides,
   };
+}
+
+function createStubEnv(vars: Record<string, string>) {
+  return { get: (key: string) => vars[key] };
 }
 
 describe("executeReview", () => {
@@ -620,10 +624,6 @@ describe("executeReview", () => {
   });
 
   describe("CI mode", () => {
-    function createStubEnv(vars: Record<string, string>) {
-      return { get: (key: string) => vars[key] };
-    }
-
     const githubEnv = {
       GITHUB_ACTIONS: "true",
       GITHUB_TOKEN: "gha-token",

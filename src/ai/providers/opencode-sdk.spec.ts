@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
 const { mockClient, mockServer, mockCreateOpencode } = vi.hoisted(() => {
-  const mockClient = {
+  const client = {
     event: {
       subscribe: vi.fn(),
     },
@@ -13,14 +13,14 @@ const { mockClient, mockServer, mockCreateOpencode } = vi.hoisted(() => {
       delete: vi.fn(),
     },
   };
-  const mockServer = {
+  const server = {
     close: vi.fn(),
   };
-  const mockCreateOpencode = vi.fn().mockResolvedValue({
-    client: mockClient,
-    server: mockServer,
+  const createOpencode = vi.fn().mockResolvedValue({
+    client,
+    server,
   });
-  return { mockClient, mockServer, mockCreateOpencode };
+  return { mockClient: client, mockServer: server, mockCreateOpencode: createOpencode };
 });
 
 vi.mock("@opencode-ai/sdk", () => ({
@@ -67,11 +67,11 @@ function mockSuccessfulPrompt(output: unknown = { findings: [] }): void {
   });
 }
 
-describe("OpenCodeSdkProvider", () => {
-  function createProvider(maxRetries = 1, timeoutMs = 5000, model?: string): OpenCodeSdkProvider {
-    return new OpenCodeSdkProvider({ maxRetries, timeoutMs, model });
-  }
+function createProvider(maxRetries = 1, timeoutMs = 5000, model?: string): OpenCodeSdkProvider {
+  return new OpenCodeSdkProvider({ maxRetries, timeoutMs, model });
+}
 
+describe("OpenCodeSdkProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();

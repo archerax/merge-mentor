@@ -39,21 +39,24 @@ export function mergeTokenUsage(
   };
 }
 
+function formatNumber(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
 /**
  * Formats token usage for human-readable CLI output.
  * Returns an array of lines to display.
  */
 export function formatTokenUsage(usage: TokenUsage): string[] {
   const lines: string[] = [];
-  const fmt = (n: number) => n.toLocaleString("en-US");
 
-  lines.push(`Input tokens:   ${fmt(usage.inputTokens)}`);
-  lines.push(`Output tokens:  ${fmt(usage.outputTokens)}`);
+  lines.push(`Input tokens:   ${formatNumber(usage.inputTokens)}`);
+  lines.push(`Output tokens:  ${formatNumber(usage.outputTokens)}`);
   if (usage.cachedTokens !== undefined) {
-    lines.push(`Cached tokens:  ${fmt(usage.cachedTokens)}`);
+    lines.push(`Cached tokens:  ${formatNumber(usage.cachedTokens)}`);
   }
   const total = usage.inputTokens + usage.outputTokens;
-  lines.push(`Total tokens:   ${fmt(total)}`);
+  lines.push(`Total tokens:   ${formatNumber(total)}`);
   if (usage.model) {
     lines.push(`Model:          ${usage.model}`);
   }

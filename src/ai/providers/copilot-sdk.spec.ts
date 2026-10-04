@@ -2,22 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
 const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
-  const mockSession = {
+  const session = {
     on: vi.fn(),
     sendAndWait: vi.fn(),
     disconnect: vi.fn(),
   };
-  const mockClient = {
+  const client = {
     start: vi.fn().mockResolvedValue(undefined),
-    createSession: vi.fn().mockResolvedValue(mockSession),
+    createSession: vi.fn().mockResolvedValue(session),
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
   };
   // biome-ignore lint/complexity/useArrowFunction: regular function required so Reflect.construct works when called with `new`
-  const MockCopilotClient = vi.fn().mockImplementation(function () {
-    return mockClient;
+  const ClientCtor = vi.fn().mockImplementation(function () {
+    return client;
   });
-  return { mockSession, mockClient, MockCopilotClient };
+  return { mockSession: session, mockClient: client, MockCopilotClient: ClientCtor };
 });
 
 vi.mock("@github/copilot-sdk", () => ({
@@ -68,25 +68,31 @@ function mockSuccessfulPrompt(output: unknown = { findings: [] }): void {
   });
 }
 
-describe("CopilotSdkProvider", () => {
-  function createProvider(
-    maxRetries = 1,
-    timeoutMs = 5000,
-    model?: string,
-    token?: string,
-    aiBaseUrl?: string,
-    aiApiKey?: string
-  ): CopilotSdkProvider {
-    return new CopilotSdkProvider({
-      maxRetries,
-      timeoutMs,
-      model,
-      token,
-      aiBaseUrl,
-      aiApiKey,
-    });
-  }
+function createProvider(
+  maxRetries = 1,
+  timeoutMs = 5000,
+  model?: string,
+  token?: string,
+  aiBaseUrl?: string,
+  aiApiKey?: string
+): CopilotSdkProvider {
+  return new CopilotSdkProvider({
+    maxRetries,
+    timeoutMs,
+    model,
+    token,
+    aiBaseUrl,
+    aiApiKey,
+  });
+}
 
+function createProviderWithInvalidByok(): CopilotSdkProvider {
+  return new CopilotSdkProvider({
+    aiApiKey: "bedrock-key",
+  } satisfies AIProviderOptions);
+}
+
+describe("CopilotSdkProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -130,11 +136,6 @@ describe("CopilotSdkProvider", () => {
     });
 
     it("throws when Copilot SDK BYOK API key is provided without a base URL", () => {
-      const createProviderWithInvalidByok = () =>
-        new CopilotSdkProvider({
-          aiApiKey: "bedrock-key",
-        } satisfies AIProviderOptions);
-
       expect(createProviderWithInvalidByok).toThrow(ValidationError);
       expect(createProviderWithInvalidByok).toThrow(
         "AI base URL is required when an AI API key is provided."
@@ -1416,16 +1417,16 @@ describe("CopilotSdkProvider", () => {
   });
 });
 
-describe("createReviewPermissionHandler", () => {
-  function createStubLogger() {
-    return {
-      warn: vi.fn(),
-      debug: vi.fn(),
-      info: vi.fn(),
-      error: vi.fn(),
-    } as unknown as ReturnType<typeof import("../../logger.js").createChildLogger>;
-  }
+function createStubLogger() {
+  return {
+    warn: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  } as unknown as ReturnType<typeof import("../../logger.js").createChildLogger>;
+}
 
+describe("createReviewPermissionHandler", () => {
   it("approves read permission requests", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);

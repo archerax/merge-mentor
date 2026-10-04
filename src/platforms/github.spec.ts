@@ -678,7 +678,7 @@ describe("GitHubAdapter", () => {
         });
 
         const result = await adapter.getLinkedPBIIds(10);
-        expect([...result].sort()).toEqual(["101", "123", "456", "789"].sort());
+        expect(result.toSorted()).toEqual(["101", "123", "456", "789"].toSorted());
       });
 
       it("is case-insensitive and handles multiple spacing/prefixes", async () => {
@@ -695,7 +695,7 @@ describe("GitHubAdapter", () => {
         });
 
         const result = await adapter.getLinkedPBIIds(10);
-        expect([...result].sort()).toEqual(["111", "555", "888", "999"].sort());
+        expect(result.toSorted()).toEqual(["111", "555", "888", "999"].toSorted());
       });
     });
   });

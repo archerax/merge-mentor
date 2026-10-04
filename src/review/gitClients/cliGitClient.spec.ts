@@ -3,13 +3,13 @@ import { createStubProcessRunner } from "../../ports/processRunner.test-helper.j
 import { buildAuthArgs, buildGitEnv, CliGitClient } from "./cliGitClient.js";
 import { createScratchRepo } from "./gitRepo.test-helper.js";
 
-describe("CliGitClient", () => {
-  function makeClient() {
-    const runner = createStubProcessRunner();
-    const client = new CliGitClient(runner);
-    return { client, runner } as const;
-  }
+function makeClient() {
+  const runner = createStubProcessRunner();
+  const client = new CliGitClient(runner);
+  return { client, runner } as const;
+}
 
+describe("CliGitClient", () => {
   // ── clone ──────────────────────────────────────────────────────────────────
 
   describe("clone", () => {
@@ -424,7 +424,7 @@ describe("CliGitClient local diffs (real git)", () => {
       expect(staged.map((c) => c.path)).toEqual(["README.md"]);
 
       const worktree = await client.workingTreeDiff(repo.path);
-      const paths = worktree.map((c) => c.path).sort();
+      const paths = worktree.map((c) => c.path).toSorted();
       expect(paths).toContain("README.md");
       expect(paths).toContain("tracked.txt");
     } finally {

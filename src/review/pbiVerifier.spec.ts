@@ -9,6 +9,44 @@ import type {
 import { createCapturingOutputWriter } from "../ports/outputWriter.test-helper.js";
 import { PbiVerifier } from "./pbiVerifier.js";
 
+function createMockPlatform(overrides?: Partial<PlatformAdapter>): PlatformAdapter {
+  return {
+    getProjectIdentifier: vi.fn().mockReturnValue("Hello-World"),
+    getPlatformName: vi.fn().mockReturnValue("github"),
+    getRepoInfo: vi
+      .fn()
+      .mockReturnValue({ owner: "octocat", repo: "Hello-World", platform: "github" }),
+    getToken: vi.fn().mockReturnValue("token"),
+    getPRDetails: vi.fn(),
+    getPRFiles: vi.fn(),
+    getExistingBotComments: vi.fn(),
+    getCommentThread: vi.fn(),
+    getUnresolvedCommentThreads: vi.fn(),
+    postCommentReply: vi.fn(),
+    resolveCommentThread: vi.fn(),
+    postInlineComment: vi.fn(),
+    postGeneralComment: vi.fn(),
+    getLinkedPBIIds: vi.fn().mockResolvedValue([]),
+    getPBIDetails: vi.fn(),
+    getProjectDetails: vi.fn(),
+    postPBIComment: vi.fn(),
+    attachWorkItemFile: vi.fn(),
+    updatePRDetails: vi.fn(),
+    ...overrides,
+  };
+}
+
+function createMockAIProvider(overrides?: Partial<AIProviderClient>): AIProviderClient {
+  return {
+    executePrompt: vi.fn(),
+    parseFileReview: vi.fn(),
+    parseCrossFileReview: vi.fn(),
+    parseBatchedFileReview: vi.fn(),
+    parseFastReview: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("PbiVerifier", () => {
   const mockPRFiles: PRFile[] = [
     {
@@ -25,44 +63,6 @@ describe("PbiVerifier", () => {
     findings: [],
     recommendations: [],
   };
-
-  function createMockPlatform(overrides?: Partial<PlatformAdapter>): PlatformAdapter {
-    return {
-      getProjectIdentifier: vi.fn().mockReturnValue("Hello-World"),
-      getPlatformName: vi.fn().mockReturnValue("github"),
-      getRepoInfo: vi
-        .fn()
-        .mockReturnValue({ owner: "octocat", repo: "Hello-World", platform: "github" }),
-      getToken: vi.fn().mockReturnValue("token"),
-      getPRDetails: vi.fn(),
-      getPRFiles: vi.fn(),
-      getExistingBotComments: vi.fn(),
-      getCommentThread: vi.fn(),
-      getUnresolvedCommentThreads: vi.fn(),
-      postCommentReply: vi.fn(),
-      resolveCommentThread: vi.fn(),
-      postInlineComment: vi.fn(),
-      postGeneralComment: vi.fn(),
-      getLinkedPBIIds: vi.fn().mockResolvedValue([]),
-      getPBIDetails: vi.fn(),
-      getProjectDetails: vi.fn(),
-      postPBIComment: vi.fn(),
-      attachWorkItemFile: vi.fn(),
-      updatePRDetails: vi.fn(),
-      ...overrides,
-    };
-  }
-
-  function createMockAIProvider(overrides?: Partial<AIProviderClient>): AIProviderClient {
-    return {
-      executePrompt: vi.fn(),
-      parseFileReview: vi.fn(),
-      parseCrossFileReview: vi.fn(),
-      parseBatchedFileReview: vi.fn(),
-      parseFastReview: vi.fn(),
-      ...overrides,
-    };
-  }
 
   it("adds warning when no linked PBIs are found", async () => {
     const platform = createMockPlatform({

@@ -31,7 +31,7 @@ vi.mock("../platforms/github.js", () => {
 
 vi.mock("../platforms/azure.js", () => {
   return {
-    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
+    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;
     }),
   };

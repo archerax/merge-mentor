@@ -35,8 +35,8 @@ export async function validateGitWorkspace(
     if (!currentBranch) {
       currentBranch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf-8" }).trim();
     }
-  } catch (_err) {
-    throw new Error("Execution aborted: Failed to get current git branch.");
+  } catch (error) {
+    throw new Error("Execution aborted: Failed to get current git branch.", { cause: error });
   }
 
   if (currentBranch !== expectedHeadBranch) {
@@ -50,8 +50,8 @@ export async function validateGitWorkspace(
   let status = "";
   try {
     status = execSync("git status --porcelain", { encoding: "utf-8" }).trim();
-  } catch (_err) {
-    throw new Error("Execution aborted: Failed to run 'git status'.");
+  } catch (error) {
+    throw new Error("Execution aborted: Failed to run 'git status'.", { cause: error });
   }
 
   if (status.length > 0) {

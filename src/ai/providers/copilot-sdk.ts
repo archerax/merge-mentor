@@ -300,9 +300,7 @@ export class CopilotSdkProvider implements AIProviderClient {
       return;
     }
 
-    try {
-      new URL(this.byokBaseUrl);
-    } catch {
+    if (!URL.canParse(this.byokBaseUrl)) {
       throw new ValidationError("aiBaseUrl", "AI base URL must be a valid URL.");
     }
   }
@@ -433,7 +431,7 @@ export class CopilotSdkProvider implements AIProviderClient {
         collectedUsage = mergeTokenUsage(collectedUsage, usageEvent);
       });
 
-      let unsubscribeToolComplete = () => {};
+      let unsubscribeToolComplete: (() => void) | undefined;
       if (this.experimentalTools) {
         unsubscribeToolComplete = session.on("tool.execution_complete", (event) => {
           this.logger.debug(
@@ -564,7 +562,7 @@ export class CopilotSdkProvider implements AIProviderClient {
         unsubscribeDelta();
         unsubscribeUsage();
         if (this.experimentalTools) {
-          unsubscribeToolComplete();
+          unsubscribeToolComplete?.();
         }
         onUsageCollected?.(collectedUsage);
       }

@@ -107,7 +107,7 @@ export function findNearestValidLine(
   }
 
   // Find nearest valid line
-  const sortedLines = Array.from(validLines).sort((a, b) => a - b);
+  const sortedLines = Array.from(validLines).toSorted((a, b) => a - b);
 
   let nearest = sortedLines[0];
   let minDistance = Math.abs(requestedLine - nearest);
