@@ -1,12 +1,12 @@
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 
+import { loadConfig } from "@merge-mentor/core/config.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadConfig } from "../config.js";
 import { program } from "../program.js";
 
 // Mock dependencies
-vi.mock("../config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
@@ -24,7 +24,7 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
-import type { Config } from "../config.js";
+import type { Config } from "@merge-mentor/core/config.js";
 
 function createMockConfig(): Partial<Config> {
   return {

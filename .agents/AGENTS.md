@@ -13,18 +13,15 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 ## Project Structure
 
-This repo is a pnpm workspace whose packages live under `apps/*` and `libs/*`. The CLI still resides at the repo root under `src/` and will move to `apps/cli` in a later phase. The root `build`, `test`, `typecheck`, and `lint` scripts run the root package first, then recursively across every workspace package, so `pnpm check` keeps working unchanged.
+This repo is a pnpm workspace whose packages live under `apps/*` and `libs/*`. Shared libraries are consumed as TypeScript source via `workspace:*` dependencies, `tsconfig.base.json` `paths`, and matching Vitest aliases — there is no per-library build step. The root `build`, `test`, `typecheck`, and `lint` scripts run the root package first, then recursively (`--if-present`) across every workspace package, so `pnpm check` keeps working unchanged.
 
-- `src/ai/` – AI provider abstraction (Copilot, OpenCode)
-- `src/audit/` – Audit logging for security/compliance
-- `src/ci/` – Continuous Integration environment adapters
-- `src/commands/` – Command line interface orchestrations (via Commander)
-- `src/errors/` – Structured custom application exceptions
-- `src/platforms/` – Platform adapters (GitHub & Azure DevOps)
-- `src/ports/` – Port interfaces for clean architecture (Clock, FileSystem, etc.)
-- `src/review/` – Review engine, comment management, and deduplication
-- `src/utils/` – Helper utilities
-- `src/` – CLI entrypoint, configuration, logging, program definition
+Packages (dependency direction: `shared` ← `core` ← root CLI):
+
+- `libs/shared/src/` (`@merge-mentor/shared`) – Foundation with no upward deps: `errors/`, `ports/`, `logger.ts`, `audit/`.
+- `libs/core/src/` (`@merge-mentor/core`) – Review engine and integrations: `ai/`, `review/`, `platforms/`, `config.ts`, `constants.ts`, `utils/`.
+- `src/` – CLI entrypoint, Commander commands, `ci/`, `build/`, and `eval/` support code. This will move to `apps/cli` in a later phase.
+
+Cross-package imports MUST use the `@merge-mentor/shared/...` or `@merge-mentor/core/...` aliases (keeping `.js` extensions). Relative imports are only for files within the same package. `libs/*/package.json` versions are kept in lockstep with the root version because `libs/core/src/review/*` reads its own `package.json` for the version footer.
 
 ## Tech Stack
 
@@ -45,7 +42,7 @@ TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Oxlint linter,
 **Good:**
 
 ```typescript
-import { ValidationError } from "../errors/index.js";
+import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import type { File } from "./types.js";
 
 async function fetchPullRequestFiles(owner: string, repo: string): Promise<File[]> {

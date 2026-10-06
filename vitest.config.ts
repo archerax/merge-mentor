@@ -1,10 +1,21 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
+const sharedSrc = fileURLToPath(new URL("./libs/shared/src", import.meta.url));
+const coreSrc = fileURLToPath(new URL("./libs/core/src", import.meta.url));
+
 export default defineConfig({
+  resolve: {
+    alias: [
+      { find: /^@merge-mentor\/shared\/(.*)\.js$/, replacement: `${sharedSrc}/$1.ts` },
+      { find: /^@merge-mentor\/core\/(.*)\.js$/, replacement: `${coreSrc}/$1.ts` },
+    ],
+  },
   test: {
     globals: true,
     environment: "node",
-    include: ["src/**/*.spec.ts"],
+    include: ["src/**/*.spec.ts", "libs/*/src/**/*.spec.ts"],
     isolate: true,
     pool: "threads",
     sequence: {
@@ -14,13 +25,16 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
-      include: ["src/**/*.ts"],
+      include: ["src/**/*.ts", "libs/*/src/**/*.ts"],
       exclude: [
         "src/**/*.spec.ts",
         "src/**/*.test-helper.ts",
         "src/**/types.ts",
         "src/cli.ts",
         "src/program.ts",
+        "libs/*/src/**/*.spec.ts",
+        "libs/*/src/**/*.test-helper.ts",
+        "libs/*/src/**/types.ts",
       ],
       all: true,
       thresholds: {

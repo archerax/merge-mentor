@@ -1,12 +1,13 @@
-import { createAIProvider } from "../ai/providerFactory.js";
-import type { AIProviderType } from "../ai/types.js";
-import { loadConfig, validateConfig } from "../config.js";
-import { AzureDevOpsAdapter } from "../platforms/azure.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import { consoleOutputWriter } from "../ports/outputWriter.js";
-import { createGitClient } from "../review/gitClients/factory.js";
-import { PlanEngine } from "../review/planEngine.js";
-import { detectGitRemoteUrl, parseGitRemoteUrl } from "../utils/gitRemote.js";
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
+import { PlanEngine } from "@merge-mentor/core/review/planEngine.js";
+import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/core/utils/gitRemote.js";
+import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
+
 import type { PlanOptions } from "./types.js";
 
 /**

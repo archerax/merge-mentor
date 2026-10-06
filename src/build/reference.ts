@@ -1,4 +1,5 @@
-import { ValidationError } from "../errors/index.js";
+import { ValidationError } from "@merge-mentor/shared/errors/index.js";
+
 import type { BuildPlatform, BuildReference } from "./types.js";
 
 /**

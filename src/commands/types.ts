@@ -1,7 +1,7 @@
-import type { Platform } from "../config.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import type { Environment, OutputWriter } from "../ports/index.js";
-import type { ReviewResult } from "../review/engine.js";
+import type { Platform } from "@merge-mentor/core/config.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
+import type { Environment, OutputWriter } from "@merge-mentor/shared/ports/index.js";
 
 /** Options for the `review` command. */
 export interface ReviewOptions {

@@ -1,4 +1,4 @@
-import { MergeMentorError } from "../errors/index.js";
+import { MergeMentorError } from "@merge-mentor/shared/errors/index.js";
 
 /**
  * Error thrown when a build analysis cannot be performed.

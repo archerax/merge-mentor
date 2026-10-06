@@ -1,6 +1,6 @@
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { PlatformApiError } from "../../errors/index.js";
 import type { BuildReference } from "../types.js";
 import { type GithubBuildHttp, GithubBuildProvider } from "./github.js";
 

@@ -1,7 +1,13 @@
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig } from "@merge-mentor/core/config.js";
+import { REVIEW_PASSES } from "@merge-mentor/core/review/reviewSelection.js";
+import { parsePRUrl } from "@merge-mentor/core/utils/prUrl.js";
+import { resolveWorkItemReference } from "@merge-mentor/core/utils/workItemReference.js";
+import { logger } from "@merge-mentor/shared/logger.js";
+import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { Command } from "commander";
 
 import packageJson from "../package.json" with { type: "json" };
-import type { AIProviderType } from "./ai/types.js";
 import { executeBuildAnalyze } from "./commands/build.js";
 import { displayDescribeResults, executeDescribe } from "./commands/describe.js";
 import { executeDoctorCommand } from "./commands/doctor.js";
@@ -20,12 +26,6 @@ import {
   hasBlockingFindings,
   STAGE_BLOCKING_EXIT_CODE,
 } from "./commands/stage.js";
-import { loadConfig } from "./config.js";
-import { logger } from "./logger.js";
-import { consoleOutputWriter } from "./ports/index.js";
-import { REVIEW_PASSES } from "./review/reviewSelection.js";
-import { parsePRUrl } from "./utils/prUrl.js";
-import { resolveWorkItemReference } from "./utils/workItemReference.js";
 
 // Re-export types and functions for backward compatibility
 export * from "./commands/types.js";

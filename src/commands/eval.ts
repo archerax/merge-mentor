@@ -1,7 +1,8 @@
-import type { AIProviderType } from "../ai/types.js";
-import { CorpusEvalError } from "../errors/index.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
+
 import { evaluateCorpus, formatTerminalSummary } from "../eval/harness.js";
-import { consoleOutputWriter } from "../ports/index.js";
 import type { EvalCommandOptions, EvalExecutionResult, ProgramDeps } from "./types.js";
 
 /**

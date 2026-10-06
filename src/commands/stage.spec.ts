@@ -2,13 +2,16 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { AIResponse } from "@merge-mentor/core/ai/types.js";
+import type { FileFinding } from "@merge-mentor/core/platforms/types.js";
+import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
+import {
+  createScratchRepo,
+  type ScratchRepo,
+} from "@merge-mentor/core/review/gitClients/gitRepo.test-helper.js";
+import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AIResponse } from "../ai/types.js";
-import type { FileFinding } from "../platforms/types.js";
-import type { OutputWriter } from "../ports/index.js";
-import type { ReviewResult } from "../review/engine.js";
-import { createScratchRepo, type ScratchRepo } from "../review/gitClients/gitRepo.test-helper.js";
 import {
   countStageIssuesBySeverity,
   displayStageResults,
@@ -24,8 +27,8 @@ const providers: Array<{
   parseFastReview: ReturnType<typeof vi.fn>;
 }> = [];
 
-vi.mock("../ai/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../ai/index.js")>();
+vi.mock("@merge-mentor/core/ai/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@merge-mentor/core/ai/index.js")>();
   return {
     ...actual,
     createAIProvider: vi.fn(() => {

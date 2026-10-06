@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 
+import type { Config } from "@merge-mentor/core/config.js";
+import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Config } from "./config.js";
-import { loadConfig, validateConfig } from "./config.js";
 import { program } from "./program.js";
 
 // Mock dependencies
@@ -18,12 +18,12 @@ const mockAdapter = {
   getPlatformName: () => "github" as const,
 };
 
-vi.mock("./config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
 
-vi.mock("./platforms/github.js", () => {
+vi.mock("@merge-mentor/core/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapter() {
       return mockAdapter;
@@ -31,7 +31,7 @@ vi.mock("./platforms/github.js", () => {
   };
 });
 
-vi.mock("./platforms/azure.js", () => {
+vi.mock("@merge-mentor/core/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
       return mockAdapter;
@@ -39,7 +39,7 @@ vi.mock("./platforms/azure.js", () => {
   };
 });
 
-vi.mock("./review/engine.js", () => {
+vi.mock("@merge-mentor/core/review/engine.js", () => {
   return {
     ReviewEngine: vi.fn(function ReviewEngine() {
       return { reviewPR: mockReviewPR, describePR: mockDescribePR };
@@ -47,7 +47,7 @@ vi.mock("./review/engine.js", () => {
   };
 });
 
-vi.mock("./review/pbiEngine.js", () => {
+vi.mock("@merge-mentor/core/review/pbiEngine.js", () => {
   return {
     PBIReviewEngine: vi.fn(function PBIReviewEngine() {
       return { reviewPBI: vi.fn().mockResolvedValue({ title: "Mock PBI" }) };
@@ -63,7 +63,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   };
 });
 
-import { resolveReviewProfile } from "./review/reviewSelection.js";
+import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   const {

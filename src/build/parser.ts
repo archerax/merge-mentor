@@ -1,6 +1,6 @@
+import { parseJsonResponse } from "@merge-mentor/core/ai/shared/parseJsonResponse.js";
 import { z } from "zod";
 
-import { parseJsonResponse } from "../ai/shared/parseJsonResponse.js";
 import type { BuildDiagnosis, LogArtifact, PreparedEvidence } from "./types.js";
 
 const DiagnosisSchema = z.object({

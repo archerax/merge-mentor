@@ -1,9 +1,9 @@
 import type { Stats } from "node:fs";
 
+import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { describe, expect, it } from "vitest";
 
-import { CorpusEvalError } from "../errors/index.js";
-import type { FileSystem } from "../ports/fileSystem.js";
 import { MockAIProvider } from "./mockProvider.js";
 
 describe("MockAIProvider", () => {

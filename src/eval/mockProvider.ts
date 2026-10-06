@@ -5,11 +5,14 @@ import type {
   AIResponse,
   ExecutePromptOptions,
   FastReviewResult,
-} from "../ai/types.js";
-import { CorpusEvalError } from "../errors/index.js";
-import type { CrossFileReviewResult, FileReviewResult } from "../platforms/types.js";
-import type { FileSystem } from "../ports/fileSystem.js";
-import { nodeFs } from "../ports/fileSystem.js";
+} from "@merge-mentor/core/ai/types.js";
+import type {
+  CrossFileReviewResult,
+  FileReviewResult,
+} from "@merge-mentor/core/platforms/types.js";
+import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
+import { nodeFs } from "@merge-mentor/shared/ports/fileSystem.js";
 
 /** Options for configuring a MockAIProvider. */
 export interface MockAIProviderOptions {

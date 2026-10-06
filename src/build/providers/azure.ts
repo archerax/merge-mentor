@@ -1,8 +1,8 @@
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import * as azdev from "azure-devops-node-api";
 import type { IBuildApi } from "azure-devops-node-api/BuildApi.js";
 import { BuildResult, BuildStatus } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
-import { PlatformApiError } from "../../errors/index.js";
 import type {
   BuildAnalysisProvider,
   BuildLogChunk,

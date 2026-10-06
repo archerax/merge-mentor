@@ -2,15 +2,23 @@ import { execSync } from "node:child_process";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 
-import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
-import { createAIProvider } from "../ai/providerFactory.js";
-import type { AIProviderType } from "../ai/types.js";
-import { loadConfig, type Platform, validateConfig } from "../config.js";
-import { initLogger } from "../logger.js";
-import { AzureDevOpsAdapter } from "../platforms/azure.js";
-import { GitHubAdapter } from "../platforms/github.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import { consoleOutputWriter, type OutputWriter, processEnvironment } from "../ports/index.js";
+import {
+  buildSecurityPreamble,
+  wrapUntrustedContent,
+} from "@merge-mentor/core/ai/prompts/securityPreamble.js";
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig, type Platform, validateConfig } from "@merge-mentor/core/config.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import { initLogger } from "@merge-mentor/shared/logger.js";
+import {
+  consoleOutputWriter,
+  type OutputWriter,
+  processEnvironment,
+} from "@merge-mentor/shared/ports/index.js";
+
 import { ensureCIContext } from "./shared/ci.js";
 import type { FixOptions, ProgramDeps } from "./types.js";
 

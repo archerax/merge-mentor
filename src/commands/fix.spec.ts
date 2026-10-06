@@ -1,8 +1,8 @@
 import { execSync } from "node:child_process";
 
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createAIProvider } from "../ai/providerFactory.js";
 import { executeFixCommand, validateGitWorkspace } from "./fix.js";
 
 // Mock child_process
@@ -27,7 +27,7 @@ vi.mock("node:readline/promises", () => ({
 
 // Mock AI Provider Factory
 const mockExecutePrompt = vi.fn();
-vi.mock("../ai/providerFactory.js", () => ({
+vi.mock("@merge-mentor/core/ai/providerFactory.js", () => ({
   createAIProvider: vi.fn(() => ({
     executePrompt: mockExecutePrompt,
   })),
@@ -40,20 +40,20 @@ const mockAdapter = {
   getPlatformName: () => "github" as const,
 };
 
-vi.mock("../platforms/github.js", () => ({
+vi.mock("@merge-mentor/core/platforms/github.js", () => ({
   GitHubAdapter: vi.fn(function GitHubAdapter() {
     return mockAdapter;
   }),
 }));
 
-vi.mock("../platforms/azure.js", () => ({
+vi.mock("@merge-mentor/core/platforms/azure.js", () => ({
   AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
     return mockAdapter;
   }),
 }));
 
 // Mock config
-vi.mock("../config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(() => ({
     defaultPlatform: "github",
     github: { token: "token", owner: "owner", repo: "repo" },

@@ -1,11 +1,12 @@
-import type { AIProviderType } from "../ai/types.js";
-import { loadConfig, type Platform, validateConfig } from "../config.js";
-import { initLogger, logger } from "../logger.js";
-import { AzureDevOpsAdapter } from "../platforms/azure.js";
-import { GitHubAdapter } from "../platforms/github.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
-import { ReviewEngine } from "../review/engine.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig, type Platform, validateConfig } from "@merge-mentor/core/config.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import { ReviewEngine } from "@merge-mentor/core/review/engine.js";
+import { initLogger, logger } from "@merge-mentor/shared/logger.js";
+import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
+
 import { ensureCIContext } from "./shared/ci.js";
 import type { DescribeExecutionResult, DescribeOptions, ProgramDeps } from "./types.js";
 

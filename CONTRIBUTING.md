@@ -41,13 +41,13 @@ pnpm install
 ### Code Style
 
 - **Strict TypeScript** — no explicit `any` in production code (Oxlint enforces `no-explicit-any` and `no-non-null-assertion` as errors).
-- **Relative imports must end with `.js`** (ESM), e.g. `import { foo } from "./bar.js"`.
-- **Hexagonal architecture** — core logic depends on ports (`src/ports/`), not concrete I/O. Use the existing `FileSystem`, `ProcessRunner`, `Clock`, and `OutputWriter` ports instead of calling `node:fs`/`child_process` directly; each port has a `*.test-helper.ts` fake for tests.
-- **Errors** — throw the typed errors from `src/errors/` (e.g. `AIProviderError`, `ConfigurationError`), not raw `Error`, and preserve the original error via `cause`.
+- **Imports must end with `.js`** (ESM), e.g. `import { foo } from "./bar.js"`. Use relative imports within a package; cross-package imports use the `@merge-mentor/shared/...` and `@merge-mentor/core/...` aliases.
+- **Hexagonal architecture** — core logic depends on ports (`libs/shared/src/ports/`), not concrete I/O. Use the existing `FileSystem`, `ProcessRunner`, `Clock`, and `OutputWriter` ports instead of calling `node:fs`/`child_process` directly; each port has a `*.test-helper.ts` fake for tests.
+- **Errors** — throw the typed errors from `libs/shared/src/errors/` (e.g. `AIProviderError`, `ConfigurationError`), not raw `Error`, and preserve the original error via `cause`.
 
 ### Security
 
-- **Never interpolate untrusted content** (PR titles/descriptions/diffs, review comments, work-item fields) into AI prompts without the defenses in `src/ai/prompts/securityPreamble.ts` (`buildSecurityPreamble()` + `wrapUntrustedContent()`).
+- **Never interpolate untrusted content** (PR titles/descriptions/diffs, review comments, work-item fields) into AI prompts without the defenses in `libs/core/src/ai/prompts/securityPreamble.ts` (`buildSecurityPreamble()` + `wrapUntrustedContent()`).
 - **AI agent tools stay least-privilege** — shell/write tools are never auto-approved for flows that ingest untrusted input.
 - **No telemetry** — the only outbound calls are the platform APIs and the configured AI endpoint.
 - Report vulnerabilities privately per [SECURITY.md](./SECURITY.md) — never in a public issue.

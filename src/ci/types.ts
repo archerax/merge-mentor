@@ -1,4 +1,4 @@
-import type { Platform } from "../config.js";
+import type { Platform } from "@merge-mentor/core/config.js";
 
 /**
  * CI system detection and context resolution module.

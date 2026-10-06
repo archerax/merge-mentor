@@ -1,6 +1,6 @@
+import { createStubEnvironment } from "@merge-mentor/shared/ports/environment.test-helper.js";
 import { describe, expect, test } from "vitest";
 
-import { createStubEnvironment } from "../ports/environment.test-helper.js";
 import { resolveAzurePipelinesContext } from "./azure-pipelines.js";
 import { detectCIEnvironment } from "./detector.js";
 import { resolveGitHubActionsContext } from "./github-actions.js";

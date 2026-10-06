@@ -1,8 +1,8 @@
+import { createStubEnvironment } from "@merge-mentor/shared/ports/environment.test-helper.js";
+import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWriter.test-helper.js";
 import { describe, expect, it } from "vitest";
 
 import type { CIContext } from "../../ci/index.js";
-import { createStubEnvironment } from "../../ports/environment.test-helper.js";
-import { createCapturingOutputWriter } from "../../ports/outputWriter.test-helper.js";
 import type { ReviewOptions } from "../types.js";
 import { ensureCIContext, mergeCIContext } from "./ci.js";
 

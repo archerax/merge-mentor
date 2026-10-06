@@ -1,0 +1,1632 @@
+import { Readable } from "node:stream";
+
+import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
+import { createChildLogger } from "@merge-mentor/shared/logger.js";
+import * as azdev from "azure-devops-node-api";
+import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
+import type {
+  Comment,
+  GitPullRequestCommentThread,
+} from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import * as Diff from "diff";
+
+import type { Config } from "../config.js";
+import { DIFF_CONTEXT_LINES } from "../constants.js";
+import { getIgnorePatterns, shouldIgnoreFile } from "../utils/ignoreFilter.js";
+import { extractMoSCoWTag } from "../utils/moscow.js";
+import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
+import type {
+  ExistingComment,
+  FileStatus,
+  PBIComment,
+  PBIDetails,
+  PlatformAdapter,
+  PRDetails,
+  PRFile,
+  ProjectDependency,
+  ProjectDetails,
+  ProjectWorkItem,
+  RepoInfo,
+  UnresolvedComment,
+  UnresolvedCommentThread,
+  WorkItemState,
+} from "./types.js";
+
+/** Maximum file size in bytes for diff generation (1MB). */
+const MAX_FILE_SIZE_BYTES = 1 * 1024 * 1024;
+
+/** Azure DevOps thread status values. */
+const AzureThreadStatus = {
+  ACTIVE: 1,
+  FIXED: 2,
+  WONT_FIX: 3,
+  CLOSED: 4,
+  BY_DESIGN: 5,
+  PENDING: 6,
+} as const;
+
+/** Azure DevOps comment type values. */
+const AzureCommentType = {
+  TEXT: 1,
+} as const;
+
+/**
+ * Platform adapter for Azure DevOps pull requests.
+ */
+export class AzureDevOpsAdapter implements PlatformAdapter {
+  private readonly connection: azdev.WebApi;
+  private readonly project: string;
+  private readonly repoName: string;
+  private readonly botIdentifier: string;
+  private readonly auditLogger = getAuditLogger();
+  private readonly logger = createChildLogger({
+    component: "AzureDevOpsAdapter",
+  });
+  private readonly token: string;
+  private readonly orgUrl: string;
+  private readonly org: string;
+
+  constructor(config: Pick<Config, "azure" | "botCommentIdentifier">) {
+    const authHandler = azdev.getPersonalAccessTokenHandler(config.azure.token);
+    this.orgUrl = `https://dev.azure.com/${config.azure.org}`;
+    this.connection = new azdev.WebApi(this.orgUrl, authHandler);
+    this.project = config.azure.project;
+    this.repoName = config.azure.repo;
+    this.botIdentifier = config.botCommentIdentifier;
+    this.token = config.azure.token;
+    this.org = config.azure.org;
+    this.logger.info(
+      { project: this.project, repo: this.repoName },
+      "AzureDevOpsAdapter initialized"
+    );
+  }
+
+  /**
+   * Returns the project identifier for this platform instance.
+   * @returns Organization/project/repository path
+   */
+  getProjectIdentifier(): string {
+    return `${this.org}/${this.project}/${this.repoName}`;
+  }
+
+  /**
+   * Returns the platform name for dispatching platform-specific logic.
+   * @returns "azure"
+   */
+  getPlatformName(): "azure" {
+    return "azure";
+  }
+
+  /**
+   * Returns repository information for context loading.
+   * @returns Repository owner (organization), name, and platform
+   */
+  getRepoInfo(): RepoInfo {
+    return {
+      owner: this.org,
+      repo: this.repoName,
+      platform: "azure",
+      org: this.org,
+      project: this.project,
+    };
+  }
+
+  /**
+   * Gets the authentication token for API calls.
+   * @returns Azure DevOps personal access token
+   */
+  getToken(): string {
+    return this.token;
+  }
+
+  /**
+   * Retrieves pull request details from Azure DevOps.
+   * @param prNumber - The PR number to fetch
+   * @returns Details about the pull request
+   */
+  async getPRDetails(prNumber: number): Promise<PRDetails> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+
+      const details = {
+        number: pr.pullRequestId || prNumber,
+        title: pr.title || "",
+        description: pr.description || "",
+        author: pr.createdBy?.displayName || "unknown",
+        baseBranch: pr.targetRefName?.replace("refs/heads/", "") || "",
+        headBranch: pr.sourceRefName?.replace("refs/heads/", "") || "",
+      };
+
+      this.auditLogger.logPRDetailsFetch(prNumber, "azure", "success");
+      return details;
+    } catch (error) {
+      this.auditLogger.logPRDetailsFetch(prNumber, "azure", "failure", (error as Error).message);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves files changed in a pull request, generating diffs from blob content at both commits.
+   * @param prNumber - The PR number
+   * @param ignorePatterns - Optional glob patterns to skip fetching file content/diffs early
+   * @returns Array of files changed in the pull request
+   */
+  async getPRFiles(prNumber: number, ignorePatterns?: string[]): Promise<PRFile[]> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+
+      // Get PR details to find repository ID
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        this.logger.warn({ prNumber }, "Could not find repository ID for PR");
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      const iterations = await withRateLimitHandling(() =>
+        gitApi.getPullRequestIterations(this.repoName, prNumber, this.project)
+      );
+      if (!iterations || iterations.length === 0) {
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      const lastIteration = iterations[iterations.length - 1];
+
+      // Use sourceRefCommit (head) and commonRefCommit (base) from iteration for accurate diffs
+      if (!lastIteration.sourceRefCommit?.commitId || !lastIteration.commonRefCommit?.commitId) {
+        this.logger.warn(
+          {
+            prNumber,
+            iterationId: lastIteration.id,
+            hasSourceRef: !!lastIteration.sourceRefCommit,
+            hasCommonRef: !!lastIteration.commonRefCommit,
+          },
+          "Missing sourceRefCommit or commonRefCommit in PR iteration"
+        );
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      const baseCommitId = lastIteration.commonRefCommit.commitId;
+      const headCommitId = lastIteration.sourceRefCommit.commitId;
+      const iterationId = lastIteration.id;
+
+      if (!iterationId) {
+        this.logger.warn({ prNumber }, "Missing iteration ID");
+        this.auditLogger.logPRFilesFetch(prNumber, "azure", 0);
+        return [];
+      }
+
+      this.logger.info(
+        {
+          prNumber,
+          repositoryId,
+          iterationId,
+          baseCommitId,
+          headCommitId,
+        },
+        "Fetching PR iteration changes via REST API"
+      );
+
+      // Fetch all changed files using PR Iteration Changes API (includes all files across all commits)
+      const diffs = await this.fetchPRIterationChanges(
+        repositoryId,
+        prNumber,
+        iterationId,
+        baseCommitId,
+        headCommitId,
+        ignorePatterns
+      );
+
+      this.auditLogger.logPRFilesFetch(prNumber, "azure", diffs.length);
+      return diffs;
+    } catch (error) {
+      this.auditLogger.logPRFilesFetch(
+        prNumber,
+        "azure",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Page size for paginated API requests.
+   */
+  private readonly CHANGES_PAGE_SIZE = 100;
+
+  /**
+   * Fetches all PR iteration changes via Azure DevOps REST API with pagination.
+   * Uses the Pull Request Iteration Changes API which returns ALL files changed
+   * across ALL commits in the PR, not just a single commit.
+   */
+  private async fetchPRIterationChanges(
+    repositoryId: string,
+    prNumber: number,
+    iterationId: number,
+    baseCommitId: string,
+    headCommitId: string,
+    ignorePatterns?: string[]
+  ): Promise<PRFile[]> {
+    // Fetch all changes with pagination
+    const allChanges = await this.fetchAllIterationChanges(repositoryId, prNumber, iterationId);
+
+    if (allChanges.length === 0) {
+      this.logger.info("No changes found in PR iteration");
+      return [];
+    }
+
+    this.logger.info(
+      { changesCount: allChanges.length },
+      "Total changes fetched from PR Iteration Changes API"
+    );
+
+    const mergedIgnorePatterns = getIgnorePatterns(ignorePatterns);
+
+    // Filter out folder changes and process files
+    const files: PRFile[] = [];
+    for (const change of allChanges) {
+      const item = change.item;
+      if (!item?.path || item.gitObjectType === "tree") {
+        continue; // Skip folders
+      }
+
+      const status = this.mapIterationChangeTypeToStatus(change.changeType);
+      const path = item.path.startsWith("/") ? item.path.slice(1) : item.path;
+
+      // Early check: ignore pattern matching before downloading blobs
+      if (shouldIgnoreFile(path, mergedIgnorePatterns)) {
+        this.logger.info({ filePath: path }, "Skipping ignored file early in AzureDevOpsAdapter");
+        this.auditLogger.logFileSkipped(path, prNumber, "ignored_pattern");
+        continue;
+      }
+
+      // Fetch file content at both commits and generate diff
+      const { patch, additions, deletions } = await this.generateDiffFromBlobs(
+        repositoryId,
+        path,
+        baseCommitId,
+        headCommitId,
+        status,
+        prNumber
+      );
+
+      files.push({
+        filename: path,
+        status,
+        additions,
+        deletions,
+        patch,
+        sha: item.objectId,
+      });
+    }
+
+    return files;
+  }
+
+  /**
+   * Fetches all iteration changes with pagination support.
+   * Azure DevOps API uses $top and $skip for pagination on the iteration changes endpoint.
+   */
+  private async fetchAllIterationChanges(
+    repositoryId: string,
+    prNumber: number,
+    iterationId: number
+  ): Promise<
+    Array<{
+      item?: { path?: string; objectId?: string; gitObjectType?: string };
+      changeType?: number;
+    }>
+  > {
+    const allChanges: Array<{
+      item?: { path?: string; objectId?: string; gitObjectType?: string };
+      changeType?: number;
+    }> = [];
+
+    let skip = 0;
+    let hasMoreResults = true;
+
+    this.logger.info(
+      { prNumber, iterationId },
+      "Fetching PR iteration changes via REST API with pagination"
+    );
+
+    while (hasMoreResults) {
+      // Use PR Iteration Changes API - returns all files changed in the PR
+      const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/pullRequests/${prNumber}/iterations/${iterationId}/changes?$top=${this.CHANGES_PAGE_SIZE}&$skip=${skip}&api-version=7.0`;
+
+      this.logger.debug({ skip, top: this.CHANGES_PAGE_SIZE }, "Fetching iteration changes page");
+
+      const response = await withRateLimitHandling(async () => {
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          this.logger.error(
+            {
+              status: res.status,
+              statusText: res.statusText,
+              errorText,
+            },
+            "Failed to fetch PR iteration changes via REST API"
+          );
+          throw new PlatformApiError(
+            "azure",
+            "fetch-iteration-changes",
+            `Azure DevOps API error: ${res.status} ${res.statusText}`,
+            undefined,
+            res.status
+          );
+        }
+        return res;
+      });
+
+      const data = (await response.json()) as {
+        changeEntries?: Array<{
+          item?: { path?: string; objectId?: string; gitObjectType?: string };
+          changeType?: number;
+        }>;
+      };
+
+      const pageChanges = data.changeEntries || [];
+      allChanges.push(...pageChanges);
+
+      this.logger.debug(
+        { pageSize: pageChanges.length, totalSoFar: allChanges.length },
+        "Received iteration changes page"
+      );
+
+      // Check if we need to fetch more pages
+      // If we got fewer results than requested, we've reached the end
+      if (pageChanges.length < this.CHANGES_PAGE_SIZE) {
+        hasMoreResults = false;
+      } else {
+        skip += this.CHANGES_PAGE_SIZE;
+      }
+    }
+
+    return allChanges;
+  }
+
+  private mapIterationChangeTypeToStatus(changeType?: number): FileStatus {
+    if (changeType === undefined) {
+      return "modified";
+    }
+    // Delete
+    if ((changeType & 16) !== 0) {
+      return "deleted";
+    }
+    // Rename, SourceRename, or TargetRename
+    if ((changeType & 8) !== 0 || (changeType & 1024) !== 0 || (changeType & 2048) !== 0) {
+      return "renamed";
+    }
+    // Add
+    if (changeType === 1 || changeType === 3) {
+      return "added";
+    }
+    return "modified";
+  }
+
+  /**
+   * Generates a unified diff by fetching blob content at both commits.
+   */
+  private async generateDiffFromBlobs(
+    repositoryId: string,
+    filePath: string,
+    baseCommitId: string,
+    targetCommitId: string,
+    status: FileStatus,
+    prNumber?: number
+  ): Promise<{ patch: string; additions: number; deletions: number }> {
+    try {
+      let baseContent = "";
+      let targetContent = "";
+
+      // Fetch base version content (if not added)
+      if (status !== "added") {
+        try {
+          baseContent = await this.fetchFileContentAtCommit(
+            repositoryId,
+            filePath,
+            baseCommitId,
+            prNumber
+          );
+        } catch (error) {
+          if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as Error).message.includes("File size exceeds 1MB limit")) {
+            throw error;
+          }
+          if (error instanceof PlatformApiError && error.status === 404) {
+            this.logger.debug(
+              { filePath, commit: baseCommitId, error: (error as Error).message },
+              "Could not fetch base content (file may be new)"
+            );
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Fetch target version content (if not deleted)
+      if (status !== "deleted") {
+        try {
+          targetContent = await this.fetchFileContentAtCommit(
+            repositoryId,
+            filePath,
+            targetCommitId,
+            prNumber
+          );
+        } catch (error) {
+          if ((error as Error).message.includes("Binary file")) {
+            throw error;
+          }
+          if ((error as Error).message.includes("File size exceeds 1MB limit")) {
+            throw error;
+          }
+          if (error instanceof PlatformApiError && error.status === 404) {
+            this.logger.debug(
+              {
+                filePath,
+                commit: targetCommitId,
+                error: (error as Error).message,
+              },
+              "Could not fetch target content (file may be deleted)"
+            );
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      this.logger.debug(
+        {
+          filePath,
+          baseLength: baseContent.length,
+          targetLength: targetContent.length,
+        },
+        "Fetched file contents for diff generation"
+      );
+
+      // Generate unified diff using the diff library with extended context
+      const structuredDiff = Diff.structuredPatch(
+        filePath,
+        filePath,
+        baseContent,
+        targetContent,
+        "",
+        "",
+        { context: DIFF_CONTEXT_LINES }
+      );
+
+      // Format as git-style unified diff and count changed lines
+      let patch = `diff --git a/${filePath} b/${filePath}\n`;
+      patch += `--- a/${filePath}\n`;
+      patch += `+++ b/${filePath}\n`;
+
+      let additions = 0;
+      let deletions = 0;
+
+      for (const hunk of structuredDiff.hunks) {
+        patch += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
+        for (const line of hunk.lines) {
+          patch += `${line}\n`;
+          if (line.startsWith("+")) additions++;
+          else if (line.startsWith("-")) deletions++;
+        }
+      }
+
+      if (structuredDiff.hunks.length === 0) {
+        this.logger.warn(
+          {
+            filePath,
+            baseLength: baseContent.length,
+            targetLength: targetContent.length,
+          },
+          "No diff hunks generated - files may be identical"
+        );
+      } else {
+        this.logger.info(
+          { filePath, hunksCount: structuredDiff.hunks.length },
+          "Generated diff successfully"
+        );
+      }
+
+      return { patch, additions, deletions };
+    } catch (error) {
+      if ((error as Error).message.includes("Binary file")) {
+        this.logger.info({ filePath }, "Skipping binary file in diff generation");
+        return {
+          patch: "",
+          additions: 0,
+          deletions: 0,
+        };
+      }
+      if ((error as Error).message.includes("File size exceeds 1MB limit")) {
+        this.logger.info({ filePath }, "Skipping large file (>1MB) in diff generation");
+        return {
+          patch: "",
+          additions: 0,
+          deletions: 0,
+        };
+      }
+      if (error instanceof PlatformApiError && error.status === 404) {
+        this.logger.warn(
+          { filePath, error: (error as Error).message },
+          "Expected file content not found (404) during diff generation"
+        );
+        return {
+          patch: this.createEmptyDiffHeader(filePath),
+          additions: 0,
+          deletions: 0,
+        };
+      }
+      this.logger.error(
+        { filePath, error: (error as Error).message },
+        "Unexpected error generating diff from blobs"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches file content at a specific commit using the Items API.
+   */
+  private async fetchFileContentAtCommit(
+    repositoryId: string,
+    filePath: string,
+    commitId: string,
+    prNumber?: number
+  ): Promise<string> {
+    const url = `${this.orgUrl}/${encodeURIComponent(this.project)}/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(`/${filePath}`)}&versionType=commit&version=${commitId}&includeContent=true&api-version=7.0`;
+
+    this.logger.debug({ filePath, commitId }, "Fetching file content at commit");
+
+    const response = await withRateLimitHandling(async () => {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`:${this.token}`).toString("base64")}`,
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        throw new PlatformApiError(
+          "azure",
+          "fetch-file-content",
+          `Failed to fetch file content: ${res.status} ${res.statusText}`,
+          undefined,
+          res.status
+        );
+      }
+      return res;
+    });
+
+    const data = (await response.json()) as {
+      content?: string;
+      contentType?: string;
+      versionControlContentType?: string;
+    };
+
+    const type = (data.contentType || data.versionControlContentType)?.toLowerCase();
+    if (type === "base64encoded") {
+      throw new Error(`Binary file: base64Encoded content type detected for ${filePath}`);
+    }
+
+    if (!data.content) {
+      this.logger.warn({ filePath, commitId }, "No content returned from Items API");
+      return "";
+    }
+
+    const contentBytes = Buffer.byteLength(data.content, "utf8");
+    if (contentBytes > MAX_FILE_SIZE_BYTES) {
+      this.logger.warn(
+        { filePath, commitId, sizeBytes: contentBytes },
+        "File size exceeds 1MB limit, skipping file content"
+      );
+      this.auditLogger.logFileSkipped(filePath, prNumber, "max_size_exceeded", {
+        sizeBytes: contentBytes,
+      });
+      throw new Error(`File size exceeds 1MB limit (${contentBytes} bytes) for ${filePath}`);
+    }
+
+    return data.content;
+  }
+
+  /**
+   * Creates an empty diff header (no content changes).
+   */
+  private createEmptyDiffHeader(filename: string): string {
+    return `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n`;
+  }
+
+  /**
+   * Gets existing bot comments on a PR from its comment threads.
+   * @param prNumber - The PR number
+   * @returns Comments written by the bot
+   */
+  async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      const comments: ExistingComment[] = [];
+      for (const thread of threads || []) {
+        const firstComment = thread.comments?.[0];
+        if (firstComment?.content?.includes(this.botIdentifier)) {
+          comments.push({
+            id: thread.id?.toString() || "",
+            body: firstComment.content || "",
+            path: thread.threadContext?.filePath,
+            line: thread.threadContext?.rightFileStart?.line,
+            isResolved:
+              thread.status !== AzureThreadStatus.ACTIVE &&
+              thread.status !== AzureThreadStatus.PENDING,
+          });
+        }
+      }
+
+      this.auditLogger.logCommentsFetch(prNumber, "azure", comments.length);
+      return comments;
+    } catch (error) {
+      this.auditLogger.logCommentsFetch(
+        prNumber,
+        "azure",
+        undefined,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves a specific comment thread by thread or comment ID.
+   * @param prNumber - The PR number
+   * @param commentId - The thread or comment ID
+   * @returns The matching comment thread
+   * @throws If the thread cannot be found on the PR
+   */
+  async getCommentThread(
+    prNumber: number,
+    commentId: string | number
+  ): Promise<UnresolvedCommentThread> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      const targetId = commentId.toString();
+      const thread = (threads || []).find(
+        (t) =>
+          t.id?.toString() === targetId || t.comments?.some((c) => c.id?.toString() === targetId)
+      );
+
+      if (!thread) {
+        throw new Error(`Comment thread "${commentId}" not found on PR #${prNumber}`);
+      }
+
+      const rawPath = thread.threadContext?.filePath || "";
+      const line = thread.threadContext?.rightFileStart?.line || 1;
+      const validComments = (thread.comments || []).filter((c) => !c.isDeleted);
+      const firstComment = validComments[0];
+
+      return {
+        id: thread.id?.toString() || "",
+        path: rawPath.startsWith("/") ? rawPath.slice(1) : rawPath,
+        line,
+        status:
+          thread.status === AzureThreadStatus.ACTIVE || thread.status === AzureThreadStatus.PENDING
+            ? "active"
+            : "resolved",
+        botInitiated: (firstComment?.content || "").includes(this.botIdentifier),
+        comments: validComments.map((c): UnresolvedComment => ({
+          id: c.id,
+          author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+          body: c.content || "",
+          createdAt: c.publishedDate ? c.publishedDate.toISOString() : undefined,
+          isBot: (c.content || "").includes(this.botIdentifier),
+        })),
+      };
+    } catch (error) {
+      this.logger.error(
+        { prNumber, commentId, error: (error as Error).message },
+        "Failed to fetch comment thread"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves all unresolved/active PR comment threads.
+   * @param prNumber - The PR number
+   * @returns Array of unresolved comment threads
+   */
+  async getUnresolvedCommentThreads(prNumber: number): Promise<UnresolvedCommentThread[]> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const threads = await withRateLimitHandling(() =>
+        gitApi.getThreads(this.repoName, prNumber, this.project)
+      );
+
+      const unresolved: UnresolvedCommentThread[] = [];
+      for (const thread of threads || []) {
+        const isUnresolved =
+          thread.status === AzureThreadStatus.ACTIVE || thread.status === AzureThreadStatus.PENDING;
+        const path = thread.threadContext?.filePath;
+        const line = thread.threadContext?.rightFileStart?.line;
+
+        if (isUnresolved && path && line && thread.comments && thread.comments.length > 0) {
+          const validComments = thread.comments.filter((c) => !c.isDeleted);
+          const mappedComments: UnresolvedComment[] = validComments.map((c): UnresolvedComment => {
+            const isBot = (c.content || "").includes(this.botIdentifier);
+            return {
+              author: c.author?.uniqueName ?? c.author?.displayName ?? "unknown",
+              body: c.content || "",
+              ...(c.publishedDate ? { createdAt: c.publishedDate.toISOString() } : {}),
+              ...(isBot ? { isBot: true } : {}),
+            };
+          });
+
+          const firstComment = mappedComments[0];
+          const botInitiated = firstComment ? Boolean(firstComment.isBot) : false;
+
+          unresolved.push({
+            id: thread.id?.toString() || "",
+            path,
+            line,
+            comments: mappedComments,
+            ...(botInitiated ? { botInitiated: true } : {}),
+          });
+        }
+      }
+
+      return unresolved;
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to fetch unresolved comment threads"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Posts a reply to an existing PR comment thread.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   * @param body - The reply message body
+   */
+  async postCommentReply(prNumber: number, threadId: string | number, body: string): Promise<void> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const numericThreadId =
+        typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
+
+      if (Number.isNaN(numericThreadId)) {
+        throw new Error(`Invalid thread ID for Azure DevOps: "${threadId}"`);
+      }
+
+      const comment: Comment = {
+        content: body,
+        commentType: AzureCommentType.TEXT,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.createComment(comment, this.repoName, prNumber, numericThreadId, this.project)
+      );
+
+      this.logger.info({ prNumber, threadId }, "Comment reply posted successfully");
+      this.auditLogger.logInlineCommentPost(prNumber, "thread", 0, "azure", "success");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to post comment reply"
+      );
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        "thread",
+        0,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Resolves an unresolved PR comment thread by closing it.
+   * @param prNumber - The PR number
+   * @param threadId - The target thread ID
+   */
+  async resolveCommentThread(prNumber: number, threadId: string | number): Promise<void> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const numericThreadId =
+        typeof threadId === "number" ? threadId : Number.parseInt(String(threadId), 10);
+
+      if (Number.isNaN(numericThreadId)) {
+        throw new Error(`Invalid thread ID for Azure DevOps: "${threadId}"`);
+      }
+
+      const threadUpdate: GitPullRequestCommentThread = {
+        status: AzureThreadStatus.CLOSED,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.updateThread(threadUpdate, this.repoName, prNumber, numericThreadId, this.project)
+      );
+
+      this.logger.info({ prNumber, threadId }, "Comment thread resolved successfully");
+    } catch (error) {
+      this.logger.error(
+        { prNumber, threadId, error: (error as Error).message },
+        "Failed to resolve comment thread"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Posts an inline comment on a specific file line.
+   * @param prNumber - The PR number
+   * @param path - File path
+   * @param line - Line number
+   * @param body - Comment body
+   * @param startLine - Optional first line of a multi-line comment range
+   */
+  async postInlineComment(
+    prNumber: number,
+    path: string,
+    line: number,
+    body: string,
+    startLine?: number
+  ): Promise<void> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+
+      const thread: GitPullRequestCommentThread = {
+        comments: [
+          {
+            content: body,
+            commentType: AzureCommentType.TEXT,
+          } as Comment,
+        ],
+        threadContext: {
+          filePath: path.startsWith("/") ? path : `/${path}`,
+          rightFileStart: { line: startLine ?? line, offset: 1 },
+          rightFileEnd: { line, offset: 1 },
+        },
+        status: AzureThreadStatus.ACTIVE,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.createThread(thread, this.repoName, prNumber, this.project)
+      );
+      this.auditLogger.logInlineCommentPost(prNumber, path, line, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        path,
+        line,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Posts a general (top-level) comment thread on the PR.
+   * @param prNumber - The PR number
+   * @param body - Comment body
+   */
+  async postGeneralComment(prNumber: number, body: string): Promise<void> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+
+      const thread: GitPullRequestCommentThread = {
+        comments: [
+          {
+            content: body,
+            commentType: AzureCommentType.TEXT,
+          } as Comment,
+        ],
+        status: AzureThreadStatus.ACTIVE,
+      };
+
+      await withRateLimitHandling(() =>
+        gitApi.createThread(thread, this.repoName, prNumber, this.project)
+      );
+      this.auditLogger.logGeneralCommentPost(prNumber, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logGeneralCommentPost(
+        prNumber,
+        "azure",
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves Azure DevOps work item details as PBI data, including comments, a MoSCoW tag,
+   * story points, and backlog priority. Task details are merged with the parent PBI when available.
+   * @param id - The work item ID
+   * @returns Details about the work item
+   * @throws If the work item ID is invalid or the work item is not found
+   */
+  async getPBIDetails(id: string): Promise<PBIDetails> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+      const workItem = await withRateLimitHandling(
+        () => witApi.getWorkItem(workItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
+      );
+
+      if (!workItem?.fields) {
+        throw new Error(`Work item with ID ${id} not found.`);
+      }
+
+      const title = (workItem.fields["System.Title"] as string) || "";
+      const rawDescription = (workItem.fields["System.Description"] as string) || "";
+      const rawAcceptanceCriteria =
+        (workItem.fields["Microsoft.VSTS.Common.AcceptanceCriteria"] as string) || "";
+
+      const storyPointsValue =
+        workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
+        workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
+      const parsedStoryPoints =
+        storyPointsValue !== undefined && storyPointsValue !== null
+          ? Number.parseFloat(storyPointsValue.toString())
+          : undefined;
+      const storyPoints =
+        parsedStoryPoints !== undefined && !Number.isNaN(parsedStoryPoints)
+          ? parsedStoryPoints
+          : undefined;
+
+      const tagsString = (workItem.fields["System.Tags"] as string) || "";
+      const tags = tagsString
+        .split(/[;,]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const moscowTag = extractMoSCoWTag(tags);
+
+      const backlogPriorityValue =
+        workItem.fields["Microsoft.VSTS.Common.BacklogPriority"] ??
+        workItem.fields["Microsoft.VSTS.Common.StackRank"];
+      const parsedBacklogPriority =
+        backlogPriorityValue !== undefined && backlogPriorityValue !== null
+          ? Number.parseFloat(backlogPriorityValue.toString())
+          : undefined;
+      const backlogPriority =
+        parsedBacklogPriority !== undefined && !Number.isNaN(parsedBacklogPriority)
+          ? parsedBacklogPriority
+          : undefined;
+
+      const description = stripHtml(rawDescription);
+      const acceptanceCriteria = stripHtml(rawAcceptanceCriteria);
+
+      const commentsList = await withRateLimitHandling(() =>
+        witApi.getComments(this.project, workItemId)
+      );
+
+      const comments: PBIComment[] = (commentsList.comments || []).map((c) => ({
+        id: c.id ?? "",
+        body: stripHtml(c.text || ""),
+      }));
+
+      const attachments = (workItem.relations || [])
+        .filter((rel) => rel.rel === "AttachedFile")
+        .map((rel) => rel.attributes?.name)
+        .filter((name): name is string => typeof name === "string" && name.length > 0);
+
+      const workItemType = workItem.fields["System.WorkItemType"] as string;
+
+      if (workItemType === "Task") {
+        const parentRelation = workItem.relations?.find(
+          (rel) => rel.rel === "System.LinkTypes.Hierarchy-Reverse"
+        );
+        if (parentRelation?.url) {
+          const match = parentRelation.url.match(/\/workItems\/(\d+)(?:\?|$)/);
+          if (match) {
+            const parentId = match[1];
+            try {
+              const parentDetails = await this.getPBIDetails(parentId);
+              const combinedTitle = `Task: ${title} (Parent PBI #${parentId}: ${parentDetails.title})`;
+
+              const combinedDescription = [
+                "Task Description:",
+                description || "(No description)",
+                "Parent PBI Description:",
+                parentDetails.description || "(No description)",
+              ].join("\n\n");
+
+              const taskAC = acceptanceCriteria;
+              const parentAC = parentDetails.acceptanceCriteria;
+              let combinedAcceptanceCriteria: string | undefined;
+              if (taskAC && parentAC) {
+                combinedAcceptanceCriteria = `Task Acceptance Criteria:\n${taskAC}\n\nParent PBI Acceptance Criteria:\n${parentAC}`;
+              } else if (taskAC) {
+                combinedAcceptanceCriteria = `Task Acceptance Criteria:\n${taskAC}`;
+              } else if (parentAC) {
+                combinedAcceptanceCriteria = `Parent PBI Acceptance Criteria:\n${parentAC}`;
+              }
+
+              const combinedComments = [...comments, ...parentDetails.comments];
+
+              return {
+                id,
+                platform: "azure",
+                title: combinedTitle,
+                description: combinedDescription,
+                acceptanceCriteria: combinedAcceptanceCriteria,
+                storyPoints: storyPoints ?? parentDetails.storyPoints,
+                comments: combinedComments,
+                moscowTag: moscowTag ?? parentDetails.moscowTag,
+                backlogPriority: backlogPriority ?? parentDetails.backlogPriority,
+                attachments,
+              };
+            } catch (parentError) {
+              this.logger.warn(
+                { id, parentId, error: (parentError as Error).message },
+                "Failed to fetch parent PBI details for task; using task details only."
+              );
+            }
+          }
+        }
+      }
+
+      return {
+        id,
+        platform: "azure",
+        title,
+        description,
+        acceptanceCriteria: acceptanceCriteria || undefined,
+        storyPoints,
+        comments,
+        moscowTag,
+        backlogPriority,
+        attachments,
+      };
+    } catch (error) {
+      this.logger.error(
+        { id, error: (error as Error).message },
+        "Failed to fetch Azure DevOps work item details"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Posts a new comment on a work item, or updates an existing one when commentId is provided.
+   * @param id - The work item ID
+   * @param body - Comment body
+   * @param commentId - Optional comment ID to update an existing comment in-place
+   */
+  async postPBIComment(id: string, body: string, commentId?: number | string): Promise<void> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+      if (commentId !== undefined) {
+        const numericCommentId =
+          typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
+        const routeValues = {
+          project: this.project,
+          workItemId,
+          commentId: numericCommentId,
+        };
+        const verData = await (
+          witApi as unknown as {
+            vsoClient: {
+              getVersioningData: (
+                apiVersion: string,
+                area: string,
+                locationId: string,
+                routeValues: Record<string, unknown>
+              ) => Promise<{ requestUrl: string; apiVersion: string }>;
+            };
+          }
+        ).vsoClient.getVersioningData(
+          "7.1",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          routeValues
+        );
+        const url = `${verData.requestUrl}?format=Markdown`;
+        const options = (
+          witApi as unknown as {
+            createRequestOptions: (type: string, apiVersion?: string) => unknown;
+          }
+        ).createRequestOptions("application/json", verData.apiVersion);
+
+        await withRateLimitHandling(() =>
+          (
+            witApi as unknown as {
+              rest: {
+                update: (url: string, data: unknown, options: unknown) => Promise<unknown>;
+              };
+            }
+          ).rest.update(url, { text: body }, options)
+        );
+        this.logger.info({ id, commentId }, "Work item comment updated successfully");
+      } else {
+        const routeValues = {
+          project: this.project,
+          workItemId,
+        };
+        const verData = await (
+          witApi as unknown as {
+            vsoClient: {
+              getVersioningData: (
+                apiVersion: string,
+                area: string,
+                locationId: string,
+                routeValues: Record<string, unknown>
+              ) => Promise<{ requestUrl: string; apiVersion: string }>;
+            };
+          }
+        ).vsoClient.getVersioningData(
+          "7.1",
+          "wit",
+          "608aac0a-32e1-4493-a863-b9cf4566d257",
+          routeValues
+        );
+        const url = `${verData.requestUrl}?format=Markdown`;
+        const options = (
+          witApi as unknown as {
+            createRequestOptions: (type: string, apiVersion?: string) => unknown;
+          }
+        ).createRequestOptions("application/json", verData.apiVersion);
+
+        await withRateLimitHandling(() =>
+          (
+            witApi as unknown as {
+              rest: {
+                create: (url: string, data: unknown, options: unknown) => Promise<unknown>;
+              };
+            }
+          ).rest.create(url, { text: body }, options)
+        );
+        this.logger.info({ id }, "Work item comment created successfully");
+      }
+    } catch (error) {
+      this.logger.error(
+        { id, commentId, error: (error as Error).message },
+        "Failed to post/update Azure DevOps comment"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Attaches a UTF-8 file to an Azure DevOps work item.
+   *
+   * Uploads the content as a work item attachment and links it to the work item
+   * with an `AttachedFile` relation.
+   *
+   * @param id - The work item ID
+   * @param fileName - Name to give the attached file
+   * @param content - UTF-8 file content
+   */
+  async attachWorkItemFile(id: string, fileName: string, content: string): Promise<void> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+
+    try {
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+
+      const attachment = await withRateLimitHandling(() =>
+        witApi.createAttachment({}, Readable.from([content]), fileName, "simple", this.project)
+      );
+
+      if (!attachment?.url) {
+        throw new Error(`Failed to upload attachment "${fileName}" to work item #${id}.`);
+      }
+
+      const patch: JsonPatchDocument = [
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "AttachedFile",
+            url: attachment.url,
+          },
+        },
+      ];
+
+      await withRateLimitHandling(() => witApi.updateWorkItem({}, patch, workItemId, this.project));
+
+      this.logger.info({ id, fileName }, "Work item attachment created successfully");
+    } catch (error) {
+      this.logger.error(
+        { id, fileName, error: (error as Error).message },
+        "Failed to attach file to Azure DevOps work item"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Identifies work items linked to a PR via Azure DevOps link relationships.
+   * @param prNumber - The PR number
+   * @returns Array of linked work item IDs
+   */
+  async getLinkedPBIIds(prNumber: number): Promise<readonly string[]> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        this.logger.warn({ prNumber }, "Could not find repository ID for PR");
+        return [];
+      }
+
+      const workItemRefs = (await withRateLimitHandling(() =>
+        gitApi.getPullRequestWorkItemRefs(repositoryId, prNumber, this.project)
+      )) as Array<{ id?: string | number }> | null | undefined;
+
+      if (!workItemRefs) {
+        return [];
+      }
+
+      const ids = workItemRefs
+        .map((ref) => ref.id)
+        .filter((id): id is string | number => id !== undefined && id !== null)
+        .map((id) => id.toString());
+
+      return ids;
+    } catch (error) {
+      this.logger.error(
+        { prNumber, error: (error as Error).message },
+        "Failed to fetch linked work items for PR"
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Updates the title and description of a pull request.
+   * @param prNumber - The PR number
+   * @param details - The new title and/or description to apply
+   */
+  async updatePRDetails(
+    prNumber: number,
+    details: { readonly title?: string; readonly body?: string }
+  ): Promise<void> {
+    try {
+      const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+      const pr = await withRateLimitHandling(() =>
+        gitApi.getPullRequestById(prNumber, this.project)
+      );
+      const repositoryId = pr.repository?.id;
+      if (!repositoryId) {
+        throw new Error(`Could not find repository ID for PR #${prNumber}`);
+      }
+
+      const updateData: { title?: string; description?: string } = {};
+      if (details.title !== undefined) updateData.title = details.title;
+      if (details.body !== undefined) updateData.description = details.body;
+
+      await withRateLimitHandling(() =>
+        gitApi.updatePullRequest(updateData, repositoryId, prNumber, this.project)
+      );
+      this.auditLogger.logPRDetailsUpdate(prNumber, "azure", "success");
+    } catch (error) {
+      this.auditLogger.logPRDetailsUpdate(prNumber, "azure", "failure", (error as Error).message);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves hierarchical project details (Epics, Features, child stories/PBIs, and dependencies)
+   * by walking the work item hierarchy starting at the root work item.
+   * @param id - The root work item ID
+   * @returns The project hierarchy and its dependencies
+   */
+  async getProjectDetails(id: string): Promise<ProjectDetails> {
+    const workItemId = Number.parseInt(id, 10);
+    if (Number.isNaN(workItemId)) {
+      throw new Error(`Invalid Azure DevOps work item ID: "${id}"`);
+    }
+    const rootId = id;
+    try {
+      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+
+      const workItemsMap = new Map<string, ProjectWorkItem>();
+      const dependenciesList: ProjectDependency[] = [];
+
+      const queue: { id: string }[] = [{ id }];
+      const visited = new Set<string>([id]);
+      const hierarchyIds = new Set<string>([id]);
+      const hierarchyParent = new Map<string, string>();
+
+      this.logger.info({ rootId }, "Fetching project details hierarchy starting at root work item");
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === undefined) {
+          continue;
+        }
+        const currentId = current.id;
+        const currentWorkItemId = Number.parseInt(currentId, 10);
+        if (Number.isNaN(currentWorkItemId)) {
+          this.logger.warn(
+            { currentId },
+            "Skipping invalid work item ID in project details fetching"
+          );
+          continue;
+        }
+
+        const workItem = await withRateLimitHandling(
+          () => witApi.getWorkItem(currentWorkItemId, undefined, undefined, 4) // WorkItemExpand.All = 4
+        ).catch((error) => {
+          this.logger.error(
+            { currentId, error: (error as Error).message },
+            "Failed to fetch work item details in project review"
+          );
+          return null;
+        });
+
+        if (!workItem?.fields) {
+          this.logger.warn({ currentId }, "Work item has no fields or is not found");
+          continue;
+        }
+
+        const title = (workItem.fields["System.Title"] as string) || "";
+        const type = (workItem.fields["System.WorkItemType"] as string) || "";
+        const rawDescription = (workItem.fields["System.Description"] as string) || "";
+        const rawAcceptanceCriteria =
+          (workItem.fields["Microsoft.VSTS.Common.AcceptanceCriteria"] as string) || "";
+
+        const storyPointsValue =
+          workItem.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ??
+          workItem.fields["Microsoft.VSTS.Scheduling.Effort"];
+        const parsedStoryPoints =
+          storyPointsValue !== undefined && storyPointsValue !== null
+            ? Number.parseFloat(storyPointsValue.toString())
+            : undefined;
+        const storyPoints =
+          parsedStoryPoints !== undefined && !Number.isNaN(parsedStoryPoints)
+            ? parsedStoryPoints
+            : undefined;
+
+        const tagsString = (workItem.fields["System.Tags"] as string) || "";
+        const tags = tagsString
+          .split(/[;,]/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const moscowTag = extractMoSCoWTag(tags);
+
+        const backlogPriorityValue =
+          workItem.fields["Microsoft.VSTS.Common.BacklogPriority"] ??
+          workItem.fields["Microsoft.VSTS.Common.StackRank"];
+        const parsedBacklogPriority =
+          backlogPriorityValue !== undefined && backlogPriorityValue !== null
+            ? Number.parseFloat(backlogPriorityValue.toString())
+            : undefined;
+        const backlogPriority =
+          parsedBacklogPriority !== undefined && !Number.isNaN(parsedBacklogPriority)
+            ? parsedBacklogPriority
+            : undefined;
+
+        const state = (workItem.fields["System.State"] as string) || "";
+        const normalizedState = normalizeState(state);
+        const description = stripHtml(rawDescription);
+        const acceptanceCriteria = stripHtml(rawAcceptanceCriteria);
+
+        let comments: PBIComment[] = [];
+        try {
+          const commentsList = await withRateLimitHandling(() =>
+            witApi.getComments(this.project, currentWorkItemId)
+          );
+          comments = (commentsList.comments || []).map((c) => ({
+            id: c.id ?? "",
+            body: stripHtml(c.text || ""),
+          }));
+        } catch (commentError) {
+          this.logger.warn(
+            { currentId, error: (commentError as Error).message },
+            "Failed to fetch comments for project work item"
+          );
+        }
+
+        workItemsMap.set(currentId, {
+          id: currentId,
+          title,
+          type,
+          description,
+          acceptanceCriteria: acceptanceCriteria || undefined,
+          state,
+          normalizedState,
+          storyPoints,
+          comments,
+          moscowTag,
+          backlogPriority,
+        });
+
+        const shouldFollowHierarchy =
+          hierarchyIds.has(currentId) && ContainerWorkItemTypes.has(type);
+
+        for (const rel of workItem.relations || []) {
+          if (!rel.url) continue;
+
+          const match = rel.url.match(/\/workItems\/(\d+)(?:\?|$)/);
+          if (!match) continue;
+
+          const targetId = match[1];
+
+          if (rel.rel === "System.LinkTypes.Hierarchy-Forward" && shouldFollowHierarchy) {
+            if (!hierarchyParent.has(targetId)) {
+              hierarchyParent.set(targetId, currentId);
+            }
+            if (!visited.has(targetId)) {
+              visited.add(targetId);
+              hierarchyIds.add(targetId);
+              queue.push({ id: targetId });
+            }
+          } else if (
+            rel.rel === "System.LinkTypes.Dependency-Reverse" ||
+            rel.rel === "System.LinkTypes.Dependency-Forward"
+          ) {
+            const linkType =
+              rel.rel === "System.LinkTypes.Dependency-Reverse" ? "predecessor" : "successor";
+            dependenciesList.push({
+              sourceId: currentId,
+              targetId,
+              type: linkType,
+            });
+
+            if (!visited.has(targetId)) {
+              visited.add(targetId);
+              queue.push({ id: targetId });
+            }
+          }
+        }
+      }
+
+      const rootItemDetails = workItemsMap.get(rootId);
+      if (!rootItemDetails) {
+        throw new Error(`Root work item #${rootId} could not be resolved.`);
+      }
+
+      const seenDeps = new Set<string>();
+      const dependencies = dependenciesList.filter((dep) => {
+        const key = `${dep.sourceId}:${dep.targetId}:${dep.type}`;
+        if (seenDeps.has(key)) return false;
+        seenDeps.add(key);
+        return true;
+      });
+
+      // Resolve hierarchy parent/depth after traversal so an item first reached
+      // through a dependency link is still attributed to its hierarchy parent.
+      const computeDepth = (itemId: string): number | undefined => {
+        let depth = 0;
+        let cursor = hierarchyParent.get(itemId);
+        const seen = new Set<string>();
+        while (cursor !== undefined && !seen.has(cursor)) {
+          seen.add(cursor);
+          depth += 1;
+          cursor = hierarchyParent.get(cursor);
+        }
+        return depth === 0 ? undefined : depth;
+      };
+
+      const workItems = Array.from(workItemsMap.values()).map((item) => {
+        const parentId = hierarchyParent.get(item.id);
+        if (parentId === undefined) {
+          return item;
+        }
+        return { ...item, parentId, depth: computeDepth(item.id) };
+      });
+
+      return {
+        rootId,
+        rootTitle: rootItemDetails.title,
+        rootType: rootItemDetails.type,
+        rootDescription: rootItemDetails.description,
+        platform: "azure",
+        workItems,
+        dependencies,
+      };
+    } catch (error) {
+      this.logger.error(
+        { id, error: (error as Error).message },
+        "Failed to fetch Azure DevOps project details"
+      );
+      throw error;
+    }
+  }
+}
+
+/**
+ * Strips HTML tags from text, converting block elements to newlines and decoding basic
+ * HTML entities while preserving HTML comments.
+ * @param html - The HTML text to strip
+ * @returns The plain text version of the input
+ */
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return "";
+
+  // Temporarily store HTML comments in a placeholder map to keep them from being stripped
+  const comments: string[] = [];
+  const placeholderHtml = html.replace(/<!--[\s\S]*?-->/g, (match) => {
+    comments.push(match);
+    return `__HTML_COMMENT_PLACEHOLDER_${comments.length - 1}__`;
+  });
+
+  let stripped = placeholderHtml
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<li>/gi, "\n- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .trim();
+
+  // Restore the original HTML comments
+  for (let i = 0; i < comments.length; i++) {
+    stripped = stripped.replace(`__HTML_COMMENT_PLACEHOLDER_${i}__`, comments[i]);
+  }
+
+  return stripped;
+}
+
+const ContainerWorkItemTypes = new Set(["Project", "Epic", "Feature"]);
+
+/**
+ * Normalizes a platform-specific work item state into a canonical status.
+ * @param state - The raw work item state
+ * @returns "todo", "inprogress", "done", or "unknown"
+ */
+function normalizeState(state: string | null | undefined): WorkItemState {
+  if (!state) return "unknown";
+  const lower = state.toLowerCase().replace(/\s+/g, "");
+  if (["new", "approved", "todo", "proposed", "open", "backlog"].includes(lower)) {
+    return "todo";
+  }
+  if (["inprogress", "active", "developing", "committed"].includes(lower)) {
+    return "inprogress";
+  }
+  if (["done", "completed", "closed", "resolved"].includes(lower)) {
+    return "done";
+  }
+  return "unknown";
+}

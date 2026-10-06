@@ -1,9 +1,9 @@
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadConfig } from "../config.js";
-import { logger } from "../logger.js";
-import { consoleOutputWriter } from "../ports/index.js";
+import { loadConfig } from "@merge-mentor/core/config.js";
+import { logger } from "@merge-mentor/shared/logger.js";
+import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 
 /**
  * Executes the `repos` command: lists or removes cloned repositories from the

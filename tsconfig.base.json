@@ -11,6 +11,10 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@merge-mentor/shared/*": ["./libs/shared/src/*"],
+      "@merge-mentor/core/*": ["./libs/core/src/*"]
+    }
   }
 }

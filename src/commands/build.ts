@@ -1,20 +1,21 @@
 import { writeFile } from "node:fs/promises";
 
-import { createAIProvider } from "../ai/providerFactory.js";
-import type { AIProviderType } from "../ai/types.js";
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig } from "@merge-mentor/core/config.js";
+import {
+  consoleOutputWriter,
+  type Environment,
+  type OutputWriter,
+  processEnvironment,
+} from "@merge-mentor/shared/ports/index.js";
+
 import {
   AzureBuildProvider,
   analyzeBuild,
   createBuildReference,
   GithubBuildProvider,
 } from "../build/index.js";
-import { loadConfig } from "../config.js";
-import {
-  consoleOutputWriter,
-  type Environment,
-  type OutputWriter,
-  processEnvironment,
-} from "../ports/index.js";
 import type { BuildAnalyzeOptions } from "./types.js";
 
 /** Dependency injection container for the build analysis command. */

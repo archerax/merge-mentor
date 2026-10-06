@@ -1,11 +1,10 @@
 import { mkdirSync } from "node:fs";
 
+import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
+import { ReviewEngine } from "@merge-mentor/core/review/engine.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { loadConfig, validateConfig } from "../config.js";
-import { AzureDevOpsAdapter } from "../platforms/azure.js";
-import { GitHubAdapter } from "../platforms/github.js";
-import { ReviewEngine } from "../review/engine.js";
 
 // Mock dependencies
 const mockReviewPR = vi.fn();
@@ -20,12 +19,12 @@ const mockAdapter = {
   getProjectIdentifier: () => "test-owner-test-repo",
 };
 
-vi.mock("../config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
 
-vi.mock("../platforms/github.js", () => {
+vi.mock("@merge-mentor/core/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapterMock() {
       return mockAdapter;
@@ -33,7 +32,7 @@ vi.mock("../platforms/github.js", () => {
   };
 });
 
-vi.mock("../platforms/azure.js", () => {
+vi.mock("@merge-mentor/core/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;
@@ -41,7 +40,7 @@ vi.mock("../platforms/azure.js", () => {
   };
 });
 
-vi.mock("../review/engine.js", () => {
+vi.mock("@merge-mentor/core/review/engine.js", () => {
   return {
     ReviewEngine: vi.fn(function ReviewEngineMock() {
       return { reviewPR: mockReviewPR, describePR: mockDescribePR };
@@ -62,11 +61,12 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
-import type { Config } from "../config.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import type { OutputWriter } from "../ports/outputWriter.js";
-import type { ReviewResult } from "../review/engine.js";
-import { resolveReviewProfile } from "../review/reviewSelection.js";
+import type { Config } from "@merge-mentor/core/config.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
+import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
+import type { OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
+
 import {
   displayResults,
   executeReview,

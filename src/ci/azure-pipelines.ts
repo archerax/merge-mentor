@@ -1,4 +1,5 @@
-import type { Environment } from "../ports/environment.js";
+import type { Environment } from "@merge-mentor/shared/ports/environment.js";
+
 import type { CIContext } from "./types.js";
 
 /**

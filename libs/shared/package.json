@@ -1,0 +1,9 @@
+{
+  "name": "@merge-mentor/shared",
+  "version": "3.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

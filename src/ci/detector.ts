@@ -1,4 +1,5 @@
-import type { Environment } from "../ports/environment.js";
+import type { Environment } from "@merge-mentor/shared/ports/environment.js";
+
 import { resolveAzurePipelinesContext } from "./azure-pipelines.js";
 import { resolveGitHubActionsContext } from "./github-actions.js";
 import type { CIContext } from "./types.js";
@@ -23,7 +24,7 @@ import type { CIContext } from "./types.js";
  *
  * @example
  * ```typescript
- * import { processEnvironment } from "../ports/environment.js";
+ * import { processEnvironment } from "@merge-mentor/shared/ports/environment.js";
  * import { detectCIEnvironment } from "./detector.js";
  *
  * const context = detectCIEnvironment(processEnvironment);

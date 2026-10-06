@@ -24,7 +24,7 @@ vi.mock("node:fs/promises", () => ({
   writeFile: mockWriteFile,
 }));
 
-vi.mock("../ai/providerFactory.js", () => ({
+vi.mock("@merge-mentor/core/ai/providerFactory.js", () => ({
   createAIProvider: mockCreateAIProvider,
 }));
 

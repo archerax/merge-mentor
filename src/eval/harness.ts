@@ -1,12 +1,17 @@
 import path from "node:path";
 
-import { buildGeneralFileReviewPrompt } from "../ai/prompts/specialists/general.js";
-import type { AIProviderClient, AIResponse } from "../ai/types.js";
-import { CorpusEvalError } from "../errors/index.js";
-import type { FileFinding, FileReviewResult, FindingSeverity } from "../platforms/types.js";
-import type { FileSystem } from "../ports/fileSystem.js";
-import { nodeFs } from "../ports/fileSystem.js";
-import type { DiffManifest } from "../review/diffStorage.js";
+import { buildGeneralFileReviewPrompt } from "@merge-mentor/core/ai/prompts/specialists/general.js";
+import type { AIProviderClient, AIResponse } from "@merge-mentor/core/ai/types.js";
+import type {
+  FileFinding,
+  FileReviewResult,
+  FindingSeverity,
+} from "@merge-mentor/core/platforms/types.js";
+import type { DiffManifest } from "@merge-mentor/core/review/diffStorage.js";
+import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
+import { nodeFs } from "@merge-mentor/shared/ports/fileSystem.js";
+
 import { MockAIProvider } from "./mockProvider.js";
 import type {
   EvalHarnessOptions,
@@ -140,7 +145,7 @@ export async function evaluateScenario(
   if (providerType === "mock") {
     provider = new MockAIProvider({ scenarioDir, fileSystem: fs });
   } else {
-    const { createAIProvider } = await import("../ai/providerFactory.js");
+    const { createAIProvider } = await import("@merge-mentor/core/ai/providerFactory.js");
     provider = createAIProvider(providerType);
   }
 

@@ -5,7 +5,7 @@ import { buildReplyPrompt } from "./reply/prompt.js";
 
 // Mock AI Provider Factory
 const mockExecutePrompt = vi.fn();
-vi.mock("../ai/providerFactory.js", () => ({
+vi.mock("@merge-mentor/core/ai/providerFactory.js", () => ({
   createAIProvider: vi.fn(() => ({
     executePrompt: mockExecutePrompt,
   })),
@@ -20,19 +20,19 @@ const mockAdapter = {
   getPlatformName: () => "github" as const,
 };
 
-vi.mock("../platforms/github.js", () => ({
+vi.mock("@merge-mentor/core/platforms/github.js", () => ({
   GitHubAdapter: vi.fn(function GitHubAdapter() {
     return mockAdapter;
   }),
 }));
 
-vi.mock("../platforms/azure.js", () => ({
+vi.mock("@merge-mentor/core/platforms/azure.js", () => ({
   AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
     return mockAdapter;
   }),
 }));
 
-vi.mock("../config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(() => ({
     defaultPlatform: "github",
     github: { token: "token", owner: "owner", repo: "repo" },

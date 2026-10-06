@@ -1,8 +1,8 @@
 import path from "node:path";
 
+import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { createStubFileSystem } from "../ports/fileSystem.test-helper.js";
 import { storeLogArtifacts } from "./logArtifacts.js";
 
 describe("storeLogArtifacts", () => {

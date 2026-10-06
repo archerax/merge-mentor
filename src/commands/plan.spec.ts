@@ -1,11 +1,11 @@
 import { execSync } from "node:child_process";
 
+import type { Config } from "@merge-mentor/core/config.js";
+import { loadConfig } from "@merge-mentor/core/config.js";
+import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Config } from "../config.js";
-import { loadConfig } from "../config.js";
 import { program } from "../program.js";
-import { resolveReviewProfile } from "../review/reviewSelection.js";
 
 const mockAdapter = {
   getProjectIdentifier: vi.fn(),
@@ -36,12 +36,12 @@ const mockGeneratePlan = vi.fn().mockResolvedValue({
   fileName: "merge-mentor-plan-42.md",
 });
 
-vi.mock("../config.js", () => ({
+vi.mock("@merge-mentor/core/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
 
-vi.mock("../platforms/azure.js", () => {
+vi.mock("@merge-mentor/core/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
       return mockAdapter;
@@ -49,7 +49,7 @@ vi.mock("../platforms/azure.js", () => {
   };
 });
 
-vi.mock("../platforms/github.js", () => {
+vi.mock("@merge-mentor/core/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapter() {
       return mockAdapter;
@@ -57,7 +57,7 @@ vi.mock("../platforms/github.js", () => {
   };
 });
 
-vi.mock("../review/planEngine.js", () => {
+vi.mock("@merge-mentor/core/review/planEngine.js", () => {
   return {
     PlanEngine: vi.fn(function PlanEngine() {
       return { generatePlan: mockGeneratePlan };

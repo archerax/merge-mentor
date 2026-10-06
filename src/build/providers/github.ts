@@ -1,4 +1,5 @@
-import { PlatformApiError } from "../../errors/index.js";
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
+
 import type {
   BuildAnalysisProvider,
   BuildLogChunk,

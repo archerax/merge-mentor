@@ -1,6 +1,7 @@
+import type { Environment, OutputWriter } from "@merge-mentor/shared/ports/index.js";
+
 import type { CIContext } from "../../ci/index.js";
 import { detectCIEnvironment } from "../../ci/index.js";
-import type { Environment, OutputWriter } from "../../ports/index.js";
 import type { ReviewOptions } from "../types.js";
 
 /**

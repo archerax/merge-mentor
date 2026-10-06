@@ -1,4 +1,4 @@
-import type { AIProviderClient } from "../ai/types.js";
+import type { AIProviderClient } from "@merge-mentor/core/ai/types.js";
 
 /** Supported CI platforms that can be analyzed. */
 export type BuildPlatform = "github" | "azure";
@@ -203,5 +203,5 @@ export interface BuildAnalysisOptions {
   /** Maximum number of tail bytes kept per stored artifact. */
   readonly initialTailBytes?: number;
   /** File system abstraction used for artifact storage; defaults to `node:fs`. */
-  readonly fileSystem?: import("../ports/index.js").FileSystem;
+  readonly fileSystem?: import("@merge-mentor/shared/ports/index.js").FileSystem;
 }

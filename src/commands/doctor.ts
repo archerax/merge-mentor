@@ -3,10 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
-
-import type { Config } from "../config.js";
-import { loadConfig } from "../config.js";
-import { consoleOutputWriter, processEnvironment } from "../ports/index.js";
+import type { Config } from "@merge-mentor/core/config.js";
+import { loadConfig } from "@merge-mentor/core/config.js";
+import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
 
 /**
  * Executes the `doctor` command: runs system, AI provider, and configuration

@@ -1,6 +1,6 @@
-import type { AIProviderType } from "../ai/types.js";
-import type { FileSystem } from "../ports/fileSystem.js";
-import type { OutputWriter } from "../ports/outputWriter.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
+import type { OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 
 /** Specification of an expected ground truth finding in a corpus scenario. */
 export interface ExpectedFinding {

@@ -1,18 +1,27 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { AIProviderType } from "../ai/types.js";
-import { loadConfig, type Platform, type ReviewPass, type ReviewStrategy } from "../config.js";
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
-import { initLogger } from "../logger.js";
-import { LocalPlatformAdapter, parseRemoteUrl } from "../platforms/local.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import { consoleOutputWriter } from "../ports/index.js";
-import { ReviewEngine, type ReviewResult } from "../review/engine.js";
-import type { GitBackendType } from "../review/gitClient.js";
-import { createGitClient } from "../review/gitClients/factory.js";
-import { formatReviewPasses, formatReviewTypeLabel } from "../review/reviewSelection.js";
-import { formatTokenUsage } from "../utils/tokenUsage.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import {
+  loadConfig,
+  type Platform,
+  type ReviewPass,
+  type ReviewStrategy,
+} from "@merge-mentor/core/config.js";
+import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/core/constants.js";
+import { LocalPlatformAdapter, parseRemoteUrl } from "@merge-mentor/core/platforms/local.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
+import type { GitBackendType } from "@merge-mentor/core/review/gitClient.js";
+import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
+import {
+  formatReviewPasses,
+  formatReviewTypeLabel,
+} from "@merge-mentor/core/review/reviewSelection.js";
+import { formatTokenUsage } from "@merge-mentor/core/utils/tokenUsage.js";
+import { initLogger } from "@merge-mentor/shared/logger.js";
+import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
+
 import type { ProgramDeps, StageOptions } from "./types.js";
 
 /** Exit code used when `--exit-code` finds blocking findings. */

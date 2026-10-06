@@ -1,12 +1,13 @@
-import { createAIProvider } from "../ai/providerFactory.js";
-import type { AIProviderType } from "../ai/types.js";
-import { loadConfig, type Platform, validateConfig } from "../config.js";
-import { AzureDevOpsAdapter } from "../platforms/azure.js";
-import { GitHubAdapter } from "../platforms/github.js";
-import type { PlatformAdapter } from "../platforms/types.js";
-import { processEnvironment } from "../ports/index.js";
-import { PBIReviewEngine } from "../review/pbiEngine.js";
-import { detectGitRemoteUrl, parseGitRemoteUrl } from "../utils/gitRemote.js";
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import { loadConfig, type Platform, validateConfig } from "@merge-mentor/core/config.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
+import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import { PBIReviewEngine } from "@merge-mentor/core/review/pbiEngine.js";
+import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/core/utils/gitRemote.js";
+import { processEnvironment } from "@merge-mentor/shared/ports/index.js";
+
 import type { PBIOptions } from "./types.js";
 
 /**

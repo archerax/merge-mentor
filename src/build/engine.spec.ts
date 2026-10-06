@@ -1,7 +1,7 @@
+import type { AIProviderClient } from "@merge-mentor/core/ai/types.js";
+import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AIProviderClient } from "../ai/types.js";
-import type { FileSystem } from "../ports/fileSystem.js";
 import { analyzeBuild } from "./engine.js";
 import { BuildAnalysisError } from "./errors.js";
 import type { BuildAnalysisProvider, BuildReference } from "./types.js";

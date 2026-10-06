@@ -1,0 +1,59 @@
+import { ConfigurationError } from "@merge-mentor/shared/errors/index.js";
+import { describe, expect, it } from "vitest";
+
+import { createAIProvider } from "./providerFactory.js";
+import { CopilotSdkProvider } from "./providers/copilot-sdk.js";
+import { OpenCodeSdkProvider } from "./providers/opencode-sdk.js";
+import type { AIProviderType } from "./types.js";
+
+describe("createAIProvider", () => {
+  it("should create CopilotSdkProvider for 'copilot-sdk' type", () => {
+    const provider = createAIProvider("copilot-sdk");
+    expect(provider).toBeInstanceOf(CopilotSdkProvider);
+  });
+
+  it("should create OpenCodeSdkProvider for 'opencode-sdk' type", () => {
+    const provider = createAIProvider("opencode-sdk");
+    expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
+  });
+
+  it("should pass options to CopilotSdkProvider", () => {
+    const provider = createAIProvider("copilot-sdk", {
+      model: "claude-haiku-4.5",
+      timeoutMs: 60000,
+      maxRetries: 5,
+      longContext: true,
+    });
+    expect(provider).toBeInstanceOf(CopilotSdkProvider);
+  });
+
+  it("should pass options to OpenCodeSdkProvider", () => {
+    const provider = createAIProvider("opencode-sdk", {
+      model: "claude-haiku-4.5",
+      timeoutMs: 120000,
+      maxRetries: 3,
+    });
+    expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
+  });
+
+  it("should allow experimentalTools for opencode-sdk", () => {
+    const provider = createAIProvider("opencode-sdk", {
+      experimentalTools: true,
+    });
+    expect(provider).toBeInstanceOf(OpenCodeSdkProvider);
+  });
+
+  it("should throw ConfigurationError for unsupported provider type", () => {
+    expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
+      ConfigurationError
+    );
+    expect(() => createAIProvider("invalid" as unknown as AIProviderType)).toThrow(
+      "Unsupported AI provider: invalid. Valid options are: copilot-sdk, opencode-sdk."
+    );
+  });
+
+  it("should work with undefined options", () => {
+    const provider = createAIProvider("copilot-sdk", undefined);
+    expect(provider).toBeInstanceOf(CopilotSdkProvider);
+  });
+});
