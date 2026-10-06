@@ -13,6 +13,8 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 ## Project Structure
 
+This repo is a pnpm workspace whose packages live under `apps/*` and `libs/*`. The CLI still resides at the repo root under `src/` and will move to `apps/cli` in a later phase. The root `build`, `test`, `typecheck`, and `lint` scripts run the root package first, then recursively across every workspace package, so `pnpm check` keeps working unchanged.
+
 - `src/ai/` – AI provider abstraction (Copilot, OpenCode)
 - `src/audit/` – Audit logging for security/compliance
 - `src/ci/` – Continuous Integration environment adapters
