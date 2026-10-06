@@ -12,14 +12,7 @@ import { consoleOutputWriter } from "../ports/outputWriter.js";
 
 const PBIReviewResponseSchema = z.object({
   title: z.string().default(""),
-  invest_evaluation: z.object({
-    independent: z.string().default(""),
-    negotiable: z.string().default(""),
-    valuable: z.string().default(""),
-    estimable: z.string().default(""),
-    testable: z.string().default(""),
-  }),
-  overall_assessment: z.string().default(""),
+  overall_assessment: z.string(),
   suggestions: z.array(z.string()).default([]),
 });
 
@@ -43,9 +36,9 @@ export interface PBIReviewEngineOptions {
 /**
  * Reviews Product Backlog Items / user stories for backlog quality.
  *
- * Fetches the PBI details from the platform, asks the AI provider to evaluate
- * it against the INVEST-style quality guidelines, writes a markdown report to
- * disk, and posts or updates a review comment on the PBI.
+ * Fetches the PBI details from the platform, asks the AI provider for a
+ * holistic backlog-quality assessment, writes a markdown report to disk, and
+ * posts or updates a review comment on the PBI.
  */
 export class PBIReviewEngine {
   private readonly logger = createChildLogger({ component: "PBIReviewEngine" });
@@ -132,7 +125,7 @@ export class PBIReviewEngine {
         ? pbi.comments.map((c, i) => `Comment #${i + 1}: ${c.body}`).join("\n\n")
         : "No comments yet.";
 
-    return `You are an expert Agile Coach and Product Owner reviewing a Product Backlog Item (PBI) / User Story / Issue against backlog quality guidelines.
+    return `You are an expert Agile Coach and Product Owner reviewing a Product Backlog Item (PBI) / User Story / Issue.
 
 # PBI DETAILS
 - **Title:** ${pbi.title}
@@ -145,15 +138,10 @@ export class PBIReviewEngine {
 # PBI COMMENTS/DISCUSSION
 ${commentsList}
 
-# EVALUATION CRITERIA (PBI Quality Guidelines)
-Review the PBI details against the following dimensions, treating them as guidelines rather than a strict tick list:
-1. **Independent:** Can this story be completed and delivered independently of other stories?
-2. **Negotiable:** Is there room for discussion? Avoid overly prescriptive "contracts".
-3. **Valuable:** Does this story deliver clear, recognizable value to the user or customer?
-4. **Estimable:** Is the scope clear enough to be estimated by the team? (Consider the current description complexity).
-5. **Testable:** Are there clear Acceptance Criteria or paths to verify the story?
+# REVIEW GUIDANCE
+Assess the item holistically for backlog quality and development readiness, drawing on established agile principles (such as INVEST) as an internal lens. Weigh whether the item is independent, leaves room for negotiation, delivers clear value, is estimable, is appropriately sized, and is testable — but do not structure your response around these as a checklist, do not name or label them, and do not assign status ratings like Pass, Fail, or Needs Improvement.
 
-For each dimension, provide constructive, qualitative feedback explaining how well the PBI aligns with the guideline and any suggestions/nuance. Do not assign status ratings like Pass, Fail, or Needs Improvement.
+Write a single cohesive, constructive narrative assessment in plain prose, then list actionable suggestions. Focus on clarity, user value, scope, and how the item can be improved.
 
 # OUTPUT FORMAT
 You must respond in strict JSON format within a \`\`\`json markdown block.
@@ -161,14 +149,7 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
 \`\`\`json
 {
   "title": "${pbi.title.replace(/"/g, '\\"')}",
-  "invest_evaluation": {
-    "independent": "Concise qualitative feedback for Independent guideline",
-    "negotiable": "Concise qualitative feedback for Negotiable guideline",
-    "valuable": "Concise qualitative feedback for Valuable guideline",
-    "estimable": "Concise qualitative feedback for Estimable guideline",
-    "testable": "Concise qualitative feedback for Testable guideline"
-  },
-  "overall_assessment": "Holistic assessment of the story quality and development readiness.",
+  "overall_assessment": "A holistic narrative assessment of the item's quality and development readiness.",
   "suggestions": [
     "Actionable suggestion 1",
     "Actionable suggestion 2"
@@ -186,70 +167,47 @@ You must respond in strict JSON format within a \`\`\`json markdown block.
       const obj = JSON.parse(jsonStr);
       return {
         title: obj.title || fallbackTitle,
-        invest_evaluation: {
-          independent:
-            typeof obj.invest_evaluation?.independent === "string"
-              ? obj.invest_evaluation.independent
-              : obj.invest_evaluation?.independent?.feedback || "",
-          negotiable:
-            typeof obj.invest_evaluation?.negotiable === "string"
-              ? obj.invest_evaluation.negotiable
-              : obj.invest_evaluation?.negotiable?.feedback || "",
-          valuable:
-            typeof obj.invest_evaluation?.valuable === "string"
-              ? obj.invest_evaluation.valuable
-              : obj.invest_evaluation?.valuable?.feedback || "",
-          estimable:
-            typeof obj.invest_evaluation?.estimable === "string"
-              ? obj.invest_evaluation.estimable
-              : obj.invest_evaluation?.estimable?.feedback || "",
-          testable:
-            typeof obj.invest_evaluation?.testable === "string"
-              ? obj.invest_evaluation.testable
-              : obj.invest_evaluation?.testable?.feedback || "",
-        },
-        overall_assessment: obj.overall_assessment || "",
-        suggestions: obj.suggestions || [],
+        overall_assessment: this.extractAssessment(obj),
+        suggestions: Array.isArray(obj.suggestions) ? obj.suggestions : [],
       };
     } catch {
       return {
         title: fallbackTitle,
-        invest_evaluation: {
-          independent: "Failed to parse AI evaluation.",
-          negotiable: "Failed to parse AI evaluation.",
-          valuable: "Failed to parse AI evaluation.",
-          estimable: "Failed to parse AI evaluation.",
-          testable: "Failed to parse AI evaluation.",
-        },
         overall_assessment: "AI review failed to generate a parseable response.",
         suggestions: [],
       };
     }
   }
 
+  /**
+   * Extracts the narrative assessment from a parsed AI response, tolerating
+   * older responses that split feedback across named criteria.
+   */
+  private extractAssessment(obj: Record<string, unknown>): string {
+    if (typeof obj.overall_assessment === "string") {
+      return obj.overall_assessment;
+    }
+
+    const legacy = obj.invest_evaluation;
+    if (legacy && typeof legacy === "object") {
+      return Object.values(legacy as Record<string, unknown>)
+        .map((value) =>
+          typeof value === "string"
+            ? value
+            : ((value as { feedback?: string } | null)?.feedback ?? "")
+        )
+        .filter((value) => value.length > 0)
+        .join(" ");
+    }
+
+    return "";
+  }
+
   private generateMarkdownReport(data: PBIReviewResponse, id: string): string {
-    const evalObj = data.invest_evaluation;
     const model = this.options.aiModel?.trim() || "AI model";
     return `## 📋 PBI Review: #${id} - ${data.title}
 
-### 📊 PBI Quality Guidelines
-
-#### 🧩 Independent
-${evalObj.independent}
-
-#### 💬 Negotiable
-${evalObj.negotiable}
-
-#### 💎 Valuable
-${evalObj.valuable}
-
-#### 📐 Estimable
-${evalObj.estimable}
-
-#### 🧪 Testable
-${evalObj.testable}
-
-### 🎯 Overall Assessment
+### 🎯 Assessment
 ${data.overall_assessment}
 
 ${
@@ -266,24 +224,12 @@ ${APP_NAME_LINK} v${packageJson.version}, PBI review, ${model}
 
   private displayTerminalReport(data: PBIReviewResponse): void {
     const output = consoleOutputWriter;
-    const evalObj = data.invest_evaluation;
 
     output.log("=".repeat(60));
     output.log(`📊 PBI Review Results: ${data.title}`);
     output.log("=".repeat(60));
 
-    const printDimension = (name: string, feedback: string) => {
-      output.log(`• ${name}: ${feedback}`);
-    };
-
-    printDimension("Independent", evalObj.independent);
-    printDimension("Negotiable", evalObj.negotiable);
-    printDimension("Valuable", evalObj.valuable);
-    printDimension("Estimable", evalObj.estimable);
-    printDimension("Testable", evalObj.testable);
-    output.log("");
-
-    output.log(`🎯 Overall Assessment:\n${data.overall_assessment}\n`);
+    output.log(`🎯 Assessment:\n${data.overall_assessment}\n`);
 
     if (data.suggestions.length > 0) {
       output.log("💡 Suggestions for Improvement:");

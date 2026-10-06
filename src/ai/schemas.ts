@@ -72,9 +72,15 @@ const FastReviewFindingSchema = FileFindingSchema.extend({
   file: z.coerce.string().optional(),
 });
 
-/** Zod schema validating the fast review response: a summary plus a flat findings list. */
+/**
+ * Zod schema validating the fast review response: a summary, the list of files
+ * the model actually read, and a flat findings list. `reviewed_files` makes
+ * per-file coverage verifiable so skipped files are detectable rather than
+ * silently treated as clean.
+ */
 export const FastReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
+  reviewed_files: z.array(z.coerce.string()).default([]),
   findings: z.array(FastReviewFindingSchema).default([]),
 });
 

@@ -190,7 +190,7 @@ export class MockAIProvider implements AIProviderClient {
               findings: [],
               recommendations: [],
             };
-      return { fileResults, crossFileResult };
+      return { fileResults, crossFileResult, reviewedFiles: [] };
     }
     return {
       fileResults: [],
@@ -199,6 +199,7 @@ export class MockAIProvider implements AIProviderClient {
         findings: [],
         recommendations: [],
       },
+      reviewedFiles: [],
     };
   }
 

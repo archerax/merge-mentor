@@ -11,6 +11,11 @@ export interface FastReviewResult {
   readonly fileResults: FileReviewResult[];
   /** Cross-file review result built from the non-file findings and summary. */
   readonly crossFileResult: CrossFileReviewResult;
+  /**
+   * Files the model reported actually reading, used to verify per-file coverage.
+   * Empty when the provider (e.g. the multi-agent synthesizer) does not report it.
+   */
+  readonly reviewedFiles: string[];
 }
 
 /** Supported AI provider types. */

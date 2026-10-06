@@ -104,6 +104,14 @@ describe("buildFastReviewPrompt", () => {
     expect(prompt).toContain('"reasoning"');
   });
 
+  test("requires per-file coverage in the output schema", () => {
+    const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
+
+    expect(prompt).toContain('"reviewed_files"');
+    expect(prompt).toContain("Review ALL files listed below");
+    expect(prompt).toContain("list them all in `reviewed_files`");
+  });
+
   test("contains severity thresholds", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 

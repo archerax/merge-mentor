@@ -128,6 +128,9 @@ Perform a COMPLETE review of this PR covering:
 - Individual file analysis (bugs, security, performance, quality)
 - Cross-file architectural analysis (integration, consistency, design)
 
+Review ALL files listed below. Each file's diff is stored separately - read each
+diff before analyzing it, then account for every file in your output.
+
 Files to Review:
 ${filesListing}
 ${commentsSection}
@@ -153,7 +156,8 @@ For each finding, \`reasoning\` must confirm the issue is real, state its concre
    - **File-level**: Include file but omit line number
    - **General/PR-level**: Omit both file and line (architectural concerns)
 5. Additive passes increase attention and context, but do NOT restrict findings to a narrow category
-${existingCommentsContext ? "6. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
+6. Read and review EVERY file listed above, then list them all in \`reviewed_files\` - even files with no findings
+${existingCommentsContext ? "7. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
 # SEVERITY THRESHOLDS
 Use these exact criteria:
@@ -225,6 +229,6 @@ Only report findings that survive this check.
 - **File-level**: Include file and omit line number
 - **General/PR-level**: Omit both file and line
 
-${buildFastReviewOutputFormat()}
+${buildFastReviewOutputFormat(true)}
 `;
 }

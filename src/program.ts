@@ -588,7 +588,7 @@ program
 // PBI Review command
 program
   .command("pbi [id]")
-  .description("Review a Product Backlog Item / User Story / Issue against the INVEST model")
+  .description("Review a Product Backlog Item / User Story / Issue for backlog quality")
   .optionsGroup("General Options")
   .option("--id <id>", "Work item ID")
   .option("--url <url>", "Work item URL (automatically parses platform and repository details)")

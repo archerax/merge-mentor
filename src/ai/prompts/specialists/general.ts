@@ -319,7 +319,7 @@ export function buildGeneralFileReviewPrompt(
 Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns. Report all genuine findings with line references.${additionalFilePassAnalysis}`;
 
   return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer analyzing changes. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another close read.
+Expert code reviewer analyzing changes. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
 ${buildWorkspaceSection(repoPath)}
 # TASK
 Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
@@ -398,7 +398,7 @@ Diff format: [+/-/SPACE][NUMBER] | CODE
 
 Before reporting ANY finding, ask yourself:
 1. Could this be intentional? (e.g., deliberate error swallowing in retry logic)
-2. Is this handled elsewhere? (e.g., validation at API gateway)
+2. Is this validated elsewhere? (e.g., at API gateway)
 3. Is this test/mock code? (different standards apply)
 4. Is there framework context I'm missing?
 5. Would a senior engineer flag this? (Is it substantive, not nitpicking?)

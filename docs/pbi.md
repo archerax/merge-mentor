@@ -5,7 +5,7 @@ title: PBI Command
 
 # `pbi` Command
 
-The `pbi` command reviews a Product Backlog Item, User Story, or Issue against the **INVEST** model (Independent, Negotiable, Valuable, Estimable, Small, Testable) using an AI provider.
+The `pbi` command reviews a Product Backlog Item, User Story, or Issue for backlog quality and development readiness using an AI provider. The review is grounded in established agile principles such as **INVEST**, but presents a holistic narrative assessment rather than a criterion-by-criterion checklist.
 
 ## Usage
 
@@ -61,13 +61,6 @@ merge-mentor pbi 1024 --platform azure --write
 
 ---
 
-## INVEST Model Verification
+## Review Approach
 
-The AI provider analyzes the Product Backlog Item's description, acceptance criteria, and comments to evaluate how well it matches the INVEST quality framework:
-
-- **I**ndependent: The item should be self-contained with minimal dependencies.
-- **N**egotiable: It should describe the co-creation of value, leaving room for discussion.
-- **V**aluable: It must deliver clear value to the end user or business.
-- **E**stimable: It contains enough information for developers to estimate the effort.
-- **S**mall: It should be sized appropriately to fit within a single sprint/iteration.
-- **T**estable: It must have clear acceptance criteria to allow writing automated or manual tests.
+The AI provider analyzes the Product Backlog Item's description, acceptance criteria, and comments and returns a single narrative assessment of its quality and readiness, followed by actionable suggestions. It weighs well-established backlog-quality considerations — such as whether the item can be delivered independently, leaves room for negotiation, delivers clear value, is estimable, is appropriately sized, and is testable — internally, without organizing the output around them or assigning pass/fail ratings.

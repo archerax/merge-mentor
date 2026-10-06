@@ -104,6 +104,7 @@ describe("responseParsers", () => {
       raw: "",
       parsed: {
         summary: "Fast review completed",
+        reviewed_files: ["main.ts"],
         findings: [
           {
             file: "main.ts",
@@ -125,6 +126,7 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.overallAssessment).toBe("Fast review completed");
     expect(result.fileResults).toHaveLength(1);
     expect(result.fileResults[0].filename).toBe("main.ts");
+    expect(result.reviewedFiles).toEqual(["main.ts"]);
   });
 
   it("parseAgentReview splits file and cross-file findings", () => {

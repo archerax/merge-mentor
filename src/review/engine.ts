@@ -109,6 +109,15 @@ import { WorkspaceManager } from "./workspaceManager.js";
 const ATTACHMENT_SIZE_THRESHOLD_BYTES = 150 * 1024;
 
 /**
+ * Normalizes a repository path reported by the model so it can be compared
+ * against manifest filenames, stripping leading "./", separators, and
+ * normalizing Windows-style backslashes to forward slashes.
+ */
+function normalizeRepoPath(filePath: string): string {
+  return filePath.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/**
  * Complete results from a pull request review.
  *
  * Contains file-by-file findings, cross-file analysis, and comment creation results.
@@ -1419,6 +1428,17 @@ During the database pass, pay extra attention to query correctness, transaction 
       // Parse combined response
       const result = this.provider.parseFastReview(response);
 
+      // Verify per-file coverage. The fast prompt requires the model to read
+      // every diff and list them in `reviewed_files`; warn (without failing the
+      // review) when a changed file was not reported so skipped files stay visible.
+      const missingFiles = this.findUnreviewedFiles(result.reviewedFiles, filesToReview);
+      if (missingFiles.length > 0) {
+        this.logger.warn(
+          { missingCount: missingFiles.length, missing: missingFiles.map((f) => f.filename) },
+          "Fast review did not report coverage for all files"
+        );
+      }
+
       // Validate line numbers specifically on filesToReview
       const validatedNewResults = this.lineNumberValidator.validate(
         result.fileResults,
@@ -1475,6 +1495,33 @@ During the database pass, pay extra attention to query correctness, transaction 
       );
       throw error;
     }
+  }
+
+  /**
+   * Returns the subset of `filesToReview` that the model did not report in
+   * `reviewedFiles`. Returns an empty array when the provider reported no
+   * coverage (e.g. the multi-agent synthesizer or legacy callers) so that
+   * coverage is only checked when it can actually be verified.
+   */
+  private findUnreviewedFiles(
+    reviewedFiles: readonly string[],
+    filesToReview: readonly PRFile[]
+  ): PRFile[] {
+    if (!reviewedFiles || reviewedFiles.length === 0) {
+      return [];
+    }
+
+    const normalized = reviewedFiles.map((file) => normalizeRepoPath(file));
+    const bases = new Set(normalized.map((file) => path.posix.basename(file)));
+
+    return filesToReview.filter((file) => {
+      const target = normalizeRepoPath(file.filename);
+      return (
+        !normalized.includes(target) &&
+        !normalized.some((reviewed) => reviewed.endsWith(`/${target}`)) &&
+        !bases.has(path.posix.basename(target))
+      );
+    });
   }
 
   /**

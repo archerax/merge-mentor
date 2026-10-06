@@ -1253,6 +1253,41 @@ describe("ReviewEngine", () => {
       expect(result.fileResults.every((r) => r.findings.length === 0)).toBe(true);
     });
 
+    it("fast review warns but still completes when the model omits files from coverage", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewType: "fast",
+      });
+      const prDetails = createPRDetails();
+      const files = [
+        createPRFile({ filename: "file1.ts" }),
+        createPRFile({ filename: "file2.ts" }),
+      ];
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFastReview.mockReturnValue({
+        fileResults: [{ filename: "file1.ts", findings: [] }],
+        crossFileResult: {
+          overallAssessment: "Partial coverage",
+          findings: [],
+          recommendations: [],
+        },
+        reviewedFiles: ["file1.ts"],
+      });
+
+      const result = await engine.reviewPR(123);
+
+      // file2.ts was reported as unreviewed, but the review still completes
+      expect(result.fileResults).toHaveLength(2);
+      expect(result.fileResults.map((r) => r.filename).toSorted()).toEqual([
+        "file1.ts",
+        "file2.ts",
+      ]);
+    });
+
     it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,

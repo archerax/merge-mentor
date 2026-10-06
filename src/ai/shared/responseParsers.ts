@@ -139,7 +139,9 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
     logger.warn({ error: result.error.format() }, "Fast review schema drift detected");
   }
 
-  const data = result.success ? result.data : { summary: "Review completed", findings: [] };
+  const data = result.success
+    ? result.data
+    : { summary: "Review completed", reviewed_files: [], findings: [] };
   const fileFindings = new Map<string, FileFinding[]>();
   const crossFileFindings: CrossFileFinding[] = [];
 
@@ -189,7 +191,7 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
     recommendations: [],
   };
 
-  return { fileResults, crossFileResult };
+  return { fileResults, crossFileResult, reviewedFiles: data.reviewed_files };
 }
 
 /**

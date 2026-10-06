@@ -165,13 +165,29 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
  * Builds the fast review output format section describing the combined
  * summary/findings JSON schema, attribution rules, and native suggestion rules.
  *
+ * @param includeCoverage - When true, require a `reviewed_files` list so that
+ *   per-file coverage is verifiable. Enabled for the fast file review; omitted
+ *   for the multi-agent synthesizer, which does not review files directly.
  * @returns The fast review output format markdown section.
  */
-export function buildFastReviewOutputFormat(): string {
+export function buildFastReviewOutputFormat(includeCoverage = false): string {
+  const coverageField = includeCoverage
+    ? `
+  "reviewed_files": ["path/to/file.ts", "path/to/other.ts"],`
+    : "";
+  const coverageFooter = includeCoverage
+    ? `
+
+COVERAGE:
+- Read every file listed below before analyzing it.
+- \`reviewed_files\` must list EVERY changed file you opened, including files with no findings.
+- Do not omit a file because it looks small, trivial, or test-only.`
+    : "";
+
   return buildOutputFormatSection(
     "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",
     `{
-  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
+  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",${coverageField}
   "findings": [
     {
       "file": "path/to/file.ts",
@@ -214,7 +230,7 @@ export function buildFastReviewOutputFormat(): string {
 REMEMBER:
 - Consider BOTH file-level AND architectural concerns in your analysis
 - Use appropriate attribution for each finding type
-- The summary should cover both individual code quality and overall architecture`,
+- The summary should cover both individual code quality and overall architecture${coverageFooter}`,
     true
   );
 }

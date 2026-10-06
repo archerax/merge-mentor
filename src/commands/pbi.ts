@@ -11,7 +11,7 @@ import type { PBIOptions } from "./types.js";
 
 /**
  * Executes the `pbi` command: reviews a Product Backlog Item / User Story /
- * Issue against the INVEST model.
+ * Issue for backlog quality.
  *
  * @param id - Work item ID to review
  * @param options - PBI options (platform, write mode, AI provider, etc.)

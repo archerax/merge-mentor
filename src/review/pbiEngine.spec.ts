@@ -44,14 +44,7 @@ describe("PBIReviewEngine", () => {
 
   const mockAiOutput = {
     title: "Test User Story",
-    invest_evaluation: {
-      independent: "Ind feedback",
-      negotiable: "Neg feedback",
-      valuable: "Val feedback",
-      estimable: "Est feedback",
-      testable: "Test feedback",
-    },
-    overall_assessment: "Good overall, but estimability and testability need work.",
+    overall_assessment: "A solid story, though the acceptance criteria could be more precise.",
     suggestions: ["Add more details to acceptance criteria"],
   };
 
@@ -105,8 +98,9 @@ describe("PBIReviewEngine", () => {
     expect(adapter.getPBIDetails).toHaveBeenCalledWith("12345");
     expect(aiClient.executePrompt).toHaveBeenCalled();
     expect(result.title).toBe("Test User Story");
-    expect(result.invest_evaluation.estimable).toBe("Est feedback");
-    expect(result.invest_evaluation.testable).toBe("Test feedback");
+    expect(result.overall_assessment).toBe(
+      "A solid story, though the acceptance criteria could be more precise."
+    );
 
     // Should post a new comment because no comment with signature was found
     expect(adapter.postPBIComment).toHaveBeenCalledWith(
@@ -193,15 +187,10 @@ describe("PBIReviewEngine", () => {
 
   it("should handle schema drift and fallback to fallbackParse on invalid zod schema output", async () => {
     const adapter = createMockAdapter();
-    // Raw output is valid JSON, but doesn't conform to the schema (missing invest_evaluation)
-    const malformedOutput = {
-      title: "Malformed Story",
-      overall_assessment: "Invalid structure",
-      suggestions: [],
-    };
+    // Parsed object is missing the required assessment, so the raw response is re-parsed.
     const malformedResponse: AIResponse = {
-      raw: JSON.stringify(malformedOutput),
-      parsed: malformedOutput,
+      raw: '{"title":"Malformed Story","overall_assessment":"Recovered assessment","suggestions":[]}',
+      parsed: { invalid: true },
     };
     const aiClient = createMockAiClient(malformedResponse);
     const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
@@ -209,11 +198,10 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Malformed Story");
-    expect(result.invest_evaluation.independent).toBe("");
-    expect(result.overall_assessment).toBe("Invalid structure");
+    expect(result.overall_assessment).toBe("Recovered assessment");
   });
 
-  it("should parse fallback JSON wrapped in markdown code blocks (old object structure)", async () => {
+  it("should parse fallback JSON wrapped in markdown code blocks (legacy object structure)", async () => {
     const adapter = createMockAdapter();
     const markdownRaw =
       'Some explanation\n```json\n{\n  "title": "Wrapped Story",\n  "invest_evaluation": {\n    "independent": { "status": "pass", "feedback": "Good" }\n  }\n}\n```\nSome other explanation';
@@ -227,11 +215,10 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Wrapped Story");
-    expect(result.invest_evaluation.independent).toBe("Good");
-    expect(result.invest_evaluation.negotiable).toBe("");
+    expect(result.overall_assessment).toBe("Good");
   });
 
-  it("should parse fallback JSON wrapped in markdown code blocks (new string structure)", async () => {
+  it("should parse fallback JSON wrapped in markdown code blocks (legacy string structure)", async () => {
     const adapter = createMockAdapter();
     const markdownRaw =
       'Some explanation\n```json\n{\n  "title": "Wrapped Story",\n  "invest_evaluation": {\n    "independent": "Good"\n  }\n}\n```\nSome other explanation';
@@ -245,8 +232,7 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Wrapped Story");
-    expect(result.invest_evaluation.independent).toBe("Good");
-    expect(result.invest_evaluation.negotiable).toBe("");
+    expect(result.overall_assessment).toBe("Good");
   });
 
   it("should return fully failing fallback structure when parsing completely fails", async () => {
@@ -262,13 +248,11 @@ describe("PBIReviewEngine", () => {
 
     expect(result.title).toBe("Test User Story"); // Fallbacks to story title
     expect(result.overall_assessment).toBe("AI review failed to generate a parseable response.");
-    expect(result.invest_evaluation.independent).toBe("Failed to parse AI evaluation.");
   });
 
   it("should parse fallback JSON not wrapped in markdown code blocks", async () => {
     const adapter = createMockAdapter();
-    const rawJson =
-      '{\n  "title": "Direct JSON Story",\n  "invest_evaluation": {\n    "independent": "Good"\n  }\n}';
+    const rawJson = '{\n  "title": "Direct JSON Story",\n  "overall_assessment": "Good"\n}';
     const invalidParsedResponse: AIResponse = {
       raw: rawJson,
       parsed: { invalid: true },
@@ -279,7 +263,7 @@ describe("PBIReviewEngine", () => {
     const result = await engine.reviewPBI("12345");
 
     expect(result.title).toBe("Direct JSON Story");
-    expect(result.invest_evaluation.independent).toBe("Good");
+    expect(result.overall_assessment).toBe("Good");
   });
 
   it("should include moscowTag and backlogPriority in the prompt if defined", async () => {

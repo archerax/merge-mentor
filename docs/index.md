@@ -51,7 +51,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 - **[describe](./describe.md)**: Generates a title, summary, and changelog for a pull request.
 - **[doctor](./doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
 - **[repos](./repos.md)**: Manages local cloned repositories used for context loading.
-- **[pbi](./pbi.md)**: Reviews a Product Backlog Item / User Story / Issue against the INVEST model.
+- **[pbi](./pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
 - **[project](./project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[plan](./plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.

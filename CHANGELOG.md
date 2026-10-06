@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only when they describe the same underlying issue, preserving distinct
   findings that share a category. Removes the pre-classifier prompt, parser,
   and schema.
+- **Holistic PBI Review**: the `pbi` command now returns a single narrative
+  assessment with actionable suggestions instead of a per-dimension breakdown.
+  INVEST remains the underlying lens but is no longer surfaced as an explicit
+  checklist in the prompt, report, or terminal output.
 
 ### Added
 
