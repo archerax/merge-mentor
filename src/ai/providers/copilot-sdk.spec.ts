@@ -853,7 +853,7 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
-    it("limits review sessions to read-only grep and glob tools", async () => {
+    it("limits review sessions to read-only grep, glob, and view tools", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();
 
@@ -862,7 +862,7 @@ describe("CopilotSdkProvider", () => {
       await resultPromise;
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
-        expect.objectContaining({ availableTools: ["grep", "glob"] })
+        expect.objectContaining({ availableTools: ["grep", "glob", "view"] })
       );
     });
 
@@ -1545,7 +1545,7 @@ describe("createReviewPermissionHandler", () => {
   });
 
   describe("write/shell tool availability", () => {
-    it("exposes write/edit but not shell when only write tools are enabled", async () => {
+    it("exposes the edit/create write tools but not shell when only write tools are enabled", async () => {
       const provider = new CopilotSdkProvider({ enableWriteTools: true });
       mockSuccessfulPrompt();
 
@@ -1553,16 +1553,17 @@ describe("createReviewPermissionHandler", () => {
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          availableTools: expect.arrayContaining(["write", "edit"]),
+          availableTools: expect.arrayContaining(["edit", "create", "apply_patch"]),
         })
       );
       const sessionConfig = mockClient.createSession.mock.calls[0][0] as {
         availableTools: string[];
       };
-      expect(sessionConfig.availableTools).not.toContain("shell");
+      expect(sessionConfig.availableTools).not.toContain("bash");
+      expect(sessionConfig.availableTools).not.toContain("read_bash");
     });
 
-    it("exposes shell only when shell tools are explicitly enabled", async () => {
+    it("exposes the bash shell tools only when shell tools are explicitly enabled", async () => {
       const provider = new CopilotSdkProvider({ enableWriteTools: true, enableShellTools: true });
       mockSuccessfulPrompt();
 
@@ -1570,12 +1571,20 @@ describe("createReviewPermissionHandler", () => {
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          availableTools: expect.arrayContaining(["write", "edit", "shell"]),
+          availableTools: expect.arrayContaining([
+            "edit",
+            "create",
+            "apply_patch",
+            "bash",
+            "read_bash",
+            "list_bash",
+            "stop_bash",
+          ]),
         })
       );
     });
 
-    it("exposes neither write nor shell by default", async () => {
+    it("exposes neither write nor shell tools by default", async () => {
       const provider = new CopilotSdkProvider();
       mockSuccessfulPrompt();
 
@@ -1584,9 +1593,9 @@ describe("createReviewPermissionHandler", () => {
       const sessionConfig = mockClient.createSession.mock.calls[0][0] as {
         availableTools: string[];
       };
-      expect(sessionConfig.availableTools).not.toContain("write");
-      expect(sessionConfig.availableTools).not.toContain("edit");
-      expect(sessionConfig.availableTools).not.toContain("shell");
+      for (const name of ["edit", "create", "apply_patch", "bash", "read_bash", "list_bash"]) {
+        expect(sessionConfig.availableTools).not.toContain(name);
+      }
     });
   });
 

@@ -70,7 +70,21 @@ const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set(
   "hook",
 ]);
 
-const READ_ONLY_REVIEW_TOOLS = ["grep", "glob"] as const;
+const READ_ONLY_REVIEW_TOOLS = ["grep", "glob", "view"] as const;
+
+/**
+ * Write-capable built-in tools enabled by `enableWriteTools`. Uses the runtime's
+ * actual tool names (`edit`/`create`/`apply_patch`); the legacy `write` alias is
+ * not a valid built-in and silently matched nothing.
+ */
+const WRITE_TOOLS = ["edit", "create", "apply_patch"] as const;
+
+/**
+ * Shell built-in tools enabled by `enableShellTools`. Uses the runtime's actual
+ * tool names (the `bash` family); the legacy `shell` alias is not a valid
+ * built-in and silently matched nothing.
+ */
+const SHELL_TOOLS = ["bash", "read_bash", "list_bash", "stop_bash"] as const;
 
 /**
  * Creates a permission handler for review sessions.
@@ -382,8 +396,8 @@ export class CopilotSdkProvider implements AIProviderClient {
         availableTools: [
           ...READ_ONLY_REVIEW_TOOLS,
           ...(this.experimentalTools ? ["postComment" as const] : []),
-          ...(this.enableWriteTools ? ["write" as const, "edit" as const] : []),
-          ...(this.enableShellTools ? ["shell" as const] : []),
+          ...(this.enableWriteTools ? WRITE_TOOLS : []),
+          ...(this.enableShellTools ? SHELL_TOOLS : []),
         ],
         tools: this.experimentalTools ? [postCommentTool] : undefined,
         onPermissionRequest: createReviewPermissionHandler(

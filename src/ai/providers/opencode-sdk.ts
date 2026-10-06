@@ -196,16 +196,27 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       Object.assign(opencodeConfig, reasoningConfig);
     }
 
-    // Restrict the agent to read-only access by default. File edits are allowed
-    // when enableWriteTools is true; bash execution only when enableShellTools
-    // is explicitly enabled — never for flows whose prompts contain untrusted
-    // input (e.g. PR review comments in the fix command).
+    // Deny-by-default tool allowlist. The "*" wildcard blocks every tool —
+    // including tools introduced by future OpenCode versions and dynamically
+    // registered MCP/custom tools — then each capability the review needs is
+    // explicitly re-allowed. This is stricter than OpenCode's permissive
+    // defaults (most permissions default to "allow") and avoids relying on an
+    // enumerate-and-disable list that silently misses new tools.
+    //
+    // Rules are always "deny"/"allow" (never "ask"): headless runs never
+    // service permission-request events, so an "ask" rule would stall until
+    // the prompt times out. File edits are allowed when enableWriteTools is
+    // true; bash execution only when enableShellTools is explicitly enabled —
+    // never for flows whose prompts contain untrusted input (e.g. PR review
+    // comments in the fix command).
     opencodeConfig.permission = {
-      edit: this.enableWriteTools ? "allow" : "deny",
-      bash: this.enableShellTools ? "allow" : "deny",
-      webfetch: "deny",
-      doom_loop: "deny",
-      external_directory: "deny",
+      "*": "deny",
+      read: "allow",
+      glob: "allow",
+      grep: "allow",
+      ...(this.experimentalTools ? { postComment: "allow" } : {}),
+      ...(this.enableWriteTools ? { edit: "allow" } : {}),
+      ...(this.enableShellTools ? { bash: "allow" } : {}),
     };
 
     const { client, server } = await createOpencode({

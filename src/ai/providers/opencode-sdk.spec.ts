@@ -647,12 +647,49 @@ describe("OpenCodeSdkProvider", () => {
         expect.objectContaining({
           config: expect.objectContaining({
             permission: {
-              edit: "deny",
-              bash: "deny",
-              webfetch: "deny",
-              doom_loop: "deny",
-              external_directory: "deny",
+              "*": "deny",
+              read: "allow",
+              glob: "allow",
+              grep: "allow",
             },
+          }),
+        })
+      );
+    });
+
+    it("denies unknown tools by default so future tools stay sandboxed", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const createCall = mockCreateOpencode.mock.calls[0]?.[0] as {
+        config: { permission: Record<string, string> };
+      };
+      expect(createCall.config.permission["*"]).toBe("deny");
+      for (const tool of ["task", "skill", "webfetch", "websearch", "todowrite", "lsp"]) {
+        expect(createCall.config.permission[tool]).not.toBe("allow");
+      }
+    });
+
+    it("re-allows the postComment tool when experimental tools are enabled", async () => {
+      const provider = new OpenCodeSdkProvider({
+        maxRetries: 1,
+        timeoutMs: 5000,
+        experimentalTools: true,
+      });
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockCreateOpencode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            permission: expect.objectContaining({ "*": "deny", postComment: "allow" }),
           }),
         })
       );
@@ -670,7 +707,7 @@ describe("OpenCodeSdkProvider", () => {
         expect.objectContaining({
           config: expect.objectContaining({
             model: "gpt-4.1",
-            permission: expect.objectContaining({ bash: "deny", edit: "deny" }),
+            permission: expect.objectContaining({ "*": "deny" }),
           }),
         })
       );
@@ -688,13 +725,11 @@ describe("OpenCodeSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      expect(mockCreateOpencode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            permission: expect.objectContaining({ edit: "allow", bash: "deny" }),
-          }),
-        })
-      );
+      const createCall = mockCreateOpencode.mock.calls[0]?.[0] as {
+        config: { permission: Record<string, string> };
+      };
+      expect(createCall.config.permission).toMatchObject({ "*": "deny", edit: "allow" });
+      expect(createCall.config.permission.bash).not.toBe("allow");
     });
 
     it("allows bash only when shell tools are explicitly enabled", async () => {
@@ -713,7 +748,7 @@ describe("OpenCodeSdkProvider", () => {
       expect(mockCreateOpencode).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            permission: expect.objectContaining({ edit: "allow", bash: "allow" }),
+            permission: expect.objectContaining({ "*": "deny", edit: "allow", bash: "allow" }),
           }),
         })
       );
