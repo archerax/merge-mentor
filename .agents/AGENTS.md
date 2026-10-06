@@ -15,11 +15,11 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 This repo is a pnpm workspace whose packages live under `apps/*` and `libs/*`. Shared libraries are consumed as TypeScript source via `workspace:*` dependencies, `tsconfig.base.json` `paths`, and matching Vitest aliases — there is no per-library build step. The root `build`, `test`, `typecheck`, and `lint` scripts run the root package first, then recursively (`--if-present`) across every workspace package, so `pnpm check` keeps working unchanged.
 
-Packages (dependency direction: `shared` ← `core` ← root CLI):
+Packages (dependency direction: `shared` ← `core` ← `apps/cli`):
 
 - `libs/shared/src/` (`@merge-mentor/shared`) – Foundation with no upward deps: `errors/`, `ports/`, `logger.ts`, `audit/`.
 - `libs/core/src/` (`@merge-mentor/core`) – Review engine and integrations: `ai/`, `review/`, `platforms/`, `config.ts`, `constants.ts`, `utils/`.
-- `src/` – CLI entrypoint, Commander commands, `ci/`, `build/`, and `eval/` support code. This will move to `apps/cli` in a later phase.
+- `apps/cli/src/` (`@merge-mentor/cli`) – CLI entrypoint, Commander commands, `ci/`, `build/`, and `eval/` support code. The publishable `merge-mentor` package metadata (name, `bin`, `files`, version) still lives in the root `package.json`; the root build bundles `apps/cli/src/cli.ts` into `dist/cli.js`.
 
 Cross-package imports MUST use the `@merge-mentor/shared/...` or `@merge-mentor/core/...` aliases (keeping `.js` extensions). Relative imports are only for files within the same package. `libs/*/package.json` versions are kept in lockstep with the root version because `libs/core/src/review/*` reads its own `package.json` for the version footer.
 
@@ -84,7 +84,7 @@ function calc(x) {
 - Run `pnpm check` to verify your changes before submitting
 - Write unit tests (`*.spec.ts`) in the same directory as the code they test
 - Use `process.cwd()` for configs and logs to support global installation
-- Explicitly catch and map external errors to custom exceptions in `src/errors/`
+- Explicitly catch and map external errors to custom exceptions in `libs/shared/src/errors/`
 
 ⚠️ **Ask First:**
 

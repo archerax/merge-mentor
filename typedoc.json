@@ -1,5 +1,5 @@
 {
-  "entryPoints": ["src", "libs/shared/src", "libs/core/src"],
+  "entryPoints": ["apps/cli/src", "libs/shared/src", "libs/core/src"],
   "entryPointStrategy": "expand",
   "out": "docs/api",
   "plugin": ["typedoc-plugin-markdown"],

@@ -7,7 +7,7 @@ import { logger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { Command } from "commander";
 
-import packageJson from "../package.json" with { type: "json" };
+import packageJson from "../../../package.json" with { type: "json" };
 import { executeBuildAnalyze } from "./commands/build.js";
 import { displayDescribeResults, executeDescribe } from "./commands/describe.js";
 import { executeDoctorCommand } from "./commands/doctor.js";

@@ -7,8 +7,9 @@ async function buildProject() {
     console.log(`Building for ${isProduction ? "production" : "development"}...`);
 
     await build({
-      entryPoints: ["src/cli.ts"],
+      entryPoints: ["apps/cli/src/cli.ts"],
       outdir: "dist",
+      tsconfig: "tsconfig.json",
       bundle: true,
       platform: "node",
       format: "esm",

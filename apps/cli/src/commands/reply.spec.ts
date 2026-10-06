@@ -101,7 +101,7 @@ describe("reply command", () => {
     });
 
     it("returns full file if lines count <= 100", () => {
-      const snippet = getCodeSnippetAtHead("src/commands/types.ts", 5);
+      const snippet = getCodeSnippetAtHead("apps/cli/src/commands/types.ts", 5);
       expect(snippet).not.toContain("not found");
       expect(snippet.length).toBeGreaterThan(0);
     });

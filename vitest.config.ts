@@ -15,7 +15,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["src/**/*.spec.ts", "libs/*/src/**/*.spec.ts"],
+    include: ["apps/cli/src/**/*.spec.ts", "libs/*/src/**/*.spec.ts"],
     isolate: true,
     pool: "threads",
     sequence: {
@@ -25,13 +25,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
-      include: ["src/**/*.ts", "libs/*/src/**/*.ts"],
+      include: ["apps/cli/src/**/*.ts", "libs/*/src/**/*.ts"],
       exclude: [
-        "src/**/*.spec.ts",
-        "src/**/*.test-helper.ts",
-        "src/**/types.ts",
-        "src/cli.ts",
-        "src/program.ts",
+        "apps/cli/src/**/*.spec.ts",
+        "apps/cli/src/**/*.test-helper.ts",
+        "apps/cli/src/**/types.ts",
+        "apps/cli/src/cli.ts",
+        "apps/cli/src/program.ts",
         "libs/*/src/**/*.spec.ts",
         "libs/*/src/**/*.test-helper.ts",
         "libs/*/src/**/types.ts",

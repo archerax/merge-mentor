@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mutate:
-        description: "Optional glob (or space-separated globs) of files to mutate. Overrides the stryker.config.mjs mutate patterns, so include exclusions (e.g. '!src/**/*.spec.ts') yourself."
+        description: "Optional glob (or space-separated globs) of files to mutate. Overrides the stryker.config.mjs mutate patterns, so include exclusions (e.g. '!apps/cli/src/**/*.spec.ts') yourself."
         required: false
         default: ""
       break_threshold:

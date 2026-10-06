@@ -9,15 +9,15 @@ Use this skill when modifying existing Git/PR hosting platform adapters (GitHub,
 
 ## Architectural Guidelines
 
-- Platform adapters exist in `src/platforms/`.
-- All adapters must adhere to the `PlatformAdapter` interface defined in [src/platforms/types.ts](file:///root/merge-mentor/src/platforms/types.ts).
-- Ports and core business logic (e.g., in `src/review/`) interact only with the adapter interface, keeping the core platform-agnostic.
+- Platform adapters exist in `libs/core/src/platforms/`.
+- All adapters must adhere to the `PlatformAdapter` interface defined in [libs/core/src/platforms/types.ts](file:///root/merge-mentor/libs/core/src/platforms/types.ts).
+- Ports and core business logic (e.g., in `libs/core/src/review/`) interact only with the adapter interface, keeping the core platform-agnostic.
 
 ## Step-by-Step Guide
 
 ### 1. Implement Platform Adapter Interface
 
-Create or modify the platform file under `src/platforms/your-platform.ts`. Ensure it handles:
+Create or modify the platform file under `libs/core/src/platforms/your-platform.ts`. Ensure it handles:
 
 - Fetching pull request details (`getPRDetails`).
 - Listing and downloading files changed in the PR (`getPRFiles`).
@@ -35,7 +35,7 @@ Ensure all imports from within the workspace use explicit `.js` extensions (e.g.
 ### 4. Write Mocks & Tests
 
 - Ensure you mock API responses correctly using Vitest mocks or MSW (Mock Service Worker) if relevant.
-- Add/update tests under `src/platforms/your-platform.spec.ts`.
+- Add/update tests under `libs/core/src/platforms/your-platform.spec.ts`.
 
 ## Checklist Before Completing
 
