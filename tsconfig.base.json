@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
+    "types": ["node"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +15,7 @@
     "resolveJsonModule": true,
     "paths": {
       "@merge-mentor/shared/*": ["./libs/shared/src/*"],
+      "@merge-mentor/config/*": ["./libs/config/src/*"],
       "@merge-mentor/core/*": ["./libs/core/src/*"]
     }
   }

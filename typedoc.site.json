@@ -1,5 +1,5 @@
 {
-  "entryPoints": ["apps/cli/src", "libs/shared/src", "libs/core/src"],
+  "entryPoints": ["apps/cli/src", "libs/shared/src", "libs/config/src", "libs/core/src"],
   "entryPointStrategy": "expand",
   "out": "docs/site",
   "exclude": [

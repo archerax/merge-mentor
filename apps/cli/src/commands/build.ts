@@ -1,8 +1,8 @@
 import { writeFile } from "node:fs/promises";
 
+import { loadConfig } from "@merge-mentor/config/config.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { loadConfig } from "@merge-mentor/core/config.js";
 import {
   consoleOutputWriter,
   type Environment,

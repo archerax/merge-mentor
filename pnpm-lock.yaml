@@ -251,6 +251,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@merge-mentor/config':
+        specifier: workspace:*
+        version: link:../../libs/config
       '@merge-mentor/core':
         specifier: workspace:*
         version: link:../../libs/core
@@ -258,8 +261,17 @@ importers:
         specifier: workspace:*
         version: link:../../libs/shared
 
+  libs/config:
+    dependencies:
+      '@merge-mentor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   libs/core:
     dependencies:
+      '@merge-mentor/config':
+        specifier: workspace:*
+        version: link:../config
       '@merge-mentor/shared':
         specifier: workspace:*
         version: link:../shared

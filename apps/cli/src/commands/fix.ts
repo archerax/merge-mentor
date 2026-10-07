@@ -2,13 +2,13 @@ import { execSync } from "node:child_process";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 
+import { loadConfig, type Platform, validateConfig } from "@merge-mentor/config/config.js";
 import {
   buildSecurityPreamble,
   wrapUntrustedContent,
 } from "@merge-mentor/core/ai/prompts/securityPreamble.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { loadConfig, type Platform, validateConfig } from "@merge-mentor/core/config.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";

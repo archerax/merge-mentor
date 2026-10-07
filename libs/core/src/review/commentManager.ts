@@ -34,6 +34,11 @@
  * ```
  */
 
+import {
+  formatReviewTypeLabel,
+  type ReviewPass,
+  type ReviewStrategy,
+} from "@merge-mentor/config/reviewSelection.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 
 import packageJson from "../../package.json" with { type: "json" };
@@ -49,7 +54,6 @@ import type {
 import { remapLineNumber } from "../utils/hunkRemapper.js";
 import { formatNativeSuggestion, validateNativeSuggestion } from "../utils/nativeSuggestion.js";
 import { calculateTextSimilarity } from "../utils/textSimilarity.js";
-import { formatReviewTypeLabel, type ReviewPass, type ReviewStrategy } from "./reviewSelection.js";
 
 /**
  * Configuration options for comment management behavior.

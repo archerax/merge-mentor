@@ -1,6 +1,6 @@
+import { loadConfig } from "@merge-mentor/config/config.js";
+import { REVIEW_PASSES } from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { loadConfig } from "@merge-mentor/core/config.js";
-import { REVIEW_PASSES } from "@merge-mentor/core/review/reviewSelection.js";
 import { parsePRUrl } from "@merge-mentor/core/utils/prUrl.js";
 import { resolveWorkItemReference } from "@merge-mentor/core/utils/workItemReference.js";
 import { logger } from "@merge-mentor/shared/logger.js";

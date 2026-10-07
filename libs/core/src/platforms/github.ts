@@ -1,9 +1,9 @@
+import type { Config } from "@merge-mentor/config/config.js";
 import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
 import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { Octokit } from "@octokit/rest";
 
-import type { Config } from "../config.js";
 import { DEFAULT_PAGE_SIZE } from "../constants.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";
 import { withRateLimitHandling } from "../utils/rateLimitHandler.js";

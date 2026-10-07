@@ -1,16 +1,16 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 
-import type { Config } from "@merge-mentor/core/config.js";
-import { loadConfig } from "@merge-mentor/core/config.js";
-import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
+import type { Config } from "@merge-mentor/config/config.js";
+import { loadConfig } from "@merge-mentor/config/config.js";
+import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
 import { processEnvironment } from "@merge-mentor/shared/ports/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { program } from "../program.js";
 
 // Mock dependencies
-vi.mock("@merge-mentor/core/config.js", () => ({
+vi.mock("@merge-mentor/config/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));

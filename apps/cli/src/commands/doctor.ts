@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
-import type { Config } from "@merge-mentor/core/config.js";
-import { loadConfig } from "@merge-mentor/core/config.js";
+import type { Config } from "@merge-mentor/config/config.js";
+import { loadConfig } from "@merge-mentor/config/config.js";
 import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
 
 /**

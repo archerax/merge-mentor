@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 
-import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
+import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import { ReviewEngine } from "@merge-mentor/core/review/engine.js";
@@ -19,7 +19,7 @@ const mockAdapter = {
   getProjectIdentifier: () => "test-owner-test-repo",
 };
 
-vi.mock("@merge-mentor/core/config.js", () => ({
+vi.mock("@merge-mentor/config/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
@@ -61,10 +61,10 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
-import type { Config } from "@merge-mentor/core/config.js";
+import type { Config } from "@merge-mentor/config/config.js";
+import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
 import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
-import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 
 import {

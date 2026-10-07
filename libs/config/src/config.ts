@@ -4,8 +4,6 @@ import { ConfigurationError } from "@merge-mentor/shared/errors/index.js";
 import { type Environment, processEnvironment } from "@merge-mentor/shared/ports/environment.js";
 import { z } from "zod";
 
-import type { AIProviderType, ReasoningEffort } from "./ai/types.js";
-import type { GitBackendType } from "./review/gitClient.js";
 import {
   parseReviewPasses,
   type ResolvedReviewProfile,
@@ -15,12 +13,21 @@ import {
   resolveReviewProfile,
   validateReviewStrategy as validateReviewStrategyValue,
   validateReviewType as validateReviewTypeValue,
-} from "./review/reviewSelection.js";
+} from "./reviewSelection.js";
 
 /** Supported platform types for PR reviews. */
 export type Platform = "github" | "azure";
 
-export type { ReviewPass, ReviewStrategy } from "./review/reviewSelection.js";
+/** Supported AI provider types. */
+export type AIProviderType = "copilot-sdk" | "opencode-sdk";
+
+/** Valid reasoning effort levels for models that support it. */
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+
+/** Supported git backend implementations. */
+export type GitBackendType = "cli" | "isomorphic";
+
+export type { ReviewPass, ReviewStrategy } from "./reviewSelection.js";
 
 /** GitHub-specific configuration. */
 interface GitHubConfig {

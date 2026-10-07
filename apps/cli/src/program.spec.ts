@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 
-import type { Config } from "@merge-mentor/core/config.js";
-import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
+import type { Config } from "@merge-mentor/config/config.js";
+import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { program } from "./program.js";
@@ -18,7 +18,7 @@ const mockAdapter = {
   getPlatformName: () => "github" as const,
 };
 
-vi.mock("@merge-mentor/core/config.js", () => ({
+vi.mock("@merge-mentor/config/config.js", () => ({
   loadConfig: vi.fn(),
   validateConfig: vi.fn(),
 }));
@@ -63,7 +63,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   };
 });
 
-import { resolveReviewProfile } from "@merge-mentor/core/review/reviewSelection.js";
+import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   const {

@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadConfig } from "@merge-mentor/core/config.js";
+import { loadConfig } from "@merge-mentor/config/config.js";
 import { logger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 

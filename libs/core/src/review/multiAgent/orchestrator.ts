@@ -1,3 +1,4 @@
+import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 
@@ -20,7 +21,6 @@ import { StreamingDisplay } from "../../utils/streamingDisplay.js";
 import { calculateTextSimilarity } from "../../utils/textSimilarity.js";
 import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import type { DiffManifest } from "../diffStorage.js";
-import type { ReviewPass } from "../reviewSelection.js";
 import { type AgentRoleId, getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
 /** Heartbeat check interval in ms. */

@@ -1,4 +1,4 @@
-import type { ReviewPass } from "../../../review/reviewSelection.js";
+import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
 
 /**
  * Builds the additive review passes section listing the extra passes to run

@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 
+import type { Config } from "@merge-mentor/config/config.js";
 import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
 import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
@@ -11,7 +12,6 @@ import type {
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import * as Diff from "diff";
 
-import type { Config } from "../config.js";
 import { DIFF_CONTEXT_LINES } from "../constants.js";
 import { getIgnorePatterns, shouldIgnoreFile } from "../utils/ignoreFilter.js";
 import { extractMoSCoWTag } from "../utils/moscow.js";

@@ -1,6 +1,6 @@
+import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { loadConfig, validateConfig } from "@merge-mentor/core/config.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";

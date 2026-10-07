@@ -41,7 +41,7 @@ pnpm install
 ### Code Style
 
 - **Strict TypeScript** — no explicit `any` in production code (Oxlint enforces `no-explicit-any` and `no-non-null-assertion` as errors).
-- **Imports must end with `.js`** (ESM), e.g. `import { foo } from "./bar.js"`. Use relative imports within a package; cross-package imports use the `@merge-mentor/shared/...` and `@merge-mentor/core/...` aliases.
+- **Imports must end with `.js`** (ESM), e.g. `import { foo } from "./bar.js"`. Use relative imports within a package; cross-package imports use the `@merge-mentor/shared/...`, `@merge-mentor/config/...`, and `@merge-mentor/core/...` aliases.
 - **Hexagonal architecture** — core logic depends on ports (`libs/shared/src/ports/`), not concrete I/O. Use the existing `FileSystem`, `ProcessRunner`, `Clock`, and `OutputWriter` ports instead of calling `node:fs`/`child_process` directly; each port has a `*.test-helper.ts` fake for tests.
 - **Errors** — throw the typed errors from `libs/shared/src/errors/` (e.g. `AIProviderError`, `ConfigurationError`), not raw `Error`, and preserve the original error via `cause`.
 

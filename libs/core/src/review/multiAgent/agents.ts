@@ -1,4 +1,4 @@
-import type { ReviewPass } from "../reviewSelection.js";
+import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
 
 /**
  * The five hardcoded specialized subagent roles used by the multi-agent

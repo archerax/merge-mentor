@@ -1,6 +1,7 @@
+import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
+
 import type { PRDetails } from "../../../platforms/types.js";
 import type { DiffManifest } from "../../../review/diffStorage.js";
-import type { ReviewPass } from "../../../review/reviewSelection.js";
 import {
   buildSecurityPreamble,
   wrapUntrustedExistingComments,

@@ -2,14 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 
-import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
-import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import {
   type Config,
   loadConfig,
   type Platform,
   validateConfig,
-} from "@merge-mentor/core/config.js";
+} from "@merge-mentor/config/config.js";
+import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import type {

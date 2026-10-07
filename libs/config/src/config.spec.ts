@@ -6,7 +6,7 @@ import {
   validateGitBackend,
   validateReviewStrategy,
   validateReviewType,
-} from "@merge-mentor/core/config.js";
+} from "@merge-mentor/config/config.js";
 import { ConfigurationError } from "@merge-mentor/shared/errors/index.js";
 import type { Environment } from "@merge-mentor/shared/ports/environment.js";
 import { createStubEnvironment } from "@merge-mentor/shared/ports/environment.test-helper.js";

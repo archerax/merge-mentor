@@ -1,23 +1,20 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import {
   loadConfig,
   type Platform,
   type ReviewPass,
   type ReviewStrategy,
   validateConfig,
-} from "@merge-mentor/core/config.js";
+} from "@merge-mentor/config/config.js";
+import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
+import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/core/constants.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
-import {
-  formatReviewPasses,
-  formatReviewTypeLabel,
-} from "@merge-mentor/core/review/reviewSelection.js";
 import {
   generatePRIdentifier,
   sanitizeProjectName,

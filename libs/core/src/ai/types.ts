@@ -1,3 +1,4 @@
+import type { ReasoningEffort } from "@merge-mentor/config/config.js";
 import type { Clock } from "@merge-mentor/shared/ports/clock.js";
 import type { ExecutableFinder } from "@merge-mentor/shared/ports/executableFinder.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
@@ -19,11 +20,7 @@ export interface FastReviewResult {
   readonly reviewedFiles: string[];
 }
 
-/** Supported AI provider types. */
-export type AIProviderType = "copilot-sdk" | "opencode-sdk";
-
-/** Valid reasoning effort levels for models that support it. */
-export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type { AIProviderType, ReasoningEffort } from "@merge-mentor/config/config.js";
 
 /** Token usage statistics from AI provider execution. */
 export interface TokenUsage {

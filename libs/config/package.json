@@ -1,10 +1,9 @@
 {
-  "name": "@merge-mentor/core",
+  "name": "@merge-mentor/config",
   "version": "3.1.1",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@merge-mentor/config": "workspace:*",
     "@merge-mentor/shared": "workspace:*"
   },
   "scripts": {

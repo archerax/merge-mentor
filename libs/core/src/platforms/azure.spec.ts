@@ -1,7 +1,7 @@
+import type { Config } from "@merge-mentor/config/config.js";
+import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Config } from "../config.js";
-import { resolveReviewProfile } from "../review/reviewSelection.js";
 import { AzureDevOpsAdapter } from "./azure.js";
 
 const mockWitApiInstance = {

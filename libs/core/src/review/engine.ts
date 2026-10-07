@@ -44,6 +44,15 @@
 
 import path from "node:path";
 
+import type { Platform } from "@merge-mentor/config/config.js";
+import {
+  type ResolvedReviewProfile,
+  type ReviewPass,
+  type ReviewStrategy,
+  resolveReviewProfile,
+  validateReviewStrategy,
+  validateReviewType,
+} from "@merge-mentor/config/reviewSelection.js";
 import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
@@ -71,7 +80,6 @@ import {
   buildGeneralFileReviewPrompt,
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
-import type { Platform } from "../config.js";
 import { APP_NAME_LINK } from "../constants.js";
 import type {
   CommentAction,
@@ -100,14 +108,6 @@ import { LineNumberValidator } from "./lineNumberValidator.js";
 import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";
 import { PbiVerifier } from "./pbiVerifier.js";
 import { RepoManager } from "./repoManager.js";
-import {
-  type ResolvedReviewProfile,
-  type ReviewPass,
-  type ReviewStrategy,
-  resolveReviewProfile,
-  validateReviewStrategy,
-  validateReviewType,
-} from "./reviewSelection.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 import { WorkspaceManager } from "./workspaceManager.js";
 

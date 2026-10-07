@@ -53,7 +53,7 @@ vi.mock("@merge-mentor/core/platforms/azure.js", () => ({
 }));
 
 // Mock config
-vi.mock("@merge-mentor/core/config.js", () => ({
+vi.mock("@merge-mentor/config/config.js", () => ({
   loadConfig: vi.fn(() => ({
     defaultPlatform: "github",
     github: { token: "token", owner: "owner", repo: "repo" },
