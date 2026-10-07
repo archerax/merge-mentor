@@ -2,5 +2,6 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "trailingComma": "es5",
   "sortPackageJson": false,
-  "sortImports": true
+  "sortImports": true,
+  "ignorePatterns": ["apps/web/src/routeTree.gen.ts"]
 }

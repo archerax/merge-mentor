@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["dist", "node_modules", "coverage", "docs"],
+  "ignorePatterns": ["dist", "node_modules", "coverage", "docs", "apps/web/src/routeTree.gen.ts"],
   "plugins": ["typescript", "vitest", "unicorn", "oxc", "import"],
   "categories": {
     "correctness": "error",
