@@ -1,13 +1,5 @@
 import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
-
-/**
- * The five hardcoded specialized subagent roles used by the multi-agent
- * strategy. Custom domain agents are post-MVP.
- */
-const AGENT_ROLE_IDS = ["general", "security", "performance", "testing", "architecture"] as const;
-
-/** Union of the five hardcoded specialized subagent role identifiers. */
-export type AgentRoleId = (typeof AGENT_ROLE_IDS)[number];
+import { AGENT_ROLE_IDS, type AgentRoleId } from "@merge-mentor/domain/agents.js";
 
 /**
  * A specialized subagent role in the multi-agent strategy.

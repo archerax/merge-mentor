@@ -257,12 +257,18 @@ importers:
       '@merge-mentor/core':
         specifier: workspace:*
         version: link:../../libs/core
+      '@merge-mentor/domain':
+        specifier: workspace:*
+        version: link:../../libs/domain
       '@merge-mentor/shared':
         specifier: workspace:*
         version: link:../../libs/shared
 
   libs/config:
     dependencies:
+      '@merge-mentor/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@merge-mentor/shared':
         specifier: workspace:*
         version: link:../shared
@@ -272,11 +278,20 @@ importers:
       '@merge-mentor/config':
         specifier: workspace:*
         version: link:../config
+      '@merge-mentor/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@merge-mentor/shared':
         specifier: workspace:*
         version: link:../shared
 
-  libs/shared: {}
+  libs/domain: {}
+
+  libs/shared:
+    dependencies:
+      '@merge-mentor/domain':
+        specifier: workspace:*
+        version: link:../domain
 
 packages:
 

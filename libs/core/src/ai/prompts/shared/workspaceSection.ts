@@ -1,4 +1,4 @@
-import type { DiffManifest } from "../../../review/diffStorage.js";
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
 
 /**
  * Builds a workspace access section for prompts.

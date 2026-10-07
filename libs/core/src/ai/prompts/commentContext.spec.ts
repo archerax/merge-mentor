@@ -1,6 +1,6 @@
+import type { ExistingComment } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import type { ExistingComment } from "../../platforms/types.js";
 import { formatExistingCommentsContext, formatFullCommentsContext } from "./commentContext.js";
 
 describe("commentContext", () => {

@@ -1,4 +1,5 @@
 {
+  "files": ["types/micromatch.d.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -14,6 +15,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "paths": {
+      "@merge-mentor/domain/*": ["./libs/domain/src/*"],
       "@merge-mentor/shared/*": ["./libs/shared/src/*"],
       "@merge-mentor/config/*": ["./libs/config/src/*"],
       "@merge-mentor/core/*": ["./libs/core/src/*"]

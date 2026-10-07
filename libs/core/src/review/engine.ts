@@ -45,6 +45,7 @@
 import path from "node:path";
 
 import type { Platform } from "@merge-mentor/config/config.js";
+import type { GitBackendType } from "@merge-mentor/config/config.js";
 import {
   type ResolvedReviewProfile,
   type ReviewPass,
@@ -53,7 +54,17 @@ import {
   validateReviewStrategy,
   validateReviewType,
 } from "@merge-mentor/config/reviewSelection.js";
+import type {
+  CommentAction,
+  CrossFileReviewResult,
+  ExistingComment,
+  FileReviewResult,
+  PlatformAdapter,
+  PRDetails,
+  PRFile,
+} from "@merge-mentor/domain/platform.js";
 import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import {
@@ -62,6 +73,19 @@ import {
   nodeFs,
   type OutputWriter,
 } from "@merge-mentor/shared/ports/index.js";
+import { filterPRFiles, getIgnorePatterns } from "@merge-mentor/shared/utils/ignoreFilter.js";
+import { detectLanguage } from "@merge-mentor/shared/utils/languageDetector.js";
+import {
+  generatePRIdentifier,
+  parsePRNumberSafe,
+  sanitizeProjectName,
+} from "@merge-mentor/shared/utils/prIdentifier.js";
+import { StreamingDisplay } from "@merge-mentor/shared/utils/streamingDisplay.js";
+import {
+  findTestFileForProduction,
+  isTestFile,
+} from "@merge-mentor/shared/utils/testFileMapper.js";
+import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import {
   type AIProviderClient,
@@ -80,29 +104,8 @@ import {
   buildGeneralFileReviewPrompt,
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
-import { APP_NAME_LINK } from "../constants.js";
-import type {
-  CommentAction,
-  CrossFileReviewResult,
-  ExistingComment,
-  FileReviewResult,
-  PlatformAdapter,
-  PRDetails,
-  PRFile,
-} from "../platforms/types.js";
-import { filterPRFiles, getIgnorePatterns } from "../utils/ignoreFilter.js";
-import { detectLanguage } from "../utils/languageDetector.js";
-import {
-  generatePRIdentifier,
-  parsePRNumberSafe,
-  sanitizeProjectName,
-} from "../utils/prIdentifier.js";
-import { StreamingDisplay } from "../utils/streamingDisplay.js";
-import { findTestFileForProduction, isTestFile } from "../utils/testFileMapper.js";
-import { mergeTokenUsage } from "../utils/tokenUsage.js";
 import { CommentManager } from "./commentManager.js";
 import { DiffStorage } from "./diffStorage.js";
-import type { GitBackendType } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
 import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";

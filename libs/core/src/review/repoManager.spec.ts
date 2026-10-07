@@ -1,13 +1,13 @@
 import type { Stats } from "node:fs";
 import path from "node:path";
 
+import type { GitClient } from "@merge-mentor/domain/git.js";
 import type { Clock } from "@merge-mentor/shared/ports/clock.js";
 import { createFixedClock } from "@merge-mentor/shared/ports/clock.test-helper.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
-import type { GitClient } from "./gitClient.js";
 import { createStubGitClient } from "./gitClients/gitClient.test-helper.js";
 import { type RepoInfo, RepoManager } from "./repoManager.js";
 

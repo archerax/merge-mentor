@@ -1,5 +1,6 @@
-import type { PRDetails } from "../../../platforms/types.js";
-import type { DiffManifest } from "../../../review/diffStorage.js";
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type { PRDetails } from "@merge-mentor/domain/platform.js";
+
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";

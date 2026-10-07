@@ -1,14 +1,14 @@
-import { describe, expect, it, test, vi } from "vitest";
-
-import packageJson from "../../package.json" with { type: "json" };
-import { APP_NAME_LINK } from "../constants.js";
 import type {
   CrossFileReviewResult,
   ExistingComment,
   FileFinding,
   FileReviewResult,
   FindingSeverity,
-} from "../platforms/types.js";
+} from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
+import { describe, expect, it, test, vi } from "vitest";
+
+import packageJson from "../../package.json" with { type: "json" };
 import { CommentManager } from "./commentManager.js";
 
 // Mock the logger

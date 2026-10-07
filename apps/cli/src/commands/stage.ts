@@ -7,17 +7,17 @@ import {
   type ReviewPass,
   type ReviewStrategy,
 } from "@merge-mentor/config/config.js";
+import type { GitBackendType } from "@merge-mentor/config/config.js";
 import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/core/constants.js";
 import { LocalPlatformAdapter, parseRemoteUrl } from "@merge-mentor/core/platforms/local.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
-import type { GitBackendType } from "@merge-mentor/core/review/gitClient.js";
 import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
-import { formatTokenUsage } from "@merge-mentor/core/utils/tokenUsage.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
+import { formatTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import type { ProgramDeps, StageOptions } from "./types.js";
 

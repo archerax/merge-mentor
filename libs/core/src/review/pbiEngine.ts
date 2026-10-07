@@ -1,14 +1,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { PBIDetails, PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import { z } from "zod";
 
 import packageJson from "../../package.json" with { type: "json" };
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
-import { APP_NAME_LINK } from "../constants.js";
-import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 
 const PBIReviewResponseSchema = z.object({
   title: z.string().default(""),

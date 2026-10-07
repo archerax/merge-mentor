@@ -15,14 +15,15 @@ pnpm check            # Full validation suite (typecheck + lint + build + test)
 
 This repo is a pnpm workspace whose packages live under `apps/*` and `libs/*`. Shared libraries are consumed as TypeScript source via `workspace:*` dependencies, `tsconfig.base.json` `paths`, and matching Vitest aliases — there is no per-library build step. The root `build`, `test`, `typecheck`, and `lint` scripts run the root package first, then recursively (`--if-present`) across every workspace package, so `pnpm check` keeps working unchanged.
 
-Packages (dependency direction: `shared` ← `config` ← `core` ← `apps/cli`):
+Packages (dependency direction: `domain` ← `shared` ← `config` ← `core` ← `apps/cli`):
 
-- `libs/shared/src/` (`@merge-mentor/shared`) – Foundation with no upward deps: `errors/`, `ports/`, `logger.ts`, `audit/`.
-- `libs/config/src/` (`@merge-mentor/config`) – Configuration loading/validation (`config.ts`), the config-owned unions (`Platform`, `AIProviderType`, `ReasoningEffort`, `GitBackendType`), and review-profile selection (`reviewSelection.ts`).
-- `libs/core/src/` (`@merge-mentor/core`) – Review engine and integrations: `ai/`, `review/`, `platforms/`, `constants.ts`, `utils/`.
+- `libs/domain/src/` (`@merge-mentor/domain`) – Dependency-free domain contracts and ports: platform DTOs and `PlatformAdapter`/`GitClient` ports (`platform.ts`, `git.ts`), `DiffManifest` (`diff.ts`), `AgentRoleId` (`agents.ts`), `TokenUsage` (`ai.ts`), and the `Platform` union. Sits at the bottom of the graph so `ai`, `platforms`, and `review` never import each other.
+- `libs/shared/src/` (`@merge-mentor/shared`) – Foundation: `errors/`, `ports/`, `logger.ts`, `audit/`, `constants.ts`, and `utils/`.
+- `libs/config/src/` (`@merge-mentor/config`) – Configuration loading/validation (`config.ts`), the config-owned unions (`AIProviderType`, `ReasoningEffort`, `GitBackendType`; `Platform` is re-exported from `@merge-mentor/domain`), and review-profile selection (`reviewSelection.ts`).
+- `libs/core/src/` (`@merge-mentor/core`) – Review engine and integrations: `ai/`, `review/`, `platforms/`.
 - `apps/cli/src/` (`@merge-mentor/cli`) – CLI entrypoint, Commander commands, `ci/`, `build/`, and `eval/` support code. The publishable `merge-mentor` package metadata (name, `bin`, `files`, version) still lives in the root `package.json`; the root build bundles `apps/cli/src/cli.ts` into `dist/cli.js`.
 
-Cross-package imports MUST use the `@merge-mentor/shared/...`, `@merge-mentor/config/...`, or `@merge-mentor/core/...` aliases (keeping `.js` extensions). Relative imports are only for files within the same package. `libs/*/package.json` versions are kept in lockstep with the root version because `libs/core/src/review/*` reads its own `package.json` for the version footer.
+Cross-package imports MUST use the `@merge-mentor/domain/...`, `@merge-mentor/shared/...`, `@merge-mentor/config/...`, or `@merge-mentor/core/...` aliases (keeping `.js` extensions). Relative imports are only for files within the same package. `libs/*/package.json` versions are kept in lockstep with the root version because `libs/core/src/review/*` reads its own `package.json` for the version footer.
 
 ## Tech Stack
 

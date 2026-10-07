@@ -11,7 +11,7 @@ import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import {
   consoleOutputWriter,

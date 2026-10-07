@@ -1,4 +1,4 @@
-import type { PRFile } from "../../platforms/types.js";
+import type { PRFile } from "@merge-mentor/domain/platform.js";
 
 /**
  * Builds a summary of changed files for prompt context.

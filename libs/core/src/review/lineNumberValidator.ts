@@ -1,7 +1,6 @@
+import type { FileReviewResult, PRFile } from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
-
-import type { FileReviewResult, PRFile } from "../platforms/types.js";
-import { findNearestValidLine, getValidDiffLines } from "../utils/diffParser.js";
+import { findNearestValidLine, getValidDiffLines } from "@merge-mentor/shared/utils/diffParser.js";
 
 /**
  * Adjusts AI-reported finding line numbers to match actual diff lines.

@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { PBIDetails, PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
-import { APP_NAME_LINK } from "../constants.js";
-import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { PBIReviewEngine } from "./pbiEngine.js";
 
 vi.mock("node:fs", async (importOriginal) => {

@@ -1,10 +1,10 @@
 import path from "node:path";
 
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import type { FileSystem, OutputWriter } from "@merge-mentor/shared/ports/index.js";
 
-import type { PlatformAdapter } from "../platforms/types.js";
-import type { DiffManifest } from "./diffStorage.js";
 import type { RepoManager } from "./repoManager.js";
 
 /**

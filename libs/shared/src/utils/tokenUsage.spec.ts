@@ -1,6 +1,6 @@
+import type { TokenUsage } from "@merge-mentor/domain/ai.js";
 import { describe, expect, it } from "vitest";
 
-import type { TokenUsage } from "../ai/types.js";
 import { formatTokenUsage, mergeTokenUsage, sumOptional } from "./tokenUsage.js";
 
 describe("sumOptional", () => {

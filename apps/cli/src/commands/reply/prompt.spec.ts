@@ -1,4 +1,4 @@
-import type { UnresolvedCommentThread } from "@merge-mentor/core/platforms/types.js";
+import type { UnresolvedCommentThread } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
 import { buildReplyPrompt, type ReplyPromptInput } from "./prompt.js";

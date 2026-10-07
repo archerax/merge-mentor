@@ -43,7 +43,7 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-} from "../platforms/types.js";
+} from "@merge-mentor/domain/platform.js";
 
 /**
  * Generates a fingerprint for a finding to enable deduplication.

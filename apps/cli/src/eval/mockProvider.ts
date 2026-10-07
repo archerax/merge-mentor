@@ -6,10 +6,7 @@ import type {
   ExecutePromptOptions,
   FastReviewResult,
 } from "@merge-mentor/core/ai/types.js";
-import type {
-  CrossFileReviewResult,
-  FileReviewResult,
-} from "@merge-mentor/core/platforms/types.js";
+import type { CrossFileReviewResult, FileReviewResult } from "@merge-mentor/domain/platform.js";
 import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { nodeFs } from "@merge-mentor/shared/ports/fileSystem.js";

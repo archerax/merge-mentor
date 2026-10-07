@@ -11,8 +11,6 @@
  * @module
  */
 
-export type { GitBackendType } from "@merge-mentor/config/config.js";
-
 /**
  * Authentication context passed to every git network operation.
  *

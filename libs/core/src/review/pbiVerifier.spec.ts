@@ -1,13 +1,13 @@
-import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWriter.test-helper.js";
-import { describe, expect, it, vi } from "vitest";
-
-import type { AIProviderClient, TokenUsage } from "../ai/index.js";
 import type {
   CrossFileReviewResult,
   PBIDetails,
   PlatformAdapter,
   PRFile,
-} from "../platforms/types.js";
+} from "@merge-mentor/domain/platform.js";
+import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWriter.test-helper.js";
+import { describe, expect, it, vi } from "vitest";
+
+import type { AIProviderClient, TokenUsage } from "../ai/index.js";
 import { PbiVerifier } from "./pbiVerifier.js";
 
 function createMockPlatform(overrides?: Partial<PlatformAdapter>): PlatformAdapter {

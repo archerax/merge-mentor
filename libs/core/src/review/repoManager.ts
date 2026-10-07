@@ -32,6 +32,7 @@
 
 import path from "node:path";
 
+import type { GitAuth, GitClient } from "@merge-mentor/domain/git.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import {
   type Clock,
@@ -39,9 +40,8 @@ import {
   nodeFs,
   systemClock,
 } from "@merge-mentor/shared/ports/index.js";
+import { redactToken } from "@merge-mentor/shared/utils/redact.js";
 
-import { redactToken } from "../utils/redact.js";
-import type { GitAuth, GitClient } from "./gitClient.js";
 import { createGitClient } from "./gitClients/factory.js";
 
 /** Repository information for cloning. */

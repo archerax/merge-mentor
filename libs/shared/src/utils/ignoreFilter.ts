@@ -1,6 +1,5 @@
+import type { PRFile } from "@merge-mentor/domain/platform.js";
 import micromatch from "micromatch";
-
-import type { PRFile } from "../platforms/types.js";
 
 /**
  * File ignore filtering utilities for PR reviews.

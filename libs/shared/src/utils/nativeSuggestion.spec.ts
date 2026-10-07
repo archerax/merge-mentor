@@ -1,6 +1,6 @@
+import type { FileFinding } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import type { FileFinding } from "../platforms/types.js";
 import { formatNativeSuggestion, validateNativeSuggestion } from "./nativeSuggestion.js";
 
 function finding(overrides: Partial<FileFinding> = {}): FileFinding {

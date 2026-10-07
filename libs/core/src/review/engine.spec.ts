@@ -1,3 +1,10 @@
+import type {
+  ExistingComment,
+  PlatformAdapter,
+  PRDetails,
+  PRFile,
+} from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import { createFixedClock } from "@merge-mentor/shared/ports/clock.test-helper.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
@@ -6,8 +13,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import packageJson from "../../package.json" with { type: "json" };
 import { createAIProvider } from "../ai/index.js";
 import type { AIProviderType } from "../ai/types.js";
-import { APP_NAME_LINK } from "../constants.js";
-import type { ExistingComment, PlatformAdapter, PRDetails, PRFile } from "../platforms/types.js";
 import { DiffStorage } from "./diffStorage.js";
 import { ReviewEngine as OriginalReviewEngine } from "./engine.js";
 

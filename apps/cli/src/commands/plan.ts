@@ -2,11 +2,11 @@ import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
 import { PlanEngine } from "@merge-mentor/core/review/planEngine.js";
-import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/core/utils/gitRemote.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
+import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/shared/utils/gitRemote.js";
 
 import type { PlanOptions } from "./types.js";
 

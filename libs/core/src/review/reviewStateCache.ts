@@ -46,6 +46,7 @@
 
 import path from "node:path";
 
+import type { FileReviewResult } from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import {
   type Clock,
@@ -53,8 +54,6 @@ import {
   nodeFs,
   systemClock,
 } from "@merge-mentor/shared/ports/index.js";
-
-import type { FileReviewResult } from "../platforms/types.js";
 
 /** Cached state for a single file review. */
 interface CachedFileReview {
@@ -77,7 +76,7 @@ interface ReviewState {
   /** Map of filename to cached review (keyed by filename for quick lookup) */
   readonly files: Record<string, CachedFileReview>;
   /** Cached cross-file analysis result (if available) */
-  readonly crossFileResult?: import("../platforms/types.js").CrossFileReviewResult;
+  readonly crossFileResult?: import("@merge-mentor/domain/platform.js").CrossFileReviewResult;
 }
 
 /**
@@ -179,7 +178,7 @@ export class ReviewStateCache {
     prIdentifier: string,
     fileResults: readonly FileReviewResult[],
     fileShaMap: Map<string, string>,
-    crossFileResult?: import("../platforms/types.js").CrossFileReviewResult
+    crossFileResult?: import("@merge-mentor/domain/platform.js").CrossFileReviewResult
   ): Promise<void> {
     try {
       await this.fileSystem.mkdir(this.cacheDir, { recursive: true });

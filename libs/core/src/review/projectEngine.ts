@@ -1,6 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type {
+  PlatformAdapter,
+  ProjectDetails,
+  ProjectWorkItem,
+} from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import { z } from "zod";
@@ -8,8 +14,6 @@ import { z } from "zod";
 import packageJson from "../../package.json" with { type: "json" };
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
-import { APP_NAME_LINK, SEVERITY_EMOJI } from "../constants.js";
-import type { PlatformAdapter, ProjectDetails, ProjectWorkItem } from "../platforms/types.js";
 
 /** Fixed cap on how many comments per work item are inlined into the prompt. */
 const MAX_COMMENTS_PER_ITEM = 5;

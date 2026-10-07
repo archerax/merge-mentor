@@ -1,4 +1,4 @@
-import type { FileFinding } from "../platforms/types.js";
+import type { FileFinding } from "@merge-mentor/domain/platform.js";
 
 const MAX_SUGGESTION_LINES = 9;
 

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-
 import type {
   CrossFileFinding,
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-} from "../platforms/types.js";
+} from "@merge-mentor/domain/platform.js";
+import { describe, expect, it } from "vitest";
+
 import { FindingAggregator } from "./findingAggregator.js";
 
 function createFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {

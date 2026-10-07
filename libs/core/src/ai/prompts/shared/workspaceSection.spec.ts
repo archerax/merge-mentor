@@ -1,6 +1,6 @@
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
 import { describe, expect, it } from "vitest";
 
-import type { DiffManifest } from "../../../review/diffStorage.js";
 import { buildFilesListing, buildWorkspaceSection } from "./workspaceSection.js";
 
 describe("Shared Workspace Prompts", () => {

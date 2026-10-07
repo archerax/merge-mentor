@@ -10,18 +10,18 @@ import {
 } from "@merge-mentor/config/config.js";
 import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/core/constants.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
+import { initLogger, logger } from "@merge-mentor/shared/logger.js";
+import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
 import {
   generatePRIdentifier,
   sanitizeProjectName,
-} from "@merge-mentor/core/utils/prIdentifier.js";
-import { formatTokenUsage } from "@merge-mentor/core/utils/tokenUsage.js";
-import { initLogger, logger } from "@merge-mentor/shared/logger.js";
-import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
+} from "@merge-mentor/shared/utils/prIdentifier.js";
+import { formatTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import { ensureCIContext } from "./shared/ci.js";
 import type { ProgramDeps, ReviewExecutionResult, ReviewOptions } from "./types.js";

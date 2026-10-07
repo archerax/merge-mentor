@@ -7,7 +7,7 @@ import {
   DOCS_URL,
   RETRY_DELAY_BASE_MS,
   SEVERITY_EMOJI,
-} from "@merge-mentor/core/constants.js";
+} from "@merge-mentor/shared/constants.js";
 import { describe, expect, it } from "vitest";
 
 describe("Constants", () => {

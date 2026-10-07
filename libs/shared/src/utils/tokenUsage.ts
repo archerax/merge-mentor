@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../ai/types.js";
+import type { TokenUsage } from "@merge-mentor/domain/ai.js";
 
 /**
  * Sums two optional numeric values. When at least one is defined, returns the

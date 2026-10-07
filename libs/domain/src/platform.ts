@@ -1,3 +1,14 @@
+/**
+ * Platform-agnostic domain contracts.
+ *
+ * Pure types and ports shared by the platform adapters, AI providers, and
+ * review engines. This module MUST stay dependency-free so it can sit at the
+ * bottom of the workspace dependency graph.
+ */
+
+/** Supported platform types for PR reviews. */
+export type Platform = "github" | "azure";
+
 /** Details about a pull request. */
 export interface PRDetails {
   /** Pull request number on the platform. */
@@ -190,7 +201,7 @@ export interface RepoInfo {
   /** Repository name. */
   readonly repo: string;
   /** Platform the repository lives on. */
-  readonly platform: "github" | "azure";
+  readonly platform: Platform;
   /** For Azure DevOps: organization name */
   readonly org?: string;
   /** For Azure DevOps: project name */
@@ -213,7 +224,7 @@ export interface PlatformAdapter {
    * Returns the platform name for dispatching platform-specific logic.
    * @returns "github" or "azure"
    */
-  getPlatformName(): "github" | "azure";
+  getPlatformName(): Platform;
 
   /**
    * Returns repository information for context loading.
@@ -356,7 +367,7 @@ export interface PBIDetails {
   /** Platform identifier of the work item. */
   readonly id: string;
   /** Platform the work item lives on. */
-  readonly platform: "github" | "azure";
+  readonly platform: Platform;
   /** Title of the work item. */
   readonly title: string;
   /** Markdown description of the work item. */
@@ -434,7 +445,7 @@ export interface ProjectDetails {
   /** Description of the root work item. */
   readonly rootDescription: string;
   /** Platform the project hierarchy lives on. */
-  readonly platform: "github" | "azure";
+  readonly platform: Platform;
   /** All work items discovered in the hierarchy. */
   readonly workItems: readonly ProjectWorkItem[];
   /** Dependency relationships between work items. */

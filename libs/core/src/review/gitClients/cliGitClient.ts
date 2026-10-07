@@ -12,6 +12,12 @@
 
 import path from "node:path";
 
+import type {
+  GitAuth,
+  GitClient,
+  GitCloneOptions,
+  GitFileChange,
+} from "@merge-mentor/domain/git.js";
 import {
   type FileSystem,
   nodeFs,
@@ -19,7 +25,6 @@ import {
   type ProcessRunner,
 } from "@merge-mentor/shared/ports/index.js";
 
-import type { GitAuth, GitClient, GitCloneOptions, GitFileChange } from "../gitClient.js";
 import {
   buildAddedFilePatch,
   countPatchStats,

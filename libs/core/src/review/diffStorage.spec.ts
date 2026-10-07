@@ -1,9 +1,9 @@
 import path from "node:path";
 
+import type { PRFile } from "@merge-mentor/domain/platform.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PRFile } from "../platforms/types.js";
 import { DiffStorage } from "./diffStorage.js";
 
 describe("DiffStorage", () => {

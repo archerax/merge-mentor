@@ -1,3 +1,8 @@
+import type {
+  CrossFileReviewResult,
+  PlatformAdapter,
+  PRFile,
+} from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 
@@ -9,7 +14,6 @@ import {
   type TokenUsage,
 } from "../ai/index.js";
 import { buildPBIAlignmentPrompt } from "../ai/prompts/alignment.js";
-import type { CrossFileReviewResult, PlatformAdapter, PRFile } from "../platforms/types.js";
 
 /**
  * Verifies that a PR's changes align with its linked backlog items/issues.

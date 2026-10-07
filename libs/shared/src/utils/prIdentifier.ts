@@ -1,4 +1,4 @@
-import type { Platform } from "@merge-mentor/config/config.js";
+import type { Platform } from "@merge-mentor/domain/platform.js";
 
 const MAX_PROJECT_NAME_LENGTH = 50;
 

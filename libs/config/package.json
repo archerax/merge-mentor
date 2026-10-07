@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@merge-mentor/domain": "workspace:*",
     "@merge-mentor/shared": "workspace:*"
   },
   "scripts": {

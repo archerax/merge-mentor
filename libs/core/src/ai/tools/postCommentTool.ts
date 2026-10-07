@@ -1,9 +1,8 @@
 import type { ToolInvocation, ToolResultObject } from "@github/copilot-sdk";
 import { defineTool } from "@github/copilot-sdk";
+import type { FileFinding } from "@merge-mentor/domain/platform.js";
 import { consoleOutputWriter, type OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { z } from "zod";
-
-import type { FileFinding } from "../../platforms/types.js";
 
 /** Zod schema validating the arguments accepted by the postComment tool. */
 export const PostCommentArgsSchema = z.object({

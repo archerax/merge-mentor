@@ -1,4 +1,4 @@
-import type { FileReviewResult } from "../../../platforms/types.js";
+import type { FileReviewResult } from "@merge-mentor/domain/platform.js";
 
 /**
  * Language types supported by specialist reviews.

@@ -1,6 +1,6 @@
+import type { FileReviewResult, PRFile } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import type { FileReviewResult, PRFile } from "../platforms/types.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
 
 describe("LineNumberValidator", () => {

@@ -39,10 +39,6 @@ import {
   type ReviewPass,
   type ReviewStrategy,
 } from "@merge-mentor/config/reviewSelection.js";
-import { createChildLogger } from "@merge-mentor/shared/logger.js";
-
-import packageJson from "../../package.json" with { type: "json" };
-import { APP_NAME_LINK, CATEGORY_EMOJI, SEVERITY_EMOJI } from "../constants.js";
 import type {
   CommentAction,
   CrossFileReviewResult,
@@ -50,10 +46,17 @@ import type {
   FileFinding,
   FileReviewResult,
   FindingSeverity,
-} from "../platforms/types.js";
-import { remapLineNumber } from "../utils/hunkRemapper.js";
-import { formatNativeSuggestion, validateNativeSuggestion } from "../utils/nativeSuggestion.js";
-import { calculateTextSimilarity } from "../utils/textSimilarity.js";
+} from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK, CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
+import { createChildLogger } from "@merge-mentor/shared/logger.js";
+import { remapLineNumber } from "@merge-mentor/shared/utils/hunkRemapper.js";
+import {
+  formatNativeSuggestion,
+  validateNativeSuggestion,
+} from "@merge-mentor/shared/utils/nativeSuggestion.js";
+import { calculateTextSimilarity } from "@merge-mentor/shared/utils/textSimilarity.js";
+
+import packageJson from "../../package.json" with { type: "json" };
 
 /**
  * Configuration options for comment management behavior.

@@ -1,9 +1,9 @@
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type { ExistingComment, PRDetails } from "@merge-mentor/domain/platform.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse, ExecutePromptOptions } from "../../ai/types.js";
-import type { ExistingComment, PRDetails } from "../../platforms/types.js";
-import type { DiffManifest } from "../diffStorage.js";
 import { MultiAgentOrchestrator } from "./orchestrator.js";
 
 function createPRDetails(): PRDetails {

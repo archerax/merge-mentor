@@ -3,7 +3,8 @@ import type {
   CrossFileReviewResult,
   FileFinding,
   FileReviewResult,
-} from "../../platforms/types.js";
+} from "@merge-mentor/domain/platform.js";
+
 import {
   AgentReviewResponseSchema,
   BatchedFileReviewResponseSchema,

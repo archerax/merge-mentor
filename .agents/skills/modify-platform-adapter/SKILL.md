@@ -10,7 +10,7 @@ Use this skill when modifying existing Git/PR hosting platform adapters (GitHub,
 ## Architectural Guidelines
 
 - Platform adapters exist in `libs/core/src/platforms/`.
-- All adapters must adhere to the `PlatformAdapter` interface defined in [libs/core/src/platforms/types.ts](file:///root/merge-mentor/libs/core/src/platforms/types.ts).
+- All adapters must adhere to the `PlatformAdapter` interface defined in [libs/domain/src/platform.ts](file:///root/merge-mentor/libs/domain/src/platform.ts).
 - Ports and core business logic (e.g., in `libs/core/src/review/`) interact only with the adapter interface, keeping the core platform-agnostic.
 
 ## Step-by-Step Guide

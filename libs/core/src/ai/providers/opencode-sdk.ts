@@ -1,7 +1,13 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { CrossFileReviewResult, FileReviewResult } from "@merge-mentor/domain/platform.js";
 import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
+import {
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_TIMEOUT_MS,
+  RETRY_DELAY_BASE_MS,
+} from "@merge-mentor/shared/constants.js";
 import { AIProviderError, ValidationError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import {
@@ -12,11 +18,9 @@ import {
   type OutputWriter,
   systemClock,
 } from "@merge-mentor/shared/ports/index.js";
+import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 import { createOpencode } from "@opencode-ai/sdk";
 
-import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, RETRY_DELAY_BASE_MS } from "../../constants.js";
-import type { CrossFileReviewResult, FileReviewResult } from "../../platforms/types.js";
-import { mergeTokenUsage } from "../../utils/tokenUsage.js";
 import { delay } from "../shared/delay.js";
 import { getJsonSchema } from "../shared/jsonSchemas.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";

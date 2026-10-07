@@ -1,4 +1,4 @@
-import type { ExistingComment } from "../../platforms/types.js";
+import type { ExistingComment } from "@merge-mentor/domain/platform.js";
 
 /** Sentinels returned when there are no inline comments to include. */
 export const NO_COMMENTS = "No existing comments on this PR.";

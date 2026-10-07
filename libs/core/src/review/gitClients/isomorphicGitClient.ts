@@ -18,11 +18,16 @@ import fs from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 
+import type {
+  GitAuth,
+  GitClient,
+  GitCloneOptions,
+  GitFileChange,
+} from "@merge-mentor/domain/git.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/node";
 
-import type { GitAuth, GitClient, GitCloneOptions, GitFileChange } from "../gitClient.js";
 import {
   buildContentDiffPatch,
   countPatchStats,

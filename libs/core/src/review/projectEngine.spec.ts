@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { PlatformAdapter, ProjectDetails } from "@merge-mentor/domain/platform.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
-import type { PlatformAdapter, ProjectDetails } from "../platforms/types.js";
 import { ProjectReviewEngine } from "./projectEngine.js";
 
 vi.mock("node:fs", async (importOriginal) => {

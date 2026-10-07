@@ -2,10 +2,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { PBIDetails, PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
-import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
 import { createStubGitClient } from "./gitClients/gitClient.test-helper.js";
 import { PlanEngine } from "./planEngine.js";
 

@@ -1,5 +1,11 @@
 {
-  "entryPoints": ["apps/cli/src", "libs/shared/src", "libs/config/src", "libs/core/src"],
+  "entryPoints": [
+    "libs/domain/src",
+    "apps/cli/src",
+    "libs/shared/src",
+    "libs/config/src",
+    "libs/core/src"
+  ],
   "entryPointStrategy": "expand",
   "out": "docs/api",
   "plugin": ["typedoc-plugin-markdown"],

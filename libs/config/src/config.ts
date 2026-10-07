@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import type { Platform } from "@merge-mentor/domain/platform.js";
 import { ConfigurationError } from "@merge-mentor/shared/errors/index.js";
 import { type Environment, processEnvironment } from "@merge-mentor/shared/ports/environment.js";
 import { z } from "zod";
@@ -15,8 +16,7 @@ import {
   validateReviewType as validateReviewTypeValue,
 } from "./reviewSelection.js";
 
-/** Supported platform types for PR reviews. */
-export type Platform = "github" | "azure";
+export type { Platform } from "@merge-mentor/domain/platform.js";
 
 /** Supported AI provider types. */
 export type AIProviderType = "copilot-sdk" | "opencode-sdk";

@@ -1,12 +1,4 @@
 import type { Config } from "@merge-mentor/config/config.js";
-import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
-import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
-import { createChildLogger } from "@merge-mentor/shared/logger.js";
-import { Octokit } from "@octokit/rest";
-
-import { DEFAULT_PAGE_SIZE } from "../constants.js";
-import { extractMoSCoWTag } from "../utils/moscow.js";
-import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
   FileStatus,
@@ -18,7 +10,14 @@ import type {
   RepoInfo,
   UnresolvedComment,
   UnresolvedCommentThread,
-} from "./types.js";
+} from "@merge-mentor/domain/platform.js";
+import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
+import { DEFAULT_PAGE_SIZE } from "@merge-mentor/shared/constants.js";
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
+import { createChildLogger } from "@merge-mentor/shared/logger.js";
+import { extractMoSCoWTag } from "@merge-mentor/shared/utils/moscow.js";
+import { withRateLimitHandling } from "@merge-mentor/shared/utils/rateLimitHandler.js";
+import { Octokit } from "@octokit/rest";
 
 /**
  * Platform adapter for GitHub pull requests.

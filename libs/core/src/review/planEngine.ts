@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { GitClient } from "@merge-mentor/domain/git.js";
+import type { PBIDetails, PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import { z } from "zod";
@@ -8,9 +11,6 @@ import { z } from "zod";
 import packageJson from "../../package.json" with { type: "json" };
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
-import { APP_NAME_LINK } from "../constants.js";
-import type { PBIDetails, PlatformAdapter } from "../platforms/types.js";
-import type { GitClient } from "./gitClient.js";
 
 const PlanTaskSchema = z.object({
   description: z.string().default(""),

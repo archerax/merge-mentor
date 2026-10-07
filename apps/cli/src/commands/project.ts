@@ -3,10 +3,10 @@ import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import { ProjectReviewEngine } from "@merge-mentor/core/review/projectEngine.js";
-import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/core/utils/gitRemote.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { processEnvironment } from "@merge-mentor/shared/ports/index.js";
+import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/shared/utils/gitRemote.js";
 
 import type { ProjectOptions } from "./types.js";
 

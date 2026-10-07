@@ -11,9 +11,7 @@
 
 import path from "node:path";
 
-import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
-
-import type { GitClient, GitFileChange } from "../review/gitClient.js";
+import type { GitClient, GitFileChange } from "@merge-mentor/domain/git.js";
 import type {
   ExistingComment,
   PBIDetails,
@@ -23,7 +21,8 @@ import type {
   ProjectDetails,
   RepoInfo,
   UnresolvedCommentThread,
-} from "./types.js";
+} from "@merge-mentor/domain/platform.js";
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 
 /** Options for constructing a `LocalPlatformAdapter`. */
 export interface LocalPlatformOptions {

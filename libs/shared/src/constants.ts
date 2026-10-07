@@ -3,7 +3,7 @@
  * Centralizes magic numbers and strings for maintainability.
  */
 
-import type { FindingCategory } from "./platforms/types.js";
+import type { FindingCategory } from "@merge-mentor/domain/platform.js";
 
 /** Documentation website URL for Merge Mentor. */
 export const DOCS_URL = "https://archerax.github.io/merge-mentor/";

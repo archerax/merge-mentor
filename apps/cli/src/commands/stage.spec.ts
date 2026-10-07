@@ -3,12 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { AIResponse } from "@merge-mentor/core/ai/types.js";
-import type { FileFinding } from "@merge-mentor/core/platforms/types.js";
 import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
 import {
   createScratchRepo,
   type ScratchRepo,
 } from "@merge-mentor/core/review/gitClients/gitRepo.test-helper.js";
+import type { FileFinding } from "@merge-mentor/domain/platform.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

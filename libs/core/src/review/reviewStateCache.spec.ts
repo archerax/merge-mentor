@@ -1,9 +1,9 @@
+import type { FileReviewResult } from "@merge-mentor/domain/platform.js";
 import { createFixedClock } from "@merge-mentor/shared/ports/clock.test-helper.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
-import type { FileReviewResult } from "../platforms/types.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 
 describe("ReviewStateCache", () => {

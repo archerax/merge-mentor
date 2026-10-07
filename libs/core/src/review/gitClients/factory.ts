@@ -4,9 +4,10 @@
  * @module
  */
 
+import type { GitBackendType } from "@merge-mentor/config/config.js";
+import type { GitClient } from "@merge-mentor/domain/git.js";
 import { nodeProcessRunner, type ProcessRunner } from "@merge-mentor/shared/ports/index.js";
 
-import type { GitBackendType, GitClient } from "../gitClient.js";
 import { CliGitClient } from "./cliGitClient.js";
 import { IsomorphicGitClient } from "./isomorphicGitClient.js";
 

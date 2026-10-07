@@ -1,6 +1,18 @@
 import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
+import type { AgentRoleId } from "@merge-mentor/domain/agents.js";
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type {
+  CrossFileReviewResult,
+  ExistingComment,
+  FileFinding,
+  FileReviewResult,
+  PRDetails,
+} from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
+import { StreamingDisplay } from "@merge-mentor/shared/utils/streamingDisplay.js";
+import { calculateTextSimilarity } from "@merge-mentor/shared/utils/textSimilarity.js";
+import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import {
   formatFullCommentsContext,
@@ -10,18 +22,7 @@ import {
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
 import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
-import type {
-  CrossFileReviewResult,
-  ExistingComment,
-  FileFinding,
-  FileReviewResult,
-  PRDetails,
-} from "../../platforms/types.js";
-import { StreamingDisplay } from "../../utils/streamingDisplay.js";
-import { calculateTextSimilarity } from "../../utils/textSimilarity.js";
-import { mergeTokenUsage } from "../../utils/tokenUsage.js";
-import type { DiffManifest } from "../diffStorage.js";
-import { type AgentRoleId, getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
+import { getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
 /** Heartbeat check interval in ms. */
 const HEARTBEAT_INTERVAL_MS = 1000;

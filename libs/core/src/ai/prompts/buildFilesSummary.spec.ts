@@ -1,6 +1,6 @@
+import type { PRFile } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import type { PRFile } from "../../platforms/types.js";
 import { buildFilesSummary } from "./buildFilesSummary.js";
 
 describe("buildFilesSummary", () => {

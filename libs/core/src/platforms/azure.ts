@@ -1,21 +1,6 @@
 import { Readable } from "node:stream";
 
 import type { Config } from "@merge-mentor/config/config.js";
-import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
-import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
-import { createChildLogger } from "@merge-mentor/shared/logger.js";
-import * as azdev from "azure-devops-node-api";
-import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
-import type {
-  Comment,
-  GitPullRequestCommentThread,
-} from "azure-devops-node-api/interfaces/GitInterfaces.js";
-import * as Diff from "diff";
-
-import { DIFF_CONTEXT_LINES } from "../constants.js";
-import { getIgnorePatterns, shouldIgnoreFile } from "../utils/ignoreFilter.js";
-import { extractMoSCoWTag } from "../utils/moscow.js";
-import { withRateLimitHandling } from "../utils/rateLimitHandler.js";
 import type {
   ExistingComment,
   FileStatus,
@@ -31,7 +16,21 @@ import type {
   UnresolvedComment,
   UnresolvedCommentThread,
   WorkItemState,
-} from "./types.js";
+} from "@merge-mentor/domain/platform.js";
+import { getAuditLogger } from "@merge-mentor/shared/audit/index.js";
+import { DIFF_CONTEXT_LINES } from "@merge-mentor/shared/constants.js";
+import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
+import { createChildLogger } from "@merge-mentor/shared/logger.js";
+import { getIgnorePatterns, shouldIgnoreFile } from "@merge-mentor/shared/utils/ignoreFilter.js";
+import { extractMoSCoWTag } from "@merge-mentor/shared/utils/moscow.js";
+import { withRateLimitHandling } from "@merge-mentor/shared/utils/rateLimitHandler.js";
+import * as azdev from "azure-devops-node-api";
+import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
+import type {
+  Comment,
+  GitPullRequestCommentThread,
+} from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import * as Diff from "diff";
 
 /** Maximum file size in bytes for diff generation (1MB). */
 const MAX_FILE_SIZE_BYTES = 1 * 1024 * 1024;

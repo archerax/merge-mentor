@@ -1,11 +1,11 @@
 import path from "node:path";
 
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWriter.test-helper.js";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PlatformAdapter } from "../platforms/types.js";
-import type { DiffManifest } from "./diffStorage.js";
 import type { RepoManager } from "./repoManager.js";
 import { WorkspaceManager } from "./workspaceManager.js";
 

@@ -2,7 +2,7 @@ import {
   buildSecurityPreamble,
   wrapUntrustedContent,
 } from "@merge-mentor/core/ai/prompts/securityPreamble.js";
-import type { UnresolvedCommentThread } from "@merge-mentor/core/platforms/types.js";
+import type { UnresolvedCommentThread } from "@merge-mentor/domain/platform.js";
 
 /** Inputs used to build the AI prompt for replying to a PR comment thread. */
 export interface ReplyPromptInput {

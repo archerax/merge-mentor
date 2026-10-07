@@ -63,8 +63,8 @@ vi.mock("node:fs", async (importOriginal) => {
 
 import type { Config } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
-import type { PlatformAdapter } from "@merge-mentor/core/platforms/types.js";
 import type { ReviewResult } from "@merge-mentor/core/review/engine.js";
+import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 
 import {

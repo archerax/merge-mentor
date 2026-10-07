@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@merge-mentor/config": "workspace:*",
+    "@merge-mentor/domain": "workspace:*",
     "@merge-mentor/shared": "workspace:*"
   },
   "scripts": {

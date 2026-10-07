@@ -1,7 +1,7 @@
+import type { DiffManifest } from "@merge-mentor/domain/diff.js";
+import type { FileReviewResult, PRDetails } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import type { FileReviewResult, PRDetails } from "../../platforms/types.js";
-import type { DiffManifest } from "../../review/diffStorage.js";
 import { buildBatchedFileReviewPrompt, buildCrossFilePrompt } from "./prompts.js";
 
 describe("AI Prompts", () => {

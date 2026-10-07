@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+const domainSrc = fileURLToPath(new URL("./libs/domain/src", import.meta.url));
 const sharedSrc = fileURLToPath(new URL("./libs/shared/src", import.meta.url));
 const configSrc = fileURLToPath(new URL("./libs/config/src", import.meta.url));
 const coreSrc = fileURLToPath(new URL("./libs/core/src", import.meta.url));
@@ -9,6 +10,7 @@ const coreSrc = fileURLToPath(new URL("./libs/core/src", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: [
+      { find: /^@merge-mentor\/domain\/(.*)\.js$/, replacement: `${domainSrc}/$1.ts` },
       { find: /^@merge-mentor\/shared\/(.*)\.js$/, replacement: `${sharedSrc}/$1.ts` },
       { find: /^@merge-mentor\/config\/(.*)\.js$/, replacement: `${configSrc}/$1.ts` },
       { find: /^@merge-mentor\/core\/(.*)\.js$/, replacement: `${coreSrc}/$1.ts` },

@@ -1,6 +1,6 @@
 import type { Dirent, Stats } from "node:fs";
 
-import type { FileFinding } from "@merge-mentor/core/platforms/types.js";
+import type { FileFinding } from "@merge-mentor/domain/platform.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { describe, expect, it } from "vitest";
 
