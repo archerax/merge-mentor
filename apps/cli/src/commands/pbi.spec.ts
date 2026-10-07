@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import type { Config } from "@merge-mentor/config/config.js";
 import { loadConfig } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
-import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { program } from "../program.js";
@@ -23,7 +23,7 @@ vi.mock("@merge-mentor/config/config.js", () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock("@merge-mentor/core/platforms/github.js", () => {
+vi.mock("@merge-mentor/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapter() {
       return mockAdapter;
@@ -31,7 +31,7 @@ vi.mock("@merge-mentor/core/platforms/github.js", () => {
   };
 });
 
-vi.mock("@merge-mentor/core/platforms/azure.js", () => {
+vi.mock("@merge-mentor/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;

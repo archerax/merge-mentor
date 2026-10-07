@@ -10,10 +10,10 @@ import {
 import type { GitBackendType } from "@merge-mentor/config/config.js";
 import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { LocalPlatformAdapter, parseRemoteUrl } from "@merge-mentor/core/platforms/local.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
 import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { LocalPlatformAdapter, parseRemoteUrl } from "@merge-mentor/platforms/local.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";

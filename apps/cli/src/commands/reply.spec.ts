@@ -20,13 +20,13 @@ const mockAdapter = {
   getPlatformName: () => "github" as const,
 };
 
-vi.mock("@merge-mentor/core/platforms/github.js", () => ({
+vi.mock("@merge-mentor/platforms/github.js", () => ({
   GitHubAdapter: vi.fn(function GitHubAdapter() {
     return mockAdapter;
   }),
 }));
 
-vi.mock("@merge-mentor/core/platforms/azure.js", () => ({
+vi.mock("@merge-mentor/platforms/azure.js", () => ({
   AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
     return mockAdapter;
   }),

@@ -1,10 +1,10 @@
 import { loadConfig, type Platform, validateConfig } from "@merge-mentor/config/config.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
-import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import { PBIReviewEngine } from "@merge-mentor/core/review/pbiEngine.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { processEnvironment } from "@merge-mentor/shared/ports/index.js";
 import { detectGitRemoteUrl, parseGitRemoteUrl } from "@merge-mentor/shared/utils/gitRemote.js";
 

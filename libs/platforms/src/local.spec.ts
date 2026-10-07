@@ -1,6 +1,6 @@
+import { createStubGitClient } from "@merge-mentor/domain/git.test-helper.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { createStubGitClient } from "../review/gitClients/gitClient.test-helper.js";
 import { LocalPlatformAdapter, parseRemoteUrl, toPRFile } from "./local.js";
 
 const BASE_CHANGE = {

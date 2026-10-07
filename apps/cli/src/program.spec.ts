@@ -23,7 +23,7 @@ vi.mock("@merge-mentor/config/config.js", () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock("@merge-mentor/core/platforms/github.js", () => {
+vi.mock("@merge-mentor/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapter() {
       return mockAdapter;
@@ -31,7 +31,7 @@ vi.mock("@merge-mentor/core/platforms/github.js", () => {
   };
 });
 
-vi.mock("@merge-mentor/core/platforms/azure.js", () => {
+vi.mock("@merge-mentor/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
       return mockAdapter;

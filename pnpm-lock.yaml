@@ -260,6 +260,9 @@ importers:
       '@merge-mentor/domain':
         specifier: workspace:*
         version: link:../../libs/domain
+      '@merge-mentor/platforms':
+        specifier: workspace:*
+        version: link:../../libs/platforms
       '@merge-mentor/shared':
         specifier: workspace:*
         version: link:../../libs/shared
@@ -286,6 +289,18 @@ importers:
         version: link:../shared
 
   libs/domain: {}
+
+  libs/platforms:
+    dependencies:
+      '@merge-mentor/config':
+        specifier: workspace:*
+        version: link:../config
+      '@merge-mentor/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@merge-mentor/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   libs/shared:
     dependencies:

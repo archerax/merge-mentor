@@ -4,6 +4,7 @@
     "apps/cli/src",
     "libs/shared/src",
     "libs/config/src",
+    "libs/platforms/src",
     "libs/core/src"
   ],
   "entryPointStrategy": "expand",

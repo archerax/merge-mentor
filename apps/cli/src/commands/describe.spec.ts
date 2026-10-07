@@ -1,8 +1,8 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
-import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import { ReviewEngine } from "@merge-mentor/core/review/engine.js";
+import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { displayDescribeResults, executeDescribe } from "./describe.js";
@@ -25,7 +25,7 @@ vi.mock("@merge-mentor/config/config.js", () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock("@merge-mentor/core/platforms/github.js", () => {
+vi.mock("@merge-mentor/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapterMock() {
       return mockAdapter;
@@ -33,7 +33,7 @@ vi.mock("@merge-mentor/core/platforms/github.js", () => {
   };
 });
 
-vi.mock("@merge-mentor/core/platforms/azure.js", () => {
+vi.mock("@merge-mentor/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
       return mockAdapter;

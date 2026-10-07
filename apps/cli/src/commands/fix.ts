@@ -9,9 +9,9 @@ import {
 } from "@merge-mentor/core/ai/prompts/securityPreamble.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
-import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import {
   consoleOutputWriter,

@@ -1,13 +1,11 @@
 {
-  "name": "@merge-mentor/cli",
+  "name": "@merge-mentor/platforms",
   "version": "3.1.1",
   "private": true,
   "type": "module",
   "dependencies": {
     "@merge-mentor/config": "workspace:*",
-    "@merge-mentor/core": "workspace:*",
     "@merge-mentor/domain": "workspace:*",
-    "@merge-mentor/platforms": "workspace:*",
     "@merge-mentor/shared": "workspace:*"
   },
   "scripts": {

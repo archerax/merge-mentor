@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
-import { AzureDevOpsAdapter } from "@merge-mentor/core/platforms/azure.js";
-import { GitHubAdapter } from "@merge-mentor/core/platforms/github.js";
 import { ReviewEngine } from "@merge-mentor/core/review/engine.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -24,7 +24,7 @@ vi.mock("@merge-mentor/config/config.js", () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock("@merge-mentor/core/platforms/github.js", () => {
+vi.mock("@merge-mentor/platforms/github.js", () => {
   return {
     GitHubAdapter: vi.fn(function GitHubAdapterMock() {
       return mockAdapter;
@@ -32,7 +32,7 @@ vi.mock("@merge-mentor/core/platforms/github.js", () => {
   };
 });
 
-vi.mock("@merge-mentor/core/platforms/azure.js", () => {
+vi.mock("@merge-mentor/platforms/azure.js", () => {
   return {
     AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;
