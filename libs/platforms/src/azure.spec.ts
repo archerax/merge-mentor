@@ -91,7 +91,6 @@ function createTestConfig(): Config {
     longContext: false,
     experimentalTools: false,
     verifyPbi: false,
-    multiAgentMinConfidence: 0.7,
     multiAgentMaxParallel: 4,
   };
 }

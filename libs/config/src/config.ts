@@ -74,7 +74,7 @@ export interface Config {
   /**
    * Higher-tier model used by the `plan` command. Falls back to `aiModel`, then
    * leaves the provider to apply its own default (e.g. `Auto` for Copilot SDK)
-   * when unset. Env: `MM_AI_PLAN_MODEL` / CLI: `--plan-model`.
+   * when unset. CLI: `--plan-model`.
    */
   readonly aiPlanModel?: string;
   /** Generic OpenAI-compatible BYOK base URL for AI providers that support it. */
@@ -106,11 +106,6 @@ export interface Config {
   /** Verify pull request changes against linked Product Backlog Items/Issues */
   readonly verifyPbi: boolean;
   /**
-   * Legacy multi-agent confidence setting. Retained for config compatibility;
-   * confidence filtering is currently disabled. Config-only (no CLI flag).
-   */
-  readonly multiAgentMinConfidence: number;
-  /**
    * Maximum number of subagents the multi-agent orchestrator dispatches
    * concurrently. Config-only (no CLI flag). Default: 4
    */
@@ -128,16 +123,6 @@ const ConfigParserSchema = z.object({
     .enum(["general", "testing", "security", "performance", "fast", "custom"])
     .catch("general"),
   reviewStrategy: z.enum(["deep", "fast", "multi-agent"]).catch("fast"),
-  multiAgentMinConfidence: z.preprocess(
-    (val) => {
-      if (val === undefined || val === null || val === "") return undefined;
-      const parsed = typeof val === "string" ? Number.parseFloat(val) : val;
-      return Number.isFinite(parsed) && (parsed as number) >= 0 && (parsed as number) <= 1
-        ? parsed
-        : undefined;
-    },
-    z.custom<number>((val) => typeof val === "number").catch(0.3)
-  ),
   multiAgentMaxParallel: z.preprocess(
     (val) => {
       if (val === undefined || val === null || val === "") return undefined;
@@ -200,7 +185,6 @@ export function loadConfig(
     gitBackend: cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"),
     reviewType: cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"),
     reviewStrategy: cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY"),
-    multiAgentMinConfidence: env.get("MM_MULTI_AGENT_MIN_CONFIDENCE"),
     multiAgentMaxParallel: env.get("MM_MULTI_AGENT_MAX_PARALLEL"),
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED"),
     streamingLines:
@@ -243,11 +227,7 @@ export function loadConfig(
     copilotToken: cliOverrides?.copilotToken ?? env.get("MM_COPILOT_TOKEN"),
     aiTimeoutMs: parsed.aiTimeoutMs,
     aiModel: cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
-    aiPlanModel:
-      cliOverrides?.planModel ??
-      env.get("MM_AI_PLAN_MODEL") ??
-      cliOverrides?.aiModel ??
-      env.get("MM_AI_MODEL"),
+    aiPlanModel: cliOverrides?.planModel ?? cliOverrides?.aiModel ?? env.get("MM_AI_MODEL"),
     aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
     aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
     skipPreExisting: true,
@@ -262,7 +242,6 @@ export function loadConfig(
     reasoningEffort: parsed.reasoningEffort,
     experimentalTools: parsed.experimentalTools,
     verifyPbi: parsed.verifyPbi,
-    multiAgentMinConfidence: parsed.multiAgentMinConfidence,
     multiAgentMaxParallel: parsed.multiAgentMaxParallel,
   };
 }

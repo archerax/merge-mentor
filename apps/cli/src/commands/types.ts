@@ -227,7 +227,7 @@ export interface PlanOptions {
   write?: boolean;
   /** Allow execution even if the local Git workspace has uncommitted changes. Default: `false`. */
   allowDirty?: boolean;
-  /** Higher-tier AI model used to generate the plan. Env: `MM_AI_PLAN_MODEL`. */
+  /** Higher-tier AI model used to generate the plan. CLI: `--plan-model`. */
   planModel?: string;
   /** Generic model identifier for the active AI provider. Env: `MM_AI_MODEL`. */
   aiModel?: string;

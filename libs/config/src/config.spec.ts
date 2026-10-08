@@ -104,7 +104,7 @@ describe("Config", () => {
       expect(config.aiModel).toBe("gpt-5.2-codex");
     });
 
-    it("should load MM_AI_PLAN_MODEL from environment", () => {
+    it("should ignore MM_AI_PLAN_MODEL and use MM_AI_MODEL for the plan model", () => {
       const env = createStubEnvironment({
         MM_AI_MODEL: "gpt-5.2-codex",
         MM_AI_PLAN_MODEL: "gpt-5.6-sol",
@@ -112,7 +112,7 @@ describe("Config", () => {
 
       const config = loadConfig(undefined, env);
 
-      expect(config.aiPlanModel).toBe("gpt-5.6-sol");
+      expect(config.aiPlanModel).toBe("gpt-5.2-codex");
     });
 
     it("should fall back to MM_AI_MODEL for the plan model when unset", () => {
@@ -128,7 +128,6 @@ describe("Config", () => {
     it("should accept a CLI plan model override that beats the environment", () => {
       const env = createStubEnvironment({
         MM_AI_MODEL: "gpt-5.2-codex",
-        MM_AI_PLAN_MODEL: "env-plan-model",
       });
 
       const config = loadConfig({ planModel: "cli-plan-model", aiModel: "cli-model" }, env);
@@ -401,36 +400,31 @@ describe("Config", () => {
       expect(config.reviewProfile.strategy).toBe("multi-agent");
     });
 
-    it("should default multiAgentMinConfidence to 0.3 and maxParallel to 2", () => {
+    it("should default multiAgentMaxParallel to 2", () => {
       const env = createStubEnvironment();
 
       const config = loadConfig(undefined, env);
 
-      expect(config.multiAgentMinConfidence).toBe(0.3);
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 
     it("should load multi-agent config from environment", () => {
       const env = createStubEnvironment({
-        MM_MULTI_AGENT_MIN_CONFIDENCE: "0.85",
         MM_MULTI_AGENT_MAX_PARALLEL: "2",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.multiAgentMinConfidence).toBe(0.85);
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 
     it("should fall back to defaults for invalid multi-agent config values", () => {
       const env = createStubEnvironment({
-        MM_MULTI_AGENT_MIN_CONFIDENCE: "1.5",
         MM_MULTI_AGENT_MAX_PARALLEL: "-1",
       });
 
       const config = loadConfig(undefined, env);
 
-      expect(config.multiAgentMinConfidence).toBe(0.3);
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 

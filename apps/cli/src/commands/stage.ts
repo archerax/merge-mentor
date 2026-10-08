@@ -114,7 +114,6 @@ export async function executeStage(
     experimentalTools: config.experimentalTools,
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
-    multiAgentMinConfidence: config.multiAgentMinConfidence,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
     noCache: options.noCache,
     reReview: options.reReview,

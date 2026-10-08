@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   item instead of overwriting, and it can be attached to the work item with
   `--write`; `--allow-dirty` permits planning
   with uncommitted changes. Adds the `aiPlanModel` config
-  (`MM_AI_PLAN_MODEL`/`--plan-model`, falling back to `MM_AI_MODEL` then the
+  (`--plan-model`, falling back to `MM_AI_MODEL` then the
   provider default), a zod-validated `PlanEngine` with a regex fallback and
   deterministic Markdown rendering, `hasUncommittedChanges`/`switchBranch`/`pull`
   to both git backends, and `attachWorkItemFile` to the platform adapters.

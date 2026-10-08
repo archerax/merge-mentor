@@ -741,7 +741,7 @@ program
   .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
   .option(
     "--plan-model <model>",
-    "Higher-tier model used to generate the plan. Env: MM_AI_PLAN_MODEL"
+    "Higher-tier model used to generate the plan. Defaults to --ai-model"
   )
   .option(
     "--ai-base-url <url>",

@@ -61,7 +61,7 @@ The generated plan is saved under `.mergementor/reports/`. Files are named `merg
 | `--provider <provider>`   | AI provider (`copilot-sdk`, `opencode-sdk`) | `MM_AI_PROVIDER`   | `copilot-sdk`                        |
 | `--copilot-token <token>` | Copilot GitHub token                        | `MM_COPILOT_TOKEN` | -                                    |
 | `--ai-model <model>`      | Model name for the active AI provider       | `MM_AI_MODEL`      | provider default                     |
-| `--plan-model <model>`    | Higher-tier model used to generate the plan | `MM_AI_PLAN_MODEL` | `MM_AI_MODEL`, else provider default |
+| `--plan-model <model>`    | Higher-tier model used to generate the plan | -                  | `MM_AI_MODEL`, else provider default |
 | `--ai-base-url <url>`     | OpenAI-compatible API base URL for BYOK     | `MM_AI_BASE_URL`   | -                                    |
 | `--ai-api-key <key>`      | API key for BYOK                            | `MM_AI_API_KEY`    | -                                    |
 | `--ai-timeout <ms>`       | Timeout in ms for all AI providers          | `MM_AI_TIMEOUT`    | -                                    |

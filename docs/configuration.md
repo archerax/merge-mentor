@@ -79,15 +79,12 @@ Check provider documentation for all supported models.
 
 ### Planning Model
 
-The `plan` command uses a higher-tier planning model, configured separately:
+The `plan` command uses a higher-tier planning model. By default it uses the
+active `MM_AI_MODEL`; override it per invocation with `--plan-model <model>`.
 
 ```bash
-# Higher-tier model used to generate phased implementation plans.
-# Falls back to MM_AI_MODEL when unset, then defaults to the provider default.
-export MM_AI_PLAN_MODEL=gpt-6-sol
+merge-mentor plan --id 123 --base main --plan-model gpt-6-sol
 ```
-
-Override per invocation with `--plan-model <model>`.
 
 ---
 
