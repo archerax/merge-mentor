@@ -24,6 +24,7 @@
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
     "eval": "node dist/cli.js eval",
+    "ui": "pnpm --filter @merge-mentor/web dev",
     "typecheck": "pnpm run typecheck:root && pnpm -r --if-present run typecheck",
     "typecheck:root": "tsc --noEmit",
     "lint": "pnpm run lint:root && pnpm -r --if-present run lint",

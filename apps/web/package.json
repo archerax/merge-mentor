@@ -13,11 +13,18 @@
   "dependencies": {
     "@mantine/core": "^9.7.1",
     "@mantine/hooks": "^9.7.1",
+    "@merge-mentor/config": "workspace:*",
+    "@merge-mentor/core": "workspace:*",
+    "@merge-mentor/domain": "workspace:*",
+    "@merge-mentor/platforms": "workspace:*",
     "@merge-mentor/shared": "workspace:*",
     "@tanstack/react-router": "^1.170.41",
     "@tanstack/react-start": "^1.168.60",
+    "dotenv": "^18.0.5",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tanstack/router-cli": "^1.132.0",

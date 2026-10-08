@@ -11,6 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
+import { Route as ConfigRouteImport } from './routes/config'
+import { Route as PbiRouteImport } from './routes/pbi'
+import { Route as ProjectRouteImport } from './routes/project'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ReviewRouteImport } from './routes/review'
+import { Route as ApiPbiStreamRouteImport } from './routes/api/pbi/stream'
+import { Route as ApiProjectStreamRouteImport } from './routes/api/project/stream'
+import { Route as ApiReviewStreamRouteImport } from './routes/api/review/stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +30,134 @@ const AuditRoute = AuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConfigRoute = ConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PbiRoute = PbiRouteImport.update({
+  id: '/pbi',
+  path: '/pbi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectRoute = ProjectRouteImport.update({
+  id: '/project',
+  path: '/project',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPbiStreamRoute = ApiPbiStreamRouteImport.update({
+  id: '/api/pbi/stream',
+  path: '/api/pbi/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectStreamRoute = ApiProjectStreamRouteImport.update({
+  id: '/api/project/stream',
+  path: '/api/project/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReviewStreamRoute = ApiReviewStreamRouteImport.update({
+  id: '/api/review/stream',
+  path: '/api/review/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/config': typeof ConfigRoute
+  '/pbi': typeof PbiRoute
+  '/project': typeof ProjectRoute
+  '/reports': typeof ReportsRoute
+  '/review': typeof ReviewRoute
+  '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/project/stream': typeof ApiProjectStreamRoute
+  '/api/review/stream': typeof ApiReviewStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/config': typeof ConfigRoute
+  '/pbi': typeof PbiRoute
+  '/project': typeof ProjectRoute
+  '/reports': typeof ReportsRoute
+  '/review': typeof ReviewRoute
+  '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/project/stream': typeof ApiProjectStreamRoute
+  '/api/review/stream': typeof ApiReviewStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/config': typeof ConfigRoute
+  '/pbi': typeof PbiRoute
+  '/project': typeof ProjectRoute
+  '/reports': typeof ReportsRoute
+  '/review': typeof ReviewRoute
+  '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/project/stream': typeof ApiProjectStreamRoute
+  '/api/review/stream': typeof ApiReviewStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/audit'
+  fullPaths:
+    | '/'
+    | '/audit'
+    | '/config'
+    | '/pbi'
+    | '/project'
+    | '/reports'
+    | '/review'
+    | '/api/pbi/stream'
+    | '/api/project/stream'
+    | '/api/review/stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit'
-  id: '__root__' | '/' | '/audit'
+  to:
+    | '/'
+    | '/audit'
+    | '/config'
+    | '/pbi'
+    | '/project'
+    | '/reports'
+    | '/review'
+    | '/api/pbi/stream'
+    | '/api/project/stream'
+    | '/api/review/stream'
+  id:
+    | '__root__'
+    | '/'
+    | '/audit'
+    | '/config'
+    | '/pbi'
+    | '/project'
+    | '/reports'
+    | '/review'
+    | '/api/pbi/stream'
+    | '/api/project/stream'
+    | '/api/review/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
+  ConfigRoute: typeof ConfigRoute
+  PbiRoute: typeof PbiRoute
+  ProjectRoute: typeof ProjectRoute
+  ReportsRoute: typeof ReportsRoute
+  ReviewRoute: typeof ReviewRoute
+  ApiPbiStreamRoute: typeof ApiPbiStreamRoute
+  ApiProjectStreamRoute: typeof ApiProjectStreamRoute
+  ApiReviewStreamRoute: typeof ApiReviewStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +176,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/config': {
+      id: '/config'
+      path: '/config'
+      fullPath: '/config'
+      preLoaderRoute: typeof ConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pbi': {
+      id: '/pbi'
+      path: '/pbi'
+      fullPath: '/pbi'
+      preLoaderRoute: typeof PbiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project': {
+      id: '/project'
+      path: '/project'
+      fullPath: '/project'
+      preLoaderRoute: typeof ProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pbi/stream': {
+      id: '/api/pbi/stream'
+      path: '/api/pbi/stream'
+      fullPath: '/api/pbi/stream'
+      preLoaderRoute: typeof ApiPbiStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/project/stream': {
+      id: '/api/project/stream'
+      path: '/api/project/stream'
+      fullPath: '/api/project/stream'
+      preLoaderRoute: typeof ApiProjectStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/review/stream': {
+      id: '/api/review/stream'
+      path: '/api/review/stream'
+      fullPath: '/api/review/stream'
+      preLoaderRoute: typeof ApiReviewStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
+  ConfigRoute: ConfigRoute,
+  PbiRoute: PbiRoute,
+  ProjectRoute: ProjectRoute,
+  ReportsRoute: ReportsRoute,
+  ReviewRoute: ReviewRoute,
+  ApiPbiStreamRoute: ApiPbiStreamRoute,
+  ApiProjectStreamRoute: ApiProjectStreamRoute,
+  ApiReviewStreamRoute: ApiReviewStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

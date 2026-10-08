@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "../../types/micromatch.d.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -19,7 +19,10 @@
     "resolveJsonModule": true,
     "paths": {
       "@merge-mentor/shared/*": ["../../libs/shared/src/*"],
-      "@merge-mentor/domain/*": ["../../libs/domain/src/*"]
+      "@merge-mentor/domain/*": ["../../libs/domain/src/*"],
+      "@merge-mentor/config/*": ["../../libs/config/src/*"],
+      "@merge-mentor/core/*": ["../../libs/core/src/*"],
+      "@merge-mentor/platforms/*": ["../../libs/platforms/src/*"]
     }
   }
 }
