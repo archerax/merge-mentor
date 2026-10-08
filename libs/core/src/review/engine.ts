@@ -195,6 +195,14 @@ interface ReviewEngineOptions {
   readonly streamingEnabled?: boolean;
   /** Maximum lines to display in streaming view (default: 5) */
   readonly streamingLines?: number;
+  /**
+   * Optional callback invoked with each raw AI output chunk as it streams in.
+   *
+   * Unlike {@link streamingEnabled} (which renders a rolling terminal display),
+   * this is intended for non-terminal consumers such as the web UI. It receives
+   * chunks even when `streamingEnabled` is disabled.
+   */
+  readonly onStreamChunk?: (chunk: string) => void;
   /** CI mode: output as plain text (non-interactive, for log capture) */
   readonly ciMode?: boolean;
   /** Git backend for repository cloning and fetching. Default: 'cli' (system git binary) */
@@ -224,8 +232,6 @@ interface ReviewEngineOptions {
   readonly noCache?: boolean;
   /** Re-review all files, ignoring cached results (default: false). Fresh cache is still written afterward. */
   readonly reReview?: boolean;
-  /** Minimum confidence threshold for multi-agent strategy findings (default: 0.3). */
-  readonly multiAgentMinConfidence?: number;
   /** Maximum concurrent subagents for the multi-agent strategy (default: 2). */
   readonly multiAgentMaxParallel?: number;
 }
@@ -419,20 +425,27 @@ export class ReviewEngine {
     callback: ((chunk: string) => void) | undefined;
     finish: () => void;
   } {
-    if (!this.streamingEnabled) {
+    const onStreamChunk = this.options.onStreamChunk;
+    if (!this.streamingEnabled && !onStreamChunk) {
       return { callback: undefined, finish: () => {} };
     }
 
-    const display = new StreamingDisplay({
-      maxLines: this.streamingLines,
-      title: `🤖 ${context}`,
-      enabled: this.streamingEnabled,
-      ciMode: this.options.ciMode,
-    });
+    const display = this.streamingEnabled
+      ? new StreamingDisplay({
+          maxLines: this.streamingLines,
+          title: `🤖 ${context}`,
+          enabled: true,
+          ciMode: this.options.ciMode,
+          output: this.output,
+        })
+      : undefined;
 
     return {
-      callback: (chunk: string) => display.push(chunk),
-      finish: () => display.finish(),
+      callback: (chunk: string) => {
+        onStreamChunk?.(chunk);
+        display?.push(chunk);
+      },
+      finish: () => display?.finish(),
     };
   }
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { PBIDetails, PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
-import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
+import { consoleOutputWriter, type OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import { z } from "zod";
 
 import packageJson from "../../package.json" with { type: "json" };
@@ -31,6 +31,15 @@ export interface PBIReviewEngineOptions {
   readonly aiProvider?: AIProviderType;
   /** Model identifier used by the AI provider. */
   readonly aiModel?: string;
+  /** Output writer for progress messages (default: consoleOutputWriter). */
+  readonly output?: OutputWriter;
+  /**
+   * Optional callback invoked with each raw AI output chunk as it streams in.
+   *
+   * Intended for non-terminal consumers such as the web UI; when omitted the
+   * AI provider runs without streaming.
+   */
+  readonly onStreamChunk?: (chunk: string) => void;
 }
 
 /**
@@ -57,7 +66,7 @@ export class PBIReviewEngine {
     const tempPath = this.options.tempPath ?? "./.mergementor";
     const provider = this.options.aiProvider ?? "copilot-sdk";
 
-    const output = consoleOutputWriter;
+    const output = this.options.output ?? consoleOutputWriter;
     const modeLabel = dryRun ? " (dry-run)" : "";
 
     output.log(
@@ -70,7 +79,10 @@ export class PBIReviewEngine {
     output.log(`🤖 Requesting AI review using ${provider} against quality guidelines...\n`);
 
     const prompt = this.buildPBIReviewPrompt(pbiDetails);
-    const aiResponse = await this.aiClient.executePrompt(prompt);
+    const onStreamChunk = this.options.onStreamChunk;
+    const aiResponse = onStreamChunk
+      ? await this.aiClient.executePrompt(prompt, { onStreamData: onStreamChunk })
+      : await this.aiClient.executePrompt(prompt);
 
     const parsedResult = PBIReviewResponseSchema.safeParse(aiResponse.parsed);
     if (!parsedResult.success) {
@@ -223,7 +235,7 @@ ${APP_NAME_LINK} v${packageJson.version}, PBI review, ${model}
   }
 
   private displayTerminalReport(data: PBIReviewResponse): void {
-    const output = consoleOutputWriter;
+    const output = this.options.output ?? consoleOutputWriter;
 
     output.log("=".repeat(60));
     output.log(`📊 PBI Review Results: ${data.title}`);

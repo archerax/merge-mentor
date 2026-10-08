@@ -1300,7 +1300,6 @@ describe("ReviewEngine", () => {
         verbose: false,
         streamingEnabled: false,
         reviewStrategy: "multi-agent",
-        multiAgentMinConfidence: 0.7,
         multiAgentMaxParallel: 2,
       });
       const prDetails = createPRDetails();
@@ -1378,7 +1377,6 @@ describe("ReviewEngine", () => {
         verbose: false,
         streamingEnabled: false,
         reviewStrategy: "multi-agent",
-        multiAgentMinConfidence: 0.7,
         multiAgentMaxParallel: 2,
       });
       const prDetails = createPRDetails();

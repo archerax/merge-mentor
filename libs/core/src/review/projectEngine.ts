@@ -8,7 +8,7 @@ import type {
 } from "@merge-mentor/domain/platform.js";
 import { APP_NAME_LINK, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
-import { consoleOutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
+import { consoleOutputWriter, type OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import { z } from "zod";
 
 import packageJson from "../../package.json" with { type: "json" };
@@ -83,6 +83,15 @@ export interface ProjectReviewEngineOptions {
   readonly aiProvider?: AIProviderType;
   /** Model identifier used by the AI provider. */
   readonly aiModel?: string;
+  /** Output writer for progress messages (default: consoleOutputWriter). */
+  readonly output?: OutputWriter;
+  /**
+   * Optional callback invoked with each raw AI output chunk as it streams in.
+   *
+   * Intended for non-terminal consumers such as the web UI; when omitted the
+   * AI provider runs without streaming.
+   */
+  readonly onStreamChunk?: (chunk: string) => void;
 }
 
 /**
@@ -111,7 +120,7 @@ export class ProjectReviewEngine {
     const tempPath = this.options.tempPath ?? "./.mergementor";
     const provider = this.options.aiProvider ?? "copilot-sdk";
 
-    const output = consoleOutputWriter;
+    const output = this.options.output ?? consoleOutputWriter;
     const modeLabel = dryRun ? " (dry-run)" : "";
 
     output.log(
@@ -129,7 +138,11 @@ export class ProjectReviewEngine {
     );
 
     const prompt = this.buildProjectReviewPrompt(projectDetails);
-    const aiResponse = await this.aiClient.executePrompt(prompt, { promptType: "project" });
+    const onStreamChunk = this.options.onStreamChunk;
+    const aiResponse = await this.aiClient.executePrompt(prompt, {
+      promptType: "project",
+      ...(onStreamChunk ? { onStreamData: onStreamChunk } : {}),
+    });
 
     const parsedResult = ProjectReviewResponseSchema.safeParse(aiResponse.parsed);
     if (!parsedResult.success) {
@@ -511,7 +524,7 @@ ${APP_NAME_LINK} v${packageJson.version}, Project review, ${model}
   }
 
   private displayTerminalReport(data: ProjectReviewResponse): void {
-    const output = consoleOutputWriter;
+    const output = this.options.output ?? consoleOutputWriter;
 
     output.log("=".repeat(60));
     output.log(`📊 Project Review Results: ${data.title}`);
