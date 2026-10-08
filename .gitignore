@@ -23,7 +23,7 @@ Thumbs.db
 coverage/
 
 # Mutation testing
-reports/
+/reports/
 .stryker-tmp/
 
 # Logs
