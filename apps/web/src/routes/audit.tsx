@@ -1,7 +1,8 @@
-import { Alert, Code, Stack, Text, Title } from "@mantine/core";
+import { Alert, Code, Stack } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AuditLogTable } from "../components/AuditLogTable.js";
+import { PageHeader } from "../components/PageHeader.js";
 import { getAuditEvents } from "../server/audit.functions.js";
 
 export const Route = createFileRoute("/audit")({
@@ -14,12 +15,14 @@ function AuditLogPage() {
 
   return (
     <Stack gap="lg">
-      <div>
-        <Title order={2}>Audit Log</Title>
-        <Text c="dimmed">
-          Structured audit events recorded in <Code>.mergementor/logs</Code>.
-        </Text>
-      </div>
+      <PageHeader
+        title="Audit Log"
+        description={
+          <>
+            Structured audit events recorded in <Code>.mergementor/logs</Code>.
+          </>
+        }
+      />
 
       {entries.length === 0 ? (
         <Alert title="No audit events found" color="gray">

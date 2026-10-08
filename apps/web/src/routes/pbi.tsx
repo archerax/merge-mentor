@@ -1,6 +1,7 @@
-import { Code, Stack, Text, Title } from "@mantine/core";
+import { Code, Stack } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { PageHeader } from "../components/PageHeader.js";
 import { PBIReviewResult, WorkItemReviewRunner } from "../components/WorkItemReviewRunner.js";
 import type { PBIReviewSummary } from "../server/review.types.js";
 
@@ -11,14 +12,16 @@ export const Route = createFileRoute("/pbi")({
 function PBIPage() {
   return (
     <Stack gap="lg">
-      <div>
-        <Title order={2}>Interactive PBI Review</Title>
-        <Text c="dimmed">
-          Review a Product Backlog Item, user story, or issue for backlog quality. Paste a work item
-          URL or enter an ID; comments are not posted unless write mode is enabled. Reports are
-          saved to <Code>.mergementor/reports</Code>.
-        </Text>
-      </div>
+      <PageHeader
+        title="Interactive PBI Review"
+        description={
+          <>
+            Review a Product Backlog Item, user story, or issue for backlog quality. Paste a work
+            item URL or enter an ID; comments are not posted unless write mode is enabled. Reports
+            are saved to <Code>.mergementor/reports</Code>.
+          </>
+        }
+      />
 
       <WorkItemReviewRunner<PBIReviewSummary>
         endpoint="/api/pbi/stream"

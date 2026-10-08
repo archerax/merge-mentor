@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   ScrollArea,
+  SimpleGrid,
   Stack,
   Switch,
   Text,
@@ -208,11 +209,8 @@ export function ReviewRunner() {
             <Title order={5}>Live output</Title>
             {running && <Loader size="xs" />}
           </Group>
-          <ScrollArea.Autosize mah={420} viewportRef={viewportRef}>
-            <Code
-              block
-              style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "transparent" }}
-            >
+          <ScrollArea.Autosize mah={420} viewportRef={viewportRef} type="auto">
+            <Code block className="mm-code-block">
               {entries.map((entry) => (
                 <span key={entry.id} style={entryStyle(entry.kind)}>
                   {entry.text}
@@ -270,14 +268,14 @@ function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
           </Group>
         </Group>
 
-        <Group gap="lg">
+        <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="sm">
           <Stat label="Files reviewed" value={summary.filesReviewed} />
           <Stat label="Files skipped" value={summary.filesSkipped} />
           <Stat label="File findings" value={findings.length} />
           <Stat label="Cross-file findings" value={summary.crossFileFindings.length} />
           <Stat label="Comments" value={summary.commentsCreated} />
           <Stat label="Lines" value={`+${summary.linesAdded} / -${summary.linesDeleted}`} />
-        </Group>
+        </SimpleGrid>
 
         {critical > 0 && (
           <Alert title={`${critical} critical finding(s)`} color="red">
@@ -332,14 +330,20 @@ function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
 
 function Stat({ label, value }: { readonly label: string; readonly value: string | number }) {
   return (
-    <Stack gap={0}>
-      <Text size="xl" fw={700}>
+    <Card
+      withBorder={false}
+      shadow="none"
+      padding="sm"
+      radius="md"
+      bg="var(--mantine-color-default-hover)"
+    >
+      <Text size="xl" fw={700} lh={1.15}>
         {value}
       </Text>
       <Text size="xs" c="dimmed">
         {label}
       </Text>
-    </Stack>
+    </Card>
   );
 }
 
@@ -361,7 +365,13 @@ function FindingsList({ title, findings, showFile = false }: FindingsListProps) 
         </Title>
         <Stack gap="sm" mt="xs">
           {findings.map((finding, index) => (
-            <Card key={`${finding.file ?? ""}:${finding.line}:${index}`} withBorder padding="sm">
+            <Card
+              key={`${finding.file ?? ""}:${finding.line}:${index}`}
+              withBorder
+              shadow="none"
+              radius="md"
+              padding="sm"
+            >
               <Group gap="xs" mb={4}>
                 <Badge
                   color={SEVERITY_COLORS[finding.severity] ?? "gray"}

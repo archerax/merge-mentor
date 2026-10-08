@@ -1,6 +1,7 @@
-import { Code, Stack, Text, Title } from "@mantine/core";
+import { Code, Stack } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { PageHeader } from "../components/PageHeader.js";
 import { ReviewRunner } from "../components/ReviewRunner.js";
 
 export const Route = createFileRoute("/review")({
@@ -10,13 +11,15 @@ export const Route = createFileRoute("/review")({
 function ReviewPage() {
   return (
     <Stack gap="lg">
-      <div>
-        <Title order={2}>Interactive PR Review</Title>
-        <Text c="dimmed">
-          Trigger a review and watch raw output stream in live. Comments are not posted unless write
-          mode is enabled; use <Code>.mergementor/reports</Code> for saved reports.
-        </Text>
-      </div>
+      <PageHeader
+        title="Interactive PR Review"
+        description={
+          <>
+            Trigger a review and watch raw output stream in live. Comments are not posted unless
+            write mode is enabled; use <Code>.mergementor/reports</Code> for saved reports.
+          </>
+        }
+      />
 
       <ReviewRunner />
     </Stack>

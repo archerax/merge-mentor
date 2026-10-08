@@ -55,7 +55,7 @@ export function AuditLogTable({ entries }: AuditLogTableProps) {
       </Group>
 
       <Table.ScrollContainer minWidth={900}>
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover stickyHeader stickyHeaderOffset={64} fz="sm">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Timestamp</Table.Th>

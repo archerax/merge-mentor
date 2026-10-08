@@ -8,10 +8,10 @@ import {
   Loader,
   NavLink,
   ScrollArea,
+  Skeleton,
   Stack,
   Text,
   TextInput,
-  Title,
 } from "@mantine/core";
 import type {
   ReportDocument,
@@ -22,6 +22,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
+import { PageHeader } from "../components/PageHeader.js";
 import { getReport, getReports } from "../server/reports.functions.js";
 
 export const Route = createFileRoute("/reports")({
@@ -78,12 +79,14 @@ function ReportsPage() {
 
   return (
     <Stack gap="lg">
-      <div>
-        <Title order={2}>Review Reports</Title>
-        <Text c="dimmed">
-          Rendered markdown reports saved in <Code>.mergementor/reports</Code>.
-        </Text>
-      </div>
+      <PageHeader
+        title="Review Reports"
+        description={
+          <>
+            Rendered markdown reports saved in <Code>.mergementor/reports</Code>.
+          </>
+        }
+      />
 
       {reports.length === 0 ? (
         <Alert title="No reports found" color="gray">
@@ -93,13 +96,16 @@ function ReportsPage() {
       ) : (
         <Grid gap="lg">
           <Grid.Col span={{ base: 12, md: 4 }}>
-            <Stack gap="sm">
+            <Stack gap="sm" style={{ position: "sticky", top: 88 }}>
               <TextInput
                 placeholder="Search reports..."
                 value={query}
                 onChange={(event) => setQuery(event.currentTarget.value)}
               />
-              <ScrollArea.Autosize mah={560}>
+              <Text size="xs" c="dimmed">
+                {filtered.length} of {reports.length} reports
+              </Text>
+              <ScrollArea.Autosize mah={560} type="auto">
                 <Stack gap={4}>
                   {filtered.map((report) => (
                     <ReportNavItem
@@ -121,8 +127,17 @@ function ReportsPage() {
           </Grid.Col>
 
           <Grid.Col span={{ base: 12, md: 8 }}>
-            <Card withBorder padding="lg" radius="md">
-              {selected ? (
+            <Card padding="lg">
+              {loadingName !== null ? (
+                <Stack gap="sm">
+                  <Skeleton height={28} width="40%" />
+                  <Skeleton height={14} />
+                  <Skeleton height={14} />
+                  <Skeleton height={14} width="80%" />
+                  <Skeleton height={14} />
+                  <Skeleton height={14} width="60%" />
+                </Stack>
+              ) : selected ? (
                 <MarkdownReport content={selected.content} />
               ) : (
                 <Text c="dimmed">Select a report to view its contents.</Text>

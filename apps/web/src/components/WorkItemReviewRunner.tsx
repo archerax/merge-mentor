@@ -246,11 +246,8 @@ export function WorkItemReviewRunner<TSummary>({
             <Title order={5}>Live output</Title>
             {running && <Loader size="xs" />}
           </Group>
-          <ScrollArea.Autosize mah={420} viewportRef={viewportRef}>
-            <Code
-              block
-              style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "transparent" }}
-            >
+          <ScrollArea.Autosize mah={420} viewportRef={viewportRef} type="auto">
+            <Code block className="mm-code-block">
               {entries.map((entry) => (
                 <span key={entry.id} style={entryStyle(entry.kind)}>
                   {entry.text}
@@ -402,6 +399,8 @@ function ProjectFindings({ findings }: { readonly findings: readonly ProjectRevi
             <Card
               key={`${finding.workItemId}:${finding.dimension}:${index}`}
               withBorder
+              shadow="none"
+              radius="md"
               padding="sm"
             >
               <Group gap="xs" mb={4}>

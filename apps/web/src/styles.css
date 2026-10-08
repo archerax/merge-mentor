@@ -1,7 +1,131 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  min-height: 100dvh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: var(--mantine-color-body);
+  background-image:
+    radial-gradient(
+      60rem 60rem at 110% -10%,
+      color-mix(in srgb, var(--mantine-color-brand-6) 10%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50rem 50rem at -10% 0%,
+      color-mix(in srgb, var(--mantine-color-accent-6) 9%, transparent),
+      transparent 55%
+    );
+  background-attachment: fixed;
+}
+
+[data-mantine-color-scheme="dark"] body {
+  background-image:
+    radial-gradient(
+      60rem 60rem at 110% -10%,
+      color-mix(in srgb, var(--mantine-color-brand-7) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50rem 50rem at -10% 0%,
+      color-mix(in srgb, var(--mantine-color-accent-7) 14%, transparent),
+      transparent 55%
+    );
+}
+
+::selection {
+  background: color-mix(in srgb, var(--mantine-color-brand-5) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--mantine-color-brand-5);
+  outline-offset: 2px;
+}
+
+.mm-gradient-text {
+  background: linear-gradient(
+    100deg,
+    var(--mantine-color-accent-6),
+    var(--mantine-color-brand-5) 55%,
+    var(--mantine-color-brand-7)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.mm-card-interactive {
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.mm-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mantine-shadow-md);
+  border-color: var(--mantine-color-brand-4);
+}
+
+.mm-code-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: transparent !important;
+  border: 0;
+  padding: 0;
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.55;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mantine-color-gray-4) transparent;
+}
+
+[data-mantine-color-scheme="dark"] * {
+  scrollbar-color: var(--mantine-color-dark-4) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--mantine-color-gray-4);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+[data-mantine-color-scheme="dark"] *::-webkit-scrollbar-thumb {
+  background-color: var(--mantine-color-dark-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .mm-card-interactive {
+    transition: none;
+  }
+
+  .mm-card-interactive:hover {
+    transform: none;
+  }
 }
