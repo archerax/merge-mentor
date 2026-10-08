@@ -24,6 +24,7 @@ vi.mock("@github/copilot-sdk", () => ({
   defineTool: vi.fn((name, config) => ({ name, ...config })),
   RuntimeConnection: {
     forStdio: vi.fn((options) => ({ kind: "stdio", ...options })),
+    forInProcess: vi.fn(() => ({ kind: "inprocess" })),
   },
 }));
 
@@ -130,6 +131,21 @@ describe("CopilotSdkProvider", () => {
         expect(RuntimeConnection.forStdio).toHaveBeenCalledWith({
           path: "/dummy/path/to/copilot-cli",
         });
+        expect(RuntimeConnection.forInProcess).not.toHaveBeenCalled();
+      } finally {
+        process.env.COPILOT_CLI_PATH = originalEnv;
+      }
+    });
+
+    it("uses the in-process RuntimeConnection when COPILOT_CLI_PATH is not set", () => {
+      const originalEnv = process.env.COPILOT_CLI_PATH;
+      delete process.env.COPILOT_CLI_PATH;
+      try {
+        const provider = new CopilotSdkProvider();
+        const client = (provider as unknown as { getClient: () => unknown }).getClient();
+        expect(client).toBeDefined();
+        expect(RuntimeConnection.forInProcess).toHaveBeenCalledTimes(1);
+        expect(RuntimeConnection.forStdio).not.toHaveBeenCalled();
       } finally {
         process.env.COPILOT_CLI_PATH = originalEnv;
       }

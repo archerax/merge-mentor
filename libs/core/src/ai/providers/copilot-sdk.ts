@@ -291,15 +291,24 @@ export class CopilotSdkProvider implements AIProviderClient {
 
     const cliPath = process.env.COPILOT_CLI_PATH;
 
-    const config: Record<string, unknown> = {};
+    // Prefer the in-process (FFI) transport when no explicit CLI path is set.
+    // The SDK's default stdio transport spawns the bundled `copilot-runtime`
+    // wrapper, which resolves its companion `runtime.node` relative to its own
+    // executable path. On hardlinked installs under proot (e.g. Android/Termux)
+    // that resolves to a broken path such as `/.l2s/runtime.node`, so the CLI
+    // server exits before authentication. The in-process transport loads the
+    // cdylib directly instead. `COPILOT_CLI_PATH` still opts into stdio for a
+    // custom CLI installation.
+    const config: Record<string, unknown> = {
+      connection: cliPath
+        ? RuntimeConnection.forStdio({ path: cliPath })
+        : RuntimeConnection.forInProcess(),
+    };
     if (this.token) {
       config.gitHubToken = this.token;
     }
-    if (cliPath) {
-      config.connection = RuntimeConnection.forStdio({ path: cliPath });
-    }
 
-    this.client = new CopilotClient(Object.keys(config).length > 0 ? config : undefined);
+    this.client = new CopilotClient(config);
     return this.client;
   }
 
