@@ -1,6 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-
 import {
   loadConfig,
   type Platform,
@@ -11,20 +8,18 @@ import {
 import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
+import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
-import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
 import { initLogger, logger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter, processEnvironment } from "@merge-mentor/shared/ports/index.js";
-import {
-  generatePRIdentifier,
-  sanitizeProjectName,
-} from "@merge-mentor/shared/utils/prIdentifier.js";
 import { formatTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import { ensureCIContext } from "./shared/ci.js";
 import type { ProgramDeps, ReviewExecutionResult, ReviewOptions } from "./types.js";
+
+export { generateMarkdownReport } from "@merge-mentor/core/review/reviewReport.js";
 
 /**
  * Execute the review command logic.
@@ -169,202 +164,6 @@ export async function executeReview(
 }
 
 /**
- * Generate a markdown report for the review.
- */
-export function generateMarkdownReport(
-  result: ReviewResult,
-  aiProvider: AIProviderType,
-  dryRun: boolean,
-  reviewType = "general",
-  reviewPasses?: readonly ReviewPass[],
-  reviewStrategy: ReviewStrategy = "fast"
-): string {
-  const date = new Date().toISOString();
-  const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
-  const crossFileIssues = result.crossFileResult.findings.length;
-  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
-  const formattedPasses = formatReviewPasses(reviewPasses);
-
-  let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
-
-  // Header with PR details
-  report += `**Generated:** ${date}  \n`;
-  report += `**AI Provider:** ${aiProvider}  \n`;
-  report += `**Review Profile:** ${reviewTypeLabel}  \n`;
-  if (formattedPasses) {
-    report += `**Review Passes:** ${formattedPasses}  \n`;
-  }
-  if (reviewStrategy !== "fast") {
-    report += `**Review Strategy:** ${reviewStrategy}  \n`;
-  }
-  report += `**PR Title:** ${result.prDetails.title}  \n`;
-  report += `**Author:** ${result.prDetails.author}  \n`;
-  report += `**Branch:** \`${result.prDetails.headBranch}\` → \`${result.prDetails.baseBranch}\`  \n\n`;
-
-  // Summary
-  report += `## 📊 Review Summary\n\n`;
-  report += `- **Files Reviewed:** ${result.filesReviewed}\n`;
-  report += `- **Files Skipped:** ${result.filesSkipped}\n`;
-  report += `- **Total Issues Found:** ${totalIssues + crossFileIssues}\n`;
-  report += `  - File-specific issues: ${totalIssues}\n`;
-  report += `  - Cross-file issues: ${crossFileIssues}\n\n`;
-
-  if (result.tokenUsage) {
-    const lines = formatTokenUsage(result.tokenUsage);
-    report += `### 💰 Token Usage\n\n`;
-    for (const line of lines) {
-      report += `- ${line}\n`;
-    }
-    report += `\n`;
-  }
-
-  // Review actions summary
-  const actionHeader = dryRun ? "### 📝 Planned Actions (Dry-Run)" : "### 📝 Review Actions";
-  report += `${actionHeader}\n\n`;
-  report += `- Comments to Create: ${result.commentsCreated}\n\n`;
-
-  // Issues by severity
-  const severityCounts = countIssuesBySeverity(result);
-  if (Object.values(severityCounts).some((count) => count > 0)) {
-    report += `### Issues by Severity\n\n`;
-    Object.entries(severityCounts).forEach(([severity, count]) => {
-      if (count > 0) {
-        const emoji = SEVERITY_EMOJI[severity as keyof typeof SEVERITY_EMOJI];
-        report += `- ${emoji} **${
-          severity.charAt(0).toUpperCase() + severity.slice(1)
-        }:** ${count}\n`;
-      }
-    });
-    report += `\n`;
-  }
-
-  // Issues by category
-  const categoryCounts = countIssuesByCategory(result);
-  if (Object.values(categoryCounts).some((count) => count > 0)) {
-    report += `### Issues by Category\n\n`;
-    Object.entries(categoryCounts).forEach(([category, count]) => {
-      if (count > 0) {
-        const emoji = CATEGORY_EMOJI[category as keyof typeof CATEGORY_EMOJI];
-        report += `- ${emoji} **${
-          category.charAt(0).toUpperCase() + category.slice(1)
-        }:** ${count}\n`;
-      }
-    });
-    report += `\n`;
-  }
-
-  // File-specific issues
-  if (totalIssues > 0) {
-    report += `## 📁 File-Specific Issues\n\n`;
-
-    result.fileResults.forEach((fileResult) => {
-      if (fileResult.findings.length > 0) {
-        report += `### \`${fileResult.filename}\`\n\n`;
-
-        fileResult.findings.forEach((finding, index) => {
-          const severityEmoji = SEVERITY_EMOJI[finding.severity];
-          const categoryEmoji = CATEGORY_EMOJI[finding.category];
-
-          report += `#### ${index + 1}. Line ${finding.line} ${severityEmoji} ${categoryEmoji}\n\n`;
-          report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
-          report += `**Category:** ${finding.category}  \n`;
-          if (finding.isPreExisting) {
-            report += `**Pre-existing:** Yes ⚠️  \n`;
-          }
-          report += `\n**Issue:** ${finding.message}\n\n`;
-          report += `**Suggestion:** ${finding.suggestion}\n\n`;
-          report += `---\n\n`;
-        });
-      }
-    });
-  }
-
-  // Cross-file issues
-  if (crossFileIssues > 0) {
-    report += `## 🔗 Cross-File Issues\n\n`;
-
-    result.crossFileResult.findings.forEach((finding, index) => {
-      const severityEmoji = SEVERITY_EMOJI[finding.severity];
-      const categoryEmoji = CATEGORY_EMOJI[finding.category];
-
-      report += `### ${
-        index + 1
-      }. ${severityEmoji} ${categoryEmoji} ${finding.category.toUpperCase()}\n\n`;
-      report += `**Severity:** ${finding.severity.toUpperCase()}  \n`;
-      report += `**Affected Files:** ${finding.affectedFiles
-        .map((f) => `\`${f}\``)
-        .join(", ")}  \n\n`;
-      report += `**Issue:** ${finding.message}\n\n`;
-      report += `---\n\n`;
-    });
-  }
-
-  // Overall assessment
-  if (result.crossFileResult.overallAssessment) {
-    report += `## 🎯 Overall Assessment\n\n`;
-    report += `${result.crossFileResult.overallAssessment}\n\n`;
-  }
-
-  // Recommendations
-  if (result.crossFileResult.recommendations.length > 0) {
-    report += `## 💡 Recommendations\n\n`;
-    result.crossFileResult.recommendations.forEach((rec, index) => {
-      report += `${index + 1}. ${rec}\n`;
-    });
-    report += `\n`;
-  }
-
-  return report;
-}
-
-/**
- * Count issues by severity across all files and cross-file results.
- */
-function countIssuesBySeverity(result: ReviewResult): Record<string, number> {
-  const counts: Record<string, number> = {
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-  };
-
-  // Count file-specific issues
-  result.fileResults.forEach((fileResult) => {
-    fileResult.findings.forEach((finding) => {
-      counts[finding.severity] = (counts[finding.severity] || 0) + 1;
-    });
-  });
-
-  // Count cross-file issues
-  result.crossFileResult.findings.forEach((finding) => {
-    counts[finding.severity] = (counts[finding.severity] || 0) + 1;
-  });
-
-  return counts;
-}
-
-/**
- * Count issues by category across all files and cross-file results.
- */
-function countIssuesByCategory(result: ReviewResult): Record<string, number> {
-  const counts: Record<string, number> = {};
-
-  // Count file-specific issues
-  result.fileResults.forEach((fileResult) => {
-    fileResult.findings.forEach((finding) => {
-      counts[finding.category] = (counts[finding.category] || 0) + 1;
-    });
-  });
-
-  // Count cross-file issues
-  result.crossFileResult.findings.forEach((finding) => {
-    counts[finding.category] = (counts[finding.category] || 0) + 1;
-  });
-
-  return counts;
-}
-
-/**
  * Display review results to console.
  */
 export function displayResults(
@@ -441,26 +240,17 @@ export function displayResults(
   // Generate and save markdown report
   if (aiProvider && adapter && platform) {
     try {
-      const markdownReport = generateMarkdownReport(
+      const reportFile = saveReviewReport({
         result,
         aiProvider,
         dryRun,
         reviewType,
         reviewPasses,
-        reviewStrategy
-      );
-      const reportDir = join(tempPath ?? "./.mergementor", "reports");
-
-      // Generate unique report filename using platform and project
-      const projectId = sanitizeProjectName(adapter.getProjectIdentifier());
-      const prIdentifier = generatePRIdentifier(platform, projectId, result.prDetails.number);
-      const reportFile = join(reportDir, `${prIdentifier}-review-profile-report.md`);
-
-      // Ensure directory exists
-      mkdirSync(reportDir, { recursive: true });
-
-      // Write the report
-      writeFileSync(reportFile, markdownReport, "utf-8");
+        reviewStrategy,
+        platform,
+        projectId: adapter.getProjectIdentifier(),
+        tempPath,
+      });
 
       output.log("");
       output.log("📄 Detailed markdown report generated:");

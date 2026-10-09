@@ -6,6 +6,7 @@ import {
 } from "@merge-mentor/config/config.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
+import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
@@ -150,13 +151,14 @@ function toSummary(result: ReviewResult, target: ReviewTarget): ReviewSummary {
 /** Builds the review engine for the resolved target, streaming raw output to `emit`. */
 function createEngine(
   target: ReviewTarget,
+  adapter: PlatformAdapter,
   output: OutputWriter,
   onStreamChunk: (chunk: string) => void
 ): ReviewEngine {
   const { config } = target;
   const aiProvider = config.aiProvider as AIProviderType;
 
-  return new ReviewEngine(createAdapter(target), config.botCommentIdentifier, aiProvider, {
+  return new ReviewEngine(adapter, config.botCommentIdentifier, aiProvider, {
     dryRun: !target.write,
     verbose: true,
     aiModel: config.aiModel,
@@ -210,8 +212,29 @@ export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uin
       message: `Starting code review for PR #${target.pr} on ${target.platform}${modeLabel}...`,
     });
 
-    const engine = createEngine(target, output, emit.pushChunk);
+    const adapter = createAdapter(target);
+    const engine = createEngine(target, adapter, output, emit.pushChunk);
     const result = await engine.reviewPR(target.pr);
+
+    try {
+      const reportFile = saveReviewReport({
+        result,
+        aiProvider: target.config.aiProvider as AIProviderType,
+        dryRun: !target.write,
+        reviewType: target.config.reviewType,
+        reviewPasses: target.config.reviewPasses,
+        reviewStrategy: target.config.reviewStrategy,
+        platform: target.platform,
+        projectId: adapter.getProjectIdentifier(),
+        tempPath: target.config.tempPath,
+      });
+      emit.send({ type: "log", message: `📄 Detailed markdown report saved to: ${reportFile}` });
+    } catch (error) {
+      emit.send({
+        type: "log",
+        message: `⚠️ Failed to save markdown report: ${(error as Error).message}`,
+      });
+    }
 
     emit.send({ type: "result", summary: toSummary(result, target) });
   });
