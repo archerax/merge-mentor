@@ -19,8 +19,6 @@ export interface ReviewOptions {
   write?: boolean;
   /** Print verbose output. */
   verbose?: boolean;
-  /** Type of review ('general', 'testing', 'security', 'performance', 'fast', 'custom'). Default: 'general'. */
-  reviewType?: string;
   /** Comma-separated additive review passes layered on top of the baseline review (e.g. `scan`, `security`, `logic`). */
   passes?: string;
   /** Execution strategy ('deep', 'fast', or 'multi-agent'). Default: 'fast'. */
@@ -293,8 +291,6 @@ export interface StageOptions {
   head?: string;
   /** Review only staged changes (vs the base ref). Default: `false`. */
   staged?: boolean;
-  /** Type of review ('general', 'testing', 'security', 'performance', 'fast', 'custom'). Default: 'general'. */
-  reviewType?: string;
   /** Comma-separated additive review passes layered on top of the baseline review (e.g. `scan`, `security`, `logic`). */
   passes?: string;
   /** Execution strategy ('deep', 'fast', or 'multi-agent'). Default: 'fast'. */

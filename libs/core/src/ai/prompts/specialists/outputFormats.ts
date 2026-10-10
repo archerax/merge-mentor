@@ -179,9 +179,10 @@ export function buildFastReviewOutputFormat(includeCoverage = false): string {
     ? `
 
 COVERAGE:
-- Read every file listed below before analyzing it.
-- \`reviewed_files\` must list EVERY changed file you opened, including files with no findings.
-- Do not omit a file because it looks small, trivial, or test-only.`
+- You MUST review EVERY changed file thoroughly before responding.
+- Read every file's diff IN FULL; do not skim, sample, or skip any file.
+- \`reviewed_files\` MUST list EVERY changed file, including files with no findings.
+- Do not omit a file because it looks small, trivial, repetitive, or test-only.`
     : "";
 
   return buildOutputFormatSection(

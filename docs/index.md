@@ -61,6 +61,6 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 ## 🚀 Key Features
 
 - **Multi-Provider Support**: Supports GitHub Copilot SDK and OpenCode SDK. Also supports custom OpenAI-compatible endpoints (BYOK) such as locally-hosted models (Ollama, vLLM) and Azure OpenAI.
-- **Additive Review Passes**: Layers specialist attention on top of the baseline review (e.g. `testing`, `security`, `performance`, `database`, `monorepo`).
+- **Additive Review Passes**: In the `multi-agent` strategy, dispatches specialist attention as dedicated subagents (e.g. `testing`, `security`, `performance`, `database`, `monorepo`).
 - **Smart Deduplication**: Avoids posting comments on issues that already existed in the target branch prior to the PR.
 - **Real-time Streaming**: Displays the live output feedback from the AI model during execution.

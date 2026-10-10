@@ -68,16 +68,10 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
     description: "Review profile, strategy, and multi-agent behavior.",
     fields: [
       {
-        envVar: "MM_REVIEW_TYPE",
-        label: "Review type",
-        type: "enum",
-        options: ["general", "testing", "security", "performance", "fast", "custom"],
-      },
-      {
         envVar: "MM_REVIEW_PASSES",
         label: "Review passes",
         type: "text",
-        note: "Comma-separated; includes implicit passes from the review type",
+        note: "Comma-separated; requires the multi-agent strategy",
       },
       {
         envVar: "MM_REVIEW_STRATEGY",

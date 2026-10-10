@@ -62,11 +62,10 @@ merge-mentor stage --format json --output ./stage-review.json
 
 ### Review Configuration
 
-| Option                  | Description                                                                                                            | Default   |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------- |
-| `--review-type <type>`  | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`)                                     | `general` |
-| `--passes <passNames>`  | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | -         |
-| `--strategy <strategy>` | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                  | `fast`    |
+| Option                  | Description                                                                                                                                               | Default |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `--passes <passNames>`  | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`); requires `--strategy multi-agent` | -       |
+| `--strategy <strategy>` | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                                                     | `fast`  |
 
 ### File Filtering
 

@@ -272,7 +272,6 @@ describe("stage helpers", () => {
         makeReviewResult(),
         "opencode-sdk",
         { format: "json", output: outputFile },
-        "general",
         undefined,
         "fast",
         "./.mergementor",
@@ -292,16 +291,9 @@ describe("stage helpers", () => {
       const tempPath = join(outputDir, ".mergementor");
       mkdirSync(tempPath, { recursive: true });
       const output = makeOutput();
-      displayStageResults(
-        makeReviewResult(),
-        "opencode-sdk",
-        {},
-        "general",
-        undefined,
-        "fast",
-        tempPath,
-        { output }
-      );
+      displayStageResults(makeReviewResult(), "opencode-sdk", {}, undefined, "fast", tempPath, {
+        output,
+      });
 
       const reportFile = join(tempPath, "reports", "stage-main.md");
       const report = readFileSync(reportFile, "utf-8");

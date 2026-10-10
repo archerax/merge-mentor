@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Platform } from "@merge-mentor/config/config.js";
 import {
   formatReviewPasses,
-  formatReviewTypeLabel,
+  formatReviewProfileLabel,
   type ReviewPass,
   type ReviewStrategy,
 } from "@merge-mentor/config/reviewSelection.js";
@@ -31,7 +31,6 @@ import type { ReviewResult } from "./engine.js";
  * @param result - Completed review result
  * @param aiProvider - AI provider used for the review
  * @param dryRun - Whether comments were posted or only planned
- * @param reviewType - Review type label
  * @param reviewPasses - Optional analysis passes
  * @param reviewStrategy - Review strategy
  * @returns Markdown report content
@@ -40,14 +39,13 @@ export function generateMarkdownReport(
   result: ReviewResult,
   aiProvider: AIProviderType,
   dryRun: boolean,
-  reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
   reviewStrategy: ReviewStrategy = "fast"
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
-  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const reviewTypeLabel = formatReviewProfileLabel(reviewPasses, reviewStrategy);
   const formattedPasses = formatReviewPasses(reviewPasses);
 
   let report = `# Code Review Report - PR #${result.prDetails.number}\n\n`;
@@ -190,8 +188,6 @@ export interface SaveReviewReportOptions {
   readonly aiProvider: AIProviderType;
   /** Whether comments were posted or only planned. */
   readonly dryRun: boolean;
-  /** Review type label. */
-  readonly reviewType?: string;
   /** Optional analysis passes. */
   readonly reviewPasses?: readonly ReviewPass[];
   /** Review strategy. */
@@ -215,7 +211,6 @@ export function saveReviewReport(options: SaveReviewReportOptions): string {
     options.result,
     options.aiProvider,
     options.dryRun,
-    options.reviewType,
     options.reviewPasses,
     options.reviewStrategy
   );

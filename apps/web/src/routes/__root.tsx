@@ -199,7 +199,7 @@ function AppFrame({ children }: { children: React.ReactNode }) {
 
       <AppShell.Main>
         <Box py="md">
-          <Container size="lg">{children}</Container>
+          <Container size="xxl">{children}</Container>
         </Box>
       </AppShell.Main>
 

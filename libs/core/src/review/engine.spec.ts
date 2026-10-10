@@ -716,10 +716,9 @@ describe("ReviewEngine", () => {
       expect(result.commentsCreated).toBe(2); // 1 inline + 1 summary
     });
 
-    it("includes version, review type, and model in posted comment footers", async () => {
+    it("includes version, profile, and model in posted comment footers", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "security",
         aiModel: "claude-sonnet-4.6",
       });
       const prDetails = createPRDetails();
@@ -758,7 +757,7 @@ describe("ReviewEngine", () => {
         "test.ts",
         2,
         expect.stringContaining(
-          `${APP_NAME_LINK} v${packageJson.version}, Standard review + security (deep strategy), claude-sonnet-4.6`
+          `${APP_NAME_LINK} v${packageJson.version}, Standard review (deep strategy), claude-sonnet-4.6`
         )
       );
     });
@@ -1102,93 +1101,10 @@ describe("ReviewEngine", () => {
   });
 
   describe("resolved review profiles", () => {
-    it("resolves security reviewType to a baseline review with a security pass", async () => {
+    it("runs the fast strategy when requested", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "security",
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "No security issues found",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      expect(result).toBeDefined();
-      expect(result.filesReviewed).toBe(1);
-      expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# ADDITIVE REVIEW PASSES");
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. security");
-    });
-
-    it("resolves performance reviewType to a baseline review with a performance pass", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
-        verbose: false,
-        reviewType: "performance",
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "No performance issues found",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      expect(result).toBeDefined();
-      expect(result.filesReviewed).toBe(1);
-      expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. performance");
-    });
-
-    it("resolves testing reviewType to a baseline review with a testing pass", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
-        verbose: false,
-        reviewType: "testing",
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile({ filename: "src/utils.ts" })];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([{ filename: "src/utils.ts", findings: [] }]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Test coverage looks good",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      expect(result).toBeDefined();
-      expect(result.filesReviewed).toBe(1);
-      expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. testing");
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# TESTING PASS CONTEXT");
-    });
-
-    it("uses fast strategy when reviewType is fast", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
-        verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile()];
@@ -1232,7 +1148,7 @@ describe("ReviewEngine", () => {
     it("fast review counts analyzed files even when no findings are reported", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const files = [
@@ -1263,7 +1179,7 @@ describe("ReviewEngine", () => {
     it("fast review warns but still completes when the model omits files from coverage", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const files = [
@@ -1414,43 +1330,20 @@ describe("ReviewEngine", () => {
       expect(result.fileResults.every((r) => r.findings.length === 0)).toBe(true);
     });
 
-    it("uses ordered additive passes when reviewType is custom", async () => {
-      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
-        verbose: false,
-        reviewType: "custom",
-        reviewPasses: ["scan", "logic"],
-      });
-      const prDetails = createPRDetails();
-      const files = [createPRFile()];
-
-      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
-      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
-      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
-      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
-      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
-      mockParseCrossFileReview.mockReturnValue({
-        overallAssessment: "Custom review complete",
-        findings: [],
-        recommendations: [],
-      });
-
-      const result = await engine.reviewPR(123);
-
-      expect(result).toBeDefined();
-      expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("# ADDITIVE REVIEW PASSES");
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("1. scan");
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain("2. logic");
-      expect(mockExecutePrompt.mock.calls[0][0]).toContain(
-        "These passes add focus and context. They do **not** restrict what issues you may report."
-      );
-      expect(mockExecutePrompt.mock.calls[1][0]).toContain("# ADDITIVE REVIEW PASSES");
+    it("rejects additive passes when using a non-multi-agent strategy", () => {
+      expect(
+        () =>
+          new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+            verbose: false,
+            reviewPasses: ["scan", "logic"],
+          })
+      ).toThrow(/multi-agent/);
     });
 
     it("fast review returns empty results when no files have patches", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile({ patch: undefined, status: "modified" })];
@@ -1472,7 +1365,7 @@ describe("ReviewEngine", () => {
     it("fast review re-uses cached file and cross-file results when all files are unchanged", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
@@ -1527,7 +1420,7 @@ describe("ReviewEngine", () => {
     it("fast review performs partial review on changed files and merges cached results", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,
-        reviewType: "fast",
+        reviewStrategy: "fast",
       });
       const prDetails = createPRDetails();
       const initialFiles = [

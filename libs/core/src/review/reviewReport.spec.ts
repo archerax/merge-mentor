@@ -71,7 +71,6 @@ describe("saveReviewReport", () => {
       result,
       aiProvider: "copilot-sdk",
       dryRun: true,
-      reviewType: "general",
       platform: "github",
       projectId: "test-owner-test-repo",
       tempPath,
@@ -81,7 +80,7 @@ describe("saveReviewReport", () => {
       join(tempPath, "reports", "Github-test-owner-test-repo-PR42-review-profile-report.md")
     );
     expect(stripGenerated(readFileSync(reportFile, "utf-8"))).toBe(
-      stripGenerated(generateMarkdownReport(result, "copilot-sdk", true, "general"))
+      stripGenerated(generateMarkdownReport(result, "copilot-sdk", true))
     );
   });
 

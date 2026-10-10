@@ -50,12 +50,11 @@ unsafe or malformed replacements do not produce native suggestions.
 
 ### Review Configuration
 
-| Option                    | Description                                                                                                            | Env Variable         | Default   |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------- | --------- |
-| `--review-type <type>`    | Type of review (`general`, `testing`, `security`, `performance`, `fast`, `custom`)                                     | `MM_REVIEW_TYPE`     | `general` |
-| `--passes <passNames>`    | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`) | `MM_REVIEW_PASSES`   | -         |
-| `--strategy <strategy>`   | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                  | `MM_REVIEW_STRATEGY` | `fast`    |
-| `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                                                               | `MM_GIT_BACKEND`     | `cli`     |
+| Option                    | Description                                                                                                                                               | Env Variable         | Default |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ------- |
+| `--passes <passNames>`    | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`); requires `--strategy multi-agent` | `MM_REVIEW_PASSES`   | -       |
+| `--strategy <strategy>`   | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                                                     | `MM_REVIEW_STRATEGY` | `fast`  |
+| `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                                                                                                  | `MM_GIT_BACKEND`     | `cli`   |
 
 ### Platform Credentials
 
@@ -101,17 +100,11 @@ unsafe or malformed replacements do not produce native suggestions.
 
 ## Review Profiles, Passes, and Strategies
 
-Every review includes a **baseline review** running with the **fast** execution strategy by default. You can optionally switch to the **deep** execution strategy for higher coverage, the **multi-agent** strategy for specialized subagent reviews, or add ordered **passes** to increase attention in specific areas.
+Every review includes a **baseline review** running with the **fast** execution strategy by default. You can optionally switch to the **deep** execution strategy for higher coverage, or the **multi-agent** strategy for specialized subagent reviews. Additive **passes** are a multi-agent concept: each pass dispatches a specialized subagent, so `--passes` is only valid together with `--strategy multi-agent`.
 
 ```bash
 # Baseline review with deep strategy for maximum issues detection
 merge-mentor review --pr 123 --strategy deep --write
-
-# Baseline review plus testing attention (default fast strategy)
-merge-mentor review --pr 123 --passes "testing" --write
-
-# Baseline review plus multiple ordered passes with deep strategy
-merge-mentor review --pr 123 --passes "security,database,performance" --strategy deep --write
 
 # Multi-agent review: specialized subagents coordinated by a lead synthesizer
 merge-mentor review --pr 123 --strategy multi-agent
@@ -162,15 +155,17 @@ With `--strategy multi-agent` and no explicit `--passes`, all five agents run wi
 
 ### Common Profile Choices
 
-| Profile                    | Use When                                                 | AI Calls | What It Emphasizes                                                   |
-| -------------------------- | -------------------------------------------------------- | -------- | -------------------------------------------------------------------- |
-| **Baseline**               | Standard development or unsure what to add               | 2        | Broad code review coverage                                           |
-| **Baseline + fast**        | Routine PRs where cost or latency matters                | 1        | Same baseline coverage with a cheaper execution strategy             |
-| **Baseline + testing**     | Adding/modifying tests or testable code                  | 2        | Test coverage, test quality, assertions, mocks                       |
-| **Baseline + security**    | Handling sensitive data or auth flows                    | 2        | Vulnerabilities, auth flaws, data exposure, unsafe trust boundaries  |
-| **Baseline + performance** | Performance-critical paths or scaling concerns           | 2        | Efficiency, resource usage, caching, expensive queries               |
-| **Baseline + database**    | Changing schemas, queries, repositories, or transactions | 2        | Schema safety, query correctness, migrations, transaction boundaries |
-| **Baseline + monorepo**    | Touching workspace structure or cross-package contracts  | 2        | Package boundaries, dependency ownership, shared tooling impacts     |
+Additive passes require `--strategy multi-agent`. Passes are supplied via `--passes <name>` (comma-separated for multiple).
+
+| Pass                     | Use When                                                 | AI Calls | What It Emphasizes                                                   |
+| ------------------------ | -------------------------------------------------------- | -------- | -------------------------------------------------------------------- |
+| **Baseline** (no passes) | Standard development or unsure what to add               | 2        | Broad code review coverage                                           |
+| **Baseline + fast**      | Routine PRs where cost or latency matters                | 1        | Same baseline coverage with a cheaper execution strategy             |
+| **testing**              | Adding/modifying tests or testable code                  | 2        | Test coverage, test quality, assertions, mocks                       |
+| **security**             | Handling sensitive data or auth flows                    | 2        | Vulnerabilities, auth flaws, data exposure, unsafe trust boundaries  |
+| **performance**          | Performance-critical paths or scaling concerns           | 2        | Efficiency, resource usage, caching, expensive queries               |
+| **database**             | Changing schemas, queries, repositories, or transactions | 2        | Schema safety, query correctness, migrations, transaction boundaries |
+| **monorepo**             | Touching workspace structure or cross-package contracts  | 2        | Package boundaries, dependency ownership, shared tooling impacts     |
 
 ---
 

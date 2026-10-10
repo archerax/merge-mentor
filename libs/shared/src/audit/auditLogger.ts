@@ -26,7 +26,7 @@ import { type Clock, systemClock } from "../ports/index.js";
  * const auditLogger = getAuditLogger();
  *
  * // Log PR review start
- * auditLogger.logReviewStart(123, "github", 2, "security");
+ * auditLogger.logReviewStart(123, "github", ["security"], "multi-agent");
  *
  * // Log file analysis
  * auditLogger.logFileReviewStart("src/auth.ts", 123);
@@ -483,7 +483,6 @@ export class AuditLogger {
   logReviewStart(
     prNumber: number,
     platform: string,
-    reviewType?: string,
     reviewPasses?: readonly string[],
     reviewStrategy?: string
   ): void {
@@ -495,7 +494,6 @@ export class AuditLogger {
       {
         prNumber,
         platform,
-        reviewType: reviewType ?? "general",
         ...(reviewPasses && reviewPasses.length > 0 ? { reviewPasses } : {}),
         ...(reviewStrategy ? { reviewStrategy } : {}),
       }

@@ -47,7 +47,6 @@ function collectValues(config: Config): Record<string, string | undefined> {
     MM_AI_BASE_URL: config.aiBaseUrl,
     MM_AI_API_KEY: config.aiApiKey,
     MM_COPILOT_TOKEN: config.copilotToken,
-    MM_REVIEW_TYPE: config.reviewType,
     MM_REVIEW_PASSES: config.reviewPasses.length > 0 ? config.reviewPasses.join(", ") : undefined,
     MM_REVIEW_STRATEGY: config.reviewStrategy,
     MM_MULTI_AGENT_MAX_PARALLEL: String(config.multiAgentMaxParallel),

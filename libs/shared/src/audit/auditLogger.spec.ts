@@ -168,7 +168,7 @@ describe("AuditLogger", () => {
       const logger = new AuditLogger();
       const logEventSpy = vi.spyOn(logger, "logEvent");
 
-      logger.logReviewStart(123, "github", "custom", ["scan", "logic"]);
+      logger.logReviewStart(123, "github", ["scan", "logic"], "multi-agent");
 
       expect(logEventSpy).toHaveBeenCalledWith(
         "review.start",
@@ -178,8 +178,8 @@ describe("AuditLogger", () => {
         {
           prNumber: 123,
           platform: "github",
-          reviewType: "custom",
           reviewPasses: ["scan", "logic"],
+          reviewStrategy: "multi-agent",
         }
       );
     });

@@ -9,12 +9,10 @@
  * - Repository cloning for coding standard extraction
  * - Multiple review runs with aggregated findings
  *
- * Supported review types:
- * - general: Comprehensive code review covering style, logic, and best practices
- * - security: Security vulnerability and threat model analysis
- * - testing: Test coverage, quality, and edge case analysis
- * - performance: Performance bottlenecks, complexity analysis, optimization opportunities
- * - custom: General review prompt constrained to user-selected analysis passes
+ * Supported review strategies:
+ * - fast: Single-pass combined file and cross-file analysis
+ * - deep: Separate file-by-file and cross-file analysis passes
+ * - multi-agent: Specialized subagents coordinated by a lead synthesizer
  *
  * Multiple review runs execute sequentially (with delay) and aggregate findings through
  * fingerprinting to deduplicate across runs. This improves finding diversity and robustness.
@@ -30,7 +28,6 @@
  * @example
  * ```typescript
  * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
- *   reviewType: 'security',
  *   reviewRuns: 2,
  *   dryRun: false,
  * });
@@ -52,7 +49,6 @@ import {
   type ReviewStrategy,
   resolveReviewProfile,
   validateReviewStrategy,
-  validateReviewType,
 } from "@merge-mentor/config/reviewSelection.js";
 import type {
   CommentAction,
@@ -74,17 +70,12 @@ import {
   type OutputWriter,
 } from "@merge-mentor/shared/ports/index.js";
 import { filterPRFiles, getIgnorePatterns } from "@merge-mentor/shared/utils/ignoreFilter.js";
-import { detectLanguage } from "@merge-mentor/shared/utils/languageDetector.js";
 import {
   generatePRIdentifier,
   parsePRNumberSafe,
   sanitizeProjectName,
 } from "@merge-mentor/shared/utils/prIdentifier.js";
 import { StreamingDisplay } from "@merge-mentor/shared/utils/streamingDisplay.js";
-import {
-  findTestFileForProduction,
-  isTestFile,
-} from "@merge-mentor/shared/utils/testFileMapper.js";
 import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import {
@@ -183,9 +174,7 @@ interface ReviewEngineOptions {
   readonly aiTimeoutMs?: number;
   /** Skip pre-existing issues introduced before this PR (default: true) */
   readonly skipPreExisting?: boolean;
-  /** Legacy review type alias used to resolve the review profile. */
-  readonly reviewType?: string;
-  /** Ordered additive review passes used to build the resolved review profile. */
+  /** Ordered additive review passes; only valid with the multi-agent strategy. */
   readonly reviewPasses?: readonly ReviewPass[];
   /** Execution strategy used to run the resolved review profile. */
   readonly reviewStrategy?: ReviewStrategy;
@@ -253,7 +242,6 @@ interface ReviewEngineOptions {
  * ```typescript
  * // Create engine with GitHub adapter
  * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
- *   reviewType: 'security',
  *   reviewRuns: 2,
  *   dryRun: false,
  * });
@@ -291,7 +279,6 @@ export interface DescribePrOptions {
  * @example
  * ```typescript
  * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
- *   reviewType: 'security',
  *   dryRun: false,
  * });
  * const result = await engine.reviewPR(123);
@@ -328,7 +315,6 @@ export class ReviewEngine {
    * ```typescript
    * const engine = new ReviewEngine(githubAdapter, '[Bot]', 'copilot', {
    *   aiModel: 'gpt-5.2-codex',
-   *   reviewType: 'security',
    * });
    * ```
    */
@@ -346,7 +332,6 @@ export class ReviewEngine {
     this.reviewProfile =
       options?.reviewProfile ??
       resolveReviewProfile({
-        reviewType: validateReviewType(options?.reviewType),
         reviewPasses: options?.reviewPasses,
         reviewStrategy: validateReviewStrategy(options?.reviewStrategy),
       });
@@ -371,7 +356,6 @@ export class ReviewEngine {
     this.provider = createAIProvider(providerType, providerOptions);
     this.commentManager = new CommentManager(botIdentifier, {
       skipPreExisting: options?.skipPreExisting,
-      reviewType: this.reviewProfile.reviewType,
       reviewPasses: this.reviewProfile.passes,
       reviewStrategy: this.reviewProfile.strategy,
       model: model || (providerType === "copilot-sdk" ? "GitHub Copilot" : "OpenCode"),
@@ -409,7 +393,6 @@ export class ReviewEngine {
         aiTimeoutMs: timeoutMs,
         dryRun: options?.dryRun,
         skipPreExisting: options?.skipPreExisting,
-        reviewType: this.reviewProfile.reviewType,
         reviewPasses: this.reviewProfile.passes,
         reviewStrategy: this.reviewProfile.strategy,
       },
@@ -577,12 +560,10 @@ export class ReviewEngine {
     const projectId = sanitizeProjectName(this.platform.getProjectIdentifier());
     const prIdentifier = generatePRIdentifier(this.platformName as Platform, projectId, prNumber);
 
-    const reviewType = this.reviewProfile.reviewType;
     this.logger.info(
       {
         prNumber,
         prIdentifier,
-        reviewType,
         reviewPasses: this.reviewProfile.passes,
         reviewStrategy: this.reviewProfile.strategy,
       },
@@ -592,7 +573,6 @@ export class ReviewEngine {
     this.auditLogger.logReviewStart(
       prNumber,
       this.platformName,
-      reviewType,
       this.reviewProfile.passes,
       this.reviewProfile.strategy
     );
@@ -942,90 +922,6 @@ export class ReviewEngine {
     return existingComments;
   }
 
-  private hasReviewPass(pass: ReviewPass): boolean {
-    return this.reviewProfile.passes.includes(pass);
-  }
-
-  private formatContextList(label: string, values: readonly string[]): string {
-    if (values.length === 0) {
-      return `- ${label}: none`;
-    }
-
-    return `- ${label}: ${values.join(", ")}`;
-  }
-
-  private buildAdditionalPassContextSections(filenames: readonly string[]): readonly string[] {
-    const sections: string[] = [];
-
-    if (this.hasReviewPass("testing")) {
-      sections.push(this.buildTestingPassContextSection(filenames));
-    }
-
-    if (this.hasReviewPass("database")) {
-      sections.push(this.buildDatabasePassContextSection(filenames));
-    }
-
-    return sections;
-  }
-
-  private buildTestingPassContextSection(filenames: readonly string[]): string {
-    const productionFiles = filenames.filter((filename) => !isTestFile(filename));
-    const language = productionFiles.length > 0 ? detectLanguage(productionFiles[0]) : "unknown";
-    const mappedTests = productionFiles
-      .map((productionFile) => ({
-        productionFile,
-        testFile: findTestFileForProduction(productionFile, filenames),
-      }))
-      .filter((entry) => entry.testFile !== undefined)
-      .map((entry) => `${entry.productionFile} -> ${entry.testFile}`);
-    const missingTests = productionFiles.filter(
-      (productionFile) => !findTestFileForProduction(productionFile, filenames)
-    );
-    const changedTestFiles = filenames.filter((filename) => isTestFile(filename));
-
-    return `# TESTING PASS CONTEXT
-- Detected language: ${language}
-${this.formatContextList("Changed production files", productionFiles)}
-${this.formatContextList("Changed test files", changedTestFiles)}
-${this.formatContextList("Mapped production-to-test pairs", mappedTests)}
-${this.formatContextList("Production files without nearby tests", missingTests)}
-
-During the testing pass, look more carefully for missing coverage, weak assertions, brittle tests, and testability problems while still reporting any material baseline findings.`;
-  }
-
-  private buildDatabasePassContextSection(filenames: readonly string[]): string {
-    const schemaFiles = filenames.filter((filename) =>
-      /(^|\/)(schema|schemas|migrations?|seed|seeds|prisma)\/|schema\.(prisma|sql)$|migration/i.test(
-        filename
-      )
-    );
-    const queryFiles = filenames.filter((filename) =>
-      /(repository|repositories|dao|model|models|query|queries|typeorm|sequelize|drizzle|knex|db)/i.test(
-        filename
-      )
-    );
-    const suspectedDatabaseFiles = filenames.filter((filename) =>
-      this.isLikelyDatabaseFile(filename)
-    );
-
-    return `# DATABASE PASS CONTEXT
-${this.formatContextList("Schema or migration files", schemaFiles)}
-${this.formatContextList("Query/model/repository files", queryFiles)}
-${this.formatContextList("Suspected database-related files", suspectedDatabaseFiles)}
-
-During the database pass, pay extra attention to query correctness, transaction boundaries, migration safety, nullability, indexing, batching, locking, caching, and data consistency while still reporting any material baseline findings.`;
-  }
-
-  private isLikelyDatabaseFile(filename: string): boolean {
-    return (
-      /(^|\/)(db|database|persistence|storage)\//i.test(filename) ||
-      /(repository|repositories|dao|model|models|query|queries|migration|schema|prisma|typeorm|sequelize|drizzle|knex)/i.test(
-        filename
-      ) ||
-      /\.(sql|prisma)$/.test(filename)
-    );
-  }
-
   private async reviewFiles(
     prIdentifier: string,
     files: PRFile[],
@@ -1094,7 +990,6 @@ During the database pass, pay extra attention to query correctness, transaction 
   /**
    * Reviews multiple files in a single batched AI call.
    * Stores diffs to disk and asks the AI to review all files at once.
-   * Supports both general and specialist review types.
    */
   private async reviewFilesBatched(
     prIdentifier: string,
@@ -1123,7 +1018,6 @@ During the database pass, pay extra attention to query correctness, transaction 
           prNumber,
           fileCount: manifest.files.length,
           diffDir,
-          reviewType: this.reviewProfile.reviewType,
           reviewPasses: this.reviewProfile.passes,
         },
         "Stored diffs for batched review"
@@ -1137,19 +1031,12 @@ During the database pass, pay extra attention to query correctness, transaction 
         repoPath
       );
 
-      // Build prompt from the resolved baseline + additive pass profile
+      // Build prompt from the resolved baseline profile
       const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildGeneralFileReviewPrompt(
-        manifest,
-        commentsContext || undefined,
-        repoPath,
-        this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(filesWithPatches.map((file) => file.filename))
-      );
+      const prompt = buildGeneralFileReviewPrompt(manifest, commentsContext || undefined, repoPath);
       this.logger.info(
         {
           reviewPasses: this.reviewProfile.passes,
-          reviewType: this.reviewProfile.reviewType,
         },
         "Built resolved file review prompt"
       );
@@ -1162,7 +1049,6 @@ During the database pass, pay extra attention to query correctness, transaction 
           promptPreview: prompt.substring(0, 2000),
           promptSuffix: prompt.substring(Math.max(0, prompt.length - 500)),
           hasRepoPath: !!repoPath,
-          reviewType: this.reviewProfile.reviewType,
           reviewPasses: this.reviewProfile.passes,
           totalSize,
           shouldAttach,
@@ -1249,17 +1135,10 @@ During the database pass, pay extra attention to query correctness, transaction 
         existingCommentsContext: commentsContext,
       };
 
-      const prompt = buildGeneralCrossFilePrompt(
-        prDetails,
-        context,
-        repoPath,
-        this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(files.map((file) => file.filename))
-      );
+      const prompt = buildGeneralCrossFilePrompt(prDetails, context, repoPath);
       this.logger.info(
         {
           reviewPasses: this.reviewProfile.passes,
-          reviewType: this.reviewProfile.reviewType,
         },
         "Built resolved cross-file prompt"
       );
@@ -1420,9 +1299,7 @@ During the database pass, pay extra attention to query correctness, transaction 
         prDetails,
         manifest,
         commentsContext || undefined,
-        repoPath,
-        this.reviewProfile.passes,
-        this.buildAdditionalPassContextSections(filesToReview.map((file) => file.filename))
+        repoPath
       );
 
       this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");

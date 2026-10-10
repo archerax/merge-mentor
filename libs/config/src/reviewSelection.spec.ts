@@ -3,30 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatReviewPasses,
-  formatReviewTypeLabel,
+  formatReviewProfileLabel,
   parseReviewPasses,
   resolveReviewProfile,
   validateReviewStrategy,
-  validateReviewType,
 } from "./reviewSelection.js";
 
 describe("reviewSelection", () => {
-  describe("validateReviewType", () => {
-    it("returns the type if it is a valid review type", () => {
-      expect(validateReviewType("general")).toBe("general");
-      expect(validateReviewType("testing")).toBe("testing");
-      expect(validateReviewType("security")).toBe("security");
-      expect(validateReviewType("performance")).toBe("performance");
-      expect(validateReviewType("fast")).toBe("fast");
-      expect(validateReviewType("custom")).toBe("custom");
-    });
-
-    it("falls back to 'general' if type is undefined or invalid", () => {
-      expect(validateReviewType(undefined)).toBe("general");
-      expect(validateReviewType("invalid-type")).toBe("general");
-    });
-  });
-
   describe("validateReviewStrategy", () => {
     it("returns the strategy if it is a valid review strategy", () => {
       expect(validateReviewStrategy("deep")).toBe("deep");
@@ -80,100 +63,40 @@ describe("reviewSelection", () => {
   });
 
   describe("resolveReviewProfile", () => {
-    it("resolves default profile when no options are provided", () => {
+    it("resolves the default profile when no options are provided", () => {
       const profile = resolveReviewProfile({});
 
       expect(profile).toEqual({
-        baseline: true,
-        reviewType: "general",
-        legacyAlias: undefined,
         passes: [],
         strategy: "fast",
       });
     });
 
-    it("resolves implicit passes for predefined review types", () => {
-      expect(resolveReviewProfile({ reviewType: "security" })).toEqual({
-        baseline: true,
-        reviewType: "security",
-        legacyAlias: "security",
-        passes: ["security"],
-        strategy: "fast",
-      });
-
-      expect(resolveReviewProfile({ reviewType: "performance" })).toEqual({
-        baseline: true,
-        reviewType: "performance",
-        legacyAlias: "performance",
-        passes: ["performance"],
-        strategy: "fast",
-      });
-
-      expect(resolveReviewProfile({ reviewType: "testing" })).toEqual({
-        baseline: true,
-        reviewType: "testing",
-        legacyAlias: "testing",
-        passes: ["testing"],
-        strategy: "fast",
-      });
+    it("rejects explicit passes under non-multi-agent strategies", () => {
+      expect(() =>
+        resolveReviewProfile({ reviewPasses: ["scan"], reviewStrategy: "fast" })
+      ).toThrow(ValidationError);
+      expect(() =>
+        resolveReviewProfile({ reviewPasses: ["scan"], reviewStrategy: "deep" })
+      ).toThrow(ValidationError);
+      expect(() => resolveReviewProfile({ reviewPasses: ["scan"] })).toThrow(ValidationError);
     });
 
-    it("throws ValidationError for custom reviewType when no explicit passes provided", () => {
-      expect(() => resolveReviewProfile({ reviewType: "custom" })).toThrow(ValidationError);
-      expect(() => resolveReviewProfile({ reviewType: "custom", reviewPasses: [] })).toThrow(
-        ValidationError
-      );
-    });
-
-    it("resolves custom reviewType when explicit passes are provided", () => {
+    it("resolves explicit passes under the multi-agent strategy", () => {
       const profile = resolveReviewProfile({
-        reviewType: "custom",
         reviewPasses: ["scan", "logic"],
-      });
-
-      expect(profile).toEqual({
-        baseline: true,
-        reviewType: "custom",
-        legacyAlias: "custom",
-        passes: ["scan", "logic"],
-        strategy: "fast",
-      });
-    });
-
-    it("merges explicit passes and implicit passes without duplicates", () => {
-      const profile = resolveReviewProfile({
-        reviewType: "security",
-        reviewPasses: ["scan", "security", "logic"],
-      });
-
-      expect(profile.passes).toEqual(["scan", "security", "logic"]);
-    });
-
-    it("uses fast strategy when reviewType is fast regardless of options", () => {
-      const profile = resolveReviewProfile({
-        reviewType: "fast",
-        reviewStrategy: "deep",
-      });
-
-      expect(profile.strategy).toBe("fast");
-    });
-
-    it("respects reviewStrategy option for other review types", () => {
-      const profile = resolveReviewProfile({
-        reviewType: "general",
-        reviewStrategy: "deep",
-      });
-
-      expect(profile.strategy).toBe("deep");
-    });
-
-    it("resolves the multi-agent strategy when requested", () => {
-      const profile = resolveReviewProfile({
-        reviewType: "general",
         reviewStrategy: "multi-agent",
       });
 
-      expect(profile.strategy).toBe("multi-agent");
+      expect(profile).toEqual({
+        passes: ["scan", "logic"],
+        strategy: "multi-agent",
+      });
+    });
+
+    it("respects the reviewStrategy option", () => {
+      expect(resolveReviewProfile({ reviewStrategy: "deep" }).strategy).toBe("deep");
+      expect(resolveReviewProfile({ reviewStrategy: "multi-agent" }).strategy).toBe("multi-agent");
     });
   });
 
@@ -188,40 +111,25 @@ describe("reviewSelection", () => {
     });
   });
 
-  describe("formatReviewTypeLabel", () => {
-    it("formats general / default baseline label", () => {
-      expect(formatReviewTypeLabel("general")).toBe("Standard review");
-      expect(formatReviewTypeLabel("general", [], "fast")).toBe("Standard review");
-      expect(formatReviewTypeLabel("general", undefined, "deep")).toBe(
-        "Standard review (deep strategy)"
-      );
+  describe("formatReviewProfileLabel", () => {
+    it("formats the default baseline label", () => {
+      expect(formatReviewProfileLabel()).toBe("Standard review");
+      expect(formatReviewProfileLabel([], "fast")).toBe("Standard review");
+      expect(formatReviewProfileLabel(undefined, "deep")).toBe("Standard review (deep strategy)");
     });
 
-    it("formats label with implicit passes from review type", () => {
-      expect(formatReviewTypeLabel("security")).toBe("Standard review + security");
-      expect(formatReviewTypeLabel("performance", [], "deep")).toBe(
-        "Standard review + performance (deep strategy)"
-      );
-    });
-
-    it("formats label with merged explicit passes", () => {
-      expect(formatReviewTypeLabel("custom", ["scan", "logic"])).toBe(
-        "Standard review + scan → logic"
-      );
-      expect(formatReviewTypeLabel("custom", ["scan", "logic"], "deep")).toBe(
+    it("formats label with explicit passes", () => {
+      expect(formatReviewProfileLabel(["scan", "logic"])).toBe("Standard review + scan → logic");
+      expect(formatReviewProfileLabel(["scan", "logic"], "deep")).toBe(
         "Standard review + scan → logic (deep strategy)"
       );
     });
 
-    it("formats fast review type label without deep strategy override", () => {
-      expect(formatReviewTypeLabel("fast", [], "deep")).toBe("Standard review");
-    });
-
     it("formats multi-agent strategy labels", () => {
-      expect(formatReviewTypeLabel("general", undefined, "multi-agent")).toBe(
+      expect(formatReviewProfileLabel(undefined, "multi-agent")).toBe(
         "Standard review (multi-agent strategy)"
       );
-      expect(formatReviewTypeLabel("general", ["scan", "logic"], "multi-agent")).toBe(
+      expect(formatReviewProfileLabel(["scan", "logic"], "multi-agent")).toBe(
         "Standard review + scan → logic (multi-agent strategy)"
       );
     });

@@ -81,9 +81,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     multiAgentMaxParallel = 4,
     ...restOverrides
   } = overrides;
-  const reviewType = overrides.reviewType ?? "general";
-  const reviewProfile =
-    overrides.reviewProfile ?? resolveReviewProfile({ reviewType, reviewStrategy: "fast" });
+  const reviewProfile = overrides.reviewProfile ?? resolveReviewProfile({ reviewStrategy: "fast" });
 
   return {
     defaultPlatform: "azure" as const,
@@ -95,7 +93,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     aiPlanModel: "gpt-5.6-sol",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewType,
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,

@@ -10,10 +10,8 @@ import {
   type ResolvedReviewProfile,
   type ReviewPass,
   type ReviewStrategy,
-  type ReviewType,
   resolveReviewProfile,
   validateReviewStrategy as validateReviewStrategyValue,
-  validateReviewType as validateReviewTypeValue,
 } from "./reviewSelection.js";
 
 export type { Platform } from "@merge-mentor/domain/platform.js";
@@ -83,8 +81,6 @@ export interface Config {
   readonly aiApiKey?: string;
   /** Skip pre-existing issues (issues not introduced in this PR). */
   readonly skipPreExisting: boolean;
-  /** Legacy review type alias used to resolve the review profile. Default: general */
-  readonly reviewType: ReviewType;
   /** Ordered additive review passes resolved for this run. */
   readonly reviewPasses: readonly ReviewPass[];
   /** Execution strategy for the resolved review profile. */
@@ -119,9 +115,6 @@ const ConfigParserSchema = z.object({
   platform: z.enum(["github", "azure"]).catch("github"),
   aiProvider: AIProviderSchema,
   gitBackend: GitBackendSchema,
-  reviewType: z
-    .enum(["general", "testing", "security", "performance", "fast", "custom"])
-    .catch("general"),
   reviewStrategy: z.enum(["deep", "fast", "multi-agent"]).catch("fast"),
   multiAgentMaxParallel: z.preprocess(
     (val) => {
@@ -183,7 +176,6 @@ export function loadConfig(
     platform: cliOverrides?.platform ?? env.get("MM_PLATFORM"),
     aiProvider: cliOverrides?.aiProvider ?? env.get("MM_AI_PROVIDER"),
     gitBackend: cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"),
-    reviewType: cliOverrides?.reviewType ?? env.get("MM_REVIEW_TYPE"),
     reviewStrategy: cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY"),
     multiAgentMaxParallel: env.get("MM_MULTI_AGENT_MAX_PARALLEL"),
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED"),
@@ -203,7 +195,6 @@ export function loadConfig(
   );
 
   const resolvedReviewProfile = resolveReviewProfile({
-    reviewType: parsed.reviewType,
     reviewPasses: explicitReviewPasses,
     reviewStrategy: parsed.reviewStrategy,
   });
@@ -231,7 +222,6 @@ export function loadConfig(
     aiBaseUrl: cliOverrides?.aiBaseUrl ?? env.get("MM_AI_BASE_URL"),
     aiApiKey: cliOverrides?.aiApiKey ?? env.get("MM_AI_API_KEY"),
     skipPreExisting: true,
-    reviewType: parsed.reviewType,
     reviewPasses: resolvedReviewProfile.passes,
     reviewStrategy: resolvedReviewProfile.strategy,
     reviewProfile: resolvedReviewProfile,
@@ -278,8 +268,6 @@ interface CliOverrides {
   readonly aiBaseUrl?: string;
   /** Override for the BYOK API key. */
   readonly aiApiKey?: string;
-  /** Override for the review type. */
-  readonly reviewType?: string;
   /** Override for the review passes. */
   readonly passes?: string;
   /** Override for the review strategy. */
@@ -320,27 +308,6 @@ interface CliOverrides {
  */
 export function validateAIProvider(value: string | undefined): AIProviderType {
   return AIProviderSchema.parse(value);
-}
-
-/**
- * Validates the review type.
- * Supported types are: general, testing, security, performance, fast, custom.
- * Unknown values default to general.
- *
- * @param value - Review type name as string or undefined
- * @returns Validated review type, or 'general' if invalid
- *
- * @example
- * ```typescript
- * validateReviewType("security"); // "security"
- * validateReviewType("performance"); // "performance"
- * validateReviewType("custom"); // "custom"
- * validateReviewType("unknown"); // "general" (default)
- * validateReviewType(undefined); // "general" (default)
- * ```
- */
-export function validateReviewType(value: string | undefined): ReviewType {
-  return validateReviewTypeValue(value);
 }
 
 /**

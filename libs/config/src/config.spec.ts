@@ -5,7 +5,6 @@ import {
   validateConfig,
   validateGitBackend,
   validateReviewStrategy,
-  validateReviewType,
 } from "@merge-mentor/config/config.js";
 import { ConfigurationError } from "@merge-mentor/shared/errors/index.js";
 import type { Environment } from "@merge-mentor/shared/ports/environment.js";
@@ -368,27 +367,6 @@ describe("Config", () => {
       expect(config.skipPreExisting).toBe(true);
     });
 
-    it("should load MM_REVIEW_TYPE from environment", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_TYPE: "fast",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewType).toBe("fast");
-      expect(config.reviewStrategy).toBe("fast");
-    });
-
-    it("should default MM_REVIEW_TYPE to general for invalid values", () => {
-      const env = createStubEnvironment({
-        MM_REVIEW_TYPE: "invalid",
-      });
-
-      const config = loadConfig(undefined, env);
-
-      expect(config.reviewType).toBe("general");
-    });
-
     it("should load MM_REVIEW_STRATEGY=multi-agent from environment", () => {
       const env = createStubEnvironment({
         MM_REVIEW_STRATEGY: "multi-agent",
@@ -428,44 +406,13 @@ describe("Config", () => {
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 
-    it("should accept all valid MM_REVIEW_TYPE values", () => {
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "general" })).reviewType
-      ).toBe("general");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "testing" })).reviewType
-      ).toBe("testing");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "security" })).reviewType
-      ).toBe("security");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "performance" })).reviewType
-      ).toBe("performance");
-
-      expect(
-        loadConfig(undefined, createStubEnvironment({ MM_REVIEW_TYPE: "fast" })).reviewType
-      ).toBe("fast");
-    });
-
-    it("loads additive review passes without using legacy review types", () => {
+    it("loads additive review passes", () => {
       const config = loadConfig({
         passes: "security,database",
+        reviewStrategy: "multi-agent",
       });
 
-      expect(config.reviewType).toBe("general");
       expect(config.reviewPasses).toEqual(["security", "database"]);
-    });
-
-    it("merges legacy review type aliases with explicit passes", () => {
-      const config = loadConfig({
-        reviewType: "security",
-        passes: "database",
-      });
-
-      expect(config.reviewPasses).toEqual(["database", "security"]);
     });
 
     it("should default MM_STREAMING_LINES to 9 when not set", () => {
@@ -717,23 +664,6 @@ describe("Validator functions", () => {
       expect(validateAIProvider("nonexistent-provider")).toBe("copilot-sdk");
       expect(validateAIProvider("")).toBe("copilot-sdk");
       expect(validateAIProvider(undefined)).toBe("copilot-sdk");
-    });
-  });
-
-  describe("validateReviewType", () => {
-    it("should accept valid review types", () => {
-      expect(validateReviewType("general")).toBe("general");
-      expect(validateReviewType("testing")).toBe("testing");
-      expect(validateReviewType("security")).toBe("security");
-      expect(validateReviewType("performance")).toBe("performance");
-      expect(validateReviewType("fast")).toBe("fast");
-      expect(validateReviewType("custom")).toBe("custom");
-    });
-
-    it("should default to general for invalid types", () => {
-      expect(validateReviewType("invalid")).toBe("general");
-      expect(validateReviewType("")).toBe("general");
-      expect(validateReviewType(undefined)).toBe("general");
     });
   });
 

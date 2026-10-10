@@ -83,11 +83,9 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     multiAgentMaxParallel = 4,
     ...restOverrides
   } = overrides;
-  const reviewType = overrides.reviewType ?? "general";
   const reviewProfile =
     overrides.reviewProfile ??
     resolveReviewProfile({
-      reviewType,
       reviewPasses: overrides.reviewPasses,
       reviewStrategy: overrides.reviewStrategy,
     });
@@ -106,7 +104,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     aiModel: "claude-sonnet-4.6",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewType,
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,
@@ -461,24 +458,24 @@ describe("executeReview", () => {
   it("passes custom review passes through config and engine options", async () => {
     vi.mocked(loadConfig).mockReturnValue(
       createMockConfig({
-        reviewType: "custom",
         reviewPasses: ["scan", "logic"],
+        reviewStrategy: "multi-agent",
       })
     );
 
     const options = createReviewOptions({
       write: false,
       verbose: true,
-      reviewType: "custom",
       passes: "scan,logic",
+      strategy: "multi-agent",
     });
 
     await executeReview(options);
 
     expect(loadConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        reviewType: "custom",
         passes: "scan,logic",
+        reviewStrategy: "multi-agent",
       })
     );
     expect(ReviewEngine).toHaveBeenCalledWith(
@@ -486,9 +483,8 @@ describe("executeReview", () => {
       "[merge-mentor]",
       "copilot-sdk",
       expect.objectContaining({
-        reviewType: "custom",
         reviewPasses: ["scan", "logic"],
-        reviewStrategy: "fast",
+        reviewStrategy: "multi-agent",
       })
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -867,7 +863,6 @@ describe("displayResults", () => {
       mockAdapter as unknown as PlatformAdapter,
       "github",
       "copilot-sdk",
-      "general",
       undefined,
       "deep",
       undefined,
@@ -1011,7 +1006,7 @@ describe("displayResults", () => {
   it("shows custom review passes when provided", () => {
     const result = createMockReviewResult();
 
-    displayResults(result, true, undefined, undefined, undefined, "custom", ["scan", "logic"]);
+    displayResults(result, true, undefined, undefined, undefined, ["scan", "logic"]);
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Review Profile: Standard review + scan → logic")
@@ -1049,7 +1044,7 @@ describe("displayResults", () => {
   it("displays review strategy when not fast", () => {
     const result = createMockReviewResult();
 
-    displayResults(result, true, undefined, undefined, undefined, "general", undefined, "deep");
+    displayResults(result, true, undefined, undefined, undefined, undefined, "deep");
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Review Strategy: deep"));
   });
@@ -1057,7 +1052,7 @@ describe("displayResults", () => {
   it("does not display review strategy when fast", () => {
     const result = createMockReviewResult();
 
-    displayResults(result, true, undefined, undefined, undefined, "general", undefined, "fast");
+    displayResults(result, true, undefined, undefined, undefined, undefined, "fast");
 
     // Check that we don't log the strategy
     const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => String(call[0]));
@@ -1325,10 +1320,7 @@ describe("generateMarkdownReport", () => {
 
   it("includes custom review passes in the report header", () => {
     const result = createMockReviewResult({});
-    const report = generateMarkdownReport(result, "copilot-sdk", true, "custom", [
-      "scan",
-      "performance",
-    ]);
+    const report = generateMarkdownReport(result, "copilot-sdk", true, ["scan", "performance"]);
 
     expect(report).toContain("**Review Profile:** Standard review + scan → performance");
     expect(report).toContain("**Review Passes:** scan → performance");

@@ -5,7 +5,10 @@ import {
   type ReviewStrategy,
   validateConfig,
 } from "@merge-mentor/config/config.js";
-import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
+import {
+  formatReviewPasses,
+  formatReviewProfileLabel,
+} from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
 import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
@@ -69,7 +72,6 @@ export async function executeReview(
     aiTimeout: resolvedOptions.aiTimeout,
     aiBaseUrl: resolvedOptions.aiBaseUrl,
     aiApiKey: resolvedOptions.aiApiKey,
-    reviewType: resolvedOptions.reviewType,
     passes: resolvedOptions.passes,
     reviewStrategy: resolvedOptions.strategy,
     streamingEnabled: resolvedOptions.streamingEnabled,
@@ -122,7 +124,6 @@ export async function executeReview(
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     skipPreExisting: config.skipPreExisting,
-    reviewType: resolvedOptions.reviewType ?? config.reviewType,
     reviewPasses: config.reviewPasses,
     reviewStrategy: config.reviewStrategy,
     streamingEnabled: resolvedOptions.streamingEnabled !== false && config.streamingEnabled,
@@ -150,13 +151,7 @@ export async function executeReview(
   if (config.aiBaseUrl) {
     output.log(`  BYOK URL: ${config.aiBaseUrl}`);
   }
-  output.log(
-    `  Review:   ${formatReviewTypeLabel(
-      resolvedOptions.reviewType ?? config.reviewType,
-      config.reviewPasses,
-      config.reviewStrategy
-    )}`
-  );
+  output.log(`  Review:   ${formatReviewProfileLabel(config.reviewPasses, config.reviewStrategy)}`);
   output.log("");
 
   const result = await engine.reviewPR(pr);
@@ -172,14 +167,13 @@ export function displayResults(
   adapter?: PlatformAdapter,
   platform?: Platform,
   aiProvider?: AIProviderType,
-  reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
   reviewStrategy: ReviewStrategy = "fast",
   tempPath?: string,
   deps: ProgramDeps = {}
 ): void {
   const output = deps.output ?? consoleOutputWriter;
-  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const reviewTypeLabel = formatReviewProfileLabel(reviewPasses, reviewStrategy);
   const formattedPasses = formatReviewPasses(reviewPasses);
   output.log("=".repeat(60));
   output.log("📊 Review Complete");
@@ -244,7 +238,6 @@ export function displayResults(
         result,
         aiProvider,
         dryRun,
-        reviewType,
         reviewPasses,
         reviewStrategy,
         platform,

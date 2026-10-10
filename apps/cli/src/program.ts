@@ -126,11 +126,6 @@ program
   )
   .optionsGroup("Review Configuration")
   .option(
-    "--review-type <type>",
-    "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
-    "general"
-  )
-  .option(
     "--passes <passNames>",
     `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
   )
@@ -259,7 +254,6 @@ program
         aiModel: options.aiModel,
         aiBaseUrl: options.aiBaseUrl,
         aiApiKey: options.aiApiKey,
-        reviewType: options.reviewType,
         passes: options.passes,
         reviewStrategy: options.strategy,
         reasoning: options.reasoning,
@@ -267,14 +261,12 @@ program
         verifyPbi: options.verifyPbi,
       });
       const aiProvider = (options.provider || config.aiProvider) as AIProviderType;
-      const reviewType = options.reviewType ?? config.reviewType ?? "general";
       displayResults(
         result,
         !options.write,
         adapter,
         platform,
         aiProvider,
-        reviewType,
         config.reviewPasses,
         config.reviewStrategy,
         config.tempPath
@@ -324,11 +316,6 @@ program
     "Git backend for diffing (cli, isomorphic). Default: cli. Env: MM_GIT_BACKEND"
   )
   .optionsGroup("Review Configuration")
-  .option(
-    "--review-type <type>",
-    "Type of review (general, testing, security, performance, fast, custom). Env: MM_REVIEW_TYPE",
-    "general"
-  )
   .option(
     "--passes <passNames>",
     `Comma-separated additive review passes. Use quoted exact names: "${REVIEW_PASSES.join(", ")}"`
@@ -408,7 +395,6 @@ program
         aiModel: options.aiModel,
         aiBaseUrl: options.aiBaseUrl,
         aiApiKey: options.aiApiKey,
-        reviewType: options.reviewType,
         passes: options.passes,
         reviewStrategy: options.strategy,
         tempPath: options.tempPath,
@@ -419,7 +405,6 @@ program
         result,
         aiProvider,
         options,
-        options.reviewType ?? config.reviewType ?? "general",
         config.reviewPasses,
         config.reviewStrategy,
         config.tempPath

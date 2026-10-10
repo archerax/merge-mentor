@@ -35,7 +35,7 @@
  */
 
 import {
-  formatReviewTypeLabel,
+  formatReviewProfileLabel,
   type ReviewPass,
   type ReviewStrategy,
 } from "@merge-mentor/config/reviewSelection.js";
@@ -66,8 +66,6 @@ import packageJson from "../../package.json" with { type: "json" };
 interface CommentManagerOptions {
   /** Skip findings on lines not modified in this PR (pre-existing issues). Default: true */
   readonly skipPreExisting?: boolean;
-  /** Review type label shown in comment footers. Default: general. */
-  readonly reviewType?: string;
   /** Ordered additive review passes shown in review footers. */
   readonly reviewPasses?: readonly ReviewPass[];
   /** Execution strategy shown in review footers. */
@@ -88,7 +86,6 @@ export class CommentManager {
   private readonly summaryMarker = "<!-- AI_CODE_REVIEW_SUMMARY -->";
   private readonly skipPreExisting: boolean;
   private footer: string;
-  private readonly reviewType?: string;
   private readonly reviewPasses?: readonly ReviewPass[];
   private readonly reviewStrategy?: ReviewStrategy;
   private model?: string;
@@ -112,16 +109,10 @@ export class CommentManager {
   constructor(botIdentifier: string, options?: CommentManagerOptions) {
     this.botIdentifier = botIdentifier;
     this.skipPreExisting = options?.skipPreExisting ?? true;
-    this.reviewType = options?.reviewType;
     this.reviewPasses = options?.reviewPasses;
     this.reviewStrategy = options?.reviewStrategy;
     this.model = options?.model;
-    this.footer = this.buildFooter(
-      this.reviewType,
-      this.reviewPasses,
-      this.reviewStrategy,
-      this.model
-    );
+    this.footer = this.buildFooter(this.reviewPasses, this.reviewStrategy, this.model);
   }
 
   /**
@@ -140,12 +131,7 @@ export class CommentManager {
       "Updating dynamic AI model name in comment footer"
     );
     this.model = trimmedModel;
-    this.footer = this.buildFooter(
-      this.reviewType,
-      this.reviewPasses,
-      this.reviewStrategy,
-      this.model
-    );
+    this.footer = this.buildFooter(this.reviewPasses, this.reviewStrategy, this.model);
   }
 
   /**
@@ -451,26 +437,17 @@ ${this.footer}${idMarker}`;
   }
 
   private buildFooter(
-    reviewType?: string,
     reviewPasses?: readonly ReviewPass[],
     reviewStrategy?: ReviewStrategy,
     model?: string
   ): string {
     const footerParts = [
       `${APP_NAME_LINK} v${packageJson.version}`,
-      this.formatReviewType(reviewType, reviewPasses, reviewStrategy),
+      formatReviewProfileLabel(reviewPasses, reviewStrategy),
       this.formatModelName(model),
     ];
 
     return `${footerParts.join(", ")}\n<!-- ${this.botIdentifier} -->`;
-  }
-
-  private formatReviewType(
-    reviewType?: string,
-    reviewPasses?: readonly ReviewPass[],
-    reviewStrategy?: ReviewStrategy
-  ): string {
-    return formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
   }
 
   private formatModelName(model?: string): string {

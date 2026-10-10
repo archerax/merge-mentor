@@ -25,7 +25,6 @@ const DEFAULT_FOOTER = `${APP_NAME_LINK} v${packageJson.version}, Standard revie
 
 function createCommentManager(options?: {
   skipPreExisting?: boolean;
-  reviewType?: string;
   reviewPasses?: readonly (
     | "scan"
     | "security"
@@ -173,9 +172,8 @@ describe("CommentManager", () => {
       expect(result).toContain("Security Issue");
     });
 
-    it("includes configured review type and model in the footer", () => {
+    it("includes configured review model in the footer", () => {
       const manager = createCommentManager({
-        reviewType: "fast",
         model: "claude-sonnet-4.6",
       });
 
@@ -188,7 +186,6 @@ describe("CommentManager", () => {
 
     it("includes custom review passes in the footer", () => {
       const manager = createCommentManager({
-        reviewType: "custom",
         reviewPasses: ["scan", "logic"],
       });
 

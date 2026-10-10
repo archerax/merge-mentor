@@ -1,4 +1,3 @@
-import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
 import type { DiffManifest } from "@merge-mentor/domain/diff.js";
 import type { PRDetails } from "@merge-mentor/domain/platform.js";
 
@@ -8,100 +7,25 @@ import {
   wrapUntrustedPRMetadata,
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
-import { buildSelectedPassesSection } from "../shared/passHelpers.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import { buildFastReviewOutputFormat } from "./outputFormats.js";
 
-const FAST_PASS_DETAILS: Record<ReviewPass, readonly string[]> = {
-  scan: [
-    "- Re-scan the diff for suspicious change patterns and incomplete edits",
-    "- Revisit nearby code paths for inconsistencies introduced by the PR",
-  ],
-  security: [
-    "- Re-check trust boundaries, auth/authz, validation, and exploit paths",
-    "- Revisit secrets, data exposure, and unsafe execution/deserialization risks",
-  ],
-  logic: [
-    "- Revisit edge cases, contracts, and error propagation",
-    "- Re-check state transitions and integration correctness",
-  ],
-  performance: [
-    "- Re-check algorithmic complexity, repeated work, and resource usage",
-    "- Revisit batching, caching, and scalability risks",
-  ],
-  monorepo: [
-    "- Re-check workspace boundaries, package ownership, and dependency placement",
-    "- Revisit shared tooling/config changes for cross-package breakage",
-  ],
-  testing: [
-    "- Re-check missing coverage, weak assertions, flaky patterns, and testability",
-    "- Revisit integration points or behavior changes that likely need tests",
-  ],
-  database: [
-    "- Re-check query correctness, transaction boundaries, and migration safety",
-    "- Revisit indexing, batching, locking, and data consistency concerns",
-  ],
-};
-
-/**
- * Builds the "Additional Focused Passes" section detailing each selected pass
- * with its concrete re-analysis instructions. Returns an empty string when no
- * passes are selected.
- *
- * @param selectedPasses - Optional ordered list of review passes to render.
- * @returns Markdown section describing the additional focused passes, or "" when none are selected.
- */
-function buildAdditionalPassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  return `
-## Additional Focused Passes
-${selectedPasses
-  .map(
-    (pass, index) =>
-      `### Additive Pass ${index + 1}: ${pass}\n${FAST_PASS_DETAILS[pass].join("\n")}`
-  )
-  .join("\n\n")}
-`;
-}
-
-/**
- * Joins extra context sections into a single newline-separated markdown block.
- * Returns an empty string when no additional sections are provided.
- *
- * @param additionalContextSections - Optional extra markdown sections to append.
- * @returns The additional sections joined together, or "" when none are provided.
- */
-function buildAdditionalContextSections(additionalContextSections?: readonly string[]): string {
-  if (!additionalContextSections || additionalContextSections.length === 0) {
-    return "";
-  }
-
-  return `\n${additionalContextSections.join("\n\n")}\n`;
-}
-
 /**
  * Builds the single-pass fast review prompt combining file-level analysis,
- * cross-file architectural analysis, optional additive passes, and the fast
+ * cross-file architectural analysis, existing-comments context, and the fast
  * review output format specification.
  *
  * @param prDetails - PR metadata used for the PR context section.
  * @param manifest - Diff manifest listing the files to review.
  * @param existingCommentsContext - Optional markdown of already-posted PR comments to avoid duplicating.
  * @param repoPath - Optional repository root used for workspace access sections.
- * @param selectedPasses - Optional ordered list of additive review passes.
- * @param additionalContextSections - Optional extra markdown sections to append.
  * @returns The complete fast review prompt.
  */
 export function buildFastReviewPrompt(
   prDetails: PRDetails,
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoPath?: string,
-  selectedPasses?: readonly ReviewPass[],
-  additionalContextSections?: readonly string[]
+  repoPath?: string
 ): string {
   const filesListing = buildFilesListing(manifest, repoPath);
 
@@ -114,12 +38,11 @@ IMPORTANT: Be aware of issues already flagged. Focus on NEW issues not already c
 `
     : "";
 
-  const additionalPassAnalysis = buildAdditionalPassAnalysis(selectedPasses);
   const analysisStructureSection = `# ANALYSIS
-Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns across all files and their interactions. Report all genuine findings with line references.${additionalPassAnalysis}`;
+Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns across all files and their interactions. Report all genuine findings with line references.`;
 
   return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer performing comprehensive analysis in a single pass. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
+Expert code reviewer performing comprehensive analysis in a single pass. Baseline review is always active.
 ${buildWorkspaceSection(repoPath)}
 # PR CONTEXT
 ${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
@@ -129,13 +52,16 @@ Perform a COMPLETE review of this PR covering:
 - Individual file analysis (bugs, security, performance, quality)
 - Cross-file architectural analysis (integration, consistency, design)
 
-Review ALL files listed below. Each file's diff is stored separately - read each
-diff before analyzing it, then account for every file in your output.
+You MUST review EVERY file listed below - no exceptions. Each file's diff is
+stored separately: read every diff IN FULL before analyzing it, then account for
+every file in your output. Do NOT skim, sample, batch-skip, or defer any file
+because it looks small, trivial, repetitive, test-only, or config-only. A
+thorough review of all files is required before you respond.
 
 Files to Review:
 ${filesListing}
 ${commentsSection}
-${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}${analysisStructureSection}
+${analysisStructureSection}
 
 # VERIFICATION CHECKLIST
 
@@ -156,9 +82,8 @@ For each finding, \`reasoning\` must confirm the issue is real, state its concre
    - **Line-specific**: Include both file and line number
    - **File-level**: Include file but omit line number
    - **General/PR-level**: Omit both file and line (architectural concerns)
-5. Additive passes increase attention and context, but do NOT restrict findings to a narrow category
-6. Read and review EVERY file listed above, then list them all in \`reviewed_files\` - even files with no findings
-${existingCommentsContext ? "7. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
+5. You MUST read and review EVERY file listed above IN FULL, then list them ALL in \`reviewed_files\` - even files with no findings. Skipping or skimming any file is a failure of this task
+${existingCommentsContext ? "6. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
 # SEVERITY THRESHOLDS
 Use these exact criteria:

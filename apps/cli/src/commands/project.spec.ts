@@ -62,11 +62,9 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     multiAgentMaxParallel = 4,
     ...restOverrides
   } = overrides;
-  const reviewType = overrides.reviewType ?? "general";
   const reviewProfile =
     overrides.reviewProfile ??
     resolveReviewProfile({
-      reviewType,
       reviewPasses: overrides.reviewPasses,
       reviewStrategy: overrides.reviewStrategy,
     });
@@ -85,7 +83,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     aiModel: "claude-sonnet-4.6",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewType,
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,

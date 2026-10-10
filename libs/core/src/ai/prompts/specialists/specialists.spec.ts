@@ -820,33 +820,6 @@ describe("General Review Prompts", () => {
 
       expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
     });
-
-    it("supports additive passes for file review", () => {
-      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, undefined, [
-        "scan",
-        "logic",
-      ]);
-
-      expect(prompt).toContain("# ADDITIVE REVIEW PASSES");
-      expect(prompt).toContain("1. scan");
-      expect(prompt).toContain("2. logic");
-      expect(prompt).toContain("These passes add focus and context. They do **not** restrict");
-      expect(prompt).toContain("## Additional Focused Passes");
-      expect(prompt).toContain("### Additive Pass 1: scan");
-      expect(prompt).toContain("### Additive Pass 2: logic");
-      expect(prompt).toContain(
-        "Use only these categories: bug, security, performance, quality, documentation"
-      );
-    });
-
-    it("includes monorepo-specific guidance when monorepo pass is selected", () => {
-      const prompt = buildGeneralFileReviewPrompt(mockManifest, undefined, undefined, ["monorepo"]);
-
-      expect(prompt).toContain("1. monorepo");
-      expect(prompt).toContain("Package boundary violations and private cross-package imports");
-      expect(prompt).toContain("**monorepo**: Monorepo-team lens");
-      expect(prompt).toContain("**Monorepo hygiene**: Boundary violations");
-    });
   });
 
   describe("buildGeneralCrossFilePrompt", () => {
@@ -943,34 +916,6 @@ describe("General Review Prompts", () => {
       const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext);
 
       expect(prompt).not.toContain("# WORKSPACE ACCESS ENABLED");
-    });
-
-    it("supports additive passes for cross-file review", () => {
-      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, undefined, [
-        "scan",
-        "performance",
-      ]);
-
-      expect(prompt).toContain("# ADDITIVE REVIEW PASSES");
-      expect(prompt).toContain("1. scan");
-      expect(prompt).toContain("2. performance");
-      expect(prompt).toContain(
-        "- **performance**: Algorithmic complexity, caching, resource usage"
-      );
-      expect(prompt).toContain("These passes add focus and context. They do **not** restrict");
-      expect(prompt).toContain("Return ONLY the JSON code block");
-      expect(prompt).toContain("- Security: Authentication/authorization consistent?");
-    });
-
-    it("includes monorepo checklist items when monorepo pass is selected", () => {
-      const prompt = buildGeneralCrossFilePrompt(mockPrDetails, baseContext, undefined, [
-        "monorepo",
-      ]);
-
-      expect(prompt).toContain("1. monorepo");
-      expect(prompt).toContain(
-        "- **monorepo**: Package boundaries, dependency graph hygiene, shared tooling conventions, and workspace structure"
-      );
     });
   });
 });

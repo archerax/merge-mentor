@@ -62,7 +62,7 @@ function createMockResponse(ok: boolean, status: number, data: unknown) {
 }
 
 function createTestConfig(): Config {
-  const reviewProfile = resolveReviewProfile({ reviewType: "general" });
+  const reviewProfile = resolveReviewProfile({});
 
   return {
     defaultPlatform: "azure",
@@ -81,7 +81,6 @@ function createTestConfig(): Config {
     aiProvider: "copilot-sdk",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewType: "general",
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,

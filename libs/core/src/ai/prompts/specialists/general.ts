@@ -1,4 +1,3 @@
-import type { ReviewPass } from "@merge-mentor/config/reviewSelection.js";
 import type { DiffManifest } from "@merge-mentor/domain/diff.js";
 import type { PRDetails } from "@merge-mentor/domain/platform.js";
 
@@ -8,7 +7,6 @@ import {
   wrapUntrustedPRMetadata,
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
-import { buildSelectedPassesSection } from "../shared/passHelpers.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
 import {
   buildBatchedFileResultsOutputFormat,
@@ -34,225 +32,6 @@ const CROSS_FILE_ALLOWED_CATEGORIES = [
   "performance",
   "quality",
 ] as const;
-
-const FILE_REVIEW_PASS_DETAILS: Record<
-  ReviewPass,
-  {
-    readonly analysisLines: readonly string[];
-    readonly approach: string;
-    readonly reportItems: readonly string[];
-  }
-> = {
-  scan: {
-    analysisLines: [
-      "- Suspicious diff patterns and incomplete edits",
-      "- Inconsistent changes across nearby code paths",
-      "- Maintainability risks with concrete impact on future changes",
-    ],
-    approach:
-      "Suspicious diff patterns, incomplete edits, and risky inconsistencies introduced by the PR",
-    reportItems: [
-      "**Diff risks**: Incomplete refactors, inconsistent changes, or suspicious edits with concrete maintainability impact",
-    ],
-  },
-  security: {
-    analysisLines: [
-      "- Trust boundaries, auth/authz, and secret handling",
-      "- Input validation, sanitization, and exploit paths",
-      "- Data exposure and unsafe execution or deserialization risks",
-    ],
-    approach:
-      "Security-team lens: re-check trust boundaries, validation, and exploitability without narrowing what may be reported",
-    reportItems: [
-      "**Security lens**: Issues made more visible by closely checking trust boundaries, validation, secrets, and realistic exploit paths",
-    ],
-  },
-  logic: {
-    analysisLines: [
-      "- Edge cases and missing guards",
-      "- Error propagation and failure behavior",
-      "- State transitions, contracts, and integration correctness",
-    ],
-    approach:
-      "Correctness-team lens: revisit contracts, edge cases, and failure behavior for subtle breakage",
-    reportItems: [
-      "**Correctness**: Broken edge cases, missing guards, invalid state transitions, or incorrect data flow",
-    ],
-  },
-  performance: {
-    analysisLines: [
-      "- Algorithmic complexity and repeated work",
-      "- Resource leak risks and unnecessary allocations",
-      "- Scalability concerns in changed code paths",
-    ],
-    approach:
-      "Performance-team lens: re-check complexity, repeated work, memory, I/O, and scalability risks",
-    reportItems: [
-      "**Performance lens**: N+1 queries, repeated work, resource leaks, unbounded loops, or latency-amplifying changes",
-    ],
-  },
-  monorepo: {
-    analysisLines: [
-      "- Package boundary violations and private cross-package imports",
-      "- Workspace dependency placement and package ownership",
-      "- Shared tooling/config duplication across packages",
-    ],
-    approach:
-      "Monorepo-team lens: revisit workspace boundaries, dependency placement, and shared tooling conventions",
-    reportItems: [
-      "**Monorepo hygiene**: Boundary violations, dependency leakage, or workspace-ownership issues that can break builds or contracts",
-    ],
-  },
-  testing: {
-    analysisLines: [
-      "- Missing or weak tests for changed behavior",
-      "- Test quality issues such as weak assertions or flaky patterns",
-      "- Production-code testability problems that make meaningful tests hard to write",
-    ],
-    approach:
-      "Testing-team lens: revisit coverage, test quality, and testability while still reporting any material baseline issue",
-    reportItems: [
-      "**Testing lens**: Missing coverage, brittle tests, or testability issues that increase regression risk",
-    ],
-  },
-  database: {
-    analysisLines: [
-      "- Query correctness, transaction boundaries, and consistency risks",
-      "- Migration or schema-change safety, nullability, and rollback concerns",
-      "- Indexing, batching, locking, and data-access scalability issues",
-    ],
-    approach:
-      "Database-team lens: revisit migrations, transactions, data consistency, and query access patterns",
-    reportItems: [
-      "**Database lens**: Migration safety, transaction correctness, data integrity, query efficiency, or locking concerns",
-    ],
-  },
-};
-
-const CROSS_FILE_PASS_DETAILS: Record<ReviewPass, string> = {
-  scan: "Suspicious cross-file patterns, incomplete refactors, and inconsistent changes introduced by the PR",
-  security:
-    "Trust-boundary consistency, auth/authz coverage, validation gaps, data exposure, and exploit paths across files",
-  logic:
-    "Data flow, state management, error propagation, and contract compatibility across changed files",
-  performance:
-    "Algorithmic complexity, caching, resource usage, database access, and scalability risks with concrete system impact",
-  monorepo:
-    "Package boundaries, dependency graph hygiene, shared tooling conventions, and workspace structure",
-  testing:
-    "Coverage consistency, integration-test gaps, flaky patterns, and testability across the changed files",
-  database:
-    "Schema/query consistency, transaction coverage, migration impact, and data-integrity risks across files",
-};
-
-/**
- * Builds the file-review "Additional Focused Passes" section listing each
- * selected pass with its analysis lines. Returns an empty string when no
- * passes are selected.
- *
- * @param selectedPasses - Optional ordered list of review passes to render.
- * @returns Markdown section describing the additional file passes, or "" when none are selected.
- */
-function buildAdditionalFilePassAnalysis(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  return `
-## Additional Focused Passes
-${selectedPasses
-  .map((pass, index) => {
-    const details = FILE_REVIEW_PASS_DETAILS[pass].analysisLines.join("\n");
-    return `### Additive Pass ${index + 1}: ${pass}\n${details}`;
-  })
-  .join("\n\n")}
-
-After running the additional passes above, merge the strongest findings into one final result set.`;
-}
-
-/**
- * Builds the file-review "Additional Pass Approach" section describing each
- * selected pass's analytical lens. Returns an empty string when no passes are
- * selected.
- *
- * @param selectedPasses - Optional ordered list of review passes to render.
- * @returns Markdown section describing the additional pass approaches, or "" when none are selected.
- */
-function buildAdditionalReviewApproach(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  return `
-## Additional Pass Approach
-${selectedPasses
-  .map((pass, index) => `${index + 1}. **${pass}**: ${FILE_REVIEW_PASS_DETAILS[pass].approach}`)
-  .join("\n")}
-`;
-}
-
-/**
- * Builds the file-review "Additional Pass Focus" section listing the
- * deduplicated report items of the selected passes. Returns an empty string
- * when no passes are selected.
- *
- * @param selectedPasses - Optional ordered list of review passes to render.
- * @returns Markdown section of additional report focuses, or "" when none are selected.
- */
-function buildAdditionalReportFocus(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  const items = new Set<string>();
-
-  for (const pass of selectedPasses) {
-    for (const item of FILE_REVIEW_PASS_DETAILS[pass].reportItems) {
-      items.add(item);
-    }
-  }
-
-  return `
-## Additional Pass Focus
-${Array.from(items)
-  .map((item) => `- ${item}`)
-  .join("\n")}
-`;
-}
-
-/**
- * Builds the cross-file "Additional Pass Checklist" section mapping each
- * selected pass to its cross-file focus description. Returns an empty string
- * when no passes are selected.
- *
- * @param selectedPasses - Optional ordered list of review passes to render.
- * @returns Markdown checklist of additional cross-file passes, or "" when none are selected.
- */
-function buildAdditionalCrossFileChecklist(selectedPasses?: readonly ReviewPass[]): string {
-  if (!selectedPasses || selectedPasses.length === 0) {
-    return "";
-  }
-
-  return `
-## Additional Pass Checklist
-${selectedPasses.map((pass) => `- **${pass}**: ${CROSS_FILE_PASS_DETAILS[pass]}`).join("\n")}
-`;
-}
-
-/**
- * Joins extra context sections into a single newline-separated markdown block.
- * Returns an empty string when no additional sections are provided.
- *
- * @param additionalContextSections - Optional extra markdown sections to append.
- * @returns The additional sections joined together, or "" when none are provided.
- */
-function buildAdditionalContextSections(additionalContextSections?: readonly string[]): string {
-  if (!additionalContextSections || additionalContextSections.length === 0) {
-    return "";
-  }
-
-  return `\n${additionalContextSections.join("\n\n")}\n`;
-}
 
 /**
  * Builds an existing-comments section wrapping the provided untrusted comment
@@ -288,24 +67,20 @@ export interface GeneralCrossFileContext extends BaseCrossFileContext {
 }
 
 /**
- * Builds the general (baseline) per-file review prompt with optional additive
- * passes, existing-comments context, and the batched file results output
- * format. Instructs the model to review every file in the manifest and return
- * an entry for each, even with empty findings.
+ * Builds the general (baseline) per-file review prompt with optional
+ * existing-comments context and the batched file results output format.
+ * Instructs the model to review every file in the manifest and return an entry
+ * for each, even with empty findings.
  *
  * @param manifest - Diff manifest listing the files to review.
  * @param existingCommentsContext - Optional markdown of already-posted PR comments to avoid duplicating.
  * @param repoPath - Optional repository root used for workspace access sections.
- * @param selectedPasses - Optional ordered list of additive review passes.
- * @param additionalContextSections - Optional extra markdown sections to append.
  * @returns The complete general file review prompt.
  */
 export function buildGeneralFileReviewPrompt(
   manifest: DiffManifest,
   existingCommentsContext?: string,
-  repoPath?: string,
-  selectedPasses?: readonly ReviewPass[],
-  additionalContextSections?: readonly string[]
+  repoPath?: string
 ): string {
   const filesListing = buildFilesListing(manifest, repoPath);
 
@@ -315,20 +90,22 @@ export function buildGeneralFileReviewPrompt(
     "Be aware of issues already flagged. Focus on NEW issues not already covered."
   );
 
-  const additionalFilePassAnalysis = buildAdditionalFilePassAnalysis(selectedPasses);
   const analysisStructureSection = `# ANALYSIS
-Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns. Report all genuine findings with line references.${additionalFilePassAnalysis}`;
+Scan thoroughly for bugs, security vulnerabilities, performance issues, and quality concerns. Report all genuine findings with line references.`;
 
   return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer analyzing changes. Baseline review is always active. If additive passes are configured below, treat them like extra specialist reviewers giving the same diff another focused read.
+Expert code reviewer analyzing changes. Baseline review is always active.
 ${buildWorkspaceSection(repoPath)}
 # TASK
-Review ALL files listed below. Each file's diff is stored separately - read using @filename syntax.
+You MUST review EVERY file listed below - no exceptions. Each file's diff is
+stored separately - read each diff IN FULL using @filename syntax before
+analyzing it. Do NOT skim, sample, or skip any file because it looks small,
+trivial, repetitive, test-only, or config-only.
 
 Files to Review:
 ${filesListing}
 ${commentsSection}
-${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}${analysisStructureSection}
+${analysisStructureSection}
 
 # VERIFICATION CHECKLIST
 
@@ -344,9 +121,8 @@ For each finding, \`reasoning\` must confirm the issue is real, state its concre
 1. Only flag NEW issues in added lines (marked with +)
 2. Include confidence (high/medium/low) and reasoning for EVERY finding
 3. Use exact line numbers from diff - they're pre-calculated
-4. Return results for ALL files, even if no findings
-5. Additive passes increase attention and context, but do NOT restrict findings to a narrow category
-${existingCommentsContext ? "6. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
+4. You MUST return results for EVERY file, even if it has no findings; do not skim or skip any file
+${existingCommentsContext ? "5. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
 # SEVERITY THRESHOLDS
 Use these exact criteria:
@@ -368,7 +144,6 @@ Perform multiple mental passes through each file:
 4. **Quality**: Clean code principles, maintainability
 
 Consider: null/undefined, empty arrays, boundary values, concurrent access, "what could go wrong" scenarios
-${buildAdditionalReviewApproach(selectedPasses)}
 
 # ALWAYS REPORT
 - **Bugs**: Logic errors, race conditions, unhandled edge cases, off-by-one errors
@@ -379,7 +154,6 @@ ${buildAdditionalReviewApproach(selectedPasses)}
 - **Error handling**: Missing try-catch, unhandled promises, silent failures
 - **Performance**: Algorithmic inefficiency, memory leaks, N+1 queries
 - **Breaking changes**: API incompatibilities, contract violations
-${buildAdditionalReportFocus(selectedPasses)}
 
 # NEVER REPORT
 - **Formatting**: Whitespace, indentation (if project has auto-formatter)
@@ -421,22 +195,17 @@ ${buildBatchedFileResultsOutputFormat({
 /**
  * Builds the general (baseline) cross-file review prompt performing holistic
  * architectural analysis across the changed files. Includes per-file finding
- * summaries, optional additive passes, workspace access instructions, and the
- * cross-file output format.
+ * summaries, workspace access instructions, and the cross-file output format.
  *
  * @param prDetails - PR metadata used for the PR context section.
  * @param context - Cross-file context with file summaries and per-file review results.
  * @param repoPath - Optional repository root used for workspace access sections.
- * @param selectedPasses - Optional ordered list of additive review passes.
- * @param additionalContextSections - Optional extra markdown sections to append.
  * @returns The complete general cross-file review prompt.
  */
 export function buildGeneralCrossFilePrompt(
   prDetails: PRDetails,
   context: GeneralCrossFileContext,
-  repoPath?: string,
-  selectedPasses?: readonly ReviewPass[],
-  additionalContextSections?: readonly string[]
+  repoPath?: string
 ): string {
   const { filesSummary, fileReviewResults, existingCommentsContext } = context;
 
@@ -490,7 +259,7 @@ Your working directory is set to the repository root.
     : "";
 
   return `${buildSecurityPreamble()}# YOUR ROLE
-Expert code reviewer performing holistic architectural analysis of a pull request. Baseline cross-file review is always active. If additive passes are configured, treat them like extra specialist reviewers giving the changed files another focused read.
+Expert code reviewer performing holistic architectural analysis of a pull request. Baseline cross-file review is always active.
 ${workspaceSection}
 # PR CONTEXT
 ${wrapUntrustedPRMetadata(prDetails.title, prDetails.description)}
@@ -501,13 +270,11 @@ ${filesSummary}
 Individual File Findings:
 ${findingsSummary || "No individual issues found"}
 ${commentsSection}
-${buildSelectedPassesSection(selectedPasses)}${buildAdditionalContextSections(additionalContextSections)}
 # CRITICAL RULES
 1. ONLY analyze files in the Changed Files list above - ignore any files mentioned in PR description that aren't actually changed
 2. Do NOT duplicate issues already caught in individual file reviews
 3. Include confidence (high/medium/low) and reasoning for EVERY finding
 4. Focus on system-level and architectural concerns, not individual file issues
-5. Additive passes increase attention and context, but do NOT restrict findings to a narrow category
 
 # VERIFICATION CHECKLIST
 
@@ -541,7 +308,6 @@ Use these exact criteria:
 - Dependencies: Circular dependencies? Tight coupling between modules?
 - Testing: Integration points covered? Critical paths testable?
 - Security: Authentication/authorization consistent? Input validation complete?
-${buildAdditionalCrossFileChecklist(selectedPasses)}
 
 # SELF-CHALLENGE REQUIREMENT
 

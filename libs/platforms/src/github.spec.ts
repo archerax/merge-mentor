@@ -32,7 +32,7 @@ vi.mock("@octokit/rest", () => ({
 }));
 
 function createTestConfig(): Config {
-  const reviewProfile = resolveReviewProfile({ reviewType: "general" });
+  const reviewProfile = resolveReviewProfile({});
 
   return {
     defaultPlatform: "github",
@@ -51,7 +51,6 @@ function createTestConfig(): Config {
     aiProvider: "copilot-sdk",
     gitBackend: "cli",
     skipPreExisting: true,
-    reviewType: "general",
     reviewPasses: reviewProfile.passes,
     reviewStrategy: reviewProfile.strategy,
     reviewProfile,

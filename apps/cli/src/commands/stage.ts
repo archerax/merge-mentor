@@ -8,7 +8,10 @@ import {
   type ReviewStrategy,
 } from "@merge-mentor/config/config.js";
 import type { GitBackendType } from "@merge-mentor/config/config.js";
-import { formatReviewPasses, formatReviewTypeLabel } from "@merge-mentor/config/reviewSelection.js";
+import {
+  formatReviewPasses,
+  formatReviewProfileLabel,
+} from "@merge-mentor/config/reviewSelection.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
 import { createGitClient } from "@merge-mentor/core/review/gitClients/factory.js";
@@ -53,7 +56,6 @@ export async function executeStage(
     aiTimeout: options.aiTimeout,
     aiBaseUrl: options.aiBaseUrl,
     aiApiKey: options.aiApiKey,
-    reviewType: options.reviewType,
     passes: options.passes,
     reviewStrategy: options.strategy,
     gitBackend: options.gitBackend,
@@ -102,7 +104,6 @@ export async function executeStage(
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     skipPreExisting: config.skipPreExisting,
-    reviewType: options.reviewType ?? config.reviewType,
     reviewPasses: config.reviewPasses,
     reviewStrategy: config.reviewStrategy,
     streamingEnabled: options.streamingEnabled ?? config.streamingEnabled,
@@ -131,11 +132,7 @@ export async function executeStage(
     output.log(`  BYOK URL:   ${config.aiBaseUrl}`);
   }
   output.log(
-    `  Review:     ${formatReviewTypeLabel(
-      options.reviewType ?? config.reviewType,
-      config.reviewPasses,
-      config.reviewStrategy
-    )}`
+    `  Review:     ${formatReviewProfileLabel(config.reviewPasses, config.reviewStrategy)}`
   );
   output.log("");
 
@@ -219,14 +216,13 @@ function countStageIssuesByCategory(result: ReviewResult): Record<string, number
 export function generateStageMarkdownReport(
   result: ReviewResult,
   aiProvider: AIProviderType,
-  reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
   reviewStrategy: ReviewStrategy = "fast"
 ): string {
   const date = new Date().toISOString();
   const totalIssues = result.fileResults.reduce((sum, r) => sum + r.findings.length, 0);
   const crossFileIssues = result.crossFileResult.findings.length;
-  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const reviewTypeLabel = formatReviewProfileLabel(reviewPasses, reviewStrategy);
   const formattedPasses = formatReviewPasses(reviewPasses);
 
   let report = `# Staged Review Report\n\n`;
@@ -398,7 +394,6 @@ export function displayStageResults(
   result: ReviewResult,
   aiProvider: AIProviderType,
   options: StageOptions,
-  reviewType = "general",
   reviewPasses?: readonly ReviewPass[],
   reviewStrategy: ReviewStrategy = "fast",
   tempPath = "./.mergementor",
@@ -406,7 +401,7 @@ export function displayStageResults(
 ): void {
   const output = deps.output ?? consoleOutputWriter;
   const format = options.format ?? "terminal";
-  const reviewTypeLabel = formatReviewTypeLabel(reviewType, reviewPasses, reviewStrategy);
+  const reviewTypeLabel = formatReviewProfileLabel(reviewPasses, reviewStrategy);
   const formattedPasses = formatReviewPasses(reviewPasses);
 
   if (format === "json") {
@@ -421,13 +416,7 @@ export function displayStageResults(
   }
 
   if (format === "markdown") {
-    const markdown = generateStageMarkdownReport(
-      result,
-      aiProvider,
-      reviewType,
-      reviewPasses,
-      reviewStrategy
-    );
+    const markdown = generateStageMarkdownReport(result, aiProvider, reviewPasses, reviewStrategy);
     if (options.output) {
       writeStageReport(options.output, markdown);
       output.log(`📄 Markdown report written to: ${options.output}`);
@@ -520,13 +509,7 @@ export function displayStageResults(
   }
 
   // Persist a markdown report by default (terminal mode)
-  const markdown = generateStageMarkdownReport(
-    result,
-    aiProvider,
-    reviewType,
-    reviewPasses,
-    reviewStrategy
-  );
+  const markdown = generateStageMarkdownReport(result, aiProvider, reviewPasses, reviewStrategy);
   const reportDir = path.join(tempPath, "reports");
   const reportFile = path.join(
     reportDir,
