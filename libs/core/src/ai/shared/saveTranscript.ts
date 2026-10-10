@@ -44,12 +44,40 @@ export interface SaveTranscriptData {
   jsonOutput?: string;
   /** Optional token usage statistics associated with the exchange. */
   tokenUsage?: TokenUsage;
+  /**
+   * Optional list of files attached to the prompt (e.g. the diff files). When
+   * omitted the transcript records the attachment state as "unknown"; an empty
+   * array records that no files were attached.
+   */
+  attachments?: readonly string[];
   /** Whether the exchange succeeded. */
   success: boolean;
   /** Optional error message when the exchange failed. */
   error?: string;
   /** Retry attempt number this transcript corresponds to. */
   attempt: number;
+}
+
+/**
+ * Renders transcript header lines describing which files were attached to the
+ * prompt. An empty array means the caller explicitly provided no attachments
+ * (i.e. the diffs were not attached), while an undefined value means the caller
+ * did not report attachment state.
+ *
+ * @param attachments - Attachment file paths, or undefined when not reported.
+ * @returns Header lines summarizing the attachment state.
+ */
+function formatAttachmentLines(attachments?: readonly string[]): string[] {
+  if (!attachments) {
+    return ["Diff attachments: unknown"];
+  }
+  if (attachments.length === 0) {
+    return ["Diff attachments: none"];
+  }
+  return [
+    `Diff attachments: ${attachments.length} file(s)`,
+    ...attachments.map((file) => `  - ${file}`),
+  ];
 }
 
 /**
@@ -82,6 +110,7 @@ export async function saveTranscript(
       `Status: ${status}`,
       `Model: ${deps.model || "default"}`,
       `Attempt: ${data.attempt}`,
+      ...formatAttachmentLines(data.attachments),
       data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
       "",
       "=".repeat(80),

@@ -52,6 +52,7 @@ vi.mock("@merge-mentor/shared/ports/index.js", async (importOriginal) => {
 
 import { type PermissionRequest, RuntimeConnection } from "@github/copilot-sdk";
 import { AIProviderError, ValidationError } from "@merge-mentor/shared/errors/index.js";
+import { nodeFs } from "@merge-mentor/shared/ports/index.js";
 
 import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
@@ -235,6 +236,40 @@ describe("CopilotSdkProvider", () => {
         }),
         expect.any(Number)
       );
+    });
+
+    it("records attached diff files in the transcript header", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        diffFiles: ["/tmp/diff1.patch", "/tmp/diff2.patch"],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const transcript = vi
+        .mocked(nodeFs.writeFile)
+        .mock.calls.map(([, content]) => content as string)
+        .find((content) => content.includes("COPILOT SDK PROVIDER TRANSCRIPT"));
+      expect(transcript).toContain("Diff attachments: 2 file(s)");
+      expect(transcript).toContain("  - /tmp/diff1.patch");
+      expect(transcript).toContain("  - /tmp/diff2.patch");
+    });
+
+    it("records that no diffs were attached in the transcript header", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const transcript = vi
+        .mocked(nodeFs.writeFile)
+        .mock.calls.map(([, content]) => content as string)
+        .find((content) => content.includes("COPILOT SDK PROVIDER TRANSCRIPT"));
+      expect(transcript).toContain("Diff attachments: none");
     });
 
     it("handles response with markdown JSON code blocks", async () => {

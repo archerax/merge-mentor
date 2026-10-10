@@ -100,6 +100,70 @@ describe("saveTranscript", () => {
     );
   });
 
+  it("records attached files when diffs were attached", async () => {
+    const { deps, writtenFiles } = createMockDeps();
+
+    await saveTranscript(deps, {
+      prompt: "Test prompt",
+      attachments: ["/tmp/a.diff", "/tmp/b.diff"],
+      success: true,
+      attempt: 1,
+    });
+
+    const content =
+      writtenFiles[
+        path.join(
+          "/tmp/test",
+          "transcripts",
+          "transcript-test-2026-07-24T12-00-00-000Z-attempt-1-success.txt"
+        )
+      ];
+    expect(content).toContain("Diff attachments: 2 file(s)");
+    expect(content).toContain("  - /tmp/a.diff");
+    expect(content).toContain("  - /tmp/b.diff");
+  });
+
+  it("records that no files were attached when the list is empty", async () => {
+    const { deps, writtenFiles } = createMockDeps();
+
+    await saveTranscript(deps, {
+      prompt: "Test prompt",
+      attachments: [],
+      success: true,
+      attempt: 1,
+    });
+
+    const content =
+      writtenFiles[
+        path.join(
+          "/tmp/test",
+          "transcripts",
+          "transcript-test-2026-07-24T12-00-00-000Z-attempt-1-success.txt"
+        )
+      ];
+    expect(content).toContain("Diff attachments: none");
+  });
+
+  it("records an unknown attachment state when attachments are not reported", async () => {
+    const { deps, writtenFiles } = createMockDeps();
+
+    await saveTranscript(deps, {
+      prompt: "Test prompt",
+      success: true,
+      attempt: 1,
+    });
+
+    const content =
+      writtenFiles[
+        path.join(
+          "/tmp/test",
+          "transcripts",
+          "transcript-test-2026-07-24T12-00-00-000Z-attempt-1-success.txt"
+        )
+      ];
+    expect(content).toContain("Diff attachments: unknown");
+  });
+
   it("handles failure status and error details", async () => {
     const { deps, writtenFiles } = createMockDeps();
 

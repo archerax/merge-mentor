@@ -527,6 +527,7 @@ export class CopilotSdkProvider implements AIProviderClient {
             rawResponse: content,
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage: collectedUsage,
+            attachments: options?.diffFiles,
             success: true,
             attempt,
           });
@@ -544,6 +545,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           rawResponse: content,
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage: collectedUsage,
+          attachments: options?.diffFiles,
           success: true,
           attempt,
         });
@@ -568,6 +570,7 @@ export class CopilotSdkProvider implements AIProviderClient {
               rawResponse: recovered.raw,
               jsonOutput: JSON.stringify(recovered.parsed, null, 2),
               tokenUsage: collectedUsage,
+              attachments: options?.diffFiles,
               success: true,
               attempt,
             });
@@ -581,6 +584,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           events: sessionEvents,
           rawResponse: streamedContent || undefined,
           tokenUsage: collectedUsage,
+          attachments: options?.diffFiles,
           success: false,
           error: (error as Error).message,
           attempt,
@@ -671,6 +675,7 @@ export class CopilotSdkProvider implements AIProviderClient {
     rawResponse?: string;
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
+    attachments?: readonly string[];
     success: boolean;
     error?: string;
     attempt: number;
@@ -688,6 +693,7 @@ export class CopilotSdkProvider implements AIProviderClient {
       },
       {
         ...data,
+        attachments: data.attachments ?? [],
         timeline: this.formatSessionTimeline(data.events),
       }
     );

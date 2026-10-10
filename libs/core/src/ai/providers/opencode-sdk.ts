@@ -335,6 +335,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           await this.saveTranscript({
             prompt,
             rawResponse: JSON.stringify(result, null, 2),
+            attachments: options?.diffFiles,
             success: false,
             error: err.message,
             attempt,
@@ -360,6 +361,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             rawResponse: JSON.stringify(result, null, 2),
             jsonOutput: raw,
             tokenUsage,
+            attachments: options?.diffFiles,
             success: true,
             attempt,
           });
@@ -383,6 +385,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
                 rawResponse: JSON.stringify(result, null, 2),
                 jsonOutput: JSON.stringify(parsed, null, 2),
                 tokenUsage,
+                attachments: options?.diffFiles,
                 success: true,
                 attempt,
               });
@@ -428,6 +431,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             rawResponse: JSON.stringify(result, null, 2),
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage,
+            attachments: options?.diffFiles,
             success: true,
             attempt,
           });
@@ -444,6 +448,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           rawResponse: JSON.stringify(result, null, 2),
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage,
+          attachments: options?.diffFiles,
           success: true,
           attempt,
         });
@@ -455,6 +460,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     } catch (error) {
       await this.saveTranscript({
         prompt,
+        attachments: options?.diffFiles,
         success: false,
         error: (error as Error).message,
         attempt,
@@ -476,6 +482,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     rawResponse?: string;
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
+    attachments?: readonly string[];
     success: boolean;
     error?: string;
     attempt: number;
@@ -491,7 +498,10 @@ export class OpenCodeSdkProvider implements AIProviderClient {
         displayName: "OpenCode SDK",
         model: this.model,
       },
-      data
+      {
+        ...data,
+        attachments: data.attachments ?? [],
+      }
     );
   }
 
