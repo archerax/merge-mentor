@@ -73,6 +73,17 @@ const DIMENSION_LABELS: Record<ProjectReviewFinding["dimension"], string> = {
 export type ProjectReviewResponse = z.infer<typeof ProjectReviewResponseSchema>;
 
 /**
+ * A completed project plan review: the AI assessment plus the exact comment
+ * body that was posted, or would have been posted in dry-run mode.
+ */
+export interface ProjectReviewResult extends ProjectReviewResponse {
+  /** Full markdown report body that is, or would be, posted to the root item. */
+  readonly reportMarkdown: string;
+  /** Existing bot comment that overrides, when an in-place update applies. */
+  readonly existingCommentId?: number | string;
+}
+
+/**
  * Configuration options for the project review engine.
  */
 export interface ProjectReviewEngineOptions {
@@ -121,7 +132,7 @@ export class ProjectReviewEngine {
   /**
    * Reviews the specified project/feature plan by fetching details, calling the AI provider, and writing the report.
    */
-  async reviewProject(id: string): Promise<ProjectReviewResponse> {
+  async reviewProject(id: string): Promise<ProjectReviewResult> {
     const dryRun = this.options.dryRun ?? false;
     const tempPath = this.options.tempPath ?? "./.mergementor";
     const provider = this.options.aiProvider ?? "copilot-sdk";
@@ -216,16 +227,16 @@ export class ProjectReviewEngine {
       return markdown;
     });
 
+    // Find existing comment with the signature to overwrite on the root item
+    const signature = "<!-- merge-mentor-project-review -->";
+    const rootItem = projectDetails.workItems.find((wi) => wi.id === id);
+    const rootComments = rootItem?.comments || [];
+    const existingComment = rootComments.find((c) => c.body.includes(signature));
+
     if (dryRun) {
       output.log("📝 Dry-run mode: Comment posting skipped.");
     } else {
       await runPhase("post", "Posting review comment", async () => {
-        // Find existing comment with the signature to overwrite on the root item
-        const signature = "<!-- merge-mentor-project-review -->";
-        const rootItem = projectDetails.workItems.find((wi) => wi.id === id);
-        const rootComments = rootItem?.comments || [];
-        const existingComment = rootComments.find((c) => c.body.includes(signature));
-
         if (existingComment) {
           output.log(
             `🔄 Updating existing review comment (ID: ${existingComment.id}) on Project Root #${id}...`
@@ -239,7 +250,7 @@ export class ProjectReviewEngine {
       });
     }
 
-    return reviewData;
+    return { ...reviewData, reportMarkdown, existingCommentId: existingComment?.id };
   }
 
   /** Preserves the fetched root title when the model omitted one. */

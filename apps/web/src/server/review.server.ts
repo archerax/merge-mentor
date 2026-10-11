@@ -5,6 +5,11 @@ import {
   validateConfig,
 } from "@merge-mentor/config/config.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
+import {
+  commentFingerprint,
+  type PendingComment,
+  postPlannedComments,
+} from "@merge-mentor/core/review/commentPosting.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
 import type { ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
 import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
@@ -16,7 +21,20 @@ import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { parsePRUrl } from "@merge-mentor/shared/utils/prUrl.js";
 
 import { refreshEnv, resolveTempPath } from "./env.server.js";
-import type { ReviewFindingView, ReviewStreamInput, ReviewSummary } from "./review.types.js";
+import {
+  loadPostedFingerprints,
+  postedTargetKey,
+  recordPostedFingerprints,
+  reviewScope,
+} from "./postedComments.server.js";
+import type {
+  PendingCommentView,
+  PostCommentsInput,
+  PostCommentsResult,
+  ReviewFindingView,
+  ReviewStreamInput,
+  ReviewSummary,
+} from "./review.types.js";
 import { createSseResponse } from "./sse.server.js";
 
 /** A fully resolved review target: platform, PR number, link, and configuration. */
@@ -153,7 +171,36 @@ function toSummary(result: ReviewResult, target: ReviewTarget): ReviewSummary {
     commentsCreated: result.commentsCreated,
     commentErrors: result.commentErrors,
     dryRun: !target.write,
+    pendingComments: toPendingCommentViews(target, result.plannedComments),
   };
+}
+
+/** Marks planned PR comments with a stable fingerprint and posted state. */
+function toPendingCommentViews(
+  target: ReviewTarget,
+  plannedComments: ReviewResult["plannedComments"]
+): PendingCommentView[] {
+  if (target.write || !plannedComments) return [];
+
+  const key = postedTargetKey(
+    "pr",
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.pr
+  );
+  const posted = loadPostedFingerprints(target.config.tempPath, key);
+
+  return plannedComments.map((action) => {
+    const comment: PendingComment = {
+      path: action.path,
+      line: action.line,
+      startLine: action.startLine,
+      body: action.body ?? "",
+      existingCommentId: action.existingCommentId,
+    };
+    const fingerprint = commentFingerprint(comment);
+    return { ...comment, fingerprint, posted: posted.has(fingerprint) };
+  });
 }
 
 /** Builds the review engine for the resolved target, streaming raw output to `emit`. */
@@ -265,4 +312,28 @@ export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uin
 
     emit.send({ type: "result", summary: toSummary(result, target) });
   });
+}
+
+/**
+ * Posts the comments a dry-run PR review planned, without re-running any AI
+ * work. The planned payload is round-tripped from the client.
+ */
+export async function postPRComments(input: PostCommentsInput): Promise<PostCommentsResult> {
+  const target = resolveTarget(input);
+  const adapter = createAdapter(target);
+  const key = postedTargetKey(
+    "pr",
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.pr
+  );
+  const posted = loadPostedFingerprints(target.config.tempPath, key);
+  const result = await postPlannedComments(
+    adapter,
+    { kind: "pr", prNumber: target.pr },
+    input.comments,
+    { postedFingerprints: posted }
+  );
+  recordPostedFingerprints(target.config.tempPath, key, result.postedFingerprints);
+  return result;
 }

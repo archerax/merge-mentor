@@ -6,7 +6,44 @@
  * bundle.
  */
 
+import type { PendingComment } from "@merge-mentor/core/review/commentPosting.js";
 import type { ReviewPhaseId, ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
+
+/** A planned comment with its dedup fingerprint and current posted state. */
+export interface PendingCommentView extends PendingComment {
+  /** Stable fingerprint used to track posted state across runs and reloads. */
+  readonly fingerprint: string;
+  /** Whether the comment has already been posted for this target. */
+  readonly posted: boolean;
+}
+
+/** Outcome of posting a batch of planned dry-run comments. */
+export interface PostCommentsResult {
+  /** Number of comments successfully posted or updated. */
+  readonly commentsCreated: number;
+  /** Number of comments skipped because they were already posted. */
+  readonly commentsSkipped: number;
+  /** Error messages for comments that failed to post. */
+  readonly commentErrors: readonly string[];
+  /** Fingerprints of the comments posted (or updated) by this call. */
+  readonly postedFingerprints: readonly string[];
+}
+
+/** Input accepted by the stateless post-comments endpoint. */
+export interface PostCommentsInput {
+  /** Which review kind produced the planned comments. */
+  readonly kind: "pr" | "pbi" | "project";
+  /** PR URL that determines platform, repository, and PR number. */
+  readonly prUrl?: string;
+  /** PR number, used when {@link prUrl} is not provided. */
+  readonly pr?: number;
+  /** Work item URL that determines platform, repository, and item ID. */
+  readonly url?: string;
+  /** Work item ID, used when {@link url} is not provided. */
+  readonly id?: string;
+  /** Comments planned by a dry-run review to post. */
+  readonly comments: readonly PendingComment[];
+}
 
 /** Review execution strategy selectable from the web UI. */
 export const REVIEW_STRATEGY_OPTIONS = ["fast", "deep", "multi-agent"] as const;
@@ -108,6 +145,8 @@ export interface ReviewSummary {
   readonly commentErrors: readonly string[];
   /** Whether the review ran in dry-run mode. */
   readonly dryRun: boolean;
+  /** Comments a dry-run planned to post; empty once posted. */
+  readonly pendingComments: readonly PendingCommentView[];
 }
 
 /**
@@ -139,6 +178,8 @@ export interface PBIReviewSummary {
   readonly suggestions: readonly string[];
   /** Whether the review ran in dry-run mode. */
   readonly dryRun: boolean;
+  /** Comments a dry-run planned to post; empty once posted. */
+  readonly pendingComments: readonly PendingCommentView[];
 }
 
 /** A single structured finding from a project plan review. */
@@ -179,4 +220,6 @@ export interface ProjectReviewSummary {
   readonly suggestions: readonly string[];
   /** Whether the review ran in dry-run mode. */
   readonly dryRun: boolean;
+  /** Comments a dry-run planned to post; empty once posted. */
+  readonly pendingComments: readonly PendingCommentView[];
 }

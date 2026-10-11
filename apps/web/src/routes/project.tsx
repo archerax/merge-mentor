@@ -17,18 +17,19 @@ function ProjectPage() {
         description={
           <>
             Review a project or feature plan hierarchy for planning quality. Paste a work item URL
-            or enter an ID; comments are not posted unless write mode is enabled. Reports are saved
-            to <Code>.mergementor/reports</Code>.
+            or enter an ID; post the review during the run or after a dry-run. Reports are saved to{" "}
+            <Code>.mergementor/reports</Code>.
           </>
         }
       />
 
       <WorkItemReviewRunner<ProjectReviewSummary>
         endpoint="/api/project/stream"
+        kind="project"
         inputLabel="Project root"
         placeholder="https://dev.azure.com/org/project/_workitems/edit/100 or 100"
         writeLabel="Post comments to the project root"
-        writeDescription="Off runs a dry-run and only reports what would be posted."
+        writeDescription="Off runs a dry-run; you can still post the review afterwards."
         actionLabel="Run project review"
         renderResult={(summary) => <ProjectReviewResult summary={summary} />}
       />

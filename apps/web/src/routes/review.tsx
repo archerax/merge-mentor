@@ -16,8 +16,8 @@ function ReviewPage() {
         description={
           <>
             Trigger a review and follow structured progress as the AI works, then read the formatted
-            findings. Comments are not posted unless write mode is enabled; use{" "}
-            <Code>.mergementor/reports</Code> for saved reports.
+            findings. Post comments during the run with write mode, or post the planned comments
+            after a dry-run; use <Code>.mergementor/reports</Code> for saved reports.
           </>
         }
       />

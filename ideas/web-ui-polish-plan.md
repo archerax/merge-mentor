@@ -116,10 +116,21 @@ CLI behavior is unchanged because it never passes `onProgress`.
 
 ## Part 4 — Result polish (small, same components)
 
-- Severity summary bar and finding count chips at the top of the result card.
-- Finding filters (severity/category) and a copy-report button.
-- Optional follow-up "post comments" action after a dry-run (currently write-mode
-  is fixed before the run) — defer unless desired.
+- [x] Severity summary bar and finding count chips at the top of the result card.
+- [x] Finding filters (severity/category) and a copy-report button.
+- [x] Post-dry-run "post comments" action (write-mode is no longer fixed before the
+      run): the engines expose the planned payload, a stateless `POST /api/review/post`
+      endpoint replays it without re-running AI, and the runners show a "Post N comment(s)"
+      button after a dry-run.
+- [x] **Per-comment selection.** Let the user choose a subset of the planned comments
+      to post — a checkbox per comment (with select-all/clear) so only the selected
+      comments are sent to the post endpoint. Today `PostCommentsAction` sends the entire
+      `pendingComments` batch.
+- [x] **Persistent posted-state.** Mark comments as posted and disable/hide them so
+      they cannot be posted twice across re-renders, page reloads, or repeated post
+      clicks. The current success state is component-local (resets on re-run/reload) and
+      the stateless endpoint does no dedup/idempotency; needs a durable per-comment marker
+      (e.g. a finding/comment fingerprint recorded on the run summary or server-side).
 
 ---
 

@@ -21,6 +21,17 @@ const PBIReviewResponseSchema = z.object({
 export type PBIReviewResponse = z.infer<typeof PBIReviewResponseSchema>;
 
 /**
+ * A completed PBI review: the AI assessment plus the exact comment body that
+ * was posted, or would have been posted in dry-run mode.
+ */
+export interface PBIReviewResult extends PBIReviewResponse {
+  /** Full markdown report body that is, or would be, posted to the work item. */
+  readonly reportMarkdown: string;
+  /** Existing bot comment that overrides, when an in-place update applies. */
+  readonly existingCommentId?: number | string;
+}
+
+/**
  * Configuration options for the PBI review engine.
  */
 export interface PBIReviewEngineOptions {
@@ -67,7 +78,7 @@ export class PBIReviewEngine {
   /**
    * Reviews the specified PBI by fetching details, calling the AI provider, and writing the report.
    */
-  async reviewPBI(id: string): Promise<PBIReviewResponse> {
+  async reviewPBI(id: string): Promise<PBIReviewResult> {
     const dryRun = this.options.dryRun ?? false;
     const tempPath = this.options.tempPath ?? "./.mergementor";
     const provider = this.options.aiProvider ?? "copilot-sdk";
@@ -153,14 +164,14 @@ export class PBIReviewEngine {
       return markdown;
     });
 
+    // Find existing comment with the signature to overwrite
+    const signature = "<!-- merge-mentor-pbi-review -->";
+    const existingComment = pbiDetails.comments.find((c) => c.body.includes(signature));
+
     if (dryRun) {
       output.log("📝 Dry-run mode: Comment posting skipped.");
     } else {
       await runPhase("post", "Posting review comment", async () => {
-        // Find existing comment with the signature to overwrite
-        const signature = "<!-- merge-mentor-pbi-review -->";
-        const existingComment = pbiDetails.comments.find((c) => c.body.includes(signature));
-
         if (existingComment) {
           output.log(
             `🔄 Updating existing review comment (ID: ${existingComment.id}) on PBI #${id}...`
@@ -174,7 +185,7 @@ export class PBIReviewEngine {
       });
     }
 
-    return reviewData;
+    return { ...reviewData, reportMarkdown, existingCommentId: existingComment?.id };
   }
 
   private buildPBIReviewPrompt(pbi: PBIDetails): string {

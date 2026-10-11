@@ -1565,6 +1565,9 @@ describe("ReviewEngine", () => {
       expect(result).toBeDefined();
       // In dry run, commentsCreated counts planned actions
       expect(result.commentsCreated).toBeGreaterThan(0);
+      // Planned comments are exposed so the web UI can post them later
+      expect(result.plannedComments?.length).toBeGreaterThan(0);
+      expect(result.plannedComments?.[0]?.body).toContain("Critical bug");
       // But no actual platform calls are made
       expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
       expect(mockPlatform.postGeneralComment).not.toHaveBeenCalled();

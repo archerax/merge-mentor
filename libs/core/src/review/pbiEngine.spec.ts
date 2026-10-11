@@ -168,9 +168,11 @@ describe("PBIReviewEngine", () => {
     const aiClient = createMockAiClient();
     const engine = new PBIReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
-    await engine.reviewPBI("12345");
+    const result = await engine.reviewPBI("12345");
 
     expect(adapter.postPBIComment).not.toHaveBeenCalled();
+    // The planned body is exposed so the web UI can post it later
+    expect(result.reportMarkdown).toContain("<!-- merge-mentor-pbi-review -->");
   });
 
   it("should handle writeFileSync failure when saving report", async () => {

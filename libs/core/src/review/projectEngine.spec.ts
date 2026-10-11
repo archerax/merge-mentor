@@ -195,9 +195,11 @@ describe("ProjectReviewEngine", () => {
     const aiClient = createMockAiClient();
     const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
 
-    await engine.reviewProject("100");
+    const result = await engine.reviewProject("100");
 
     expect(adapter.postPBIComment).not.toHaveBeenCalled();
+    // The planned body is exposed so the web UI can post it later
+    expect(result.reportMarkdown).toContain("<!-- merge-mentor-project-review -->");
   });
 
   it("should handle writeFileSync failure when saving report", async () => {

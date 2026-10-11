@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import {
   type PBIReviewSummary,
+  type PendingCommentView,
   type ProjectReviewFindingView,
   type ProjectReviewSummary,
   REVIEW_STRATEGY_OPTIONS,
@@ -23,6 +24,7 @@ import {
 } from "../server/review.types.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
+import { PostCommentsAction } from "./review/PostCommentsAction.js";
 import { ProgressTimeline } from "./review/ProgressTimeline.js";
 import { SEVERITY_COLORS, SeveritySummary } from "./review/SeveritySummary.js";
 import { TechnicalLog } from "./review/TechnicalLog.js";
@@ -43,9 +45,17 @@ interface WorkItemInput {
   readonly strategy?: ReviewStrategyInput;
 }
 
-interface WorkItemReviewRunnerProps<TSummary> {
+/** Summary shape required to offer a post-dry-run action. */
+interface PostableSummary {
+  readonly dryRun: boolean;
+  readonly pendingComments: readonly PendingCommentView[];
+}
+
+interface WorkItemReviewRunnerProps<TSummary extends PostableSummary> {
   /** Server-sent events endpoint that runs the review. */
   readonly endpoint: string;
+  /** Which work item review kind this runner drives. */
+  readonly kind: "pbi" | "project";
   /** Label for the work item ID field. */
   readonly inputLabel: string;
   /** Placeholder shown in the work item ID field. */
@@ -66,8 +76,9 @@ interface WorkItemReviewRunnerProps<TSummary> {
  * Shares the streaming hook and progress/live/log panels with the PR runner,
  * then hands the final summary to a kind-specific result renderer.
  */
-export function WorkItemReviewRunner<TSummary>({
+export function WorkItemReviewRunner<TSummary extends PostableSummary>({
   endpoint,
+  kind,
   inputLabel,
   placeholder,
   writeLabel,
@@ -79,6 +90,7 @@ export function WorkItemReviewRunner<TSummary>({
   const [write, setWrite] = useState(false);
   const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [lastInput, setLastInput] = useState<WorkItemInput | null>(null);
 
   const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
     useReviewStream<TSummary>(endpoint);
@@ -98,6 +110,7 @@ export function WorkItemReviewRunner<TSummary>({
       return;
     }
     setFormError(null);
+    setLastInput(input);
     await run(input);
   }
 
@@ -159,6 +172,10 @@ export function WorkItemReviewRunner<TSummary>({
       <LiveThinking live={live} running={running} />
 
       {summary && renderResult(summary)}
+
+      {summary && lastInput && (
+        <PostCommentsAction kind={kind} target={lastInput} comments={summary.pendingComments} />
+      )}
 
       {!running && <TechnicalLog entries={entries} />}
     </Stack>

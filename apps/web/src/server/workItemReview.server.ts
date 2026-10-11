@@ -6,11 +6,16 @@ import {
 } from "@merge-mentor/config/config.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { PBIReviewEngine, type PBIReviewResponse } from "@merge-mentor/core/review/pbiEngine.js";
+import {
+  commentFingerprint,
+  type PendingComment,
+  postPlannedComments,
+} from "@merge-mentor/core/review/commentPosting.js";
+import { PBIReviewEngine, type PBIReviewResult } from "@merge-mentor/core/review/pbiEngine.js";
 import type { ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
 import {
   ProjectReviewEngine,
-  type ProjectReviewResponse,
+  type ProjectReviewResult,
 } from "@merge-mentor/core/review/projectEngine.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
@@ -20,9 +25,18 @@ import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { parseWorkItemUrl } from "@merge-mentor/shared/utils/workItemUrl.js";
 
 import { refreshEnv, resolveTempPath } from "./env.server.js";
+import {
+  loadPostedFingerprints,
+  postedTargetKey,
+  recordPostedFingerprints,
+  reviewScope,
+} from "./postedComments.server.js";
 import type {
   PBIReviewStreamInput,
   PBIReviewSummary,
+  PendingCommentView,
+  PostCommentsInput,
+  PostCommentsResult,
   ProjectReviewStreamInput,
   ProjectReviewSummary,
 } from "./review.types.js";
@@ -37,7 +51,7 @@ interface WorkItemTarget {
 }
 
 /** Human-readable noun used in validation and status messages for each kind. */
-type WorkItemKind = "PBI" | "project";
+export type WorkItemKind = "PBI" | "project";
 
 /**
  * Resolves the work item to review and the adapter configuration for it.
@@ -158,20 +172,48 @@ function announceStart(emit: SseEmitter, target: WorkItemTarget, kind: WorkItemK
   });
 }
 
+/**
+ * Wraps a dry-run work item comment with its fingerprint and posted state.
+ *
+ * Write-mode runs have already posted, so they expose no pending comments.
+ */
+function toWorkItemPendingComments(
+  target: WorkItemTarget,
+  kind: "pbi" | "project",
+  planned: { readonly reportMarkdown: string; readonly existingCommentId?: number | string }
+): PendingCommentView[] {
+  if (target.write) return [];
+
+  const key = postedTargetKey(
+    kind,
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.id
+  );
+  const posted = loadPostedFingerprints(target.config.tempPath, key);
+  const comment: PendingComment = {
+    body: planned.reportMarkdown,
+    existingCommentId: planned.existingCommentId,
+  };
+  const fingerprint = commentFingerprint(comment);
+  return [{ ...comment, fingerprint, posted: posted.has(fingerprint) }];
+}
+
 /** Flattens the PBI engine result into the client-safe summary view. */
-function toPBISummary(result: PBIReviewResponse, target: WorkItemTarget): PBIReviewSummary {
+function toPBISummary(result: PBIReviewResult, target: WorkItemTarget): PBIReviewSummary {
   return {
     id: target.id,
     title: result.title,
     overallAssessment: result.overall_assessment,
     suggestions: result.suggestions,
     dryRun: !target.write,
+    pendingComments: toWorkItemPendingComments(target, "pbi", result),
   };
 }
 
 /** Flattens the project engine result into the client-safe summary view. */
 function toProjectSummary(
-  result: ProjectReviewResponse,
+  result: ProjectReviewResult,
   target: WorkItemTarget
 ): ProjectReviewSummary {
   return {
@@ -192,6 +234,7 @@ function toProjectSummary(
     })),
     suggestions: result.suggestions,
     dryRun: !target.write,
+    pendingComments: toWorkItemPendingComments(target, "project", result),
   };
 }
 
@@ -255,4 +298,32 @@ export function createProjectReviewStream(
     const result = await engine.reviewProject(target.id);
     emit.send({ type: "result", summary: toProjectSummary(result, target) });
   });
+}
+
+/**
+ * Posts the comment a dry-run work item review planned, without re-running any
+ * AI work. The planned body is round-tripped from the client.
+ */
+export async function postWorkItemComments(
+  input: PostCommentsInput,
+  kind: WorkItemKind
+): Promise<PostCommentsResult> {
+  const target = resolveTarget(input, kind);
+  const adapter = createAdapter(target);
+  const storeKind = kind === "PBI" ? "pbi" : "project";
+  const key = postedTargetKey(
+    storeKind,
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.id
+  );
+  const posted = loadPostedFingerprints(target.config.tempPath, key);
+  const result = await postPlannedComments(
+    adapter,
+    { kind: storeKind, id: target.id },
+    input.comments,
+    { postedFingerprints: posted }
+  );
+  recordPostedFingerprints(target.config.tempPath, key, result.postedFingerprints);
+  return result;
 }

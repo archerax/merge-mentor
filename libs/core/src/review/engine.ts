@@ -149,6 +149,13 @@ export interface ReviewResult {
   readonly commentsCreated: number;
   /** Error messages from failed comment postings (doesn't stop review) */
   readonly commentErrors: readonly string[];
+  /**
+   * Comments a dry-run planned to post, in the order they would be created.
+   *
+   * Empty when comments were actually posted or when no comments were planned.
+   * The web UI round-trips these back to a stateless endpoint to post later.
+   */
+  readonly plannedComments?: readonly CommentAction[];
   /** Total lines added across all non-ignored files in this PR. */
   readonly linesAdded: number;
   /** Total lines deleted across all non-ignored files in this PR. */
@@ -880,6 +887,7 @@ export class ReviewEngine {
 
     let commentsCreated = 0;
     let commentErrors: string[] = [];
+    let plannedComments: CommentAction[] = [];
     if (postComments) {
       const filePatches = new Map<string, string>(
         files
@@ -893,6 +901,10 @@ export class ReviewEngine {
         crossFileResult,
         filePatches
       );
+
+      if (this.options.dryRun) {
+        plannedComments = actions;
+      }
 
       const commentStats = await this.runPhase("post", "Posting comments", () =>
         this.executeCommentActions(prDetails.number, actions)
@@ -952,6 +964,7 @@ export class ReviewEngine {
       crossFileResult,
       commentsCreated,
       commentErrors,
+      plannedComments,
       tokenUsage,
     };
   }

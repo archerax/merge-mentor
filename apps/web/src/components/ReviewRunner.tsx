@@ -25,6 +25,7 @@ import {
 } from "../server/review.types.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
+import { PostCommentsAction } from "./review/PostCommentsAction.js";
 import { ProgressTimeline } from "./review/ProgressTimeline.js";
 import { SEVERITY_COLORS, SEVERITY_ORDER, SeveritySummary } from "./review/SeveritySummary.js";
 import { TechnicalLog } from "./review/TechnicalLog.js";
@@ -35,6 +36,7 @@ export function ReviewRunner() {
   const [write, setWrite] = useState(false);
   const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [lastInput, setLastInput] = useState<ReviewStreamInput | null>(null);
 
   const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
     useReviewStream<ReviewSummary>("/api/review/stream");
@@ -63,6 +65,7 @@ export function ReviewRunner() {
       return;
     }
     setFormError(null);
+    setLastInput(input);
     await run(input);
   }
 
@@ -89,7 +92,7 @@ export function ReviewRunner() {
           />
           <Switch
             label="Post comments to the PR"
-            description="Off runs a dry-run and only reports what would be posted."
+            description="Off runs a dry-run; you can still post the planned comments afterwards."
             checked={write}
             onChange={(event) => setWrite(event.currentTarget.checked)}
             disabled={running}
@@ -124,6 +127,10 @@ export function ReviewRunner() {
       <LiveThinking live={live} running={running} />
 
       {summary && <ReviewResult summary={summary} />}
+
+      {summary && lastInput && (
+        <PostCommentsAction kind="pr" target={lastInput} comments={summary.pendingComments} />
+      )}
 
       {!running && <TechnicalLog entries={entries} />}
     </Stack>
