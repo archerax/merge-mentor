@@ -6,6 +6,8 @@
  * bundle.
  */
 
+import type { ReviewPhaseId, ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
+
 /** Review execution strategy selectable from the web UI. */
 export const REVIEW_STRATEGY_OPTIONS = ["fast", "deep", "multi-agent"] as const;
 
@@ -119,6 +121,8 @@ export type ReviewStreamEvent<TResult = ReviewSummary> =
   | { readonly type: "status"; readonly message: string }
   | { readonly type: "log"; readonly message: string }
   | { readonly type: "chunk"; readonly text: string }
+  | { readonly type: "progress"; readonly event: ReviewProgressEvent }
+  | { readonly type: "stream"; readonly phase: ReviewPhaseId; readonly delta: string }
   | { readonly type: "result"; readonly summary: TResult }
   | { readonly type: "error"; readonly message: string }
   | { readonly type: "done" };

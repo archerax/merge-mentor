@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
 import { PBIReviewEngine } from "./pbiEngine.js";
+import type { ReviewProgressEvent } from "./progress.js";
 
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
@@ -282,5 +283,54 @@ describe("PBIReviewEngine", () => {
     expect(aiClient.executePrompt).toHaveBeenCalledWith(
       expect.stringContaining("Backlog Priority:** 10")
     );
+  });
+
+  it("emits progress phases and phase-tagged AI stream deltas", async () => {
+    const events: ReviewProgressEvent[] = [];
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    vi.mocked(aiClient.executePrompt).mockImplementation(
+      async (_prompt: string, options?: { onStreamData?: (chunk: string) => void }) => {
+        options?.onStreamData?.("token");
+        return mockAiResponse;
+      }
+    );
+    const engine = new PBIReviewEngine(adapter, aiClient, {
+      dryRun: false,
+      tempPath,
+      onProgress: (event) => events.push(event),
+    });
+
+    await engine.reviewPBI("12345");
+
+    const phaseIds = events
+      .filter((event) => event.kind === "phase" && event.status === "start")
+      .map((event) => (event.kind === "phase" ? event.id : ""));
+    expect(phaseIds).toEqual(
+      expect.arrayContaining(["resolve", "fetch", "ai-review", "report", "post"])
+    );
+
+    expect(events.some((event) => event.kind === "stream" && event.phase === "ai-review")).toBe(
+      true
+    );
+  });
+
+  it("marks the ai-review phase as errored when the AI call fails", async () => {
+    const events: ReviewProgressEvent[] = [];
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    vi.mocked(aiClient.executePrompt).mockRejectedValue(new Error("AI down"));
+    const engine = new PBIReviewEngine(adapter, aiClient, {
+      dryRun: true,
+      tempPath,
+      onProgress: (event) => events.push(event),
+    });
+
+    await expect(engine.reviewPBI("12345")).rejects.toThrow("AI down");
+    expect(
+      events.some(
+        (event) => event.kind === "phase" && event.id === "ai-review" && event.status === "error"
+      )
+    ).toBe(true);
   });
 });

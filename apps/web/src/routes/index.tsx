@@ -40,7 +40,7 @@ const FEATURES: readonly Feature[] = [
     icon: IconGitPullRequest,
     title: "PR Review",
     description:
-      "Trigger a pull request review and watch raw output stream in live, then open the PR for the full diff.",
+      "Trigger a pull request review, follow structured progress, and read the formatted findings and report.",
     to: "/review",
     action: "Run a PR review",
   },

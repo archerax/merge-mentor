@@ -14,6 +14,7 @@ import { z } from "zod";
 import packageJson from "../../package.json" with { type: "json" };
 import { buildSecurityPreamble, wrapUntrustedContent } from "../ai/prompts/securityPreamble.js";
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
+import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "./progress.js";
 
 /** Fixed cap on how many comments per work item are inlined into the prompt. */
 const MAX_COMMENTS_PER_ITEM = 5;
@@ -92,6 +93,11 @@ export interface ProjectReviewEngineOptions {
    * AI provider runs without streaming.
    */
   readonly onStreamChunk?: (chunk: string) => void;
+  /**
+   * Optional callback invoked with structured progress events (phases and AI
+   * stream deltas). Intended for non-terminal consumers such as the web UI.
+   */
+  readonly onProgress?: ReviewProgressCallback;
 }
 
 /**
@@ -123,11 +129,35 @@ export class ProjectReviewEngine {
     const output = this.options.output ?? consoleOutputWriter;
     const modeLabel = dryRun ? " (dry-run)" : "";
 
+    const onProgress = this.options.onProgress;
+    const phase = (phaseId: ReviewPhaseId, label: string, status: ProgressStatus): void => {
+      onProgress?.({ kind: "phase", id: phaseId, label, status });
+    };
+    const runPhase = async <T>(
+      phaseId: ReviewPhaseId,
+      label: string,
+      fn: () => Promise<T>
+    ): Promise<T> => {
+      phase(phaseId, label, "start");
+      try {
+        const value = await fn();
+        phase(phaseId, label, "done");
+        return value;
+      } catch (error) {
+        phase(phaseId, label, "error");
+        throw error;
+      }
+    };
+
+    phase("resolve", "Resolving review target", "start");
+
     output.log(
       `\n🔍 Fetching details for Project/Feature #${id} on ${this.adapter.getPlatformName()}${modeLabel}...\n`
     );
 
-    const projectDetails = await this.adapter.getProjectDetails(id);
+    const projectDetails = await runPhase("fetch", "Fetching work item", () =>
+      this.adapter.getProjectDetails(id)
+    );
 
     output.log(`📋 Project Root: ${projectDetails.rootTitle} (${projectDetails.rootType})`);
     output.log(
@@ -136,13 +166,21 @@ export class ProjectReviewEngine {
     output.log(
       `🤖 Requesting AI review using ${provider} against planning quality guidelines...\n`
     );
+    phase("resolve", "Resolving review target", "done");
 
     const prompt = this.buildProjectReviewPrompt(projectDetails);
     const onStreamChunk = this.options.onStreamChunk;
-    const aiResponse = await this.aiClient.executePrompt(prompt, {
-      promptType: "project",
-      ...(onStreamChunk ? { onStreamData: onStreamChunk } : {}),
-    });
+    const stream = (chunk: string): void => {
+      onStreamChunk?.(chunk);
+      onProgress?.({ kind: "stream", phase: "ai-review", delta: chunk });
+    };
+    const shouldStream = onStreamChunk !== undefined || onProgress !== undefined;
+    const aiResponse = await runPhase("ai-review", "Requesting AI review", () =>
+      this.aiClient.executePrompt(prompt, {
+        promptType: "project",
+        ...(shouldStream ? { onStreamData: stream } : {}),
+      })
+    );
 
     const parsedResult = ProjectReviewResponseSchema.safeParse(aiResponse.parsed);
     if (!parsedResult.success) {
@@ -156,44 +194,49 @@ export class ProjectReviewEngine {
       ? this.applyFallbackTitle(parsedResult.data, projectDetails.rootTitle)
       : this.fallbackParse(aiResponse.raw, projectDetails.rootTitle);
 
-    const reportMarkdown = this.generateMarkdownReport(reviewData, id);
+    const reportMarkdown = await runPhase("report", "Generating report", async () => {
+      const markdown = this.generateMarkdownReport(reviewData, id);
 
-    // Save report to disk
-    try {
-      const reportDir = join(tempPath, "reports");
-      mkdirSync(reportDir, { recursive: true });
-      const reportFile = join(reportDir, `project-${id}-review-report.md`);
-      writeFileSync(reportFile, reportMarkdown, "utf-8");
-      output.log(`📄 Detailed report saved to: ${reportFile}\n`);
-    } catch (error) {
-      this.logger.warn(
-        { error: (error as Error).message },
-        "Failed to save local project review report"
-      );
-    }
+      // Save report to disk
+      try {
+        const reportDir = join(tempPath, "reports");
+        mkdirSync(reportDir, { recursive: true });
+        const reportFile = join(reportDir, `project-${id}-review-report.md`);
+        writeFileSync(reportFile, markdown, "utf-8");
+        output.log(`📄 Detailed report saved to: ${reportFile}\n`);
+      } catch (error) {
+        this.logger.warn(
+          { error: (error as Error).message },
+          "Failed to save local project review report"
+        );
+      }
 
-    // Display formatted results to terminal
-    this.displayTerminalReport(reviewData);
+      // Display formatted results to terminal
+      this.displayTerminalReport(reviewData);
+      return markdown;
+    });
 
     if (dryRun) {
       output.log("📝 Dry-run mode: Comment posting skipped.");
     } else {
-      // Find existing comment with the signature to overwrite on the root item
-      const signature = "<!-- merge-mentor-project-review -->";
-      const rootItem = projectDetails.workItems.find((wi) => wi.id === id);
-      const rootComments = rootItem?.comments || [];
-      const existingComment = rootComments.find((c) => c.body.includes(signature));
+      await runPhase("post", "Posting review comment", async () => {
+        // Find existing comment with the signature to overwrite on the root item
+        const signature = "<!-- merge-mentor-project-review -->";
+        const rootItem = projectDetails.workItems.find((wi) => wi.id === id);
+        const rootComments = rootItem?.comments || [];
+        const existingComment = rootComments.find((c) => c.body.includes(signature));
 
-      if (existingComment) {
-        output.log(
-          `🔄 Updating existing review comment (ID: ${existingComment.id}) on Project Root #${id}...`
-        );
-        await this.adapter.postPBIComment(id, reportMarkdown, existingComment.id);
-      } else {
-        output.log(`✉️ Posting new review comment on Project Root #${id}...`);
-        await this.adapter.postPBIComment(id, reportMarkdown);
-      }
-      output.log("✅ Comment posted successfully!\n");
+        if (existingComment) {
+          output.log(
+            `🔄 Updating existing review comment (ID: ${existingComment.id}) on Project Root #${id}...`
+          );
+          await this.adapter.postPBIComment(id, reportMarkdown, existingComment.id);
+        } else {
+          output.log(`✉️ Posting new review comment on Project Root #${id}...`);
+          await this.adapter.postPBIComment(id, reportMarkdown);
+        }
+        output.log("✅ Comment posted successfully!\n");
+      });
     }
 
     return reviewData;

@@ -101,6 +101,12 @@ import { createGitClient } from "./gitClients/factory.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
 import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";
 import { PbiVerifier } from "./pbiVerifier.js";
+import {
+  type ProgressStatus,
+  type ReviewPhaseId,
+  type ReviewProgressCallback,
+  type ReviewProgressEvent,
+} from "./progress.js";
 import { RepoManager } from "./repoManager.js";
 import { ReviewStateCache } from "./reviewStateCache.js";
 import { WorkspaceManager } from "./workspaceManager.js";
@@ -192,6 +198,13 @@ interface ReviewEngineOptions {
    * chunks even when `streamingEnabled` is disabled.
    */
   readonly onStreamChunk?: (chunk: string) => void;
+  /**
+   * Optional callback invoked with structured progress events (phases, steps,
+   * activity) as the review runs. Intended for non-terminal consumers such as
+   * the web UI; the CLI leaves it unset and continues to rely on
+   * {@link onStreamChunk} and console output.
+   */
+  readonly onProgress?: ReviewProgressCallback;
   /** CI mode: output as plain text (non-interactive, for log capture) */
   readonly ciMode?: boolean;
   /** Git backend for repository cloning and fetching. Default: 'cli' (system git binary) */
@@ -401,15 +414,50 @@ export class ReviewEngine {
   }
 
   /**
-   * Creates a streaming display and returns a callback for streaming data.
-   * Returns undefined callback if streaming is disabled.
+   * Emits a phase transition event when an `onProgress` consumer is attached.
+   * A no-op for the CLI, which does not subscribe to progress events.
    */
-  private createStreamingCallback(context: string): {
+  private phase(id: ReviewPhaseId, label: string, status: ProgressStatus): void {
+    this.options.onProgress?.({ kind: "phase", id, label, status });
+  }
+
+  /** Emits a progress event, tolerating engines created without a callback. */
+  private progress(event: ReviewProgressEvent): void {
+    this.options.onProgress?.(event);
+  }
+
+  /**
+   * Runs `fn` inside a named phase, emitting start/done/error transitions.
+   */
+  private async runPhase<T>(id: ReviewPhaseId, label: string, fn: () => Promise<T>): Promise<T> {
+    this.phase(id, label, "start");
+    try {
+      const value = await fn();
+      this.phase(id, label, "done");
+      return value;
+    } catch (error) {
+      this.phase(id, label, "error");
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a streaming display and returns a callback for streaming data.
+   *
+   * When `phase` is supplied, token deltas are also emitted as structured
+   * `stream` progress events so the web UI can render formatted markdown per
+   * phase. Returns undefined callback if streaming is disabled.
+   */
+  private createStreamingCallback(
+    context: string,
+    phase?: ReviewPhaseId
+  ): {
     callback: ((chunk: string) => void) | undefined;
     finish: () => void;
   } {
     const onStreamChunk = this.options.onStreamChunk;
-    if (!this.streamingEnabled && !onStreamChunk) {
+    const hasProgress = phase !== undefined && this.options.onProgress !== undefined;
+    if (!this.streamingEnabled && !onStreamChunk && !hasProgress) {
       return { callback: undefined, finish: () => {} };
     }
 
@@ -426,6 +474,9 @@ export class ReviewEngine {
     return {
       callback: (chunk: string) => {
         onStreamChunk?.(chunk);
+        if (phase !== undefined) {
+          this.progress({ kind: "stream", phase, delta: chunk });
+        }
         display?.push(chunk);
       },
       finish: () => display?.finish(),
@@ -557,6 +608,7 @@ export class ReviewEngine {
     // Azure DevOps returns "org/project/repo", whose slashes would otherwise
     // turn cache and diff paths into nested directories and silently break
     // review-state persistence.
+    this.phase("resolve", "Resolving review target", "start");
     const projectId = sanitizeProjectName(this.platform.getProjectIdentifier());
     const prIdentifier = generatePRIdentifier(this.platformName as Platform, projectId, prNumber);
 
@@ -576,16 +628,27 @@ export class ReviewEngine {
       this.reviewProfile.passes,
       this.reviewProfile.strategy
     );
+    this.phase("resolve", "Resolving review target", "done");
 
-    const { prDetails, files, ignoredFiles } = await this.fetchPRData(prNumber);
-    const existingComments = await this.fetchExistingComments(prNumber);
+    const { prDetails, files, ignoredFiles, existingComments } = await this.runPhase(
+      "fetch",
+      "Fetching PR data",
+      async () => {
+        const fetched = await this.fetchPRData(prNumber);
+        const comments = await this.fetchExistingComments(prNumber);
+        return { ...fetched, existingComments: comments };
+      }
+    );
+
     const cachedState =
       this.options.noCache || this.options.reReview
         ? undefined
         : await this.stateCache.getState(prIdentifier);
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
-    const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
+    const repoPath = await this.runPhase("workspace", "Preparing workspace", () =>
+      this.workspaceManager.resolveWorkspace(prDetails.headBranch)
+    );
 
     return this.runReviewPipeline({
       prIdentifier,
@@ -611,6 +674,7 @@ export class ReviewEngine {
    * @param files     - Files derived from the local diff.
    */
   async reviewLocal(prDetails: PRDetails, files: PRFile[]): Promise<ReviewResult> {
+    this.phase("resolve", "Resolving review target", "start");
     const projectId = sanitizeProjectName(this.platform.getProjectIdentifier());
     const branchId = sanitizeProjectName(prDetails.headBranch);
     const prIdentifier = `Local-${projectId}-${branchId}`;
@@ -620,6 +684,7 @@ export class ReviewEngine {
       "Starting local review"
     );
     this.log(`Starting local review of ${prDetails.headBranch} → ${prDetails.baseBranch}...`);
+    this.phase("resolve", "Resolving review target", "done");
 
     const ignorePatterns = getIgnorePatterns(this.options.ignorePatterns);
     const { kept, ignored } = filterPRFiles(files, ignorePatterns);
@@ -638,7 +703,9 @@ export class ReviewEngine {
         : await this.stateCache.getState(prIdentifier);
 
     // Use the local checkout directly for CLI agent access (never clones).
-    const repoPath = await this.workspaceManager.resolveWorkspace(prDetails.headBranch);
+    const repoPath = await this.runPhase("workspace", "Preparing workspace", () =>
+      this.workspaceManager.resolveWorkspace(prDetails.headBranch)
+    );
 
     return this.runReviewPipeline({
       prIdentifier,
@@ -722,74 +789,92 @@ export class ReviewEngine {
     }
 
     // Fast review combines file and cross-file analysis in a single pass
-    if (this.reviewProfile.strategy === "fast") {
-      this.log("Using fast review mode (single-pass file + architectural analysis)...");
-      const fastReviewData = await this.performFastReview(
-        prIdentifier,
-        prDetails,
-        files,
-        existingComments,
-        cachedState,
-        repoPath,
-        onTokenUsage
-      );
-      fileResults = fastReviewData.fileResults;
-      crossFileResult = fastReviewData.crossFileResult;
-      filesSkipped = fastReviewData.filesSkipped;
-      filesAnalyzed = fastReviewData.filesAnalyzed;
-    } else if (this.reviewProfile.strategy === "multi-agent") {
-      this.log("Using multi-agent review mode (specialized subagents + lead synthesizer)...");
-      const multiAgentData = await this.performMultiAgentReview(
-        prIdentifier,
-        prDetails,
-        files,
-        existingComments,
-        cachedState,
-        repoPath,
-        onTokenUsage
-      );
-      fileResults = multiAgentData.fileResults;
-      crossFileResult = multiAgentData.crossFileResult;
-      filesSkipped = multiAgentData.filesSkipped;
-      filesAnalyzed = multiAgentData.filesAnalyzed;
-    } else {
-      const reviewData = await this.reviewFiles(
-        prIdentifier,
-        files,
-        existingComments,
-        cachedState,
-        repoPath,
-        onTokenUsage
-      );
-      fileResults = reviewData.fileResults;
-      filesSkipped = reviewData.filesSkipped;
-
-      // Validate line numbers against actual diff content
-      fileResults = this.lineNumberValidator.validate(fileResults, files);
-
-      // Skip cross-file analysis if all files were cached
-      if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
-        this.log("All files unchanged - using cached cross-file analysis");
-        this.logger.info({ prIdentifier }, "Reusing cached cross-file analysis");
-        crossFileResult = cachedState.crossFileResult;
-      } else {
-        crossFileResult = await this.performCrossFileAnalysis(
+    this.phase("file-review", "Reviewing files", "start");
+    let fileReviewComplete = false;
+    try {
+      if (this.reviewProfile.strategy === "fast") {
+        this.log("Using fast review mode (single-pass file + architectural analysis)...");
+        const fastReviewData = await this.performFastReview(
+          prIdentifier,
           prDetails,
           files,
-          fileResults,
           existingComments,
+          cachedState,
           repoPath,
           onTokenUsage
         );
+        fileResults = fastReviewData.fileResults;
+        crossFileResult = fastReviewData.crossFileResult;
+        filesSkipped = fastReviewData.filesSkipped;
+        filesAnalyzed = fastReviewData.filesAnalyzed;
+        this.phase("file-review", "Reviewing files", "done");
+        fileReviewComplete = true;
+      } else if (this.reviewProfile.strategy === "multi-agent") {
+        this.log("Using multi-agent review mode (specialized subagents + lead synthesizer)...");
+        const multiAgentData = await this.performMultiAgentReview(
+          prIdentifier,
+          prDetails,
+          files,
+          existingComments,
+          cachedState,
+          repoPath,
+          onTokenUsage
+        );
+        fileResults = multiAgentData.fileResults;
+        crossFileResult = multiAgentData.crossFileResult;
+        filesSkipped = multiAgentData.filesSkipped;
+        filesAnalyzed = multiAgentData.filesAnalyzed;
+        this.phase("file-review", "Reviewing files", "done");
+        fileReviewComplete = true;
+      } else {
+        const reviewData = await this.reviewFiles(
+          prIdentifier,
+          files,
+          existingComments,
+          cachedState,
+          repoPath,
+          onTokenUsage
+        );
+        fileResults = reviewData.fileResults;
+        filesSkipped = reviewData.filesSkipped;
+
+        // Validate line numbers against actual diff content
+        fileResults = this.lineNumberValidator.validate(fileResults, files);
+        this.phase("file-review", "Reviewing files", "done");
+        fileReviewComplete = true;
+
+        // Skip cross-file analysis if all files were cached
+        if (
+          filesSkipped > 0 &&
+          filesSkipped === fileResults.length &&
+          cachedState?.crossFileResult
+        ) {
+          this.log("All files unchanged - using cached cross-file analysis");
+          this.logger.info({ prIdentifier }, "Reusing cached cross-file analysis");
+          crossFileResult = cachedState.crossFileResult;
+        } else {
+          crossFileResult = await this.runPhase("cross-file", "Cross-file analysis", () =>
+            this.performCrossFileAnalysis(
+              prDetails,
+              files,
+              fileResults,
+              existingComments,
+              repoPath,
+              onTokenUsage
+            )
+          );
+        }
       }
+    } catch (error) {
+      if (!fileReviewComplete) {
+        this.phase("file-review", "Reviewing files", "error");
+      }
+      throw error;
     }
 
     if (this.options.verifyPbi) {
-      crossFileResult = await this.pbiVerifier.verifyPRAlignment(
-        prDetails.number,
-        files,
-        crossFileResult,
-        onTokenUsage
+      crossFileResult = await this.runPhase("verify", "Verifying PR alignment", () =>
+        this.pbiVerifier.verifyPRAlignment(prDetails.number, files, crossFileResult, onTokenUsage)
       );
     }
 
@@ -809,7 +894,9 @@ export class ReviewEngine {
         filePatches
       );
 
-      const commentStats = await this.executeCommentActions(prDetails.number, actions);
+      const commentStats = await this.runPhase("post", "Posting comments", () =>
+        this.executeCommentActions(prDetails.number, actions)
+      );
       commentsCreated = commentStats.commentsCreated;
       commentErrors = commentStats.commentErrors;
     }
@@ -1056,7 +1143,7 @@ export class ReviewEngine {
         "Batched prompt being sent"
       );
 
-      const streaming = this.createStreamingCallback("Reviewing files...");
+      const streaming = this.createStreamingCallback("Reviewing files...", "file-review");
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
@@ -1143,7 +1230,7 @@ export class ReviewEngine {
         "Built resolved cross-file prompt"
       );
 
-      const streaming = this.createStreamingCallback("Cross-file analysis...");
+      const streaming = this.createStreamingCallback("Cross-file analysis...", "cross-file");
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
@@ -1311,7 +1398,10 @@ export class ReviewEngine {
         "Evaluated diff size for fast review attachments"
       );
 
-      const streaming = this.createStreamingCallback("Fast review (file + architecture)...");
+      const streaming = this.createStreamingCallback(
+        "Fast review (file + architecture)...",
+        "file-review"
+      );
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
@@ -1527,6 +1617,8 @@ export class ReviewEngine {
         passes: this.reviewProfile.passes,
         maxParallel: this.options.multiAgentMaxParallel ?? 2,
         output: this.output,
+        onProgress: this.options.onProgress,
+        streamPhase: "file-review",
         streaming: {
           enabled: this.streamingEnabled,
           lines: this.streamingLines,

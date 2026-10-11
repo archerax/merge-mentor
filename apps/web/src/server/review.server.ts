@@ -6,6 +6,7 @@ import {
 } from "@merge-mentor/config/config.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
+import type { ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
 import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
@@ -160,7 +161,8 @@ function createEngine(
   target: ReviewTarget,
   adapter: PlatformAdapter,
   output: OutputWriter,
-  onStreamChunk: (chunk: string) => void
+  onStreamChunk: (chunk: string) => void,
+  onProgress: (event: ReviewProgressEvent) => void
 ): ReviewEngine {
   const { config } = target;
   const aiProvider = config.aiProvider as AIProviderType;
@@ -178,6 +180,7 @@ function createEngine(
     reviewStrategy: config.reviewStrategy,
     streamingEnabled: false,
     onStreamChunk,
+    onProgress,
     tempPath: config.tempPath,
     gitBackend: config.gitBackend,
     longContext: config.longContext,
@@ -192,9 +195,10 @@ function createEngine(
 /**
  * Streams a review as Server-Sent Events.
  *
- * Emits `status`, `log`, and `chunk` frames while the review runs, followed by a
- * single `result` frame (or `error`) and a terminating `done` frame. The stream
- * is consumed by the web UI via `fetch` so raw output appears live.
+ * Emits `status`, `log`, and `chunk` frames for the raw technical log,
+ * structured `progress` frames for the phase timeline, batched `stream` frames
+ * for formatted per-phase AI output, then a single `result` frame (or `error`)
+ * and a terminating `done` frame.
  */
 export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uint8Array> {
   return createSseResponse(async (emit) => {
@@ -219,9 +223,19 @@ export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uin
     });
 
     const adapter = createAdapter(target);
-    const engine = createEngine(target, adapter, output, emit.pushChunk);
+    const engine = createEngine(target, adapter, output, emit.pushChunk, (event) => {
+      if (event.kind === "stream") {
+        emit.pushStream(event.phase, event.delta);
+        return;
+      }
+      emit.send({ type: "progress", event });
+    });
     const result = await engine.reviewPR(target.pr);
 
+    emit.send({
+      type: "progress",
+      event: { kind: "phase", id: "report", label: "Saving report", status: "start" },
+    });
     try {
       const reportFile = saveReviewReport({
         result,
@@ -234,10 +248,18 @@ export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uin
         tempPath: target.config.tempPath,
       });
       emit.send({ type: "log", message: `📄 Detailed markdown report saved to: ${reportFile}` });
+      emit.send({
+        type: "progress",
+        event: { kind: "phase", id: "report", label: "Saving report", status: "done" },
+      });
     } catch (error) {
       emit.send({
         type: "log",
         message: `⚠️ Failed to save markdown report: ${(error as Error).message}`,
+      });
+      emit.send({
+        type: "progress",
+        event: { kind: "phase", id: "report", label: "Saving report", status: "error" },
       });
     }
 

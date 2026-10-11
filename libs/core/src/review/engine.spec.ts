@@ -15,6 +15,7 @@ import { createAIProvider } from "../ai/index.js";
 import type { AIProviderType } from "../ai/types.js";
 import { DiffStorage } from "./diffStorage.js";
 import { ReviewEngine as OriginalReviewEngine } from "./engine.js";
+import type { ReviewProgressEvent } from "./progress.js";
 
 class ReviewEngine extends OriginalReviewEngine {
   constructor(
@@ -1845,6 +1846,97 @@ describe("ReviewEngine", () => {
 
       expect(result.body).toBe("No changes detected.");
       expect(result.title).toBeUndefined();
+    });
+  });
+
+  describe("progress events", () => {
+    it("emits phase start/done transitions across the PR pipeline", async () => {
+      const events: ReviewProgressEvent[] = [];
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        onProgress: (event) => events.push(event),
+      });
+
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", patch: "@@ -1 +1 @@" })];
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+
+      await engine.reviewPR(123);
+
+      const started = events
+        .filter((event) => event.kind === "phase" && event.status === "start")
+        .map((event) => (event.kind === "phase" ? event.id : ""));
+
+      expect(started).toEqual(
+        expect.arrayContaining(["resolve", "fetch", "workspace", "file-review", "cross-file"])
+      );
+
+      for (const id of ["resolve", "fetch", "workspace", "file-review", "cross-file"]) {
+        expect(
+          events.some(
+            (event) => event.kind === "phase" && event.id === id && event.status === "done"
+          )
+        ).toBe(true);
+      }
+    });
+
+    it("tags AI stream deltas with the phase that produced them", async () => {
+      const events: ReviewProgressEvent[] = [];
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        onProgress: (event) => events.push(event),
+      });
+
+      mockExecutePrompt.mockImplementation(
+        async (_prompt: string, options?: { onStreamData?: (chunk: string) => void }) => {
+          options?.onStreamData?.("token");
+          return { raw: "{}", parsed: {} };
+        }
+      );
+
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", patch: "@@ -1 +1 @@" })];
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+
+      await engine.reviewPR(123);
+
+      const streamPhases = new Set(
+        events
+          .filter((event) => event.kind === "stream")
+          .map((event) => (event.kind === "stream" ? event.phase : ""))
+      );
+      expect(streamPhases.has("file-review")).toBe(true);
+      expect(streamPhases.has("cross-file")).toBe(true);
+    });
+
+    it("marks the file-review phase as errored when the AI call fails", async () => {
+      const events: ReviewProgressEvent[] = [];
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        onProgress: (event) => events.push(event),
+      });
+
+      mockExecutePrompt.mockRejectedValue(new Error("AI exploded"));
+      const prDetails = createPRDetails();
+      const files = [createPRFile({ filename: "test.ts", patch: "@@ -1 +1 @@" })];
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockParseBatchedFileReview.mockReturnValue([{ filename: "test.ts", findings: [] }]);
+
+      await expect(engine.reviewPR(123)).rejects.toThrow("AI exploded");
+      expect(
+        events.some(
+          (event) =>
+            event.kind === "phase" && event.id === "file-review" && event.status === "error"
+        )
+      ).toBe(true);
     });
   });
 });

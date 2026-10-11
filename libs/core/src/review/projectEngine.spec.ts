@@ -6,6 +6,7 @@ import type { PlatformAdapter, ProjectDetails } from "@merge-mentor/domain/platf
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIProviderClient, AIResponse } from "../ai/types.js";
+import type { ReviewProgressEvent } from "./progress.js";
 import { ProjectReviewEngine } from "./projectEngine.js";
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -419,5 +420,35 @@ describe("ProjectReviewEngine", () => {
     expect(prompt).toContain("  - #101 [User Story]");
     expect(prompt).toContain("is the **successor** and depends on");
     expect(prompt).not.toContain('"title": "Test Feature"');
+  });
+
+  it("emits progress phases and phase-tagged AI stream deltas", async () => {
+    const events: ReviewProgressEvent[] = [];
+    const adapter = createMockAdapter();
+    const aiClient = createMockAiClient();
+    vi.mocked(aiClient.executePrompt).mockImplementation(
+      async (_prompt: string, options?: { onStreamData?: (chunk: string) => void }) => {
+        options?.onStreamData?.("token");
+        return mockAiResponse;
+      }
+    );
+    const engine = new ProjectReviewEngine(adapter, aiClient, {
+      dryRun: false,
+      tempPath,
+      onProgress: (event) => events.push(event),
+    });
+
+    await engine.reviewProject("100");
+
+    const phaseIds = events
+      .filter((event) => event.kind === "phase" && event.status === "start")
+      .map((event) => (event.kind === "phase" ? event.id : ""));
+    expect(phaseIds).toEqual(
+      expect.arrayContaining(["resolve", "fetch", "ai-review", "report", "post"])
+    );
+
+    expect(events.some((event) => event.kind === "stream" && event.phase === "ai-review")).toBe(
+      true
+    );
   });
 });

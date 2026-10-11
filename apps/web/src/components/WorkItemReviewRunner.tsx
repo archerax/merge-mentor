@@ -3,11 +3,8 @@ import {
   Badge,
   Button,
   Card,
-  Code,
   Divider,
   Group,
-  Loader,
-  ScrollArea,
   Select,
   Stack,
   Switch,
@@ -15,7 +12,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import {
   type PBIReviewSummary,
@@ -23,15 +20,13 @@ import {
   type ProjectReviewSummary,
   REVIEW_STRATEGY_OPTIONS,
   type ReviewStrategyInput,
-  type ReviewStreamEvent,
 } from "../server/review.types.js";
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "red",
-  high: "orange",
-  medium: "yellow",
-  low: "blue",
-};
+import { CopyReportButton } from "./review/CopyReportButton.js";
+import { LiveThinking } from "./review/LiveThinking.js";
+import { ProgressTimeline } from "./review/ProgressTimeline.js";
+import { SEVERITY_COLORS, SeveritySummary } from "./review/SeveritySummary.js";
+import { TechnicalLog } from "./review/TechnicalLog.js";
+import { useReviewStream } from "./review/useReviewStream.js";
 
 const DIMENSION_LABELS: Record<string, string> = {
   completeness: "Completeness",
@@ -39,14 +34,6 @@ const DIMENSION_LABELS: Record<string, string> = {
   acceptance_criteria: "Acceptance Criteria",
   estimation: "Estimation",
 };
-
-type Status = "idle" | "running" | "done" | "error";
-
-interface OutputEntry {
-  readonly id: number;
-  readonly kind: "status" | "log" | "chunk";
-  readonly text: string;
-}
 
 /** Input shared by the PBI and project review endpoints. */
 interface WorkItemInput {
@@ -76,9 +63,8 @@ interface WorkItemReviewRunnerProps<TSummary> {
 /**
  * Interactive runner for work item (PBI/project) reviews.
  *
- * Mirrors the PR review runner: posts the work item ID to a streaming endpoint,
- * renders status/log/raw output live, then hands the final summary to a
- * kind-specific result renderer.
+ * Shares the streaming hook and progress/live/log panels with the PR runner,
+ * then hands the final summary to a kind-specific result renderer.
  */
 export function WorkItemReviewRunner<TSummary>({
   endpoint,
@@ -92,49 +78,10 @@ export function WorkItemReviewRunner<TSummary>({
   const [itemInput, setItemInput] = useState("");
   const [write, setWrite] = useState(false);
   const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<Status>("idle");
-  const [entries, setEntries] = useState<readonly OutputEntry[]>([]);
-  const [summary, setSummary] = useState<TSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const nextId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (viewport) viewport.scrollTop = viewport.scrollHeight;
-  }, [entries]);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  function append(kind: OutputEntry["kind"], text: string) {
-    setEntries((previous) => [...previous, { id: nextId.current++, kind, text }]);
-  }
-
-  function handleEvent(event: ReviewStreamEvent<TSummary>) {
-    switch (event.type) {
-      case "status":
-        append("status", `\n▸ ${event.message}\n`);
-        break;
-      case "log":
-        append("log", `${event.message}\n`);
-        break;
-      case "chunk":
-        append("chunk", event.text);
-        break;
-      case "result":
-        setSummary(event.summary);
-        break;
-      case "error":
-        setError(event.message);
-        setStatus("error");
-        break;
-      case "done":
-        break;
-    }
-  }
+  const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
+    useReviewStream<TSummary>(endpoint);
 
   function buildInput(): WorkItemInput | { error: string } {
     const value = itemInput.trim();
@@ -144,70 +91,15 @@ export function WorkItemReviewRunner<TSummary>({
     return { id: value, ...base };
   }
 
-  async function run() {
+  async function handleRun() {
     const input = buildInput();
     if ("error" in input) {
-      setError(input.error);
+      setFormError(input.error);
       return;
     }
-
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setEntries([]);
-    setSummary(null);
-    setError(null);
-    setStatus("running");
-    nextId.current = 0;
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error(`Review request failed (HTTP ${response.status}).`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const frames = buffer.split("\n\n");
-        buffer = frames.pop() ?? "";
-        for (const frame of frames) {
-          const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
-          if (!dataLine) continue;
-          handleEvent(JSON.parse(dataLine.slice(6)) as ReviewStreamEvent<TSummary>);
-        }
-      }
-
-      setStatus((current) => (current === "error" ? current : "done"));
-    } catch (caught) {
-      if ((caught as Error).name === "AbortError") {
-        setStatus("idle");
-        return;
-      }
-      setError((caught as Error).message);
-      setStatus("error");
-    }
+    setFormError(null);
+    await run(input);
   }
-
-  function stop() {
-    abortRef.current?.abort();
-    setStatus("idle");
-  }
-
-  const running = status === "running";
 
   return (
     <Stack gap="lg">
@@ -238,7 +130,7 @@ export function WorkItemReviewRunner<TSummary>({
             disabled={running}
           />
           <Group>
-            <Button onClick={run} loading={running} disabled={running}>
+            <Button onClick={handleRun} loading={running} disabled={running}>
               {actionLabel}
             </Button>
             {running && (
@@ -250,39 +142,81 @@ export function WorkItemReviewRunner<TSummary>({
         </Stack>
       </Card>
 
-      {error && (
+      {(error ?? formError) && (
         <Alert title="Review failed" color="red">
-          {error}
+          {error ?? formError}
         </Alert>
       )}
 
-      {entries.length > 0 && (
-        <Card withBorder padding="md" radius="md">
-          <Group justify="space-between" mb="xs">
-            <Title order={5}>Live output</Title>
-            {running && <Loader size="xs" />}
-          </Group>
-          <ScrollArea.Autosize mah={420} viewportRef={viewportRef} type="auto">
-            <Code block className="mm-code-block">
-              {entries.map((entry) => (
-                <span key={entry.id} style={entryStyle(entry.kind)}>
-                  {entry.text}
-                </span>
-              ))}
-            </Code>
-          </ScrollArea.Autosize>
-        </Card>
-      )}
+      <ProgressTimeline
+        phases={phases}
+        steps={steps}
+        activity={activity}
+        elapsedMs={elapsedMs}
+        running={running}
+      />
+
+      <LiveThinking live={live} running={running} />
 
       {summary && renderResult(summary)}
+
+      {!running && <TechnicalLog entries={entries} />}
     </Stack>
   );
 }
 
-function entryStyle(kind: OutputEntry["kind"]): React.CSSProperties {
-  if (kind === "status") return { color: "var(--mantine-color-blue-6)", fontWeight: 600 };
-  if (kind === "log") return { color: "var(--mantine-color-dimmed)" };
-  return {};
+/** Builds a plain-text/markdown report from a completed PBI review summary. */
+function buildPBIReportText(summary: PBIReviewSummary): string {
+  const lines = [
+    `# PBI review: #${summary.id}${summary.title ? ` — ${summary.title}` : ""}`,
+    "",
+    `Mode: ${summary.dryRun ? "dry-run" : "write"}`,
+    "",
+    "## Assessment",
+    summary.overallAssessment,
+  ];
+  if (summary.suggestions.length > 0) {
+    lines.push("", "## Suggestions");
+    for (const suggestion of summary.suggestions) lines.push(`- ${suggestion}`);
+  }
+  return lines.join("\n");
+}
+
+/** Builds a plain-text/markdown report from a completed project review summary. */
+function buildProjectReportText(summary: ProjectReviewSummary): string {
+  const lines = [
+    `# Project review: #${summary.id}${summary.title ? ` — ${summary.title}` : ""}`,
+    "",
+    `Confidence: ${summary.confidence} · Mode: ${summary.dryRun ? "dry-run" : "write"}`,
+    "",
+    "## Plan completeness & gaps",
+    summary.completenessAssessment,
+    "",
+    "## Dependency & sequencing risks",
+    summary.dependencyRisks,
+    "",
+    "## Acceptance criteria alignment",
+    summary.acceptanceCriteriaAlignment,
+    "",
+    "## Estimation & scope consistency",
+    summary.estimationConsistency,
+  ];
+
+  if (summary.findings.length > 0) {
+    lines.push("", `## Findings (${summary.findings.length})`);
+    for (const finding of summary.findings) {
+      const location = finding.workItemId ? ` #${finding.workItemId}` : "";
+      lines.push(`- [${finding.severity}/${finding.dimension}]${location} ${finding.issue}`);
+      if (finding.recommendation) lines.push(`  - Recommendation: ${finding.recommendation}`);
+    }
+  }
+
+  lines.push("", "## Overall assessment", summary.overallAssessment);
+  if (summary.suggestions.length > 0) {
+    lines.push("", "## Suggestions");
+    for (const suggestion of summary.suggestions) lines.push(`- ${suggestion}`);
+  }
+  return lines.join("\n");
 }
 
 /** Renders the result of a completed PBI review. */
@@ -298,11 +232,14 @@ export function PBIReviewResult({ summary }: { readonly summary: PBIReviewSummar
               {summary.title ? ` · ${summary.title}` : ""}
             </Text>
           </div>
-          {summary.dryRun && (
-            <Badge color="gray" variant="light">
-              dry-run
-            </Badge>
-          )}
+          <Group gap="xs">
+            {summary.dryRun && (
+              <Badge color="gray" variant="light">
+                dry-run
+              </Badge>
+            )}
+            <CopyReportButton text={buildPBIReportText(summary)} />
+          </Group>
         </Group>
 
         <Divider />
@@ -339,8 +276,11 @@ export function ProjectReviewResult({ summary }: { readonly summary: ProjectRevi
                 dry-run
               </Badge>
             )}
+            <CopyReportButton text={buildProjectReportText(summary)} />
           </Group>
         </Group>
+
+        <SeveritySummary findings={summary.findings} />
 
         <Divider />
         <Stack gap="sm">

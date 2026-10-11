@@ -15,8 +15,9 @@ function ReviewPage() {
         title="Interactive PR Review"
         description={
           <>
-            Trigger a review and watch raw output stream in live. Comments are not posted unless
-            write mode is enabled; use <Code>.mergementor/reports</Code> for saved reports.
+            Trigger a review and follow structured progress as the AI works, then read the formatted
+            findings. Comments are not posted unless write mode is enabled; use{" "}
+            <Code>.mergementor/reports</Code> for saved reports.
           </>
         }
       />

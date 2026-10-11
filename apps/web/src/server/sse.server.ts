@@ -7,6 +7,8 @@
  * and flush scheduling so each endpoint only supplies its run logic.
  */
 
+import type { ReviewPhaseId } from "@merge-mentor/core/review/progress.js";
+
 /** Matches ANSI escape sequences emitted by the terminal streaming display. */
 // oxlint-disable-next-line no-control-regex -- the ESC control character is the point.
 const ANSI_ESCAPE = /\u001B\[[0-9;?]*[ -/]*[@-~]/g;
@@ -14,12 +16,17 @@ const ANSI_ESCAPE = /\u001B\[[0-9;?]*[ -/]*[@-~]/g;
 /** Milliseconds to batch streamed chunks before flushing them to the client. */
 const CHUNK_FLUSH_INTERVAL_MS = 80;
 
+/** Phase id attached to a streamed delta frame. */
+type StreamPhase = ReviewPhaseId;
+
 /** Emitter handed to a review run so it can push frames and raw chunks. */
 export interface SseEmitter {
   /** Sends a single JSON-encoded event frame. */
   send(event: unknown): void;
   /** Queues raw output, flushed to the client on a short interval. */
   pushChunk(chunk: string): void;
+  /** Queues formatted AI output for a phase, flushed on a short interval. */
+  pushStream(phase: StreamPhase, delta: string): void;
 }
 
 /** Extracts a human-readable message from an unknown thrown value. */
@@ -42,6 +49,8 @@ export function createSseResponse(
     async start(controller): Promise<void> {
       let closed = false;
       let pendingChunks = "";
+      let pendingStream = "";
+      let pendingStreamPhase: StreamPhase | null = null;
       let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
       const send = (event: unknown): void => {
@@ -55,23 +64,47 @@ export function createSseResponse(
         pendingChunks = "";
       };
 
-      const pushChunk = (chunk: string): void => {
-        pendingChunks += chunk.replace(ANSI_ESCAPE, "");
+      const flushStream = (): void => {
+        if (pendingStream.length === 0 || pendingStreamPhase === null) return;
+        send({ type: "stream", phase: pendingStreamPhase, delta: pendingStream });
+        pendingStream = "";
+      };
+
+      const flush = (): void => {
+        flushTimer = null;
+        flushChunks();
+        flushStream();
+      };
+
+      const schedule = (): void => {
         if (flushTimer === null) {
-          flushTimer = setTimeout(() => {
-            flushTimer = null;
-            flushChunks();
-          }, CHUNK_FLUSH_INTERVAL_MS);
+          flushTimer = setTimeout(flush, CHUNK_FLUSH_INTERVAL_MS);
         }
       };
 
+      const pushChunk = (chunk: string): void => {
+        pendingChunks += chunk.replace(ANSI_ESCAPE, "");
+        schedule();
+      };
+
+      const pushStream = (phase: StreamPhase, delta: string): void => {
+        // Phase changes are rare; flush the current buffer so a frame never
+        // mixes deltas from two phases.
+        if (pendingStream.length > 0 && pendingStreamPhase !== phase) {
+          flushStream();
+        }
+        pendingStreamPhase = phase;
+        pendingStream += delta.replace(ANSI_ESCAPE, "");
+        schedule();
+      };
+
       try {
-        await run({ send, pushChunk });
+        await run({ send, pushChunk, pushStream });
       } catch (error) {
         send({ type: "error", message: toMessage(error) });
       } finally {
         if (flushTimer !== null) clearTimeout(flushTimer);
-        flushChunks();
+        flush();
         closed = true;
         controller.close();
       }

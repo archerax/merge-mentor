@@ -6,8 +6,6 @@ import {
   Code,
   Divider,
   Group,
-  Loader,
-  ScrollArea,
   Select,
   SimpleGrid,
   Stack,
@@ -16,79 +14,30 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import {
   REVIEW_STRATEGY_OPTIONS,
   type ReviewFindingView,
-  type ReviewStreamEvent,
   type ReviewStreamInput,
   type ReviewStrategyInput,
   type ReviewSummary,
 } from "../server/review.types.js";
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "red",
-  high: "orange",
-  medium: "yellow",
-  low: "blue",
-};
-
-type Status = "idle" | "running" | "done" | "error";
-
-interface OutputEntry {
-  readonly id: number;
-  readonly kind: "status" | "log" | "chunk";
-  readonly text: string;
-}
+import { CopyReportButton } from "./review/CopyReportButton.js";
+import { LiveThinking } from "./review/LiveThinking.js";
+import { ProgressTimeline } from "./review/ProgressTimeline.js";
+import { SEVERITY_COLORS, SEVERITY_ORDER, SeveritySummary } from "./review/SeveritySummary.js";
+import { TechnicalLog } from "./review/TechnicalLog.js";
+import { useReviewStream } from "./review/useReviewStream.js";
 
 export function ReviewRunner() {
   const [prInput, setPrInput] = useState("");
   const [write, setWrite] = useState(false);
   const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<Status>("idle");
-  const [entries, setEntries] = useState<readonly OutputEntry[]>([]);
-  const [summary, setSummary] = useState<ReviewSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const nextId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (viewport) viewport.scrollTop = viewport.scrollHeight;
-  }, [entries]);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  function append(kind: OutputEntry["kind"], text: string) {
-    setEntries((previous) => [...previous, { id: nextId.current++, kind, text }]);
-  }
-
-  function handleEvent(event: ReviewStreamEvent) {
-    switch (event.type) {
-      case "status":
-        append("status", `\n▸ ${event.message}\n`);
-        break;
-      case "log":
-        append("log", `${event.message}\n`);
-        break;
-      case "chunk":
-        append("chunk", event.text);
-        break;
-      case "result":
-        setSummary(event.summary);
-        break;
-      case "error":
-        setError(event.message);
-        setStatus("error");
-        break;
-      case "done":
-        break;
-    }
-  }
+  const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
+    useReviewStream<ReviewSummary>("/api/review/stream");
 
   function buildInput(): ReviewStreamInput | { error: string } {
     const trimmed = prInput.trim();
@@ -107,70 +56,15 @@ export function ReviewRunner() {
     return { pr, ...base };
   }
 
-  async function run() {
+  async function handleRun() {
     const input = buildInput();
     if ("error" in input) {
-      setError(input.error);
+      setFormError(input.error);
       return;
     }
-
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setEntries([]);
-    setSummary(null);
-    setError(null);
-    setStatus("running");
-    nextId.current = 0;
-
-    try {
-      const response = await fetch("/api/review/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error(`Review request failed (HTTP ${response.status}).`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const frames = buffer.split("\n\n");
-        buffer = frames.pop() ?? "";
-        for (const frame of frames) {
-          const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
-          if (!dataLine) continue;
-          handleEvent(JSON.parse(dataLine.slice(6)) as ReviewStreamEvent);
-        }
-      }
-
-      setStatus((current) => (current === "error" ? current : "done"));
-    } catch (caught) {
-      if ((caught as Error).name === "AbortError") {
-        setStatus("idle");
-        return;
-      }
-      setError((caught as Error).message);
-      setStatus("error");
-    }
+    setFormError(null);
+    await run(input);
   }
-
-  function stop() {
-    abortRef.current?.abort();
-    setStatus("idle");
-  }
-
-  const running = status === "running";
 
   return (
     <Stack gap="lg">
@@ -201,7 +95,7 @@ export function ReviewRunner() {
             disabled={running}
           />
           <Group>
-            <Button onClick={run} loading={running} disabled={running}>
+            <Button onClick={handleRun} loading={running} disabled={running}>
               Run review
             </Button>
             {running && (
@@ -213,44 +107,78 @@ export function ReviewRunner() {
         </Stack>
       </Card>
 
-      {error && (
+      {(error ?? formError) && (
         <Alert title="Review failed" color="red">
-          {error}
+          {error ?? formError}
         </Alert>
       )}
 
-      {entries.length > 0 && (
-        <Card withBorder padding="md" radius="md">
-          <Group justify="space-between" mb="xs">
-            <Title order={5}>Live output</Title>
-            {running && <Loader size="xs" />}
-          </Group>
-          <ScrollArea.Autosize mah={420} viewportRef={viewportRef} type="auto">
-            <Code block className="mm-code-block">
-              {entries.map((entry) => (
-                <span key={entry.id} style={entryStyle(entry.kind)}>
-                  {entry.text}
-                </span>
-              ))}
-            </Code>
-          </ScrollArea.Autosize>
-        </Card>
-      )}
+      <ProgressTimeline
+        phases={phases}
+        steps={steps}
+        activity={activity}
+        elapsedMs={elapsedMs}
+        running={running}
+      />
+
+      <LiveThinking live={live} running={running} />
 
       {summary && <ReviewResult summary={summary} />}
+
+      {!running && <TechnicalLog entries={entries} />}
     </Stack>
   );
 }
 
-function entryStyle(kind: OutputEntry["kind"]): React.CSSProperties {
-  if (kind === "status") return { color: "var(--mantine-color-blue-6)", fontWeight: 600 };
-  if (kind === "log") return { color: "var(--mantine-color-dimmed)" };
-  return {};
+/** Builds a plain-text/markdown report from a completed review summary. */
+function buildReportText(summary: ReviewSummary): string {
+  const lines: string[] = [
+    `# Review: PR #${summary.number} — ${summary.title}`,
+    "",
+    `${summary.author} · ${summary.headBranch} → ${summary.baseBranch}`,
+    `URL: ${summary.url}`,
+    `Mode: ${summary.dryRun ? "dry-run" : "write"}`,
+    "",
+    `Files reviewed: ${summary.filesReviewed} · skipped: ${summary.filesSkipped} · comments: ${summary.commentsCreated}`,
+    "",
+  ];
+
+  const allFindings = [...summary.findings, ...summary.crossFileFindings];
+  lines.push(`## Findings (${allFindings.length})`);
+  for (const finding of allFindings) {
+    const location = finding.file
+      ? ` ${finding.file}${finding.line > 0 ? `:${finding.line}` : ""}`
+      : "";
+    lines.push(`- [${finding.severity}/${finding.category}]${location} ${finding.message}`);
+    if (finding.suggestion) lines.push(`  - Suggestion: ${finding.suggestion}`);
+  }
+
+  if (summary.overallAssessment) {
+    lines.push("", "## Overall assessment", summary.overallAssessment);
+  }
+
+  if (summary.recommendations.length > 0) {
+    lines.push("", "## Recommendations");
+    for (const recommendation of summary.recommendations) {
+      lines.push(`- ${recommendation}`);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+
   const findings = summary.findings;
   const critical = findings.filter((finding) => finding.severity === "critical").length;
+  const allFindings = [...findings, ...summary.crossFileFindings];
+
+  const matchesFilter = (finding: ReviewFindingView): boolean =>
+    severityFilter === null || finding.severity === severityFilter;
+  const filteredFileFindings = findings.filter(matchesFilter);
+  const filteredCrossFileFindings = summary.crossFileFindings.filter(matchesFilter);
+  const filteredCount = filteredFileFindings.length + filteredCrossFileFindings.length;
 
   return (
     <Card withBorder padding="lg" radius="md">
@@ -272,6 +200,7 @@ function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
                 dry-run
               </Badge>
             )}
+            <CopyReportButton text={buildReportText(summary)} />
             <Button
               component="a"
               href={summary.url}
@@ -283,6 +212,8 @@ function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
             </Button>
           </Group>
         </Group>
+
+        <SeveritySummary findings={allFindings} />
 
         <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="sm">
           <Stat label="Files reviewed" value={summary.filesReviewed} />
@@ -309,8 +240,25 @@ function ReviewResult({ summary }: { readonly summary: ReviewSummary }) {
           </>
         )}
 
-        <FindingsList title="File findings" findings={findings} showFile />
-        <FindingsList title="Cross-file findings" findings={summary.crossFileFindings} />
+        {allFindings.length > 0 && (
+          <Group justify="space-between" align="center">
+            <Text size="sm" c="dimmed">
+              Showing {filteredCount} of {allFindings.length} findings
+            </Text>
+            <Select
+              size="xs"
+              w={170}
+              placeholder="All severities"
+              clearable
+              data={SEVERITY_ORDER.map((severity) => ({ value: severity, label: severity }))}
+              value={severityFilter}
+              onChange={setSeverityFilter}
+            />
+          </Group>
+        )}
+
+        <FindingsList title="File findings" findings={filteredFileFindings} showFile />
+        <FindingsList title="Cross-file findings" findings={filteredCrossFileFindings} />
 
         {summary.recommendations.length > 0 && (
           <>

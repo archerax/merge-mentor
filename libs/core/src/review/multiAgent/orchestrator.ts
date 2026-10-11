@@ -22,6 +22,7 @@ import {
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
 import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
+import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
 /** Heartbeat check interval in ms. */
@@ -43,6 +44,10 @@ export interface MultiAgentOrchestratorOptions {
   readonly maxParallel?: number;
   /** Output writer for progress/status messages. */
   readonly output?: OutputWriter;
+  /** Optional structured progress callback (per-subagent steps, stream deltas). */
+  readonly onProgress?: ReviewProgressCallback;
+  /** Phase id used to tag streamed subagent/synthesizer tokens. Default: `file-review`. */
+  readonly streamPhase?: ReviewPhaseId;
   /** Streaming display configuration (mirrors the engine's streaming options). */
   readonly streaming?: {
     readonly enabled: boolean;
@@ -145,6 +150,8 @@ export class MultiAgentOrchestrator {
   private readonly passes?: readonly ReviewPass[];
   private readonly maxParallel: number;
   private readonly output?: OutputWriter;
+  private readonly onProgress?: ReviewProgressCallback;
+  private readonly streamPhase: ReviewPhaseId;
   private readonly streaming?: MultiAgentOrchestratorOptions["streaming"];
   private readonly logger = createChildLogger({ component: "MultiAgentOrchestrator" });
 
@@ -153,12 +160,19 @@ export class MultiAgentOrchestrator {
     this.passes = options?.passes;
     this.maxParallel = options?.maxParallel ?? 2;
     this.output = options?.output;
+    this.onProgress = options?.onProgress;
+    this.streamPhase = options?.streamPhase ?? "file-review";
     this.streaming = options?.streaming;
   }
 
   private log(message: string): void {
     this.output?.log(message);
     this.logger.debug(message);
+  }
+
+  /** Emits a structured step transition when a progress consumer is attached. */
+  private emitStep(label: string, status: ProgressStatus, detail?: string): void {
+    this.onProgress?.({ kind: "step", label, status, ...(detail !== undefined ? { detail } : {}) });
   }
 
   /**
@@ -186,7 +200,17 @@ export class MultiAgentOrchestrator {
     pushLine: ((line: string) => void) | undefined;
     lastChunkAt: (() => number | undefined) | undefined;
   } {
-    if (!this.streamingActive) {
+    const display = this.streamingActive
+      ? new StreamingDisplay({
+          maxLines: this.streaming?.lines ?? 9,
+          title: `🤖 ${context}`,
+          enabled: true,
+          ciMode: this.streaming?.ciMode ?? false,
+          ...(this.output ? { output: this.output } : {}),
+        })
+      : undefined;
+
+    if (!display && !this.onProgress) {
       return {
         callback: undefined,
         finish: () => {},
@@ -195,22 +219,15 @@ export class MultiAgentOrchestrator {
       };
     }
 
-    const display = new StreamingDisplay({
-      maxLines: this.streaming?.lines ?? 9,
-      title: `🤖 ${context}`,
-      enabled: true,
-      ciMode: this.streaming?.ciMode ?? false,
-      ...(this.output ? { output: this.output } : {}),
-    });
-
     let lastChunkAt: number | undefined;
     return {
       callback: (chunk: string) => {
         lastChunkAt = Date.now();
-        display.push(chunk);
+        display?.push(chunk);
+        this.onProgress?.({ kind: "stream", phase: this.streamPhase, delta: chunk });
       },
-      finish: () => display.finish(),
-      pushLine: (line: string) => display.push(`${line}\n`),
+      finish: () => display?.finish(),
+      pushLine: display ? (line: string) => display.push(`${line}\n`) : undefined,
       lastChunkAt: () => lastChunkAt,
     };
   }
@@ -327,6 +344,7 @@ export class MultiAgentOrchestrator {
 
     const streaming = this.createStreaming("Running Lead Synthesizer…");
     const stopHeartbeat = this.heartbeat("Lead Synthesizer", streaming);
+    this.emitStep("Lead Synthesizer", "start");
     let response: AIResponse;
     try {
       response = await this.provider.executePrompt(prompt, {
@@ -337,10 +355,14 @@ export class MultiAgentOrchestrator {
         promptType: "multi-agent-synthesizer",
         ...(streaming.callback ? { onStreamData: streaming.callback } : {}),
       });
+    } catch (error) {
+      this.emitStep("Lead Synthesizer", "error");
+      throw error;
     } finally {
       stopHeartbeat();
       streaming.finish();
     }
+    this.emitStep("Lead Synthesizer", "done");
 
     const mergedUsage = mergeTokenUsage(tokenUsage, response.tokenUsage);
     const parsed = parseFastReview(this.logger, response);
@@ -509,6 +531,7 @@ export class MultiAgentOrchestrator {
         running.add(agent);
         startedAt.set(agent, Date.now());
         this.log(`  ⏳ [${agent}] analyzing…`);
+        this.emitStep(agent, "start");
 
         const started = Date.now();
         // Concurrent agents share one display; each agent's chunks are prefixed
@@ -521,6 +544,7 @@ export class MultiAgentOrchestrator {
 
         const duration = Math.max(0, Math.round((Date.now() - started) / 1000));
         this.log(`  ✓ [${agent}] done — ${execution.findings.length} finding(s) in ${duration}s`);
+        this.emitStep(agent, "done", `${execution.findings.length} finding(s) in ${duration}s`);
         tokenUsage = mergeTokenUsage(tokenUsage, execution.tokenUsage);
         return execution;
       });

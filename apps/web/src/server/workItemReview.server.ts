@@ -7,6 +7,7 @@ import {
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { PBIReviewEngine, type PBIReviewResponse } from "@merge-mentor/core/review/pbiEngine.js";
+import type { ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
 import {
   ProjectReviewEngine,
   type ProjectReviewResponse,
@@ -132,6 +133,20 @@ function createStreamOutput(emit: SseEmitter): OutputWriter {
   };
 }
 
+/**
+ * Routes structured engine progress: AI stream deltas go to the batched
+ * formatted `stream` channel, everything else becomes a `progress` frame.
+ */
+function createProgressHandler(emit: SseEmitter): (event: ReviewProgressEvent) => void {
+  return (event) => {
+    if (event.kind === "stream") {
+      emit.pushStream(event.phase, event.delta);
+      return;
+    }
+    emit.send({ type: "progress", event });
+  };
+}
+
 /** Sends the shared configuration/start status frames and initializes logging. */
 function announceStart(emit: SseEmitter, target: WorkItemTarget, kind: WorkItemKind): void {
   initLogger(target.config.tempPath);
@@ -183,8 +198,10 @@ function toProjectSummary(
 /**
  * Streams a PBI review as Server-Sent Events.
  *
- * Emits `status`, `log`, and `chunk` frames while the review runs, followed by a
- * single `result` frame (or `error`) and a terminating `done` frame.
+ * Emits `status`, `log`, and `chunk` frames for the raw technical log,
+ * structured `progress` frames for the phase timeline, batched `stream` frames
+ * for formatted per-phase AI output, then a single `result` frame (or `error`)
+ * and a terminating `done` frame.
  */
 export function createPBIReviewStream(input: PBIReviewStreamInput): ReadableStream<Uint8Array> {
   return createSseResponse(async (emit) => {
@@ -200,6 +217,7 @@ export function createPBIReviewStream(input: PBIReviewStreamInput): ReadableStre
       aiModel: target.config.aiModel,
       output: createStreamOutput(emit),
       onStreamChunk: emit.pushChunk,
+      onProgress: createProgressHandler(emit),
     });
 
     const result = await engine.reviewPBI(target.id);
@@ -210,8 +228,10 @@ export function createPBIReviewStream(input: PBIReviewStreamInput): ReadableStre
 /**
  * Streams a project plan review as Server-Sent Events.
  *
- * Emits `status`, `log`, and `chunk` frames while the review runs, followed by a
- * single `result` frame (or `error`) and a terminating `done` frame.
+ * Emits `status`, `log`, and `chunk` frames for the raw technical log,
+ * structured `progress` frames for the phase timeline, batched `stream` frames
+ * for formatted per-phase AI output, then a single `result` frame (or `error`)
+ * and a terminating `done` frame.
  */
 export function createProjectReviewStream(
   input: ProjectReviewStreamInput
@@ -229,6 +249,7 @@ export function createProjectReviewStream(
       aiModel: target.config.aiModel,
       output: createStreamOutput(emit),
       onStreamChunk: emit.pushChunk,
+      onProgress: createProgressHandler(emit),
     });
 
     const result = await engine.reviewProject(target.id);

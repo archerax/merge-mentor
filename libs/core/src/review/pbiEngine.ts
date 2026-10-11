@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import packageJson from "../../package.json" with { type: "json" };
 import type { AIProviderClient, AIProviderType } from "../ai/types.js";
+import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "./progress.js";
 
 const PBIReviewResponseSchema = z.object({
   title: z.string().default(""),
@@ -40,6 +41,11 @@ export interface PBIReviewEngineOptions {
    * AI provider runs without streaming.
    */
   readonly onStreamChunk?: (chunk: string) => void;
+  /**
+   * Optional callback invoked with structured progress events (phases and AI
+   * stream deltas). Intended for non-terminal consumers such as the web UI.
+   */
+  readonly onProgress?: ReviewProgressCallback;
 }
 
 /**
@@ -69,20 +75,52 @@ export class PBIReviewEngine {
     const output = this.options.output ?? consoleOutputWriter;
     const modeLabel = dryRun ? " (dry-run)" : "";
 
+    const onProgress = this.options.onProgress;
+    const phase = (phaseId: ReviewPhaseId, label: string, status: ProgressStatus): void => {
+      onProgress?.({ kind: "phase", id: phaseId, label, status });
+    };
+    const runPhase = async <T>(
+      phaseId: ReviewPhaseId,
+      label: string,
+      fn: () => Promise<T>
+    ): Promise<T> => {
+      phase(phaseId, label, "start");
+      try {
+        const value = await fn();
+        phase(phaseId, label, "done");
+        return value;
+      } catch (error) {
+        phase(phaseId, label, "error");
+        throw error;
+      }
+    };
+
+    phase("resolve", "Resolving review target", "start");
+
     output.log(
       `\n🔍 Fetching details for PBI #${id} on ${this.adapter.getPlatformName()}${modeLabel}...\n`
     );
 
-    const pbiDetails = await this.adapter.getPBIDetails(id);
+    const pbiDetails = await runPhase("fetch", "Fetching work item", () =>
+      this.adapter.getPBIDetails(id)
+    );
 
     output.log(`📋 PBI Title: ${pbiDetails.title}`);
     output.log(`🤖 Requesting AI review using ${provider} against quality guidelines...\n`);
+    phase("resolve", "Resolving review target", "done");
 
     const prompt = this.buildPBIReviewPrompt(pbiDetails);
     const onStreamChunk = this.options.onStreamChunk;
-    const aiResponse = onStreamChunk
-      ? await this.aiClient.executePrompt(prompt, { onStreamData: onStreamChunk })
-      : await this.aiClient.executePrompt(prompt);
+    const stream = (chunk: string): void => {
+      onStreamChunk?.(chunk);
+      onProgress?.({ kind: "stream", phase: "ai-review", delta: chunk });
+    };
+    const shouldStream = onStreamChunk !== undefined || onProgress !== undefined;
+    const aiResponse = await runPhase("ai-review", "Requesting AI review", () =>
+      shouldStream
+        ? this.aiClient.executePrompt(prompt, { onStreamData: stream })
+        : this.aiClient.executePrompt(prompt)
+    );
 
     const parsedResult = PBIReviewResponseSchema.safeParse(aiResponse.parsed);
     if (!parsedResult.success) {
@@ -93,39 +131,47 @@ export class PBIReviewEngine {
       ? parsedResult.data
       : this.fallbackParse(aiResponse.raw, pbiDetails.title);
 
-    const reportMarkdown = this.generateMarkdownReport(reviewData, id);
+    const reportMarkdown = await runPhase("report", "Generating report", async () => {
+      const markdown = this.generateMarkdownReport(reviewData, id);
 
-    // Save report to disk
-    try {
-      const reportDir = join(tempPath, "reports");
-      mkdirSync(reportDir, { recursive: true });
-      const reportFile = join(reportDir, `pbi-${id}-review-report.md`);
-      writeFileSync(reportFile, reportMarkdown, "utf-8");
-      output.log(`📄 Detailed report saved to: ${reportFile}\n`);
-    } catch (error) {
-      this.logger.warn({ error: (error as Error).message }, "Failed to save local markdown report");
-    }
+      // Save report to disk
+      try {
+        const reportDir = join(tempPath, "reports");
+        mkdirSync(reportDir, { recursive: true });
+        const reportFile = join(reportDir, `pbi-${id}-review-report.md`);
+        writeFileSync(reportFile, markdown, "utf-8");
+        output.log(`📄 Detailed report saved to: ${reportFile}\n`);
+      } catch (error) {
+        this.logger.warn(
+          { error: (error as Error).message },
+          "Failed to save local markdown report"
+        );
+      }
 
-    // Display formatted results to terminal
-    this.displayTerminalReport(reviewData);
+      // Display formatted results to terminal
+      this.displayTerminalReport(reviewData);
+      return markdown;
+    });
 
     if (dryRun) {
       output.log("📝 Dry-run mode: Comment posting skipped.");
     } else {
-      // Find existing comment with the signature to overwrite
-      const signature = "<!-- merge-mentor-pbi-review -->";
-      const existingComment = pbiDetails.comments.find((c) => c.body.includes(signature));
+      await runPhase("post", "Posting review comment", async () => {
+        // Find existing comment with the signature to overwrite
+        const signature = "<!-- merge-mentor-pbi-review -->";
+        const existingComment = pbiDetails.comments.find((c) => c.body.includes(signature));
 
-      if (existingComment) {
-        output.log(
-          `🔄 Updating existing review comment (ID: ${existingComment.id}) on PBI #${id}...`
-        );
-        await this.adapter.postPBIComment(id, reportMarkdown, existingComment.id);
-      } else {
-        output.log(`✉️ Posting new review comment on PBI #${id}...`);
-        await this.adapter.postPBIComment(id, reportMarkdown);
-      }
-      output.log("✅ Comment posted successfully!\n");
+        if (existingComment) {
+          output.log(
+            `🔄 Updating existing review comment (ID: ${existingComment.id}) on PBI #${id}...`
+          );
+          await this.adapter.postPBIComment(id, reportMarkdown, existingComment.id);
+        } else {
+          output.log(`✉️ Posting new review comment on PBI #${id}...`);
+          await this.adapter.postPBIComment(id, reportMarkdown);
+        }
+        output.log("✅ Comment posted successfully!\n");
+      });
     }
 
     return reviewData;
