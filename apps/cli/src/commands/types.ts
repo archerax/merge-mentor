@@ -401,6 +401,16 @@ export interface BuildAnalyzeOptions {
   aiApiKey?: string;
 }
 
+/** Options for the `ui` command. */
+export interface UiOptions {
+  /** Port for the dashboard server. Default: 3000. */
+  port?: number;
+  /** Bind the dashboard server to a specific host (e.g. `0.0.0.0`). */
+  host?: string;
+  /** Open the dashboard in the default browser once it is ready. Default: `false`. */
+  open?: boolean;
+}
+
 /** Result of a successful `eval` command execution. */
 export interface EvalExecutionResult {
   /** Full evaluation report produced by the corpus harness. */

@@ -178,7 +178,7 @@ function AppFrame({ children }: { children: React.ReactNode }) {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
+      <AppShell.Navbar p="md" style={navOpened ? { transform: "none" } : undefined}>
         <Stack gap={4}>
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
             const active = pathname === to;

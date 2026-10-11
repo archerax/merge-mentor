@@ -12,8 +12,9 @@
     "merge-mentor": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm run build:root && pnpm -r --if-present run build",
+    "build": "pnpm run build:root && pnpm -r --if-present run build && pnpm run build:web",
     "build:root": "tsc --noEmit && cross-env NODE_ENV=production node build.mjs",
+    "build:web": "node scripts/bundle-web.mjs",
     "build:dev": "pnpm run build:dev:root && pnpm -r --if-present run build:dev",
     "build:dev:root": "tsc --noEmit && node build.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm build && pnpm test",

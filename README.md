@@ -67,6 +67,7 @@ Merge Mentor offers a set of subcommands to support reviews, plan checks, and au
 - **[pbi](./docs/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
 - **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[plan](./docs/plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
+- **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive reviews.
 
 For full configuration settings and options, refer to the **[Configuration Guide](./docs/configuration.md)**.
 

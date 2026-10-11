@@ -55,6 +55,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 - **[project](./project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[plan](./plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.
+- **[ui](./ui.md)**: Launches the local web dashboard for interactive reviews.
 
 ---
 

@@ -26,6 +26,7 @@ import {
   hasBlockingFindings,
   STAGE_BLOCKING_EXIT_CODE,
 } from "./commands/stage.js";
+import { DEFAULT_UI_PORT, executeUiCommand, parseUiPort } from "./commands/ui.js";
 
 // Re-export types and functions for backward compatibility
 export * from "./commands/types.js";
@@ -42,6 +43,7 @@ import type {
   ReplyOptions,
   ReviewOptions,
   StageOptions,
+  UiOptions,
 } from "./commands/types.js";
 
 const program = new Command();
@@ -568,6 +570,24 @@ program
   .action(async (options: { provider?: string }) => {
     await executeDoctorCommand(options);
     process.exit(0);
+  });
+
+// Web dashboard command
+program
+  .command("ui")
+  .description("Launch the web dashboard for interactive reviews")
+  .optionsGroup("General Options")
+  .option("--port <port>", "Port for the dashboard server", parseUiPort, DEFAULT_UI_PORT)
+  .option("--host <host>", "Bind the dashboard server to a specific host (e.g. 0.0.0.0)")
+  .option("--open", "Open the dashboard in the default browser", false)
+  .action(async (options: UiOptions) => {
+    try {
+      await executeUiCommand(options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
   });
 
 // PBI Review command
