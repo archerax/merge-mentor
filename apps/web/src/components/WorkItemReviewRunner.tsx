@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   ScrollArea,
+  Select,
   Stack,
   Switch,
   Text,
@@ -16,11 +17,13 @@ import {
 } from "@mantine/core";
 import { useEffect, useRef, useState } from "react";
 
-import type {
-  PBIReviewSummary,
-  ProjectReviewFindingView,
-  ProjectReviewSummary,
-  ReviewStreamEvent,
+import {
+  type PBIReviewSummary,
+  type ProjectReviewFindingView,
+  type ProjectReviewSummary,
+  REVIEW_STRATEGY_OPTIONS,
+  type ReviewStrategyInput,
+  type ReviewStreamEvent,
 } from "../server/review.types.js";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -50,6 +53,7 @@ interface WorkItemInput {
   readonly id?: string;
   readonly url?: string;
   readonly write: boolean;
+  readonly strategy?: ReviewStrategyInput;
 }
 
 interface WorkItemReviewRunnerProps<TSummary> {
@@ -87,6 +91,7 @@ export function WorkItemReviewRunner<TSummary>({
 }: WorkItemReviewRunnerProps<TSummary>) {
   const [itemInput, setItemInput] = useState("");
   const [write, setWrite] = useState(false);
+  const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
 
   const [status, setStatus] = useState<Status>("idle");
   const [entries, setEntries] = useState<readonly OutputEntry[]>([]);
@@ -134,8 +139,9 @@ export function WorkItemReviewRunner<TSummary>({
   function buildInput(): WorkItemInput | { error: string } {
     const value = itemInput.trim();
     if (value.length === 0) return { error: "Enter a work item URL or ID." };
-    if (/^https?:\/\//i.test(value)) return { url: value, write };
-    return { id: value, write };
+    const base = strategy ? { write, strategy } : { write };
+    if (/^https?:\/\//i.test(value)) return { url: value, ...base };
+    return { id: value, ...base };
   }
 
   async function run() {
@@ -212,6 +218,16 @@ export function WorkItemReviewRunner<TSummary>({
             placeholder={placeholder}
             value={itemInput}
             onChange={(event) => setItemInput(event.currentTarget.value)}
+            disabled={running}
+          />
+          <Select
+            label="Review strategy"
+            description="Overrides the configured default for this run."
+            placeholder="Use configured default"
+            data={REVIEW_STRATEGY_OPTIONS}
+            value={strategy}
+            onChange={(next) => setStrategy(next as ReviewStrategyInput | null)}
+            clearable
             disabled={running}
           />
           <Switch

@@ -6,6 +6,12 @@
  * bundle.
  */
 
+/** Review execution strategy selectable from the web UI. */
+export const REVIEW_STRATEGY_OPTIONS = ["fast", "deep", "multi-agent"] as const;
+
+/** Review execution strategy selectable from the web UI. */
+export type ReviewStrategyInput = (typeof REVIEW_STRATEGY_OPTIONS)[number];
+
 /** Input accepted by the review stream endpoint. */
 export interface ReviewStreamInput {
   /** PR URL that determines platform, repository, and PR number. */
@@ -14,6 +20,8 @@ export interface ReviewStreamInput {
   readonly pr?: number;
   /** Post comments to the PR. Default: `false` (dry-run). */
   readonly write?: boolean;
+  /** Overrides the configured review strategy for this run. */
+  readonly strategy?: ReviewStrategyInput;
 }
 
 /** Input accepted by the PBI review stream endpoint. */
@@ -24,6 +32,8 @@ export interface PBIReviewStreamInput {
   readonly url?: string;
   /** Post the review comment to the work item. Default: `false` (dry-run). */
   readonly write?: boolean;
+  /** Overrides the configured review strategy for this run. */
+  readonly strategy?: ReviewStrategyInput;
 }
 
 /** Input accepted by the project review stream endpoint. */
@@ -34,6 +44,8 @@ export interface ProjectReviewStreamInput {
   readonly url?: string;
   /** Post the review comment to the work item. Default: `false` (dry-run). */
   readonly write?: boolean;
+  /** Overrides the configured review strategy for this run. */
+  readonly strategy?: ReviewStrategyInput;
 }
 
 /** A single finding rendered in the review result. */

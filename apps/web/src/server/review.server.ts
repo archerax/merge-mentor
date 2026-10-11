@@ -45,9 +45,16 @@ function resolveTarget(input: ReviewStreamInput): ReviewTarget {
     azureProject?: string;
     azureRepo?: string;
     tempPath?: string;
+    reviewStrategy?: string;
+    passes?: string;
   } = { tempPath: resolveTempPath() };
   let pr: number;
   let originalUrl: string | undefined;
+
+  if (input.strategy) {
+    overrides.reviewStrategy = input.strategy;
+    if (input.strategy !== "multi-agent") overrides.passes = "";
+  }
 
   if (input.prUrl) {
     const parsed = parsePRUrl(input.prUrl);

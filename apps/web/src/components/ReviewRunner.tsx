@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   ScrollArea,
+  Select,
   SimpleGrid,
   Stack,
   Switch,
@@ -17,11 +18,13 @@ import {
 } from "@mantine/core";
 import { useEffect, useRef, useState } from "react";
 
-import type {
-  ReviewFindingView,
-  ReviewStreamEvent,
-  ReviewStreamInput,
-  ReviewSummary,
+import {
+  REVIEW_STRATEGY_OPTIONS,
+  type ReviewFindingView,
+  type ReviewStreamEvent,
+  type ReviewStreamInput,
+  type ReviewStrategyInput,
+  type ReviewSummary,
 } from "../server/review.types.js";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -42,6 +45,7 @@ interface OutputEntry {
 export function ReviewRunner() {
   const [prInput, setPrInput] = useState("");
   const [write, setWrite] = useState(false);
+  const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
 
   const [status, setStatus] = useState<Status>("idle");
   const [entries, setEntries] = useState<readonly OutputEntry[]>([]);
@@ -90,15 +94,17 @@ export function ReviewRunner() {
     const trimmed = prInput.trim();
     if (trimmed.length === 0) return { error: "Enter a PR URL or number." };
 
+    const base = strategy ? { write, strategy } : { write };
+
     if (/^https?:\/\//i.test(trimmed)) {
-      return { prUrl: trimmed, write };
+      return { prUrl: trimmed, ...base };
     }
 
     const pr = Number(trimmed);
     if (!Number.isInteger(pr) || pr <= 0) {
       return { error: "Enter a valid PR URL or a positive PR number." };
     }
-    return { pr, write };
+    return { pr, ...base };
   }
 
   async function run() {
@@ -172,9 +178,19 @@ export function ReviewRunner() {
         <Stack gap="md">
           <TextInput
             label="Pull request"
-            placeholder="https://github.com/owner/repo/pull/123 or 123"
+            placeholder="https://dev.azure.com/org/project/_git/repo/pullrequest/123 or 123"
             value={prInput}
             onChange={(event) => setPrInput(event.currentTarget.value)}
+            disabled={running}
+          />
+          <Select
+            label="Review strategy"
+            description="Overrides the configured default for this run."
+            placeholder="Use configured default"
+            data={REVIEW_STRATEGY_OPTIONS}
+            value={strategy}
+            onChange={(next) => setStrategy(next as ReviewStrategyInput | null)}
+            clearable
             disabled={running}
           />
           <Switch
