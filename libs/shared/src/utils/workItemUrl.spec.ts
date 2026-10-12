@@ -35,4 +35,34 @@ describe("parseWorkItemUrl", () => {
       "Invalid GitHub work item URL"
     );
   });
+
+  it("rejects an empty URL", () => {
+    expect(() => parseWorkItemUrl("")).toThrow("URL is empty");
+    expect(() => parseWorkItemUrl("   ")).toThrow("URL is empty");
+  });
+
+  it("rejects a malformed URL", () => {
+    expect(() => parseWorkItemUrl("not a url")).toThrow("is not a valid URL");
+  });
+
+  it("rejects non-HTTPS URLs", () => {
+    expect(() => parseWorkItemUrl("http://github.com/o/r/issues/1")).toThrow(
+      'only HTTPS URLs are supported. Got protocol "http"'
+    );
+  });
+
+  it("rejects an unrecognized host", () => {
+    expect(() => parseWorkItemUrl("https://example.com/o/r/issues/1")).toThrow(
+      "Unrecognized work item URL"
+    );
+  });
+
+  it("rejects Azure URLs with a non-numeric work item id", () => {
+    expect(() => parseWorkItemUrl("https://dev.azure.com/org/project/_workitems/edit/abc")).toThrow(
+      "Unrecognized work item URL"
+    );
+    expect(() =>
+      parseWorkItemUrl("https://org.visualstudio.com/project/_workitems/edit/abc")
+    ).toThrow("Unrecognized work item URL");
+  });
 });

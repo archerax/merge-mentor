@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -96,6 +96,31 @@ function makeReviewResult(): ReviewResult {
     },
     commentsCreated: 0,
     commentErrors: [],
+  };
+}
+
+function makeRichResult(): ReviewResult {
+  return {
+    ...makeReviewResult(),
+    filesReviewed: 2,
+    filesSkipped: 1,
+    filesIgnored: 1,
+    ignoredFiles: ["dist/bundle.js"],
+    crossFileResult: {
+      overallAssessment: "Cross assessment",
+      findings: [
+        {
+          severity: "critical",
+          confidence: "high",
+          category: "security",
+          message: "cross issue",
+          reasoning: "because",
+          affectedFiles: ["src/a.ts", "src/b.ts"],
+        },
+      ],
+      recommendations: ["fix it"],
+    },
+    tokenUsage: { inputTokens: 10, outputTokens: 5 },
   };
 }
 
@@ -206,6 +231,32 @@ describe("executeStage", () => {
     await executeStage(baseOptions);
     expect(providers[2].executePrompt).not.toHaveBeenCalled();
   });
+
+  it("logs the model and BYOK URL when configured", async () => {
+    const previousModel = process.env.MM_AI_MODEL;
+    const previousBaseUrl = process.env.MM_AI_BASE_URL;
+    process.env.MM_AI_MODEL = "gpt-5.2-codex";
+    process.env.MM_AI_BASE_URL = "https://byok.example.com";
+    try {
+      repo.write("src/bug.ts", "export function double(x: number) {\n  return x + 1;\n}\n");
+      repo.git("add", "src/bug.ts");
+      const output = makeOutput();
+
+      await executeStage(
+        { dir: repo.path, tempPath, staged: true, streamingEnabled: false },
+        { output }
+      );
+
+      const joined = output.lines.join("\n");
+      expect(joined).toContain("Model:      gpt-5.2-codex");
+      expect(joined).toContain("BYOK URL:   https://byok.example.com");
+    } finally {
+      if (previousModel === undefined) delete process.env.MM_AI_MODEL;
+      else process.env.MM_AI_MODEL = previousModel;
+      if (previousBaseUrl === undefined) delete process.env.MM_AI_BASE_URL;
+      else process.env.MM_AI_BASE_URL = previousBaseUrl;
+    }
+  });
 });
 
 describe("stage helpers", () => {
@@ -299,6 +350,125 @@ describe("stage helpers", () => {
       const report = readFileSync(reportFile, "utf-8");
       expect(report).toContain("# Staged Review Report");
       expect(output.lines.join("\n")).toContain("Stage Review Complete");
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("flags cross-file blocking findings", () => {
+    expect(hasBlockingFindings(makeRichResult())).toBe(true);
+  });
+
+  it("counts cross-file findings by severity and category", () => {
+    const counts = countStageIssuesBySeverity(makeRichResult());
+    expect(counts.critical).toBe(1);
+    expect(counts.high).toBe(1);
+
+    const report = generateStageMarkdownReport(
+      makeRichResult(),
+      "copilot-sdk",
+      ["security"],
+      "deep"
+    );
+    expect(report).toContain("**Review Passes:**");
+    expect(report).toContain("**Review Strategy:** deep");
+    expect(report).toContain("### 💰 Token Usage");
+    expect(report).toContain("## 🔗 Cross-File Issues");
+    expect(report).toContain("## 💡 Recommendations");
+    expect(report).toContain("### Issues by Severity");
+    expect(report).toContain("### Issues by Category");
+  });
+
+  it("serializes cross-file findings to JSON", () => {
+    const json = JSON.parse(stageReviewToJson(makeRichResult(), "opencode-sdk")) as {
+      crossFileResult: { findings: Array<{ message: string; affectedFiles: string[] }> };
+      tokenUsage: { inputTokens: number };
+    };
+    expect(json.crossFileResult.findings[0].message).toBe("cross issue");
+    expect(json.crossFileResult.findings[0].affectedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(json.tokenUsage.inputTokens).toBe(10);
+  });
+
+  it("prints JSON to the writer when --format json has no --output", () => {
+    const output = makeOutput();
+    displayStageResults(
+      makeReviewResult(),
+      "opencode-sdk",
+      { format: "json" },
+      undefined,
+      "fast",
+      "./.mergementor",
+      {
+        output,
+      }
+    );
+    expect(output.lines.join("\n")).toContain('"tool": "merge-mentor"');
+  });
+
+  it("writes and prints a markdown report", () => {
+    const outputDir = mkdtempSync(join(tmpdir(), "mm-stage-report-"));
+    try {
+      const outputFile = join(outputDir, "stage.md");
+      const output = makeOutput();
+      displayStageResults(
+        makeReviewResult(),
+        "opencode-sdk",
+        { format: "markdown", output: outputFile },
+        undefined,
+        "fast",
+        "./.mergementor",
+        { output }
+      );
+      expect(readFileSync(outputFile, "utf-8")).toContain("# Staged Review Report");
+      expect(output.lines.join("\n")).toContain("Markdown report written");
+
+      const printed = makeOutput();
+      displayStageResults(
+        makeReviewResult(),
+        "opencode-sdk",
+        { format: "markdown" },
+        undefined,
+        "fast",
+        "./.mergementor",
+        { output: printed }
+      );
+      expect(printed.lines.join("\n")).toContain("# Staged Review Report");
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("renders the rich terminal summary", () => {
+    const outputDir = mkdtempSync(join(tmpdir(), "mm-stage-report-"));
+    try {
+      const output = makeOutput();
+      displayStageResults(makeRichResult(), "copilot-sdk", {}, ["security"], "deep", outputDir, {
+        output,
+      });
+      const joined = output.lines.join("\n");
+      expect(joined).toContain("Review Passes:");
+      expect(joined).toContain("Review Strategy: deep");
+      expect(joined).toContain("Files Skipped: 1");
+      expect(joined).toContain("Files Ignored: 1");
+      expect(joined).toContain("dist/bundle.js");
+      expect(joined).toContain("Token Usage");
+      expect(joined).toContain("Cross-File Issues");
+      expect(joined).toContain("Recommendations");
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports when the markdown report cannot be written", () => {
+    const outputDir = mkdtempSync(join(tmpdir(), "mm-stage-report-"));
+    try {
+      const blocker = join(outputDir, "not-a-dir");
+      writeFileSync(blocker, "x");
+      const output = makeOutput();
+      displayStageResults(makeReviewResult(), "opencode-sdk", {}, undefined, "fast", blocker, {
+        output,
+      });
+      expect(output.lines.join("\n")).toContain("Failed to write markdown report");
     } finally {
       rmSync(outputDir, { recursive: true, force: true });
     }

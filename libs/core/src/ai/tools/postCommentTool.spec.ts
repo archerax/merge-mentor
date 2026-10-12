@@ -3,6 +3,8 @@ import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWr
 import { describe, expect, it } from "vitest";
 
 import {
+  combineToolAndJsonFindings,
+  convertFindingsToParsedResponse,
   createPostCommentTool,
   FindingsCollector,
   generateFindingId,
@@ -220,6 +222,184 @@ describe("postCommentTool", () => {
       expect(output.output[0].data).toContain(
         "[Experimental Tool] Finding recorded: src/db.ts:88 [HIGH] (performance): Optimize index here."
       );
+    });
+  });
+
+  describe("convertFindingsToParsedResponse", () => {
+    const findings: PostCommentFinding[] = [
+      {
+        file: "src/a.ts",
+        line: 1,
+        body: "first",
+        severity: "high",
+        category: "bug",
+        findingId: "id-a",
+        timestamp: 0,
+      },
+      {
+        file: "src/b.ts",
+        line: 2,
+        body: "second",
+        severity: "low",
+        category: "quality",
+        findingId: "id-b",
+        timestamp: 0,
+        confidence: "low",
+        suggestion: "use const",
+        reasoning: "immutability",
+      },
+    ];
+
+    it("returns an empty shape for no findings", () => {
+      const parsed = convertFindingsToParsedResponse([]) as {
+        findings: unknown[];
+        file_results: Record<string, unknown>;
+        summary: string;
+      };
+
+      expect(parsed.findings).toEqual([]);
+      expect(parsed.file_results).toEqual({});
+      expect(parsed.summary).toContain("0 findings");
+    });
+
+    it("groups findings by file and applies defaults", () => {
+      const parsed = convertFindingsToParsedResponse(findings) as {
+        findings: Record<string, unknown>[];
+        file_results: Record<string, { findings: Record<string, unknown>[] }>;
+      };
+
+      expect(parsed.findings).toHaveLength(2);
+      expect(parsed.findings[0]).toMatchObject({
+        line: 1,
+        confidence: "high",
+        suggestion: "",
+        reasoning: "Recorded via tool call.",
+        isPreExisting: false,
+      });
+      expect(parsed.findings[1]).toMatchObject({
+        suggestion: "use const",
+        reasoning: "immutability",
+      });
+      expect(Object.keys(parsed.file_results).toSorted()).toEqual(["src/a.ts", "src/b.ts"]);
+      expect(parsed.file_results["src/a.ts"].findings).toHaveLength(1);
+    });
+  });
+
+  describe("combineToolAndJsonFindings", () => {
+    const toolFindings: PostCommentFinding[] = [
+      {
+        file: "src/a.ts",
+        line: 1,
+        body: "tool finding",
+        severity: "high",
+        category: "bug",
+        findingId: "id-a",
+        timestamp: 0,
+      },
+      {
+        file: "src/b.ts",
+        line: 2,
+        body: "another tool finding",
+        severity: "medium",
+        category: "security",
+        findingId: "id-b",
+        timestamp: 0,
+      },
+    ];
+
+    it("falls back to the tool-only shape when parsed is not an object", () => {
+      expect(combineToolAndJsonFindings(null, toolFindings)).toEqual(
+        convertFindingsToParsedResponse(toolFindings)
+      );
+      expect(combineToolAndJsonFindings("nope", toolFindings)).toEqual(
+        convertFindingsToParsedResponse(toolFindings)
+      );
+    });
+
+    it("appends into existing and new file_results entries", () => {
+      const parsed = {
+        file_results: { "src/a.ts": { findings: [{ line: 9, message: "existing" }] } },
+        summary: "keep me",
+      };
+
+      const merged = combineToolAndJsonFindings(parsed, toolFindings) as {
+        file_results: Record<string, { findings: Record<string, unknown>[] }>;
+        summary: string;
+      };
+
+      expect(merged.summary).toBe("keep me");
+      expect(merged.file_results["src/a.ts"].findings).toHaveLength(2);
+      expect(merged.file_results["src/b.ts"].findings).toHaveLength(1);
+    });
+
+    it("tolerates a non-array findings field in file_results", () => {
+      const parsed = { file_results: { "src/a.ts": { findings: "not-an-array" } } };
+
+      const merged = combineToolAndJsonFindings(parsed, [toolFindings[0]]) as {
+        file_results: Record<string, { findings: Record<string, unknown>[] }>;
+      };
+
+      expect(merged.file_results["src/a.ts"].findings).toHaveLength(1);
+      expect(merged.file_results["src/a.ts"].findings[0]).toMatchObject({
+        message: "tool finding",
+      });
+    });
+
+    it("appends into a summary-shaped response", () => {
+      const parsed = { summary: "old summary", findings: [{ line: 1, message: "existing" }] };
+
+      const merged = combineToolAndJsonFindings(parsed, toolFindings) as {
+        summary: string;
+        findings: Record<string, unknown>[];
+      };
+
+      expect(merged.findings).toHaveLength(3);
+      expect(merged.findings[2]).toMatchObject({
+        file: "src/b.ts",
+        message: "another tool finding",
+      });
+    });
+
+    it("starts a fresh findings array for a summary response without one", () => {
+      const parsed = { summary: "old summary", findings: "bad" };
+
+      const merged = combineToolAndJsonFindings(parsed, [toolFindings[0]]) as {
+        findings: Record<string, unknown>[];
+      };
+
+      expect(merged.findings).toHaveLength(1);
+    });
+
+    it("appends into an overall_assessment response using affected_files", () => {
+      const parsed = { overall_assessment: "assessment", findings: [] };
+
+      const merged = combineToolAndJsonFindings(parsed, toolFindings) as {
+        overall_assessment: string;
+        findings: Record<string, unknown>[];
+      };
+
+      expect(merged.findings).toHaveLength(2);
+      expect(merged.findings[0]).toMatchObject({
+        affected_files: ["src/a.ts"],
+        message: "tool finding",
+      });
+      expect(merged.findings[0]).not.toHaveProperty("file");
+    });
+
+    it("appends into a flat findings response", () => {
+      const parsed = { findings: [] };
+
+      const merged = combineToolAndJsonFindings(parsed, toolFindings) as {
+        findings: Record<string, unknown>[];
+      };
+
+      expect(merged.findings).toHaveLength(2);
+      expect(merged.findings[0]).toMatchObject({ file: "src/a.ts", line: 1 });
+    });
+
+    it("returns the parsed object unchanged when no shape is recognized", () => {
+      const parsed = { unrelated: true };
+      expect(combineToolAndJsonFindings(parsed, toolFindings)).toEqual(parsed);
     });
   });
 });

@@ -87,6 +87,22 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
+function spyCopilotCliPath(): { restore: () => void } {
+  const env = processEnvironment;
+  const envSpy = vi
+    .spyOn(env, "get")
+    .mockImplementation((key: string) =>
+      key === "COPILOT_CLI_PATH" ? "/custom/path/copilot-cli.js" : undefined
+    );
+  const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(true);
+  return {
+    restore: () => {
+      envSpy.mockRestore();
+      existsSpy.mockRestore();
+    },
+  };
+}
+
 describe("doctor command", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -371,6 +387,122 @@ describe("doctor command", () => {
         expect.stringContaining("Skipped: BYOK mode is active")
       );
       expect(mockClient.getAuthStatus).not.toHaveBeenCalled();
+    });
+
+    it("passes the copilot token to the auth client", async () => {
+      vi.mocked(loadConfig).mockReturnValue(createMockConfig({ copilotToken: "github_pat_abc" }));
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+
+      expect(MockCopilotClient).toHaveBeenCalledWith(
+        expect.objectContaining({ gitHubToken: "github_pat_abc" })
+      );
+    });
+  });
+
+  describe("COPILOT_CLI_PATH execution fallbacks", () => {
+    it("falls back to direct execution when node cannot run the CLI", async () => {
+      const spy = spyCopilotCliPath();
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        if (cmdStr.startsWith("node ")) throw new Error("node failed");
+        if (cmdStr.includes("copilot-cli.js")) return "copilot 3.0.0";
+        throw new Error("not found");
+      });
+
+      try {
+        await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining("CLI executes: copilot 3.0.0")
+        );
+      } finally {
+        spy.restore();
+      }
+    });
+
+    it("reports when the CLI fails to execute at all", async () => {
+      const spy = spyCopilotCliPath();
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        if (cmdStr.includes("copilot-cli.js")) throw new Error("direct failed");
+        throw new Error("not found");
+      });
+
+      try {
+        await program.parseAsync(["node", "test", "doctor", "--provider", "copilot"]);
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("CLI fails to execute"));
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Error: direct failed"));
+      } finally {
+        spy.restore();
+      }
+    });
+  });
+
+  describe("opencode and generic provider diagnostics", () => {
+    it("warns when the opencode installation location cannot be determined", async () => {
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        if (cmdStr.includes("opencode --version")) return "opencode 1.0.0";
+        throw new Error("which failed");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "opencode"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Could not determine installation location")
+      );
+    });
+
+    it("reports a generic provider version and location", async () => {
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        if (cmdStr.includes("customcli --version")) return "customcli 1.2.3";
+        if (cmdStr.includes("customcli")) return "/usr/bin/customcli";
+        throw new Error("not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "customcli"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Installed: customcli 1.2.3")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Location: /usr/bin/customcli")
+      );
+    });
+
+    it("warns when a generic provider location cannot be determined", async () => {
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        if (cmdStr.includes("customcli --version")) return "customcli 1.2.3";
+        throw new Error("which failed");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "customcli"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Could not determine installation location")
+      );
+    });
+
+    it("reports a missing generic provider", async () => {
+      vi.mocked(execSync).mockImplementation((cmd) => {
+        const cmdStr = typeof cmd === "string" ? cmd : "";
+        if (cmdStr.includes("git --version")) return "git version 2.40.1";
+        throw new Error("customcli not found");
+      });
+
+      await program.parseAsync(["node", "test", "doctor", "--provider", "customcli"]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Not found or not working")
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("customcli not found"));
     });
   });
 });

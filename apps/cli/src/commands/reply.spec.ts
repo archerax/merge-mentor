@@ -11,6 +11,15 @@ vi.mock("@merge-mentor/core/ai/providerFactory.js", () => ({
   })),
 }));
 
+// Mock interactive readline prompts
+const mockQuestion = vi.fn();
+const mockClose = vi.fn();
+vi.mock("node:readline/promises", () => ({
+  default: {
+    createInterface: vi.fn(() => ({ question: mockQuestion, close: mockClose })),
+  },
+}));
+
 // Mock platform adapter
 const mockAdapter = {
   getCommentThread: vi.fn(),
@@ -104,6 +113,17 @@ describe("reply command", () => {
       const snippet = getCodeSnippetAtHead("apps/cli/src/commands/types.ts", 5);
       expect(snippet).not.toContain("not found");
       expect(snippet.length).toBeGreaterThan(0);
+    });
+
+    it("returns a numbered 30-line window for files longer than 100 lines", () => {
+      const snippet = getCodeSnippetAtHead("apps/cli/src/commands/reply.ts", 30);
+      expect(snippet.startsWith("15: ")).toBe(true);
+      expect(snippet.split("\n")).toHaveLength(31);
+    });
+
+    it("returns an error message when the file cannot be read", () => {
+      const snippet = getCodeSnippetAtHead("apps/cli/src/commands", 1);
+      expect(snippet).toContain("Failed to read file");
     });
   });
 
@@ -215,6 +235,103 @@ describe("reply command", () => {
       expect(mockOutput.log).toHaveBeenCalledWith(
         expect.stringContaining("[DRY RUN] Proposed Reply for Thread 99:")
       );
+    });
+
+    it("throws for an unsupported platform", async () => {
+      await expect(
+        executeReplyCommand({ pr: 1, ci: false, platform: "gitlab" }, { output: mockOutput })
+      ).rejects.toThrow('Invalid platform "gitlab"');
+    });
+
+    it("uses the Azure adapter when the platform is azure", async () => {
+      mockAdapter.getCommentThread.mockResolvedValueOnce({
+        id: "5",
+        path: "src/a.ts",
+        line: 1,
+        status: "active",
+        comments: [{ author: "user", body: "check", isBot: false }],
+      });
+      mockExecutePrompt.mockResolvedValueOnce({
+        raw: JSON.stringify({ reply: "sure", shouldResolve: false }),
+      });
+
+      await executeReplyCommand(
+        { pr: 2, ci: false, platform: "azure", commentId: "5", write: true },
+        { output: mockOutput }
+      );
+
+      expect(mockAdapter.postCommentReply).toHaveBeenCalledWith(2, "5", "sure");
+    });
+
+    it("logs when there are no threads awaiting reply", async () => {
+      mockAdapter.getUnresolvedCommentThreads.mockResolvedValueOnce([]);
+
+      await executeReplyCommand({ pr: 3, ci: false }, { output: mockOutput });
+
+      expect(mockOutput.log).toHaveBeenCalledWith(
+        expect.stringContaining("No matching unresolved comment threads")
+      );
+      expect(mockExecutePrompt).not.toHaveBeenCalled();
+    });
+
+    it("selects threads interactively and skips the rest", async () => {
+      mockAdapter.getUnresolvedCommentThreads.mockResolvedValueOnce([
+        {
+          id: "1",
+          path: "src/a.ts",
+          line: 1,
+          status: "active",
+          botInitiated: true,
+          comments: [
+            { author: "bot", body: "issue", isBot: true },
+            { author: "user", body: "please check", isBot: false },
+          ],
+        },
+        {
+          id: "2",
+          path: "src/b.ts",
+          line: 2,
+          status: "active",
+          botInitiated: true,
+          comments: [
+            { author: "bot", body: "issue", isBot: true },
+            { author: "user", body: "and this", isBot: false },
+          ],
+        },
+      ]);
+      mockQuestion.mockResolvedValueOnce("y").mockResolvedValueOnce("q");
+      mockExecutePrompt.mockResolvedValueOnce({
+        raw: JSON.stringify({ reply: "done", shouldResolve: false }),
+      });
+
+      await executeReplyCommand({ pr: 4, ci: false, interactive: true }, { output: mockOutput });
+
+      expect(mockQuestion).toHaveBeenCalledTimes(2);
+      expect(mockOutput.log).toHaveBeenCalledWith("Quitting reply command.");
+      expect(mockOutput.log).toHaveBeenCalledWith(
+        expect.stringContaining("[DRY RUN] Proposed Reply for Thread 1:")
+      );
+    });
+
+    it("reports when interactive selection yields no threads", async () => {
+      mockAdapter.getUnresolvedCommentThreads.mockResolvedValueOnce([
+        {
+          id: "1",
+          path: "src/a.ts",
+          line: 1,
+          status: "active",
+          botInitiated: true,
+          comments: [
+            { author: "bot", body: "issue", isBot: true },
+            { author: "user", body: "please check", isBot: false },
+          ],
+        },
+      ]);
+      mockQuestion.mockResolvedValueOnce("n");
+
+      await executeReplyCommand({ pr: 5, ci: false, interactive: true }, { output: mockOutput });
+
+      expect(mockOutput.log).toHaveBeenCalledWith("No threads selected for reply.");
     });
   });
 });

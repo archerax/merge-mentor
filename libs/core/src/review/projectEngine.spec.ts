@@ -453,4 +453,63 @@ describe("ProjectReviewEngine", () => {
       true
     );
   });
+
+  it("emits an error phase and rethrows when fetching the project fails", async () => {
+    const adapter = createMockAdapter();
+    vi.mocked(adapter.getProjectDetails).mockRejectedValueOnce(new Error("boom"));
+    const aiClient = createMockAiClient();
+    const events: unknown[] = [];
+    const engine = new ProjectReviewEngine(adapter, aiClient, {
+      dryRun: true,
+      tempPath,
+      onProgress: (event) => events.push(event),
+    });
+
+    await expect(engine.reviewProject("100")).rejects.toThrow("boom");
+    expect(events).toContainEqual(
+      expect.objectContaining({ kind: "phase", id: "fetch", status: "error" })
+    );
+  });
+
+  it("renders predecessor dependencies and orphan work items in the prompt", async () => {
+    const adapter = createMockAdapter([], {
+      workItems: [
+        ...mockProjectDetails.workItems,
+        {
+          id: "200",
+          title: "Orphan Story",
+          type: "User Story",
+          description: "No parent link",
+          state: "New",
+          normalizedState: "todo",
+          comments: [],
+        },
+      ],
+      dependencies: [{ sourceId: "100", targetId: "101", type: "predecessor" }],
+    });
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+
+    await engine.reviewProject("100");
+
+    const prompt = vi.mocked(aiClient.executePrompt).mock.calls[0][0];
+    expect(prompt).toContain("predecessor");
+    expect(prompt).toContain("no hierarchy parent");
+    expect(prompt).toContain("Orphan Story");
+  });
+
+  it("notes comments omitted beyond the per-item limit", async () => {
+    const comments = Array.from({ length: 7 }, (_, index) => ({
+      id: index + 1,
+      body: `comment ${index + 1}`,
+    }));
+    const adapter = createMockAdapter(comments);
+    const aiClient = createMockAiClient();
+    const engine = new ProjectReviewEngine(adapter, aiClient, { dryRun: true, tempPath });
+
+    await engine.reviewProject("100");
+
+    const prompt = vi.mocked(aiClient.executePrompt).mock.calls[0][0];
+    expect(prompt).toContain("(+2 more comments omitted)");
+  });
 });

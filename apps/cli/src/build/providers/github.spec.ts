@@ -79,4 +79,82 @@ describe("GithubBuildProvider", () => {
 
     await expect(provider.getBuildSummary(reference)).rejects.toBeInstanceOf(PlatformApiError);
   });
+
+  it("maps in-progress and successful runs without optional metadata", async () => {
+    const get = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "in_progress", conclusion: "success" }), {
+        status: 200,
+      })
+    );
+    const provider = new GithubBuildProvider("token", { get });
+
+    await expect(provider.getBuildSummary(reference)).resolves.toMatchObject({
+      id: "17",
+      name: "workflow run",
+      status: "inProgress",
+      result: "succeeded",
+      sourceBranch: undefined,
+      commitSha: undefined,
+      webUrl: undefined,
+    });
+  });
+
+  it("defaults unknown status and result", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ status: "queued", conclusion: "skipped" }), { status: 200 })
+      );
+    const provider = new GithubBuildProvider("token", { get });
+
+    await expect(provider.getBuildSummary(reference)).resolves.toMatchObject({
+      status: "unknown",
+      result: "unknown",
+    });
+  });
+
+  it("collects unnamed failed jobs and accepts json log content", async () => {
+    const client = http([
+      new Response(
+        JSON.stringify({
+          jobs: [
+            { id: 1, conclusion: "timed_out" },
+            { id: 2, name: "named", conclusion: "failure" },
+          ],
+        }),
+        { status: 200 }
+      ),
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+      new Response("named log", { status: 200, headers: { "content-type": "text/plain" } }),
+    ]);
+
+    await expect(
+      new GithubBuildProvider("token", client).getFailedLogs(reference)
+    ).resolves.toEqual([
+      { jobName: undefined, content: '{"ok":true}', isFailureCandidate: true },
+      { jobName: "named", content: "named log", isFailureCandidate: true },
+    ]);
+  });
+
+  it("handles a jobs payload without a jobs array", async () => {
+    const client = http([new Response(JSON.stringify({}), { status: 200 })]);
+
+    await expect(
+      new GithubBuildProvider("token", client).getFailedLogs(reference)
+    ).resolves.toEqual([]);
+  });
+
+  it("skips jobs whose log has no textual content type", async () => {
+    const client = http([
+      new Response(JSON.stringify({ jobs: [{ id: 1, conclusion: "failure" }] }), { status: 200 }),
+      new Response(null, { status: 200 }),
+    ]);
+
+    await expect(
+      new GithubBuildProvider("token", client).getFailedLogs(reference)
+    ).resolves.toEqual([]);
+  });
 });

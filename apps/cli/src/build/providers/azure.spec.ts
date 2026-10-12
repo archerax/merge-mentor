@@ -66,4 +66,63 @@ describe("AzureBuildProvider", () => {
       "Failed to retrieve Azure build log 7: forbidden"
     );
   });
+
+  it("selects logs from failed timeline records", async () => {
+    const api: Partial<IBuildApi> = {
+      getBuildLogs: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]),
+      getBuildTimeline: vi.fn().mockResolvedValue({
+        records: [
+          { result: "failed", log: { id: 7 } },
+          { result: "succeeded", log: { id: 8 } },
+          { result: "canceled", log: { id: undefined } },
+        ],
+      }),
+      getBuildLogLines: vi
+        .fn()
+        .mockImplementation((_project, _build, id) =>
+          Promise.resolve(id === 7 ? ["boom"] : ["ok"])
+        ),
+    };
+    const provider = new AzureBuildProvider("token", "org", "pat", connection(api));
+
+    await expect(provider.getFailedLogs(reference)).resolves.toEqual([
+      { sequence: 7, content: "boom", isFailureCandidate: true },
+    ]);
+  });
+
+  it("falls back to pattern matching when no failed timeline records exist", async () => {
+    const api: Partial<IBuildApi> = {
+      getBuildLogs: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]),
+      getBuildTimeline: vi.fn().mockResolvedValue({
+        records: [{ result: "succeeded", log: { id: 8 } }],
+      }),
+      getBuildLogLines: vi
+        .fn()
+        .mockImplementation((_project, _build, id) =>
+          Promise.resolve(id === 7 ? ["npm ERR! failed"] : ["ok"])
+        ),
+    };
+    const provider = new AzureBuildProvider("token", "org", "pat", connection(api));
+
+    await expect(provider.getFailedLogs(reference)).resolves.toEqual([
+      { sequence: 7, content: "npm ERR! failed", isFailureCandidate: true },
+    ]);
+  });
+
+  it("skips log entries without an id", async () => {
+    const api: Partial<IBuildApi> = {
+      getBuildLogs: vi.fn().mockResolvedValue([{ id: undefined }, { id: 7 }]),
+      getBuildTimeline: vi.fn().mockResolvedValue({ records: [] }),
+      getBuildLogLines: vi.fn().mockResolvedValue(["failed"]),
+    };
+    const provider = new AzureBuildProvider("token", "org", "pat", connection(api));
+
+    await expect(provider.getFailedLogs(reference)).resolves.toHaveLength(1);
+    expect(api.getBuildLogLines).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates a real connection for pat and bearer auth modes", () => {
+    expect(new AzureBuildProvider("token", "org", "pat")).toBeInstanceOf(AzureBuildProvider);
+    expect(new AzureBuildProvider("token", "org", "bearer")).toBeInstanceOf(AzureBuildProvider);
+  });
 });

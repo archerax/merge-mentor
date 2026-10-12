@@ -7,9 +7,11 @@ import { GitHubAdapter } from "./github.js";
 const mockOctokitInstance = {
   pulls: {
     get: vi.fn(),
+    update: vi.fn(),
     listFiles: vi.fn(),
     listReviewComments: vi.fn(),
     createReviewComment: vi.fn(),
+    createReplyForReviewComment: vi.fn(),
     getReviewComment: vi.fn(),
   },
   issues: {
@@ -30,6 +32,10 @@ vi.mock("@octokit/rest", () => ({
     graphql = mockOctokitInstance.graphql;
   },
 }));
+
+function graphqlThreads(nodes: unknown[]) {
+  return { repository: { pullRequest: { reviewThreads: { nodes } } } };
+}
 
 function createTestConfig(): Config {
   const reviewProfile = resolveReviewProfile({});
@@ -696,6 +702,311 @@ describe("GitHubAdapter", () => {
         const result = await adapter.getLinkedPBIIds(10);
         expect(result.toSorted()).toEqual(["111", "555", "888", "999"].toSorted());
       });
+    });
+  });
+
+  describe("getProjectIdentifier", () => {
+    it("returns the repository name", () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      expect(adapter.getProjectIdentifier()).toBe("test-repo");
+    });
+  });
+
+  describe("getCommentThread", () => {
+    it("resolves a thread by its node id and maps bot comments", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce(
+        graphqlThreads([
+          {
+            id: "thread-1",
+            isResolved: false,
+            path: "src/a.ts",
+            line: 10,
+            comments: {
+              nodes: [
+                {
+                  id: "c1",
+                  databaseId: 111,
+                  createdAt: "2024-01-01",
+                  author: { login: "bot[bot]" },
+                  body: "<!-- merge-mentor --> note",
+                },
+                { id: "c2", databaseId: 222, author: { login: "user" }, body: "reply" },
+              ],
+            },
+          },
+        ])
+      );
+
+      const thread = await adapter.getCommentThread(123, "thread-1");
+
+      expect(thread).toMatchObject({
+        id: "thread-1",
+        path: "src/a.ts",
+        line: 10,
+        status: "active",
+        botInitiated: true,
+      });
+      expect(thread.comments).toHaveLength(2);
+      expect(thread.comments[0]).toMatchObject({
+        id: 111,
+        author: "bot[bot]",
+        body: "<!-- merge-mentor --> note",
+        isBot: true,
+      });
+    });
+
+    it("matches a thread by an inner comment databaseId and marks resolved status", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce(
+        graphqlThreads([
+          {
+            id: "thread-9",
+            isResolved: true,
+            path: "src/b.ts",
+            line: 2,
+            comments: { nodes: [{ id: "c9", databaseId: 999, body: "done" }] },
+          },
+        ])
+      );
+
+      const thread = await adapter.getCommentThread(123, 999);
+
+      expect(thread).toMatchObject({ id: "thread-9", status: "resolved", botInitiated: false });
+      expect(thread.comments[0]).toMatchObject({ id: 999, author: "unknown", body: "done" });
+    });
+
+    it("falls back to the REST API when GraphQL fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockRejectedValueOnce(new Error("graphql down"));
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValueOnce({
+        data: {
+          id: 500,
+          in_reply_to_id: 400,
+          path: "src/b.ts",
+          line: 5,
+          body: "hello",
+          user: { login: "octocat" },
+          created_at: "2024-02-02",
+        },
+      });
+
+      const thread = await adapter.getCommentThread(123, 500);
+
+      expect(mockOctokitInstance.pulls.getReviewComment).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 500,
+      });
+      expect(thread).toMatchObject({ id: 400, path: "src/b.ts", line: 5, status: "active" });
+      expect(thread.comments[0]).toMatchObject({ id: 500, author: "octocat", body: "hello" });
+    });
+
+    it("defaults the REST line to 1 when the comment has no line", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce(graphqlThreads([]));
+      mockOctokitInstance.pulls.getReviewComment.mockResolvedValueOnce({
+        data: {
+          id: 600,
+          in_reply_to_id: null,
+          path: "src/c.ts",
+          line: null,
+          body: "",
+          user: null,
+        },
+      });
+
+      const thread = await adapter.getCommentThread(123, 600);
+
+      expect(thread).toMatchObject({ id: 600, line: 1, status: "active", botInitiated: false });
+      expect(thread.comments[0].author).toBe("unknown");
+    });
+
+    it("rethrows when the REST lookup fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce(graphqlThreads([]));
+      mockOctokitInstance.pulls.getReviewComment.mockRejectedValueOnce(new Error("Not Found"));
+
+      await expect(adapter.getCommentThread(123, 777)).rejects.toThrow("Not Found");
+    });
+
+    it("throws when a non-numeric thread id is not found", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce(graphqlThreads([]));
+
+      await expect(adapter.getCommentThread(123, "missing")).rejects.toThrow(
+        'Comment thread "missing" not found on PR #123'
+      );
+    });
+  });
+
+  describe("postCommentReply", () => {
+    it("uses the REST API for numeric comment ids", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.createReplyForReviewComment.mockResolvedValueOnce({});
+
+      await adapter.postCommentReply(7, 42, "thanks");
+
+      expect(mockOctokitInstance.pulls.createReplyForReviewComment).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 7,
+        comment_id: 42,
+        body: "thanks",
+      });
+      expect(mockOctokitInstance.graphql).not.toHaveBeenCalled();
+    });
+
+    it("uses the GraphQL mutation for thread ids", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce({});
+
+      await adapter.postCommentReply(7, "thread-1", "thanks");
+
+      const [query, variables] = mockOctokitInstance.graphql.mock.calls[0];
+      expect(query).toContain("addPullRequestReviewThreadReply");
+      expect(variables).toEqual({ threadId: "thread-1", body: "thanks" });
+    });
+
+    it("rethrows and audits on failure", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.createReplyForReviewComment.mockRejectedValueOnce(
+        new Error("reply failed")
+      );
+
+      await expect(adapter.postCommentReply(7, 42, "x")).rejects.toThrow("reply failed");
+    });
+  });
+
+  describe("resolveCommentThread", () => {
+    it("resolves a thread by node id via GraphQL", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockResolvedValueOnce({});
+
+      await adapter.resolveCommentThread(7, "thread-1");
+
+      const [query, variables] = mockOctokitInstance.graphql.mock.calls[0];
+      expect(query).toContain("resolveReviewThread");
+      expect(variables).toEqual({ threadId: "thread-1" });
+    });
+
+    it("converts a numeric comment id to its node id before resolving", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql
+        .mockResolvedValueOnce({
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: "node-1",
+                    isResolved: false,
+                    path: "a.ts",
+                    line: 1,
+                    comments: { nodes: [{ id: "c1", databaseId: 42, body: "hi" }] },
+                  },
+                ],
+              },
+            },
+          },
+        })
+        .mockResolvedValueOnce({});
+
+      await adapter.resolveCommentThread(7, 42);
+
+      const [, variables] = mockOctokitInstance.graphql.mock.calls[1];
+      expect(variables).toEqual({ threadId: "node-1" });
+    });
+
+    it("still resolves with the raw id when node id conversion fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql
+        .mockRejectedValueOnce(new Error("graphql down"))
+        .mockResolvedValueOnce({});
+      mockOctokitInstance.pulls.getReviewComment.mockRejectedValueOnce(new Error("rest down"));
+
+      await adapter.resolveCommentThread(7, 42);
+
+      const [, variables] = mockOctokitInstance.graphql.mock.calls[1];
+      expect(variables).toEqual({ threadId: "42" });
+    });
+
+    it("rethrows when the resolve mutation fails", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.graphql.mockRejectedValueOnce(new Error("resolve failed"));
+
+      await expect(adapter.resolveCommentThread(7, "thread-1")).rejects.toThrow("resolve failed");
+    });
+  });
+
+  describe("attachWorkItemFile", () => {
+    it("throws because GitHub issues cannot accept attachments", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+
+      await expect(adapter.attachWorkItemFile("1", "file.txt", "content")).rejects.toThrow(
+        "Attaching files to issues is not supported by the GitHub adapter."
+      );
+    });
+  });
+
+  describe("updatePRDetails", () => {
+    it("updates both title and body when provided", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.update.mockResolvedValueOnce({});
+
+      await adapter.updatePRDetails(7, { title: "New title", body: "New body" });
+
+      expect(mockOctokitInstance.pulls.update).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 7,
+        title: "New title",
+        body: "New body",
+      });
+    });
+
+    it("omits fields that are not provided", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.update.mockResolvedValueOnce({});
+
+      await adapter.updatePRDetails(7, { title: "Only title" });
+
+      expect(mockOctokitInstance.pulls.update).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 7,
+        title: "Only title",
+      });
+    });
+
+    it("sends only the identifiers when no details are provided", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.update.mockResolvedValueOnce({});
+
+      await adapter.updatePRDetails(7, {});
+
+      expect(mockOctokitInstance.pulls.update).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 7,
+      });
+    });
+
+    it("rethrows and audits on failure", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.update.mockRejectedValueOnce(new Error("update failed"));
+
+      await expect(adapter.updatePRDetails(7, { title: "x" })).rejects.toThrow("update failed");
+    });
+  });
+
+  describe("getProjectDetails", () => {
+    it("throws because project review is unsupported", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+
+      await expect(adapter.getProjectDetails("1")).rejects.toThrow(
+        "GitHub project review is not yet supported in this version."
+      );
     });
   });
 });

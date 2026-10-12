@@ -99,6 +99,27 @@ describe("pbiParser", () => {
       expect(result.scopeCreep).toEqual([]);
       expect(result.overallAssessment).toContain("Failed to parse AI response as JSON");
     });
+
+    it("normalizes the opposite branches of every field", () => {
+      const rawText = JSON.stringify({
+        title: "Real Title",
+        metCriteria: "not-an-array",
+        partialCriteria: [{}, "invalid item"],
+        missingCriteria: ["Missing 1"],
+        scopeCreep: ["Scope 1"],
+        overallAssessment: "Assessment text",
+      });
+
+      const result = parsePBIAlignmentResponse(rawText, "42", "Fallback Title");
+
+      expect(result.pbiId).toBe("42");
+      expect(result.title).toBe("Real Title");
+      expect(result.metCriteria).toEqual([]);
+      expect(result.partialCriteria).toEqual([{ criterion: "", explanation: "" }]);
+      expect(result.missingCriteria).toEqual(["Missing 1"]);
+      expect(result.scopeCreep).toEqual(["Scope 1"]);
+      expect(result.overallAssessment).toBe("Assessment text");
+    });
   });
 
   describe("formatPBIAlignmentReport", () => {

@@ -41,4 +41,19 @@ describe("createBuildReference", () => {
       repository: "repo",
     });
   });
+
+  it("rejects an unsupported platform", () => {
+    expect(() => createBuildReference({ platform: "gitlab", runId: "1" })).toThrow(
+      "must be github or azure"
+    );
+  });
+
+  it("rejects incomplete repository context", () => {
+    expect(() => createBuildReference({ platform: "github", runId: "1", repo: "r" })).toThrow(
+      "platform repository context is incomplete"
+    );
+    expect(() =>
+      createBuildReference({ platform: "azure", buildId: "1", org: "o", repo: "r" })
+    ).toThrow("platform repository context is incomplete");
+  });
 });

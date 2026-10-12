@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { executeFixCommand, validateGitWorkspace } from "./fix.js";
@@ -47,7 +48,7 @@ vi.mock("@merge-mentor/platforms/github.js", () => ({
 }));
 
 vi.mock("@merge-mentor/platforms/azure.js", () => ({
-  AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
+  AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
     return mockAdapter;
   }),
 }));
@@ -157,6 +158,41 @@ describe("validateGitWorkspace", () => {
     await expect(
       validateGitWorkspace("main", { allowDirty: false, interactive: true })
     ).rejects.toThrow("Execution aborted by user due to uncommitted changes.");
+  });
+
+  it("falls back to rev-parse when branch --show-current is empty", async () => {
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync) // git rev-parse inside work tree
+      .mockReturnValueOnce("" as unknown as MockExecSync) // git branch --show-current (empty)
+      .mockReturnValueOnce("main" as unknown as MockExecSync) // git rev-parse --abbrev-ref HEAD
+      .mockReturnValueOnce("" as unknown as MockExecSync); // git status --porcelain
+
+    await expect(validateGitWorkspace("main")).resolves.not.toThrow();
+  });
+
+  it("throws when the current branch cannot be determined", async () => {
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync)
+      .mockImplementationOnce(() => {
+        throw new Error("branch failed");
+      });
+
+    await expect(validateGitWorkspace("main")).rejects.toThrow(
+      "Execution aborted: Failed to get current git branch."
+    );
+  });
+
+  it("throws when git status fails", async () => {
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync)
+      .mockReturnValueOnce("main" as unknown as MockExecSync)
+      .mockImplementationOnce(() => {
+        throw new Error("status failed");
+      });
+
+    await expect(validateGitWorkspace("main")).rejects.toThrow(
+      "Execution aborted: Failed to run 'git status'."
+    );
   });
 });
 
@@ -336,6 +372,92 @@ describe("executeFixCommand", () => {
     expect(mockExecutePrompt).not.toHaveBeenCalled();
     expect(mockOutput.log).toHaveBeenCalledWith(
       expect.stringContaining("No issues selected for fixing.")
+    );
+  });
+
+  it("throws when no PR number is available", async () => {
+    await expect(executeFixCommand({ ci: false }, { output: mockOutput })).rejects.toThrow(
+      "PR number is required"
+    );
+  });
+
+  it("rejects an unsupported platform", async () => {
+    await expect(
+      executeFixCommand(
+        { pr: 1, ci: false, platform: "gitlab", interactive: false },
+        { output: mockOutput }
+      )
+    ).rejects.toThrow('Invalid platform "gitlab"');
+  });
+
+  it("uses the Azure adapter for the azure platform", async () => {
+    mockAdapter.getPRDetails.mockResolvedValue({ headBranch: "main" });
+    mockAdapter.getUnresolvedCommentThreads.mockResolvedValue([]);
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync)
+      .mockReturnValueOnce("main" as unknown as MockExecSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync);
+
+    await executeFixCommand(
+      { pr: 1, ci: false, platform: "azure", interactive: false },
+      { output: mockOutput }
+    );
+
+    expect(AzureDevOpsAdapter).toHaveBeenCalled();
+  });
+
+  it("stops interactive selection when the user quits", async () => {
+    mockAdapter.getPRDetails.mockResolvedValue({ headBranch: "main" });
+    mockAdapter.getUnresolvedCommentThreads.mockResolvedValue([
+      {
+        id: "thread-1",
+        path: "src/file.ts",
+        line: 10,
+        comments: [{ author: "reviewer", body: "Fix this." }],
+      },
+      {
+        id: "thread-2",
+        path: "src/other.ts",
+        line: 4,
+        comments: [{ author: "reviewer", body: "And this." }],
+      },
+    ]);
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync)
+      .mockReturnValueOnce("main" as unknown as MockExecSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync);
+    mockQuestion.mockResolvedValueOnce("q");
+
+    await executeFixCommand({ pr: 1, ci: false, interactive: true }, { output: mockOutput });
+
+    expect(mockOutput.log).toHaveBeenCalledWith(
+      expect.stringContaining("Exiting selection. Proceeding with currently selected issues.")
+    );
+    expect(mockOutput.log).toHaveBeenCalledWith(
+      expect.stringContaining("No issues selected for fixing.")
+    );
+  });
+
+  it("reports when AI execution fails", async () => {
+    mockAdapter.getPRDetails.mockResolvedValue({ headBranch: "main" });
+    mockAdapter.getUnresolvedCommentThreads.mockResolvedValue([
+      {
+        id: "thread-1",
+        path: "src/file.ts",
+        line: 10,
+        comments: [{ author: "reviewer", body: "Fix this." }],
+      },
+    ]);
+    vi.mocked(execSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync)
+      .mockReturnValueOnce("main" as unknown as MockExecSync)
+      .mockReturnValueOnce("" as unknown as MockExecSync);
+    mockExecutePrompt.mockRejectedValueOnce(new Error("boom"));
+
+    await executeFixCommand({ pr: 1, ci: false, interactive: false }, { output: mockOutput });
+
+    expect(mockOutput.log).toHaveBeenCalledWith(
+      expect.stringContaining("AI execution failed: boom")
     );
   });
 });

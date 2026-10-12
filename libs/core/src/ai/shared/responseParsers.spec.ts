@@ -214,4 +214,49 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.findings[0].affectedFiles).toEqual(["auth.ts", "db.ts"]);
     expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
   });
+
+  it("warns on schema drift for every parser and falls back to defaults", () => {
+    const logger = { warn: vi.fn() };
+
+    expect(parseFileReview(logger, "a.ts", { raw: "", parsed: { findings: "nope" } })).toEqual({
+      filename: "a.ts",
+      findings: [],
+    });
+    expect(parseCrossFileReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual({
+      overallAssessment: "Review completed",
+      findings: [],
+      recommendations: [],
+    });
+    expect(parseBatchedFileReview(logger, { raw: "", parsed: { file_results: "nope" } })).toEqual(
+      []
+    );
+    expect(parseFastReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual({
+      fileResults: [],
+      crossFileResult: {
+        overallAssessment: "Review completed",
+        findings: [],
+        recommendations: [],
+      },
+      reviewedFiles: [],
+    });
+    expect(parseAgentReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual([]);
+    expect(parseSynthesizedReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual({
+      overallAssessment: "Review completed",
+      fileResults: [],
+      crossFileResult: {
+        overallAssessment: "Review completed",
+        findings: [],
+        recommendations: [],
+      },
+    });
+
+    expect(logger.warn.mock.calls.map((call) => call[1])).toEqual([
+      "File review schema drift detected",
+      "Cross-file review schema drift detected",
+      "Batched file review schema drift detected",
+      "Fast review schema drift detected",
+      "Subagent review schema drift detected",
+      "Synthesizer review schema drift detected",
+    ]);
+  });
 });

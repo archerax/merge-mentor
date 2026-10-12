@@ -967,5 +967,46 @@ describe("CommentManager", () => {
       const createActions = actions.filter((a) => a.type === "create" && a.path);
       expect(createActions).toHaveLength(1);
     });
+
+    it("matches a legacy comment by message similarity without a finding id", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({
+        line: 10,
+        category: "quality",
+        message: "Detected a subtle concurrency hazard in the cache layer",
+      });
+      const existingComments: ExistingComment[] = [
+        {
+          id: 1,
+          path: "test.ts",
+          line: 10,
+          body: "Detected a subtle concurrency hazard in the cache layer",
+        },
+      ];
+
+      const actions = manager.determineActions(
+        existingComments,
+        [{ filename: "test.ts", findings: [finding] }],
+        createCrossFileResult()
+      );
+
+      expect(actions.filter((action) => action.type === "create" && action.path)).toHaveLength(0);
+    });
+
+    it("ignores comments whose finding id cannot be decoded", () => {
+      const manager = createCommentManager();
+      const finding = createFileFinding({ line: 10, message: "Some unique message" });
+      const existingComments: ExistingComment[] = [
+        { id: 1, path: "test.ts", line: 10, body: "<!-- finding-id: Zm9v --> unrelated body" },
+      ];
+
+      const actions = manager.determineActions(
+        existingComments,
+        [{ filename: "test.ts", findings: [finding] }],
+        createCrossFileResult()
+      );
+
+      expect(actions.filter((action) => action.type === "create" && action.path)).toHaveLength(1);
+    });
   });
 });

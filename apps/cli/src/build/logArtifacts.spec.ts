@@ -40,4 +40,18 @@ describe("storeLogArtifacts", () => {
       "utf8"
     );
   });
+
+  it("truncates a single oversized line to the byte limit", async () => {
+    const fileSystem = createStubFileSystem();
+    vi.spyOn(Date, "now").mockReturnValue(456);
+
+    const result = await storeLogArtifacts(
+      { platform: "github", id: "42", ownerOrOrg: "acme", repository: "app" },
+      [{ jobName: "big", content: "0123456789ABCDEFGHIJ", isFailureCandidate: true }],
+      [],
+      { tempPath: "/tmp/mm", tailLines: 5, tailBytes: 10, fileSystem }
+    );
+
+    expect(result.artifacts[0].tail).toBe("ABCDEFGHIJ");
+  });
 });

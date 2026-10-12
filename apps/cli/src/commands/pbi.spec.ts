@@ -7,6 +7,7 @@ import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { program } from "../program.js";
+import { executePBIReview } from "./pbi.js";
 
 // Mock dependencies
 const mockAdapter = {
@@ -201,5 +202,32 @@ describe("pbi command", () => {
       expect.stringContaining("Error: PBI Review Failed")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("auto-detects Azure context from the git remote", async () => {
+    vi.mocked(execSync).mockReturnValue(
+      "https://dev.azure.com/det-org/det-project/_git/det-repo\n"
+    );
+    vi.mocked(loadConfig).mockReturnValueOnce(createMockConfig({ defaultPlatform: "azure" }));
+
+    await executePBIReview("42", {});
+
+    expect(loadConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        azureOrg: "det-org",
+        azureProject: "det-project",
+        azureRepo: "det-repo",
+      })
+    );
+    expect(AzureDevOpsAdapter).toHaveBeenCalled();
+  });
+
+  it("rejects an invalid resolved platform", async () => {
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      ...createMockConfig(),
+      defaultPlatform: "gitlab",
+    } as unknown as Config);
+
+    await expect(executePBIReview("42", {})).rejects.toThrow('Invalid platform "gitlab"');
   });
 });

@@ -40,4 +40,46 @@ describe("resolveWorkItemReference", () => {
       resolveWorkItemReference({ id: "42", url: "https://github.com/o/r/issues/1" })
     ).toThrow("--url cannot be combined with --id");
   });
+
+  it("rejects a positional ID combined with --id", () => {
+    expect(() => resolveWorkItemReference({ positionalId: "1", id: "2" })).toThrow(
+      "A work item cannot be specified both as a positional ID and with --id."
+    );
+  });
+
+  it("rejects a URL combined with a positional ID", () => {
+    expect(() =>
+      resolveWorkItemReference({
+        positionalId: "1",
+        url: "https://github.com/o/r/issues/1",
+      })
+    ).toThrow("--url cannot be combined with positional ID");
+  });
+
+  it("rejects a URL combined with explicit platform context", () => {
+    expect(() =>
+      resolveWorkItemReference({
+        url: "https://github.com/o/r/issues/1",
+        platform: "github",
+      })
+    ).toThrow("--url cannot be combined with --platform");
+  });
+
+  it("rejects an Azure repository override on a GitHub URL", () => {
+    expect(() =>
+      resolveWorkItemReference({
+        url: "https://github.com/o/r/issues/1",
+        azureRepo: "repo",
+      })
+    ).toThrow("--url cannot be combined with --azure-repo");
+  });
+
+  it("requires an ID when none is provided", () => {
+    expect(() => resolveWorkItemReference({})).toThrow(
+      "A work item ID is required. Pass <id>, --id <id>, or --url <url>."
+    );
+    expect(() => resolveWorkItemReference({ positionalId: "   " })).toThrow(
+      "A work item ID is required."
+    );
+  });
 });

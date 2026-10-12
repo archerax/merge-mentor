@@ -28,6 +28,9 @@ const mockGitApiInstance = {
   getFileDiffs: vi.fn(),
   getThreads: vi.fn(),
   createThread: vi.fn(),
+  updateThread: vi.fn(),
+  createComment: vi.fn(),
+  updatePullRequest: vi.fn(),
   getItemText: vi.fn(),
   getBlobContent: vi.fn(),
   getItem: vi.fn(),
@@ -2013,6 +2016,232 @@ describe("AzureDevOpsAdapter", () => {
       await expect(adapter.attachWorkItemFile("42", "f.md", "x")).rejects.toThrow(
         "Failed to upload attachment"
       );
+    });
+  });
+
+  describe("getProjectIdentifier", () => {
+    it("returns the org/project/repo path", () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      expect(adapter.getProjectIdentifier()).toBe("test-org/test-project/test-repo");
+    });
+  });
+
+  describe("getCommentThread", () => {
+    it("maps an active thread by id, stripping a leading slash and mapping comments", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockResolvedValue([
+        {
+          id: 7,
+          status: 1, // ACTIVE
+          threadContext: { filePath: "/src/a.ts", rightFileStart: { line: 12 } },
+          comments: [
+            {
+              id: 1,
+              content: "<!-- merge-mentor --> note",
+              author: { uniqueName: "bot@example.com" },
+              publishedDate: new Date("2024-01-01T00:00:00Z"),
+            },
+            {
+              id: 2,
+              content: "reply",
+              author: { displayName: "User" },
+              isDeleted: true,
+            },
+          ],
+        },
+      ]);
+
+      const thread = await adapter.getCommentThread(5, 7);
+
+      expect(thread).toMatchObject({
+        id: "7",
+        path: "src/a.ts",
+        line: 12,
+        status: "active",
+        botInitiated: true,
+      });
+      expect(thread.comments).toHaveLength(1);
+      expect(thread.comments[0]).toMatchObject({
+        id: 1,
+        author: "bot@example.com",
+        body: "<!-- merge-mentor --> note",
+        isBot: true,
+      });
+    });
+
+    it("matches a thread by one of its comment ids and marks it resolved", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockResolvedValue([
+        {
+          id: 20,
+          status: 4, // CLOSED
+          threadContext: { filePath: "src/b.ts", rightFileStart: { line: 2 } },
+          comments: [{ id: 99, content: "done", author: { uniqueName: "u@example.com" } }],
+        },
+      ]);
+
+      const thread = await adapter.getCommentThread(5, 99);
+
+      expect(thread).toMatchObject({ id: "20", status: "resolved", botInitiated: false });
+      expect(thread.comments[0]).toMatchObject({ id: 99, author: "u@example.com" });
+    });
+
+    it("defaults the line and path when the thread context is missing", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockResolvedValue([
+        { id: 30, status: 6, comments: [{ id: 5, content: "x" }] },
+      ]);
+
+      const thread = await adapter.getCommentThread(5, 30);
+
+      expect(thread).toMatchObject({ path: "", line: 1, status: "active" });
+    });
+
+    it("throws when the thread cannot be found", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockResolvedValue([]);
+
+      await expect(adapter.getCommentThread(5, 404)).rejects.toThrow(
+        'Comment thread "404" not found on PR #5'
+      );
+    });
+
+    it("rethrows API failures", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getThreads.mockRejectedValue(new Error("Azure API error"));
+
+      await expect(adapter.getCommentThread(5, 1)).rejects.toThrow("Azure API error");
+    });
+  });
+
+  describe("postCommentReply", () => {
+    it("posts a reply for a numeric thread id", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.createComment.mockResolvedValue({});
+
+      await adapter.postCommentReply(3, 11, "thanks");
+
+      expect(mockGitApiInstance.createComment).toHaveBeenCalledWith(
+        { content: "thanks", commentType: 1 },
+        "test-repo",
+        3,
+        11,
+        "test-project"
+      );
+    });
+
+    it("parses a string thread id", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.createComment.mockResolvedValue({});
+
+      await adapter.postCommentReply(3, "12", "thanks");
+
+      expect(mockGitApiInstance.createComment).toHaveBeenCalledWith(
+        expect.anything(),
+        "test-repo",
+        3,
+        12,
+        "test-project"
+      );
+    });
+
+    it("throws for a non-numeric thread id", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      await expect(adapter.postCommentReply(3, "abc", "x")).rejects.toThrow(
+        'Invalid thread ID for Azure DevOps: "abc"'
+      );
+    });
+
+    it("rethrows API failures", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.createComment.mockRejectedValue(new Error("post failed"));
+
+      await expect(adapter.postCommentReply(3, 11, "x")).rejects.toThrow("post failed");
+    });
+  });
+
+  describe("resolveCommentThread", () => {
+    it("closes the thread for a numeric id", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.updateThread.mockResolvedValue({});
+
+      await adapter.resolveCommentThread(3, 11);
+
+      expect(mockGitApiInstance.updateThread).toHaveBeenCalledWith(
+        { status: 4 },
+        "test-repo",
+        3,
+        11,
+        "test-project"
+      );
+    });
+
+    it("throws for a non-numeric thread id", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+
+      await expect(adapter.resolveCommentThread(3, "abc")).rejects.toThrow(
+        'Invalid thread ID for Azure DevOps: "abc"'
+      );
+    });
+
+    it("rethrows API failures", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.updateThread.mockRejectedValue(new Error("resolve failed"));
+
+      await expect(adapter.resolveCommentThread(3, 11)).rejects.toThrow("resolve failed");
+    });
+  });
+
+  describe("updatePRDetails", () => {
+    it("updates the title and description when provided", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        repository: { id: "repo-guid" },
+      });
+      mockGitApiInstance.updatePullRequest.mockResolvedValue({});
+
+      await adapter.updatePRDetails(3, { title: "New", body: "Body" });
+
+      expect(mockGitApiInstance.updatePullRequest).toHaveBeenCalledWith(
+        { title: "New", description: "Body" },
+        "repo-guid",
+        3,
+        "test-project"
+      );
+    });
+
+    it("sends an empty update when no details are provided", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({
+        repository: { id: "repo-guid" },
+      });
+      mockGitApiInstance.updatePullRequest.mockResolvedValue({});
+
+      await adapter.updatePRDetails(3, {});
+
+      expect(mockGitApiInstance.updatePullRequest).toHaveBeenCalledWith(
+        {},
+        "repo-guid",
+        3,
+        "test-project"
+      );
+    });
+
+    it("throws when the repository id cannot be resolved", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockResolvedValue({});
+
+      await expect(adapter.updatePRDetails(3, { title: "x" })).rejects.toThrow(
+        "Could not find repository ID for PR #3"
+      );
+    });
+
+    it("rethrows API failures", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      mockGitApiInstance.getPullRequestById.mockRejectedValue(new Error("lookup failed"));
+
+      await expect(adapter.updatePRDetails(3, { title: "x" })).rejects.toThrow("lookup failed");
     });
   });
 });

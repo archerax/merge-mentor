@@ -157,4 +157,22 @@ describe("ui command", () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to start"));
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it("opens the browser when --open is set", async () => {
+    vi.useFakeTimers();
+    try {
+      const child = spawnChild();
+
+      const commandPromise = executeUiCommand({ open: true });
+      expect(spawn).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(1500);
+      expect(spawn).toHaveBeenCalledTimes(2);
+
+      child.emit("exit", 0);
+      await commandPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

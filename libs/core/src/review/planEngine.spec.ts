@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -280,5 +280,45 @@ describe("PlanEngine", () => {
 
     expect(result.status).toBe("ready");
     expect(result.planData.phases).toHaveLength(2);
+  });
+
+  it("returns a partial plan when parsed JSON fails schema validation", async () => {
+    const adapter = createMockAdapter();
+    const gitClient = createStubGitClient();
+    const raw = `\`\`\`json\n${JSON.stringify({ status: "ready", title: "Partial", phases: "nope" })}\n\`\`\``;
+    const ai = createMockAi({ raw, parsed: null });
+
+    const engine = new PlanEngine(adapter, ai, gitClient, { tempPath });
+    const result = await engine.generatePlan("12345", "main", "/repo");
+
+    expect(result.status).toBe("ready");
+    expect(result.planData.title).toBe("Partial");
+    expect(result.planData.phases).toEqual([]);
+  });
+
+  it("reports insufficient information when the response is unparseable", async () => {
+    const adapter = createMockAdapter();
+    const gitClient = createStubGitClient();
+    const ai = createMockAi({ raw: "no json here at all", parsed: null });
+
+    const engine = new PlanEngine(adapter, ai, gitClient, { tempPath });
+    const result = await engine.generatePlan("12345", "main", "/repo");
+
+    expect(result.status).toBe("insufficient_information");
+    expect(result.planData.missing_information.join(" ")).toContain("failed to return a parseable");
+  });
+
+  it("continues when the local plan file cannot be written", async () => {
+    const adapter = createMockAdapter();
+    const gitClient = createStubGitClient();
+    const ai = createMockAi({ raw: JSON.stringify(readyOutput), parsed: readyOutput });
+    const blocker = join(tempPath, "not-a-dir");
+    writeFileSync(blocker, "x");
+
+    const engine = new PlanEngine(adapter, ai, gitClient, { tempPath: blocker });
+    const result = await engine.generatePlan("12345", "main", "/repo");
+
+    expect(result.status).toBe("ready");
+    expect(result.fileName).toBe("merge-mentor-plan-12345.md");
   });
 });

@@ -56,4 +56,10 @@ describe("createAIProvider", () => {
     const provider = createAIProvider("copilot-sdk", undefined);
     expect(provider).toBeInstanceOf(CopilotSdkProvider);
   });
+
+  it("should reject experimentalTools for an unsupported provider type", () => {
+    expect(() =>
+      createAIProvider("invalid" as unknown as AIProviderType, { experimentalTools: true })
+    ).toThrow("Structured tool calling (--experimental-tools) is only supported");
+  });
 });

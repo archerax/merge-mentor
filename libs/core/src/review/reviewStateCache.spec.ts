@@ -295,5 +295,23 @@ describe("ReviewStateCache", () => {
     it("does not throw when clearing non-existent state", async () => {
       await expect(cache.clearState("Github-testrepo-PR999")).resolves.not.toThrow();
     });
+
+    it("warns but does not throw on unexpected unlink failures", async () => {
+      fileSystem.unlink.mockRejectedValueOnce(
+        Object.assign(new Error("permission denied"), { code: "EACCES" })
+      );
+
+      await expect(cache.clearState("Github-testrepo-PR777")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("error handling", () => {
+    it("warns but does not throw when saving state fails", async () => {
+      fileSystem.writeFile.mockRejectedValueOnce(new Error("disk full"));
+
+      await expect(
+        cache.saveState("Github-testrepo-PR555", [{ filename: "test.ts", findings: [] }], new Map())
+      ).resolves.toBeUndefined();
+    });
   });
 });

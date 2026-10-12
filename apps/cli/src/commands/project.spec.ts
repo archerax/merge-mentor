@@ -3,9 +3,11 @@ import { execSync } from "node:child_process";
 import type { Config } from "@merge-mentor/config/config.js";
 import { loadConfig } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { program } from "../program.js";
+import { executeProjectReview } from "./project.js";
 
 // Mock dependencies
 const mockAdapter = {
@@ -32,7 +34,7 @@ vi.mock("@merge-mentor/platforms/github.js", () => {
 
 vi.mock("@merge-mentor/platforms/azure.js", () => {
   return {
-    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapter() {
+    AzureDevOpsAdapter: vi.fn(function AzureDevOpsAdapterMock() {
       return mockAdapter;
     }),
   };
@@ -134,5 +136,32 @@ describe("project command", () => {
       })
     );
     expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it("auto-detects Azure context from the git remote", async () => {
+    vi.mocked(execSync).mockReturnValue(
+      "https://dev.azure.com/det-org/det-project/_git/det-repo\n"
+    );
+    vi.mocked(loadConfig).mockReturnValueOnce(createMockConfig({ defaultPlatform: "azure" }));
+
+    await executeProjectReview("42", {});
+
+    expect(loadConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        azureOrg: "det-org",
+        azureProject: "det-project",
+        azureRepo: "det-repo",
+      })
+    );
+    expect(AzureDevOpsAdapter).toHaveBeenCalled();
+  });
+
+  it("rejects an invalid resolved platform", async () => {
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      ...createMockConfig(),
+      defaultPlatform: "gitlab",
+    } as unknown as Config);
+
+    await expect(executeProjectReview("42", {})).rejects.toThrow('Invalid platform "gitlab"');
   });
 });

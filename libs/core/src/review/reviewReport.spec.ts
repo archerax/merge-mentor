@@ -98,4 +98,15 @@ describe("saveReviewReport", () => {
       join(tempPath, "reports", "Azure-My-Project_Repo-PR42-review-profile-report.md")
     );
   });
+
+  it("renders token usage and pre-existing markers", () => {
+    const result = createResult();
+    result.tokenUsage = { inputTokens: 1200, outputTokens: 340 };
+    result.fileResults[0].findings[0].isPreExisting = true;
+
+    const markdown = generateMarkdownReport(result, "opencode-sdk", false);
+
+    expect(markdown).toContain("### 💰 Token Usage");
+    expect(markdown).toContain("**Pre-existing:** Yes");
+  });
 });

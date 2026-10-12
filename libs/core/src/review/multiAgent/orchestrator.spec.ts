@@ -855,4 +855,130 @@ describe("MultiAgentOrchestrator", () => {
     expect(output.fileResults[0].filename).toBe("src/auth.ts");
     expect(output.fileResults[0].findings).toHaveLength(1);
   });
+
+  it("emits an error step and rethrows when the synthesizer fails", async () => {
+    const { provider, setResponder } = createMockProvider();
+    setResponder(async (_prompt, options) => {
+      if (options?.promptType === "multi-agent-subagent") return createResponse({ findings: [] });
+      if (options?.promptType === "multi-agent-synthesizer") throw new Error("synth boom");
+      return createResponse({});
+    });
+
+    const orchestrator = new MultiAgentOrchestrator(provider);
+    await expect(
+      orchestrator.review({ prDetails: createPRDetails(), manifest: createManifest() })
+    ).rejects.toThrow("synth boom");
+  });
+
+  it("omits non-inline existing comments from the synthesizer context", async () => {
+    const { provider, setResponder, getCalls } = createMockProvider();
+    setResponder(async (_prompt, options) => {
+      if (options?.promptType === "multi-agent-subagent") return createResponse({ findings: [] });
+      return createResponse({ overall_assessment: "ok", findings: [], recommendations: [] });
+    });
+    const existingComments: ExistingComment[] = [{ id: 1, body: "general comment without a path" }];
+
+    const orchestrator = new MultiAgentOrchestrator(provider);
+    await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+      existingComments,
+    });
+
+    const synthCall = getCalls().find((call) => call.promptType === "multi-agent-synthesizer");
+    expect(synthCall?.prompt).not.toContain("EXISTING COMMENTS");
+  });
+
+  it("groups multiple valid synthesized findings on the same file", async () => {
+    const { provider, setResponder } = createMockProvider();
+    setResponder(async (_prompt, options) => {
+      if (options?.promptType === "multi-agent-subagent") {
+        return createResponse({ findings: [createFinding({ file: "src/auth.ts", line: 12 })] });
+      }
+      if (options?.promptType === "multi-agent-synthesizer") {
+        return createResponse({
+          overall_assessment: "ok",
+          findings: [
+            {
+              file: "src/auth.ts",
+              line: 12,
+              severity: "high",
+              confidence: "high",
+              category: "security",
+              message: "first",
+              suggestion: "s",
+              reasoning: "r",
+            },
+            {
+              file: "src/auth.ts",
+              line: 13,
+              severity: "high",
+              confidence: "high",
+              category: "security",
+              message: "second",
+              suggestion: "s",
+              reasoning: "r",
+            },
+          ],
+          recommendations: [],
+        });
+      }
+      return createResponse({});
+    });
+
+    const orchestrator = new MultiAgentOrchestrator(provider);
+    const output = await orchestrator.review({
+      prDetails: createPRDetails(),
+      manifest: createManifest(),
+    });
+
+    const auth = output.fileResults.find((result) => result.filename === "src/auth.ts");
+    expect(auth?.findings).toHaveLength(2);
+  });
+
+  it("emits a synthesizer heartbeat while it is silent", async () => {
+    vi.useFakeTimers();
+    try {
+      const { provider, setResponder } = createMockProvider();
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      setResponder(async (_prompt, options) => {
+        if (options?.promptType === "multi-agent-subagent") return createResponse({ findings: [] });
+        if (options?.promptType === "multi-agent-synthesizer") {
+          options.onStreamData?.("token");
+          await gate;
+          return createResponse({ overall_assessment: "ok", findings: [], recommendations: [] });
+        }
+        return createResponse({});
+      });
+
+      const written: string[] = [];
+      const output: OutputWriter = {
+        log: (message) => written.push(message),
+        error: (message) => written.push(message),
+        write: (data) => {
+          written.push(data);
+          return true;
+        },
+      };
+      const orchestrator = new MultiAgentOrchestrator(provider, {
+        output,
+        streaming: { enabled: true, lines: 9, ciMode: true },
+      });
+      const reviewPromise = orchestrator.review({
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      await vi.advanceTimersByTimeAsync(25_000);
+      release?.();
+      await reviewPromise;
+
+      expect(written.join("")).toContain("Lead Synthesizer still working");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

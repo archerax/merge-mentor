@@ -141,6 +141,41 @@ describe("executeDescribe", () => {
     };
     await expect(executeDescribe(options)).rejects.toThrow("PR number is required");
   });
+
+  it("rejects an unsupported platform", async () => {
+    await expect(executeDescribe({ pr: 1, ci: false, platform: "gitlab" })).rejects.toThrow(
+      'Invalid platform "gitlab"'
+    );
+  });
+
+  it("rejects an unsupported AI provider", async () => {
+    await expect(executeDescribe({ pr: 1, ci: false, provider: "nope" })).rejects.toThrow(
+      'Invalid AI provider "nope"'
+    );
+  });
+
+  it("uses the Azure adapter for the azure platform", async () => {
+    const result = await executeDescribe({ pr: 7, ci: false, platform: "azure" });
+
+    expect(result.platform).toBe("azure");
+    expect(validateConfig).toHaveBeenCalledWith(expect.any(Object), "azure");
+  });
+
+  it("logs the BYOK URL when configured", async () => {
+    vi.mocked(loadConfig).mockReturnValue(
+      createMockConfig({ aiBaseUrl: "https://byok.example.com/v1" })
+    );
+    const log = vi.fn();
+
+    await executeDescribe(
+      { pr: 9, ci: false },
+      { output: { log, error: vi.fn(), write: vi.fn() } }
+    );
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("BYOK URL: https://byok.example.com/v1")
+    );
+  });
 });
 
 describe("displayDescribeResults", () => {
@@ -159,5 +194,12 @@ describe("displayDescribeResults", () => {
       expect.stringContaining("Suggested Title: feat: add feature")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Description body"));
+  });
+
+  it("indicates when the description was written to the platform", () => {
+    displayDescribeResults("feat: add feature", "Description body", true);
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("PR details have been updated on the remote platform")
+    );
   });
 });
