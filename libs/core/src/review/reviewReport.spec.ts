@@ -100,9 +100,15 @@ describe("saveReviewReport", () => {
   });
 
   it("renders token usage and pre-existing markers", () => {
-    const result = createResult();
-    result.tokenUsage = { inputTokens: 1200, outputTokens: 340 };
-    result.fileResults[0].findings[0].isPreExisting = true;
+    const base = createResult();
+    const result: ReviewResult = {
+      ...base,
+      tokenUsage: { inputTokens: 1200, outputTokens: 340 },
+      fileResults: base.fileResults.map((file) => ({
+        ...file,
+        findings: file.findings.map((finding) => ({ ...finding, isPreExisting: true })),
+      })),
+    };
 
     const markdown = generateMarkdownReport(result, "opencode-sdk", false);
 
