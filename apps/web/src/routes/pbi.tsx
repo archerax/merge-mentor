@@ -13,7 +13,7 @@ function PBIPage() {
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Interactive PBI Review"
+        title="PBI Review"
         description={
           <>
             Review a Product Backlog Item, user story, or issue for backlog quality. Paste a work

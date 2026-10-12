@@ -71,8 +71,6 @@ export interface PBIReviewStreamInput {
   readonly url?: string;
   /** Post the review comment to the work item. Default: `false` (dry-run). */
   readonly write?: boolean;
-  /** Overrides the configured review strategy for this run. */
-  readonly strategy?: ReviewStrategyInput;
 }
 
 /** Input accepted by the project review stream endpoint. */
@@ -83,8 +81,6 @@ export interface ProjectReviewStreamInput {
   readonly url?: string;
   /** Post the review comment to the work item. Default: `false` (dry-run). */
   readonly write?: boolean;
-  /** Overrides the configured review strategy for this run. */
-  readonly strategy?: ReviewStrategyInput;
 }
 
 /** A single finding rendered in the review result. */

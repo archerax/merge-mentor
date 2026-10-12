@@ -61,9 +61,10 @@ function commentPreview(body: string): string {
 export function PostCommentsAction({ kind, target, comments }: PostCommentsActionProps) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [sessionPosted, setSessionPosted] = useState<ReadonlySet<string>>(new Set());
-  const [posting, setPosting] = useState(false);
+  const [postingFingerprints, setPostingFingerprints] = useState<ReadonlySet<string>>(new Set());
   const [result, setResult] = useState<PostCommentsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<ReadonlyMap<string, string>>(new Map());
 
   const posted = useMemo(() => {
     const fingerprints = new Set(sessionPosted);
@@ -79,6 +80,8 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
   );
 
   const pendingKey = pending.map((comment) => comment.fingerprint).join("\n");
+
+  const busy = postingFingerprints.size > 0;
 
   useEffect(() => {
     setSelected(new Set(pending.map((comment) => comment.fingerprint)));
@@ -98,10 +101,25 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
     });
   }
 
-  async function handlePost(): Promise<void> {
-    if (target === null || selectedPending.length === 0) return;
-    setPosting(true);
+  function setRowError(fingerprint: string, message: string): void {
+    setRowErrors((previous) => new Map(previous).set(fingerprint, message));
+  }
+
+  function clearRowError(fingerprint: string): void {
+    setRowErrors((previous) => {
+      if (!previous.has(fingerprint)) return previous;
+      const next = new Map(previous);
+      next.delete(fingerprint);
+      return next;
+    });
+  }
+
+  async function postComments(subset: readonly PendingCommentView[]): Promise<void> {
+    if (target === null || subset.length === 0) return;
+    const fingerprints = subset.map((comment) => comment.fingerprint);
+    setPostingFingerprints((previous) => new Set([...previous, ...fingerprints]));
     setError(null);
+    if (subset.length === 1) clearRowError(subset[0].fingerprint);
     try {
       const response = await fetch("/api/review/post", {
         method: "POST",
@@ -109,7 +127,7 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
         body: JSON.stringify({
           kind,
           ...target,
-          comments: selectedPending,
+          comments: subset,
         } satisfies PostCommentsInput),
       });
       if (!response.ok) {
@@ -117,17 +135,34 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
         throw new Error(payload?.error ?? `Failed to post comments (HTTP ${response.status}).`);
       }
       const postedResult = (await response.json()) as PostCommentsResult;
-      setResult(postedResult);
+      if (subset.length > 1) setResult(postedResult);
       setSessionPosted((previous) => {
         const next = new Set(previous);
         for (const fingerprint of postedResult.postedFingerprints) next.add(fingerprint);
         return next;
       });
+      if (subset.length === 1 && postedResult.commentErrors.length > 0) {
+        setRowError(subset[0].fingerprint, postedResult.commentErrors.join(" "));
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const message = caught instanceof Error ? caught.message : String(caught);
+      if (subset.length === 1) setRowError(subset[0].fingerprint, message);
+      else setError(message);
     } finally {
-      setPosting(false);
+      setPostingFingerprints((previous) => {
+        const next = new Set(previous);
+        for (const fingerprint of fingerprints) next.delete(fingerprint);
+        return next;
+      });
     }
+  }
+
+  function handlePost(): void {
+    void postComments(selectedPending);
+  }
+
+  function handlePostOne(comment: PendingCommentView): void {
+    void postComments([comment]);
   }
 
   return (
@@ -139,9 +174,9 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
             <Text size="sm" c="dimmed">
               {pending.length === 0
                 ? "All planned comments have been posted."
-                : `Select which of the ${pending.length} planned comment${
+                : `Select from the ${pending.length} planned comment${
                     pending.length === 1 ? "" : "s"
-                  } to post.`}
+                  } to post in a batch, or post one individually with its button.`}
             </Text>
           </div>
           {pending.length > 0 && (
@@ -149,7 +184,7 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
               <Button
                 size="xs"
                 variant="subtle"
-                disabled={allSelected || posting}
+                disabled={allSelected || busy}
                 onClick={() => setSelected(new Set(pending.map((comment) => comment.fingerprint)))}
               >
                 Select all
@@ -157,7 +192,7 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
               <Button
                 size="xs"
                 variant="subtle"
-                disabled={selectedPending.length === 0 || posting}
+                disabled={selectedPending.length === 0 || busy}
                 onClick={() => setSelected(new Set())}
               >
                 Clear
@@ -170,26 +205,49 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
           <Stack gap="xs">
             {comments.map((comment) => {
               const isPosted = posted.has(comment.fingerprint);
+              const rowError = rowErrors.get(comment.fingerprint);
               return (
-                <Checkbox
-                  key={comment.fingerprint}
-                  checked={isPosted || selected.has(comment.fingerprint)}
-                  disabled={isPosted || posting}
-                  onChange={() => toggle(comment.fingerprint)}
-                  label={
-                    <Group gap="xs">
-                      <Text size="sm" fw={500}>
-                        {commentLocation(comment)}
-                      </Text>
-                      {isPosted && (
-                        <Badge color="green" variant="light" size="sm">
-                          posted
-                        </Badge>
-                      )}
-                    </Group>
-                  }
-                  description={commentPreview(comment.body)}
-                />
+                <Stack key={comment.fingerprint} gap={4}>
+                  <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
+                    <Checkbox
+                      style={{ flex: 1 }}
+                      checked={isPosted || selected.has(comment.fingerprint)}
+                      disabled={isPosted || busy}
+                      onChange={() => toggle(comment.fingerprint)}
+                      label={
+                        <Group gap="xs">
+                          <Text size="sm" fw={500}>
+                            {commentLocation(comment)}
+                          </Text>
+                          {isPosted && (
+                            <Badge color="green" variant="light" size="sm">
+                              posted
+                            </Badge>
+                          )}
+                        </Group>
+                      }
+                      description={commentPreview(comment.body)}
+                    />
+                    {!isPosted && (
+                      <Button
+                        size="xs"
+                        variant="light"
+                        leftSection={<IconSend size={14} />}
+                        loading={postingFingerprints.has(comment.fingerprint)}
+                        disabled={target === null || busy}
+                        aria-label={`Post ${commentLocation(comment)}`}
+                        onClick={() => handlePostOne(comment)}
+                      >
+                        Post
+                      </Button>
+                    )}
+                  </Group>
+                  {rowError && (
+                    <Text size="xs" c="red">
+                      {rowError}
+                    </Text>
+                  )}
+                </Stack>
               );
             })}
           </Stack>
@@ -229,8 +287,8 @@ export function PostCommentsAction({ kind, target, comments }: PostCommentsActio
             <Button
               leftSection={<IconSend size={16} />}
               onClick={handlePost}
-              loading={posting}
-              disabled={posting || target === null || selectedPending.length === 0}
+              loading={busy}
+              disabled={busy || target === null || selectedPending.length === 0}
             >
               Post {selectedPending.length} comment{selectedPending.length === 1 ? "" : "s"}
             </Button>

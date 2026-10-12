@@ -13,7 +13,7 @@ function ProjectPage() {
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Interactive Project Review"
+        title="Project Review"
         description={
           <>
             Review a project or feature plan hierarchy for planning quality. Paste a work item URL

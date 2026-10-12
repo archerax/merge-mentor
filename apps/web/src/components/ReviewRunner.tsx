@@ -23,6 +23,7 @@ import {
   type ReviewStrategyInput,
   type ReviewSummary,
 } from "../server/review.types.js";
+import { useReviewForm } from "../stores/reviewForms.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
 import { PostCommentsAction } from "./review/PostCommentsAction.js";
@@ -32,9 +33,14 @@ import { TechnicalLog } from "./review/TechnicalLog.js";
 import { useReviewStream } from "./review/useReviewStream.js";
 
 export function ReviewRunner() {
-  const [prInput, setPrInput] = useState("");
-  const [write, setWrite] = useState(false);
-  const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
+  const {
+    input: prInput,
+    write,
+    strategy,
+    setInput: setPrInput,
+    setWrite,
+    setStrategy,
+  } = useReviewForm("pr");
   const [formError, setFormError] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState<ReviewStreamInput | null>(null);
 

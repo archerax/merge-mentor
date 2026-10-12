@@ -12,7 +12,7 @@ function ReviewPage() {
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Interactive PR Review"
+        title="PR Review"
         description={
           <>
             Trigger a review and follow structured progress as the AI works, then read the formatted

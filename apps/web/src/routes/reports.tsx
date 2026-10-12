@@ -90,7 +90,7 @@ function ReportsPage() {
 
       {reports.length === 0 ? (
         <Alert title="No reports found" color="gray">
-          Run a review from the Interactive PR Review page or the Merge Mentor CLI (review, PBI,
+          Run a review from the PR Review page or the Merge Mentor CLI (review, PBI,
           project, or plan) to generate a markdown report, then reload this page.
         </Alert>
       ) : (

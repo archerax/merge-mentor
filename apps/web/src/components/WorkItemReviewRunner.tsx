@@ -5,7 +5,6 @@ import {
   Card,
   Divider,
   Group,
-  Select,
   Stack,
   Switch,
   Text,
@@ -19,9 +18,8 @@ import {
   type PendingCommentView,
   type ProjectReviewFindingView,
   type ProjectReviewSummary,
-  REVIEW_STRATEGY_OPTIONS,
-  type ReviewStrategyInput,
 } from "../server/review.types.js";
+import { useReviewForm } from "../stores/reviewForms.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
 import { PostCommentsAction } from "./review/PostCommentsAction.js";
@@ -42,7 +40,6 @@ interface WorkItemInput {
   readonly id?: string;
   readonly url?: string;
   readonly write: boolean;
-  readonly strategy?: ReviewStrategyInput;
 }
 
 /** Summary shape required to offer a post-dry-run action. */
@@ -86,9 +83,7 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
   actionLabel,
   renderResult,
 }: WorkItemReviewRunnerProps<TSummary>) {
-  const [itemInput, setItemInput] = useState("");
-  const [write, setWrite] = useState(false);
-  const [strategy, setStrategy] = useState<ReviewStrategyInput | null>(null);
+  const { input: itemInput, write, setInput: setItemInput, setWrite } = useReviewForm(kind);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState<WorkItemInput | null>(null);
 
@@ -98,9 +93,8 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
   function buildInput(): WorkItemInput | { error: string } {
     const value = itemInput.trim();
     if (value.length === 0) return { error: "Enter a work item URL or ID." };
-    const base = strategy ? { write, strategy } : { write };
-    if (/^https?:\/\//i.test(value)) return { url: value, ...base };
-    return { id: value, ...base };
+    if (/^https?:\/\//i.test(value)) return { write, url: value };
+    return { write, id: value };
   }
 
   async function handleRun() {
@@ -123,16 +117,6 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
             placeholder={placeholder}
             value={itemInput}
             onChange={(event) => setItemInput(event.currentTarget.value)}
-            disabled={running}
-          />
-          <Select
-            label="Review strategy"
-            description="Overrides the configured default for this run."
-            placeholder="Use configured default"
-            data={REVIEW_STRATEGY_OPTIONS}
-            value={strategy}
-            onChange={(next) => setStrategy(next as ReviewStrategyInput | null)}
-            clearable
             disabled={running}
           />
           <Switch

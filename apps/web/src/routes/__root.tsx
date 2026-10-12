@@ -4,7 +4,6 @@ import {
   Badge,
   Box,
   Burger,
-  Code,
   ColorSchemeScript,
   Container,
   Group,
@@ -12,7 +11,6 @@ import {
   MantineProvider,
   NavLink,
   Stack,
-  Text,
   Title,
   Tooltip,
   useComputedColorScheme,
@@ -124,7 +122,6 @@ function AppFrame({ children }: { children: React.ReactNode }) {
     <AppShell
       header={{ height: 64 }}
       navbar={{ width: 260, breakpoint: "sm", collapsed: { mobile: !navOpened } }}
-      footer={{ height: 48 }}
       padding="md"
     >
       <AppShell.Header
@@ -202,17 +199,6 @@ function AppFrame({ children }: { children: React.ReactNode }) {
           <Container size="xxl">{children}</Container>
         </Box>
       </AppShell.Main>
-
-      <AppShell.Footer p="xs">
-        <Group justify="space-between" h="100%" px="md">
-          <Text size="xs" c="dimmed">
-            Merge Mentor · Local workspace
-          </Text>
-          <Text size="xs" c="dimmed" visibleFrom="sm">
-            Reports and logs are read from <Code>.mergementor</Code>
-          </Text>
-        </Group>
-      </AppShell.Footer>
     </AppShell>
   );
 }

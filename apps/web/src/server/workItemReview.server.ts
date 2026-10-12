@@ -73,15 +73,8 @@ function resolveTarget(
     azureOrg?: string;
     azureProject?: string;
     tempPath?: string;
-    reviewStrategy?: string;
-    passes?: string;
   } = { tempPath: resolveTempPath() };
   let id: string;
-
-  if (input.strategy) {
-    overrides.reviewStrategy = input.strategy;
-    if (input.strategy !== "multi-agent") overrides.passes = "";
-  }
 
   if (input.url) {
     const parsed = parseWorkItemUrl(input.url);

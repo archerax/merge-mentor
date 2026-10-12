@@ -141,11 +141,6 @@ describe("workItemReview.server", () => {
         message: "Provide a PBI URL or ID to run a review.",
       });
     });
-
-    it("accepts a strategy override", async () => {
-      const frames = await collectFrames(createPBIReviewStream({ id: "42", strategy: "deep" }));
-      expect(frames.some((frame) => frame.type === "result")).toBe(true);
-    });
   });
 
   describe("createProjectReviewStream", () => {
