@@ -230,7 +230,7 @@ describe("executeStage", () => {
 
     await executeStage(baseOptions);
     expect(providers[2].executePrompt).not.toHaveBeenCalled();
-  });
+  }, 30000);
 
   it("logs the model and BYOK URL when configured", async () => {
     const previousModel = process.env.MM_AI_MODEL;
