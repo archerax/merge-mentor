@@ -40,7 +40,8 @@ import type {
   ProjectReviewStreamInput,
   ProjectReviewSummary,
 } from "./review.types.js";
-import { createSseResponse, type SseEmitter } from "./sse.server.js";
+import { startOrAttach } from "./reviewRuns.server.js";
+import type { SseEmitter } from "./sse.server.js";
 
 /** A fully resolved work item review target: platform, item ID, and configuration. */
 interface WorkItemTarget {
@@ -232,65 +233,101 @@ function toProjectSummary(
 }
 
 /**
- * Streams a PBI review as Server-Sent Events.
+ * Builds the run-dedupe key for a work item target.
  *
- * Emits `status`, `log`, and `chunk` frames for the raw technical log,
- * structured `progress` frames for the phase timeline, batched `stream` frames
- * for formatted per-phase AI output, then a single `result` frame (or `error`)
- * and a terminating `done` frame.
+ * This is distinct from the posted-comments key: it includes the write mode so
+ * a submit that toggles it starts a new run instead of silently attaching to an
+ * unrelated in-flight run.
  */
-export function createPBIReviewStream(input: PBIReviewStreamInput): ReadableStream<Uint8Array> {
-  return createSseResponse(async (emit) => {
-    emit.send({ type: "status", message: "Resolving review configuration..." });
-    const target = resolveTarget(input, "PBI");
-    announceStart(emit, target, "PBI");
-
-    const { aiProvider, client } = createAiClient(target);
-    const engine = new PBIReviewEngine(createAdapter(target), client, {
-      dryRun: !target.write,
-      tempPath: target.config.tempPath,
-      aiProvider,
-      aiModel: target.config.aiModel,
-      output: createStreamOutput(emit),
-      onStreamChunk: emit.pushChunk,
-      onProgress: createProgressHandler(emit),
-    });
-
-    const result = await engine.reviewPBI(target.id);
-    emit.send({ type: "result", summary: toPBISummary(result, target) });
-  });
+function runTargetKey(kind: "pbi" | "project", target: WorkItemTarget): string {
+  const base = postedTargetKey(
+    kind,
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.id
+  );
+  return `${base}:write=${target.write}`;
 }
 
 /**
- * Streams a project plan review as Server-Sent Events.
+ * Starts (or attaches to) a PBI review run and returns its id.
  *
- * Emits `status`, `log`, and `chunk` frames for the raw technical log,
- * structured `progress` frames for the phase timeline, batched `stream` frames
- * for formatted per-phase AI output, then a single `result` frame (or `error`)
- * and a terminating `done` frame.
+ * Target resolution and validation happen synchronously; execution is owned by
+ * the run registry. Clients stream frames from the GET endpoint.
  */
-export function createProjectReviewStream(
-  input: ProjectReviewStreamInput
-): ReadableStream<Uint8Array> {
-  return createSseResponse(async (emit) => {
-    emit.send({ type: "status", message: "Resolving review configuration..." });
-    const target = resolveTarget(input, "project");
-    announceStart(emit, target, "project");
+export function startPBIReview(input: PBIReviewStreamInput): { runId: string; attached: boolean } {
+  const target = resolveTarget(input, "PBI");
+  const scope = reviewScope(target.platform, target.config);
 
-    const { aiProvider, client } = createAiClient(target);
-    const engine = new ProjectReviewEngine(createAdapter(target), client, {
-      dryRun: !target.write,
-      tempPath: target.config.tempPath,
-      aiProvider,
-      aiModel: target.config.aiModel,
-      output: createStreamOutput(emit),
-      onStreamChunk: emit.pushChunk,
-      onProgress: createProgressHandler(emit),
-    });
-
-    const result = await engine.reviewProject(target.id);
-    emit.send({ type: "result", summary: toProjectSummary(result, target) });
+  return startOrAttach({
+    kind: "pbi",
+    targetKey: runTargetKey("pbi", target),
+    label: `PBI #${target.id} · ${scope}`,
+    input,
+    execute: (emitter) => executePBIReview(target, emitter),
   });
+}
+
+/** Runs a PBI review, emitting frames for the timeline and formatted AI output. */
+async function executePBIReview(target: WorkItemTarget, emit: SseEmitter): Promise<void> {
+  emit.send({ type: "status", message: "Resolving review configuration..." });
+  announceStart(emit, target, "PBI");
+
+  const { aiProvider, client } = createAiClient(target);
+  const engine = new PBIReviewEngine(createAdapter(target), client, {
+    dryRun: !target.write,
+    tempPath: target.config.tempPath,
+    aiProvider,
+    aiModel: target.config.aiModel,
+    output: createStreamOutput(emit),
+    onStreamChunk: emit.pushChunk,
+    onProgress: createProgressHandler(emit),
+  });
+
+  const result = await engine.reviewPBI(target.id);
+  emit.send({ type: "result", summary: toPBISummary(result, target) });
+}
+
+/**
+ * Starts (or attaches to) a project plan review run and returns its id.
+ *
+ * Target resolution and validation happen synchronously; execution is owned by
+ * the run registry. Clients stream frames from the GET endpoint.
+ */
+export function startProjectReview(input: ProjectReviewStreamInput): {
+  runId: string;
+  attached: boolean;
+} {
+  const target = resolveTarget(input, "project");
+  const scope = reviewScope(target.platform, target.config);
+
+  return startOrAttach({
+    kind: "project",
+    targetKey: runTargetKey("project", target),
+    label: `Project #${target.id} · ${scope}`,
+    input,
+    execute: (emitter) => executeProjectReview(target, emitter),
+  });
+}
+
+/** Runs a project plan review, emitting frames for the timeline and formatted AI output. */
+async function executeProjectReview(target: WorkItemTarget, emit: SseEmitter): Promise<void> {
+  emit.send({ type: "status", message: "Resolving review configuration..." });
+  announceStart(emit, target, "project");
+
+  const { aiProvider, client } = createAiClient(target);
+  const engine = new ProjectReviewEngine(createAdapter(target), client, {
+    dryRun: !target.write,
+    tempPath: target.config.tempPath,
+    aiProvider,
+    aiModel: target.config.aiModel,
+    output: createStreamOutput(emit),
+    onStreamChunk: emit.pushChunk,
+    onProgress: createProgressHandler(emit),
+  });
+
+  const result = await engine.reviewProject(target.id);
+  emit.send({ type: "result", summary: toProjectSummary(result, target) });
 }
 
 /**

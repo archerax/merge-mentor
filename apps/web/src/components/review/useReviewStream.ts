@@ -41,6 +41,16 @@ export interface LiveOutput {
   readonly text: string;
 }
 
+/** Options accepted by {@link useReviewStream}. */
+export interface UseReviewStreamOptions {
+  /** Server-sent events endpoint that creates and streams the review. */
+  readonly endpoint: string;
+  /** Run id from the URL, re-attached on mount to resume a run. */
+  readonly runId?: string;
+  /** Called with the new run id so the caller can persist it in the URL. */
+  readonly onRunCreated?: (runId: string) => void;
+}
+
 /** Full observable state of a streamed review run. */
 interface ReviewStreamState<TResult> {
   readonly status: ReviewStatus;
@@ -53,6 +63,8 @@ interface ReviewStreamState<TResult> {
   readonly error: string | null;
   readonly startedAt: number | null;
   readonly elapsedMs: number;
+  /** Original input of the current run, recovered from the manifest on resume. */
+  readonly runInput: unknown | null;
 }
 
 /** Hook result: stream state plus controls. */
@@ -64,6 +76,12 @@ interface UseReviewStreamResult<TResult> extends ReviewStreamState<TResult> {
 
 type PhaseEvent = Extract<ReviewProgressEvent, { kind: "phase" }>;
 type StepEvent = Extract<ReviewProgressEvent, { kind: "step" }>;
+
+/** Maximum number of reconnects before surfacing a connection error. */
+const MAX_ATTACH_ATTEMPTS = 5;
+
+/** Base delay between reconnect attempts, multiplied by the attempt number. */
+const RECONNECT_BASE_DELAY_MS = 500;
 
 /** Returns true when a thrown value is a fetch abort. */
 function isAbortError(error: unknown): boolean {
@@ -146,17 +164,53 @@ function applyStep(previous: readonly ProgressStepView[], event: StepEvent): Pro
   ];
 }
 
+/** Parses one SSE frame, returning its sequence id (when present) and data. */
+function parseFrame(frame: string): { seq: number | null; data: string | null } {
+  let seq: number | null = null;
+  let data: string | null = null;
+
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("id: ")) {
+      const parsed = Number.parseInt(line.slice(4), 10);
+      if (Number.isFinite(parsed)) seq = parsed;
+    } else if (line.startsWith("data: ")) {
+      data = line.slice(6);
+    }
+  }
+
+  return { seq, data };
+}
+
+/** Resolves after `ms`, or rejects with an abort error if `signal` fires first. */
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /**
- * Owns the fetch/SSE plumbing for a review endpoint and reduces the frame
- * stream into a structured UI model.
+ * Owns the create/attach/stream plumbing for a review endpoint and reduces the
+ * frame stream into a structured UI model.
  *
- * This replaces the duplicated run logic that previously lived inline in both
- * runner components: connection lifecycle, abort handling, raw technical log
- * accumulation, progress timeline, and per-phase AI output.
+ * `run(input)` POSTs to create a run, reports the new run id via `onRunCreated`,
+ * then attaches to its GET stream. When a `runId` is supplied (e.g. from the
+ * URL) the hook attaches on mount, replaying the persisted backlog so a refresh
+ * resumes an in-progress or finished run. Frames are de-duplicated by sequence
+ * number, making reconnects idempotent.
  */
 export function useReviewStream<TResult = ReviewSummary>(
-  endpoint: string
+  options: UseReviewStreamOptions
 ): UseReviewStreamResult<TResult> {
+  const { endpoint, runId, onRunCreated } = options;
+
   const [status, setStatus] = useState<ReviewStatus>("idle");
   const [phases, setPhases] = useState<readonly ProgressPhaseView[]>([]);
   const [steps, setSteps] = useState<readonly ProgressStepView[]>([]);
@@ -167,10 +221,18 @@ export function useReviewStream<TResult = ReviewSummary>(
   const [error, setError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [runInput, setRunInput] = useState<unknown | null>(null);
 
   const nextEntryId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const startRef = useRef<number | null>(null);
+  const attachedRunRef = useRef<string | null>(null);
+  const lastSeqRef = useRef(0);
+  const onRunCreatedRef = useRef(onRunCreated);
+
+  useEffect(() => {
+    onRunCreatedRef.current = onRunCreated;
+  }, [onRunCreated]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -241,24 +303,150 @@ export function useReviewStream<TResult = ReviewSummary>(
     [append, handleProgress]
   );
 
+  const resetState = useCallback(() => {
+    nextEntryId.current = 0;
+    lastSeqRef.current = 0;
+    startRef.current = Date.now();
+    setStartedAt(startRef.current);
+    setElapsedMs(0);
+    setPhases([]);
+    setSteps([]);
+    setActivity(null);
+    setLive(null);
+    setEntries([]);
+    setSummary(null);
+    setError(null);
+  }, []);
+
+  /** Reads an SSE body, dispatching de-duplicated frames to `handleEvent`. */
+  const readStream = useCallback(
+    async (body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> => {
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const frames = buffer.split("\n\n");
+          buffer = frames.pop() ?? "";
+          for (const frame of frames) {
+            const { seq, data } = parseFrame(frame);
+            if (!data) continue;
+            if (seq !== null) {
+              if (seq <= lastSeqRef.current) continue;
+              lastSeqRef.current = seq;
+            }
+            handleEvent(JSON.parse(data) as ReviewStreamEvent<TResult>);
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (!signal.aborted) {
+        setStatus((current) => (current === "error" ? current : "done"));
+      }
+    },
+    [handleEvent]
+  );
+
+  /**
+   * Attaches to an existing run, replaying from the last seen sequence number.
+   * Reconnects with backoff if the stream drops before the terminal frame.
+   */
+  const attach = useCallback(
+    async (id: string, attachOptions: { readonly reset: boolean }): Promise<void> => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      attachedRunRef.current = id;
+
+      if (attachOptions.reset) resetState();
+      setStatus("running");
+
+      let attempt = 0;
+      for (;;) {
+        try {
+          const url = `${endpoint}?run=${encodeURIComponent(id)}&from=${lastSeqRef.current}`;
+          const response = await fetch(url, {
+            headers: { Accept: "text/event-stream" },
+            signal: controller.signal,
+          });
+
+          if (response.status === 404) {
+            setError("This review run could not be found. It may have been cleaned up.");
+            setStatus("error");
+            return;
+          }
+          if (!response.ok || !response.body) {
+            throw new Error(`Review stream failed (HTTP ${response.status}).`);
+          }
+
+          await readStream(response.body, controller.signal);
+          return;
+        } catch (caught) {
+          if (isAbortError(caught)) {
+            setStatus("idle");
+            return;
+          }
+          attempt += 1;
+          if (attempt >= MAX_ATTACH_ATTEMPTS) {
+            setError(caught instanceof Error ? caught.message : String(caught));
+            setStatus("error");
+            return;
+          }
+          try {
+            await delay(RECONNECT_BASE_DELAY_MS * attempt, controller.signal);
+          } catch (delayError) {
+            // The signal aborted while waiting to reconnect; stop quietly.
+            if (isAbortError(delayError)) {
+              setStatus("idle");
+              return;
+            }
+            throw delayError;
+          }
+        }
+      }
+    },
+    [endpoint, readStream, resetState]
+  );
+
+  /** Recovers the original input from a run manifest, for post-comments on resume. */
+  const recoverInput = useCallback(async (id: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/review/runs/${encodeURIComponent(id)}`);
+      if (!response.ok) return;
+      const snapshot = (await response.json()) as { manifest?: { input?: unknown } };
+      setRunInput(snapshot.manifest?.input ?? null);
+    } catch {
+      // Resume still works without the input; only post-comments need it.
+    }
+  }, []);
+
+  // Resume on mount when the URL carries a run id.
+  useEffect(() => {
+    if (!runId || attachedRunRef.current === runId) return;
+    void (async () => {
+      await recoverInput(runId);
+      await attach(runId, { reset: true });
+    })().catch(() => {
+      // `attach` reports its own failures through state; nothing to surface here.
+    });
+  }, [runId, recoverInput, attach]);
+
   const run = useCallback(
     async (input: unknown) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      nextEntryId.current = 0;
-      startRef.current = Date.now();
-      setStartedAt(startRef.current);
-      setElapsedMs(0);
+      setRunInput(input);
+      resetState();
       setStatus("running");
-      setPhases([]);
-      setSteps([]);
-      setActivity(null);
-      setLive(null);
-      setEntries([]);
-      setSummary(null);
-      setError(null);
 
       try {
         const response = await fetch(endpoint, {
@@ -268,29 +456,24 @@ export function useReviewStream<TResult = ReviewSummary>(
           signal: controller.signal,
         });
 
-        if (!response.ok || !response.body) {
-          throw new Error(`Review request failed (HTTP ${response.status}).`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const frames = buffer.split("\n\n");
-          buffer = frames.pop() ?? "";
-          for (const frame of frames) {
-            const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
-            if (!dataLine) continue;
-            handleEvent(JSON.parse(dataLine.slice(6)) as ReviewStreamEvent<TResult>);
+        if (!response.ok) {
+          let message = `Review request failed (HTTP ${response.status}).`;
+          try {
+            const data = (await response.json()) as { error?: unknown };
+            if (typeof data.error === "string") message = data.error;
+          } catch {
+            // Keep the status-based message.
           }
+          throw new Error(message);
         }
 
-        setStatus((current) => (current === "error" ? current : "done"));
+        const data = (await response.json()) as { runId?: unknown };
+        if (typeof data.runId !== "string") {
+          throw new Error("Review request did not return a run id.");
+        }
+
+        onRunCreatedRef.current?.(data.runId);
+        await attach(data.runId, { reset: false });
       } catch (caught) {
         if (isAbortError(caught)) {
           setStatus("idle");
@@ -300,7 +483,7 @@ export function useReviewStream<TResult = ReviewSummary>(
         setStatus("error");
       }
     },
-    [endpoint, handleEvent]
+    [endpoint, attach, resetState]
   );
 
   const stop = useCallback(() => {
@@ -319,6 +502,7 @@ export function useReviewStream<TResult = ReviewSummary>(
     error,
     startedAt,
     elapsedMs,
+    runInput,
     running: status === "running",
     run,
     stop,

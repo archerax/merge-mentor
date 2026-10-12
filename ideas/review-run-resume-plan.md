@@ -128,12 +128,12 @@ interface LiveRun {
   summary?: unknown;
 }
 
-const active = new Map<string, LiveRun>();          // runId -> live run
-const activeByTarget = new Map<string, string>();     // targetKey -> runId
+const active = new Map<string, LiveRun>(); // runId -> live run
+const activeByTarget = new Map<string, string>(); // targetKey -> runId
 
-export function startOrAttach(kind, input): { runId: string; attached: boolean }
-export function subscribe(runId, fromSeq, onEvent): () => void   // returns unsubscribe
-export function getSnapshot(runId): { manifest; events; summary } | null
+export function startOrAttach(kind, input): { runId: string; attached: boolean };
+export function subscribe(runId, fromSeq, onEvent): () => void; // returns unsubscribe
+export function getSnapshot(runId): { manifest; events; summary } | null;
 ```
 
 - `startOrAttach` resolves the target first (reusing `resolveTarget` from
@@ -155,10 +155,10 @@ export function getSnapshot(runId): { manifest; events; summary } | null
   endpoints.
 - `GET /api/review/stream?run=<id>&from=<seq>`: validate `run`, then return an SSE
   `ReadableStream` that first replays persisted events with `seq > from`, then
-  subscribes to live events. Implement with the existing `createSseResponse`
-  (`sse.server.ts:43`) or a thin variant that emits an SSE `id:` per frame so
-  browsers natively support `Last-Event-ID` reconnection. Close the stream after
-  the terminal `done`/`error` frame when the run is already finished.
+  subscribes to live events. Implement as a thin SSE `ReadableStream` that emits
+  an SSE `id:` per frame so browsers natively support `Last-Event-ID`
+  reconnection (see `streamRun` in `reviewRuns.server.ts`). Close the stream
+  after the terminal `done`/`error` frame when the run is already finished.
 - `GET /api/review/runs/<id>` (or a `createServerFn` like
   `reports.functions.ts:11`): return the `RunSnapshot` for a page that only wants
   status/summary (e.g. reconnecting after completion).
@@ -221,7 +221,7 @@ useReviewStream<TResult>({ endpoint, kind, runId?, onRunCreated })
 - `stop()` should **detach** (abort the local fetch) rather than imply the run is
   cancelled. Add an explicit `cancelRun(runId)` control (POST
   `/api/review/runs/<id>/cancel`) if we want true cancellation; otherwise document
-  that "Stop" only stops *watching*.
+  that "Stop" only stops _watching_.
 
 ### 2c. Runner wiring
 
@@ -261,7 +261,7 @@ useReviewStream<TResult>({ endpoint, kind, runId?, onRunCreated })
   active target; both tabs subscribe and see the same frames.
 - **Server restart mid-run**: manifest is `running` but no live run — emit a
   terminal error frame; do not auto-restart costly AI work.
-- **Aborted POST before runId returned**: create the manifest *before* returning,
+- **Aborted POST before runId returned**: create the manifest _before_ returning,
   so a run is never orphaned without an id.
 - **Unknown/expired run id in URL**: `GET` returns 404; the client clears `?run=`
   and shows an empty form with a note.

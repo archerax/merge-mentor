@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import type { PBIReviewStreamInput } from "../../../server/review.types.js";
-import { createPBIReviewStream } from "../../../server/workItemReview.server.js";
+import { createRunStreamResponse } from "../../../server/runStream.server.js";
+import { startPBIReview } from "../../../server/workItemReview.server.js";
 
 /**
- * Server route that runs a PBI review and streams raw output as Server-Sent Events.
+ * Server routes for running and following a PBI review.
  *
- * The handler is server-only; `createPBIReviewStream` never reaches the client
- * bundle. Consumed by the `/pbi` route via `fetch`.
+ * `POST` creates (or attaches to) a run and returns `{ runId }`; `GET ?run=<id>`
+ * streams the run's frames as Server-Sent Events. Both handlers are server-only.
  */
 export const Route = createFileRoute("/api/pbi/stream")({
   server: {
@@ -20,15 +21,14 @@ export const Route = createFileRoute("/api/pbi/stream")({
           return new Response("Invalid JSON body", { status: 400 });
         }
 
-        return new Response(createPBIReviewStream(input), {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
-        });
+        try {
+          return Response.json(startPBIReview(input));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return Response.json({ error: message }, { status: 400 });
+        }
       },
+      GET: ({ request }) => createRunStreamResponse(request),
     },
   },
 });

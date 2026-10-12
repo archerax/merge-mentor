@@ -20,6 +20,7 @@ import { Route as ApiPbiStreamRouteImport } from './routes/api/pbi/stream'
 import { Route as ApiProjectStreamRouteImport } from './routes/api/project/stream'
 import { Route as ApiReviewPostRouteImport } from './routes/api/review/post'
 import { Route as ApiReviewStreamRouteImport } from './routes/api/review/stream'
+import { Route as ApiReviewRunsRunIdRouteImport } from './routes/api/review/runs/$runId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -76,6 +77,11 @@ const ApiReviewStreamRoute = ApiReviewStreamRouteImport.update({
   path: '/api/review/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReviewRunsRunIdRoute = ApiReviewRunsRunIdRouteImport.update({
+  id: '/api/review/runs/$runId',
+  path: '/api/review/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
+  '/api/review/runs/$runId': typeof ApiReviewRunsRunIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
+  '/api/review/runs/$runId': typeof ApiReviewRunsRunIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
+  '/api/review/runs/$runId': typeof ApiReviewRunsRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
+    | '/api/review/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
+    | '/api/review/runs/$runId'
   id:
     | '__root__'
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
+    | '/api/review/runs/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   ApiProjectStreamRoute: typeof ApiProjectStreamRoute
   ApiReviewPostRoute: typeof ApiReviewPostRoute
   ApiReviewStreamRoute: typeof ApiReviewStreamRoute
+  ApiReviewRunsRunIdRoute: typeof ApiReviewRunsRunIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReviewStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/review/runs/$runId': {
+      id: '/api/review/runs/$runId'
+      path: '/api/review/runs/$runId'
+      fullPath: '/api/review/runs/$runId'
+      preLoaderRoute: typeof ApiReviewRunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProjectStreamRoute: ApiProjectStreamRoute,
   ApiReviewPostRoute: ApiReviewPostRoute,
   ApiReviewStreamRoute: ApiReviewStreamRoute,
+  ApiReviewRunsRunIdRoute: ApiReviewRunsRunIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

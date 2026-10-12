@@ -31,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Web UI Review Resume**: reviews started from the web UI now survive a page
+  refresh or server restart. Each run gets a unique, URL-addressable id
+  (`/review?run=<id>`, plus `/pbi` and `/project`); a server-side run registry
+  owns execution independently of the HTTP connection and appends every frame to
+  a durable event log under `.mergementor/runs/<runId>/`. The create endpoint
+  returns `{ runId }` and a separate GET stream replays the persisted backlog
+  before following live frames, so a refresh re-attaches, a finished run replays
+  from the log without re-running AI work, and a duplicate submit for the same
+  target reuses the in-flight run. Adds run retention via `MM_RUN_RETENTION_MS`
+  (runs are pruned by age or beyond the newest 100; in-flight runs are kept), a
+  run snapshot endpoint, and tests.
 - **Multi-Agent Review Strategy (`--strategy multi-agent`)**: PR review can now
   be decomposed into specialized subagents — Security, Performance, Test
   Coverage, and Architecture — coordinated by a Lead Synthesizer. Agent

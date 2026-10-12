@@ -6,10 +6,16 @@ import { ProjectReviewResult, WorkItemReviewRunner } from "../components/WorkIte
 import type { ProjectReviewSummary } from "../server/review.types.js";
 
 export const Route = createFileRoute("/project")({
+  validateSearch: (search: Record<string, unknown>): { run?: string } => ({
+    run: typeof search.run === "string" && search.run.length > 0 ? search.run : undefined,
+  }),
   component: ProjectPage,
 });
 
 function ProjectPage() {
+  const { run } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
   return (
     <Stack gap="lg">
       <PageHeader
@@ -31,6 +37,10 @@ function ProjectPage() {
         writeLabel="Post comments to the project root"
         writeDescription="Off runs a dry-run; you can still post the review afterwards."
         actionLabel="Run project review"
+        runId={run}
+        onRunCreated={(runId) =>
+          navigate({ search: (previous) => ({ ...previous, run: runId }), replace: true })
+        }
         renderResult={(summary) => <ProjectReviewResult summary={summary} />}
       />
     </Stack>

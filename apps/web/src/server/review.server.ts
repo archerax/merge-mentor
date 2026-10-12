@@ -35,7 +35,8 @@ import type {
   ReviewStreamInput,
   ReviewSummary,
 } from "./review.types.js";
-import { createSseResponse } from "./sse.server.js";
+import { startOrAttach } from "./reviewRuns.server.js";
+import type { SseEmitter } from "./sse.server.js";
 
 /** A fully resolved review target: platform, PR number, link, and configuration. */
 interface ReviewTarget {
@@ -240,78 +241,110 @@ function createEngine(
 }
 
 /**
- * Streams a review as Server-Sent Events.
+ * Builds the run-dedupe key for a PR target.
  *
- * Emits `status`, `log`, and `chunk` frames for the raw technical log,
- * structured `progress` frames for the phase timeline, batched `stream` frames
- * for formatted per-phase AI output, then a single `result` frame (or `error`)
- * and a terminating `done` frame.
+ * This is distinct from the posted-comments key: it includes the execution mode
+ * (`write` and `strategy`) so a submit that changes either setting starts a new
+ * run instead of silently attaching to an unrelated in-flight run.
  */
-export function createReviewStream(input: ReviewStreamInput): ReadableStream<Uint8Array> {
-  return createSseResponse(async (emit) => {
-    const output: OutputWriter = {
-      log: (message) => emit.send({ type: "log", message }),
-      error: (message) => emit.send({ type: "log", message: `⚠️ ${message}` }),
-      write: (data) => {
-        emit.pushChunk(data);
-        return true;
-      },
-    };
+function runTargetKey(target: ReviewTarget): string {
+  const base = postedTargetKey(
+    "pr",
+    target.platform,
+    reviewScope(target.platform, target.config),
+    target.pr
+  );
+  return `${base}:write=${target.write}:strategy=${target.config.reviewStrategy}`;
+}
 
-    emit.send({ type: "status", message: "Resolving review configuration..." });
-    const target = resolveTarget(input);
+/**
+ * Starts (or attaches to) a PR review run and returns its id.
+ *
+ * Target resolution and validation happen synchronously so invalid input fails
+ * the request; execution itself is owned by the run registry and is not tied to
+ * the HTTP connection. Clients stream frames from the GET endpoint.
+ */
+export function startPRReview(input: ReviewStreamInput): { runId: string; attached: boolean } {
+  const target = resolveTarget(input);
+  const scope = reviewScope(target.platform, target.config);
 
-    initLogger(target.config.tempPath);
+  return startOrAttach({
+    kind: "pr",
+    targetKey: runTargetKey(target),
+    label: `PR #${target.pr} · ${scope}`,
+    input,
+    execute: (emitter) => executePRReview(target, emitter),
+  });
+}
 
-    const modeLabel = target.write ? "" : " (dry-run)";
-    emit.send({
-      type: "status",
-      message: `Starting code review for PR #${target.pr} on ${target.platform}${modeLabel}...`,
+/**
+ * Runs a PR review, emitting `status`, `log`, and `chunk` frames for the raw
+ * technical log, structured `progress` frames for the phase timeline, batched
+ * `stream` frames for formatted per-phase AI output, then a single `result`
+ * frame (or `error`). The registry appends a terminating `done` frame.
+ */
+async function executePRReview(target: ReviewTarget, emit: SseEmitter): Promise<void> {
+  const output: OutputWriter = {
+    log: (message) => emit.send({ type: "log", message }),
+    error: (message) => emit.send({ type: "log", message: `⚠️ ${message}` }),
+    write: (data) => {
+      emit.pushChunk(data);
+      return true;
+    },
+  };
+
+  emit.send({ type: "status", message: "Resolving review configuration..." });
+
+  initLogger(target.config.tempPath);
+
+  const modeLabel = target.write ? "" : " (dry-run)";
+  emit.send({
+    type: "status",
+    message: `Starting code review for PR #${target.pr} on ${target.platform}${modeLabel}...`,
+  });
+
+  const adapter = createAdapter(target);
+  const engine = createEngine(target, adapter, output, emit.pushChunk, (event) => {
+    if (event.kind === "stream") {
+      emit.pushStream(event.phase, event.delta);
+      return;
+    }
+    emit.send({ type: "progress", event });
+  });
+  const result = await engine.reviewPR(target.pr);
+
+  emit.send({
+    type: "progress",
+    event: { kind: "phase", id: "report", label: "Saving report", status: "start" },
+  });
+  try {
+    const reportFile = saveReviewReport({
+      result,
+      aiProvider: target.config.aiProvider as AIProviderType,
+      dryRun: !target.write,
+      reviewPasses: target.config.reviewPasses,
+      reviewStrategy: target.config.reviewStrategy,
+      platform: target.platform,
+      projectId: adapter.getProjectIdentifier(),
+      tempPath: target.config.tempPath,
     });
-
-    const adapter = createAdapter(target);
-    const engine = createEngine(target, adapter, output, emit.pushChunk, (event) => {
-      if (event.kind === "stream") {
-        emit.pushStream(event.phase, event.delta);
-        return;
-      }
-      emit.send({ type: "progress", event });
-    });
-    const result = await engine.reviewPR(target.pr);
-
+    emit.send({ type: "log", message: `📄 Detailed markdown report saved to: ${reportFile}` });
     emit.send({
       type: "progress",
-      event: { kind: "phase", id: "report", label: "Saving report", status: "start" },
+      event: { kind: "phase", id: "report", label: "Saving report", status: "done" },
     });
-    try {
-      const reportFile = saveReviewReport({
-        result,
-        aiProvider: target.config.aiProvider as AIProviderType,
-        dryRun: !target.write,
-        reviewPasses: target.config.reviewPasses,
-        reviewStrategy: target.config.reviewStrategy,
-        platform: target.platform,
-        projectId: adapter.getProjectIdentifier(),
-        tempPath: target.config.tempPath,
-      });
-      emit.send({ type: "log", message: `📄 Detailed markdown report saved to: ${reportFile}` });
-      emit.send({
-        type: "progress",
-        event: { kind: "phase", id: "report", label: "Saving report", status: "done" },
-      });
-    } catch (error) {
-      emit.send({
-        type: "log",
-        message: `⚠️ Failed to save markdown report: ${(error as Error).message}`,
-      });
-      emit.send({
-        type: "progress",
-        event: { kind: "phase", id: "report", label: "Saving report", status: "error" },
-      });
-    }
+  } catch (error) {
+    emit.send({
+      type: "log",
+      message: `⚠️ Failed to save markdown report: ${(error as Error).message}`,
+    });
+    emit.send({
+      type: "progress",
+      event: { kind: "phase", id: "report", label: "Saving report", status: "error" },
+    });
+  }
 
-    emit.send({ type: "result", summary: toSummary(result, target) });
-  });
+  emit.send({ type: "result", summary: toSummary(result, target) });
 }
 
 /**

@@ -63,6 +63,10 @@ interface WorkItemReviewRunnerProps<TSummary extends PostableSummary> {
   readonly writeDescription: string;
   /** Label for the submit button. */
   readonly actionLabel: string;
+  /** Run id from the URL, re-attached on mount to resume a run. */
+  readonly runId?: string;
+  /** Called with the new run id so the page can persist it in the URL. */
+  readonly onRunCreated?: (runId: string) => void;
   /** Renders the final summary once the review completes. */
   readonly renderResult: (summary: TSummary) => React.ReactNode;
 }
@@ -81,14 +85,29 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
   writeLabel,
   writeDescription,
   actionLabel,
+  runId,
+  onRunCreated,
   renderResult,
 }: WorkItemReviewRunnerProps<TSummary>) {
   const { input: itemInput, write, setInput: setItemInput, setWrite } = useReviewForm(kind);
   const [formError, setFormError] = useState<string | null>(null);
-  const [lastInput, setLastInput] = useState<WorkItemInput | null>(null);
 
-  const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
-    useReviewStream<TSummary>(endpoint);
+  const {
+    run,
+    stop,
+    running,
+    phases,
+    steps,
+    activity,
+    live,
+    entries,
+    summary,
+    error,
+    elapsedMs,
+    runInput,
+  } = useReviewStream<TSummary>({ endpoint, runId, onRunCreated });
+
+  const targetInput = (runInput as WorkItemInput | null) ?? null;
 
   function buildInput(): WorkItemInput | { error: string } {
     const value = itemInput.trim();
@@ -104,7 +123,6 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
       return;
     }
     setFormError(null);
-    setLastInput(input);
     await run(input);
   }
 
@@ -131,8 +149,12 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
               {actionLabel}
             </Button>
             {running && (
-              <Button variant="default" onClick={stop}>
-                Stop
+              <Button
+                variant="default"
+                onClick={stop}
+                title="Detach from this run — the review keeps running on the server and resumes if you reload."
+              >
+                Stop watching
               </Button>
             )}
           </Group>
@@ -157,8 +179,8 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
 
       {summary && renderResult(summary)}
 
-      {summary && lastInput && (
-        <PostCommentsAction kind={kind} target={lastInput} comments={summary.pendingComments} />
+      {summary && targetInput && (
+        <PostCommentsAction kind={kind} target={targetInput} comments={summary.pendingComments} />
       )}
 
       {!running && <TechnicalLog entries={entries} />}

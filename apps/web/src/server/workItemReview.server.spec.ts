@@ -70,8 +70,9 @@ vi.mock("@merge-mentor/core/review/commentPosting.js", () => ({
 }));
 
 const { postPlannedComments } = await import("@merge-mentor/core/review/commentPosting.js");
-const { createPBIReviewStream, createProjectReviewStream, postWorkItemComments } =
+const { startPBIReview, startProjectReview, postWorkItemComments } =
   await import("./workItemReview.server.js");
+const { streamRun } = await import("./reviewRuns.server.js");
 
 async function collectFrames(
   stream: ReadableStream<Uint8Array>
@@ -87,7 +88,17 @@ async function collectFrames(
   return output
     .split("\n\n")
     .filter((chunk) => chunk.trim().length > 0)
-    .map((chunk) => JSON.parse(chunk.replace(/^data: /, "")) as Record<string, unknown>);
+    .map((chunk) => chunk.split("\n").find((line) => line.startsWith("data: ")))
+    .filter((line): line is string => !!line)
+    .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>);
+}
+
+/** Starts a run and collects its frames through the registry stream. */
+async function collectRun(start: () => { runId: string }): Promise<Record<string, unknown>[]> {
+  const { runId } = start();
+  const stream = streamRun(runId, 0);
+  expect(stream).not.toBeNull();
+  return collectFrames(stream as ReadableStream<Uint8Array>);
 }
 
 describe("workItemReview.server", () => {
@@ -123,29 +134,46 @@ describe("workItemReview.server", () => {
     else process.env.MM_TEMP_PATH = originalTempPath;
   });
 
-  describe("createPBIReviewStream", () => {
+  describe("startPBIReview", () => {
     it("streams a PBI review result", async () => {
-      const frames = await collectFrames(createPBIReviewStream({ id: "42" }));
+      const frames = await collectRun(() => startPBIReview({ id: "42" }));
       const result = frames.find((frame) => frame.type === "result");
       expect(result?.summary).toMatchObject({
         id: "42",
         title: "Backlog item",
         dryRun: true,
       });
+      expect(frames.at(-1)).toMatchObject({ type: "done" });
     });
 
-    it("emits an error frame when no id or url is given", async () => {
-      const frames = await collectFrames(createPBIReviewStream({}));
-      expect(frames.at(-1)).toMatchObject({
-        type: "error",
-        message: "Provide a PBI URL or ID to run a review.",
-      });
+    it("attaches a duplicate submit to the in-flight run", async () => {
+      const first = startPBIReview({ id: "42" });
+      const second = startPBIReview({ id: "42" });
+      expect(second).toEqual({ runId: first.runId, attached: true });
+
+      await collectFrames(streamRun(first.runId, 0) as ReadableStream<Uint8Array>);
+    });
+
+    it("starts a distinct run when the write mode differs", async () => {
+      const dry = startPBIReview({ id: "42" });
+      const write = startPBIReview({ id: "42", write: true });
+      expect(write.attached).toBe(false);
+      expect(write.runId).not.toBe(dry.runId);
+
+      await Promise.all([
+        collectFrames(streamRun(dry.runId, 0) as ReadableStream<Uint8Array>),
+        collectFrames(streamRun(write.runId, 0) as ReadableStream<Uint8Array>),
+      ]);
+    });
+
+    it("rejects a missing work item reference", () => {
+      expect(() => startPBIReview({})).toThrow("Provide a PBI URL or ID to run a review.");
     });
   });
 
-  describe("createProjectReviewStream", () => {
+  describe("startProjectReview", () => {
     it("streams a project review result", async () => {
-      const frames = await collectFrames(createProjectReviewStream({ id: "10" }));
+      const frames = await collectRun(() => startProjectReview({ id: "10" }));
       const result = frames.find((frame) => frame.type === "result");
       expect(result?.summary).toMatchObject({
         id: "10",
@@ -156,12 +184,8 @@ describe("workItemReview.server", () => {
       expect(summary?.findings).toHaveLength(1);
     });
 
-    it("emits an error frame when no id or url is given", async () => {
-      const frames = await collectFrames(createProjectReviewStream({}));
-      expect(frames.at(-1)).toMatchObject({
-        type: "error",
-        message: "Provide a project URL or ID to run a review.",
-      });
+    it("rejects a missing work item reference", () => {
+      expect(() => startProjectReview({})).toThrow("Provide a project URL or ID to run a review.");
     });
   });
 

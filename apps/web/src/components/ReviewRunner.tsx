@@ -32,7 +32,14 @@ import { SEVERITY_COLORS, SEVERITY_ORDER, SeveritySummary } from "./review/Sever
 import { TechnicalLog } from "./review/TechnicalLog.js";
 import { useReviewStream } from "./review/useReviewStream.js";
 
-export function ReviewRunner() {
+interface ReviewRunnerProps {
+  /** Run id from the URL, re-attached on mount to resume a run. */
+  readonly runId?: string;
+  /** Called with the new run id so the page can persist it in the URL. */
+  readonly onRunCreated?: (runId: string) => void;
+}
+
+export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
   const {
     input: prInput,
     write,
@@ -42,10 +49,23 @@ export function ReviewRunner() {
     setStrategy,
   } = useReviewForm("pr");
   const [formError, setFormError] = useState<string | null>(null);
-  const [lastInput, setLastInput] = useState<ReviewStreamInput | null>(null);
 
-  const { run, stop, running, phases, steps, activity, live, entries, summary, error, elapsedMs } =
-    useReviewStream<ReviewSummary>("/api/review/stream");
+  const {
+    run,
+    stop,
+    running,
+    phases,
+    steps,
+    activity,
+    live,
+    entries,
+    summary,
+    error,
+    elapsedMs,
+    runInput,
+  } = useReviewStream<ReviewSummary>({ endpoint: "/api/review/stream", runId, onRunCreated });
+
+  const targetInput = (runInput as ReviewStreamInput | null) ?? null;
 
   function buildInput(): ReviewStreamInput | { error: string } {
     const trimmed = prInput.trim();
@@ -71,7 +91,6 @@ export function ReviewRunner() {
       return;
     }
     setFormError(null);
-    setLastInput(input);
     await run(input);
   }
 
@@ -108,8 +127,12 @@ export function ReviewRunner() {
               Run review
             </Button>
             {running && (
-              <Button variant="default" onClick={stop}>
-                Stop
+              <Button
+                variant="default"
+                onClick={stop}
+                title="Detach from this run — the review keeps running on the server and resumes if you reload."
+              >
+                Stop watching
               </Button>
             )}
           </Group>
@@ -134,8 +157,8 @@ export function ReviewRunner() {
 
       {summary && <ReviewResult summary={summary} />}
 
-      {summary && lastInput && (
-        <PostCommentsAction kind="pr" target={lastInput} comments={summary.pendingComments} />
+      {summary && targetInput && (
+        <PostCommentsAction kind="pr" target={targetInput} comments={summary.pendingComments} />
       )}
 
       {!running && <TechnicalLog entries={entries} />}

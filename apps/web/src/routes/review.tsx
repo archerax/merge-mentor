@@ -5,10 +5,16 @@ import { PageHeader } from "../components/PageHeader.js";
 import { ReviewRunner } from "../components/ReviewRunner.js";
 
 export const Route = createFileRoute("/review")({
+  validateSearch: (search: Record<string, unknown>): { run?: string } => ({
+    run: typeof search.run === "string" && search.run.length > 0 ? search.run : undefined,
+  }),
   component: ReviewPage,
 });
 
 function ReviewPage() {
+  const { run } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
   return (
     <Stack gap="lg">
       <PageHeader
@@ -22,7 +28,12 @@ function ReviewPage() {
         }
       />
 
-      <ReviewRunner />
+      <ReviewRunner
+        runId={run}
+        onRunCreated={(runId) =>
+          navigate({ search: (previous) => ({ ...previous, run: runId }), replace: true })
+        }
+      />
     </Stack>
   );
 }

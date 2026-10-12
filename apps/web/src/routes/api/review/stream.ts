@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { createReviewStream } from "../../../server/review.server.js";
+import { startPRReview } from "../../../server/review.server.js";
 import type { ReviewStreamInput } from "../../../server/review.types.js";
+import { createRunStreamResponse } from "../../../server/runStream.server.js";
 
 /**
- * Server route that runs a PR review and streams raw output as Server-Sent Events.
+ * Server routes for running and following a PR review.
  *
- * The handler is server-only; `createReviewStream` never reaches the client
- * bundle. Consumed by the `/review` route via `fetch`.
+ * `POST` creates (or attaches to) a run and returns `{ runId }` immediately;
+ * `GET ?run=<id>` streams the run's frames as Server-Sent Events, replaying the
+ * persisted backlog then following live output. Execution is owned by the run
+ * registry, so a refresh can re-attach. Both handlers are server-only.
  */
 export const Route = createFileRoute("/api/review/stream")({
   server: {
@@ -20,15 +23,14 @@ export const Route = createFileRoute("/api/review/stream")({
           return new Response("Invalid JSON body", { status: 400 });
         }
 
-        return new Response(createReviewStream(input), {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
-        });
+        try {
+          return Response.json(startPRReview(input));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return Response.json({ error: message }, { status: 400 });
+        }
       },
+      GET: ({ request }) => createRunStreamResponse(request),
     },
   },
 });

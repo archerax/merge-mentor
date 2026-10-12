@@ -165,6 +165,11 @@ By default, Merge Mentor stores temporary files in `./.mergementor` relative to 
 - **`logs/`**: Timestamped log files for debugging and audit trails (`.mergementor/logs/`).
 - **`reports/`**: Markdown review reports from dry-run mode (`.mergementor/reports/`).
 - **`cache/`**: Incremental review cache to track already-reviewed files (`.mergementor/cache/`).
+- **`runs/`**: Web UI review runs, each with a manifest, an append-only event log, and a final summary (`.mergementor/runs/<runId>/`). These let the web UI resume or replay a review after a page refresh or server restart.
+
+### Web UI Run Retention
+
+Completed web UI runs are pruned so the `runs/` directory does not grow without bound. Set `MM_RUN_RETENTION_MS` to control how long a run is kept (default `604800000`, i.e. 7 days). A run is pruned once it is older than this or falls outside the newest 100 runs; runs still in progress are never pruned.
 
 ### Audit Logging
 

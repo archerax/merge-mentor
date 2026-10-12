@@ -93,7 +93,8 @@ vi.mock("@merge-mentor/core/review/commentPosting.js", () => ({
 }));
 
 const { postPlannedComments } = await import("@merge-mentor/core/review/commentPosting.js");
-const { createReviewStream, postPRComments } = await import("./review.server.js");
+const { startPRReview, postPRComments } = await import("./review.server.js");
+const { streamRun } = await import("./reviewRuns.server.js");
 const { saveReviewReport } = await import("@merge-mentor/core/review/reviewReport.js");
 
 async function collectFrames(
@@ -110,7 +111,17 @@ async function collectFrames(
   return output
     .split("\n\n")
     .filter((chunk) => chunk.trim().length > 0)
-    .map((chunk) => JSON.parse(chunk.replace(/^data: /, "")) as Record<string, unknown>);
+    .map((chunk) => chunk.split("\n").find((line) => line.startsWith("data: ")))
+    .filter((line): line is string => !!line)
+    .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>);
+}
+
+/** Starts a run and collects its frames through the registry stream. */
+async function collectRun(start: () => { runId: string }): Promise<Record<string, unknown>[]> {
+  const { runId } = start();
+  const stream = streamRun(runId, 0);
+  expect(stream).not.toBeNull();
+  return collectFrames(stream as ReadableStream<Uint8Array>);
 }
 
 describe("review.server", () => {
@@ -191,9 +202,9 @@ describe("review.server", () => {
     });
   });
 
-  describe("createReviewStream", () => {
+  describe("startPRReview", () => {
     it("streams a completed review with findings and planned comments", async () => {
-      const frames = await collectFrames(createReviewStream({ pr: 7, write: false }));
+      const frames = await collectRun(() => startPRReview({ pr: 7, write: false }));
 
       const result = frames.find((frame) => frame.type === "result");
       expect(result).toBeDefined();
@@ -211,8 +222,13 @@ describe("review.server", () => {
       expect(saveReviewReport).toHaveBeenCalledTimes(1);
     });
 
+    it("terminates the stream with a done frame", async () => {
+      const frames = await collectRun(() => startPRReview({ pr: 7 }));
+      expect(frames.at(-1)).toMatchObject({ type: "done" });
+    });
+
     it("does not expose pending comments in write mode", async () => {
-      const frames = await collectFrames(createReviewStream({ pr: 7, write: true }));
+      const frames = await collectRun(() => startPRReview({ pr: 7, write: true }));
 
       const result = frames.find((frame) => frame.type === "result");
       const summary = result?.summary as Record<string, unknown>;
@@ -221,25 +237,48 @@ describe("review.server", () => {
     });
 
     it("applies a non-multi-agent strategy override", async () => {
-      const frames = await collectFrames(createReviewStream({ pr: 7, strategy: "fast" }));
+      const frames = await collectRun(() => startPRReview({ pr: 7, strategy: "fast" }));
       expect(frames.some((frame) => frame.type === "result")).toBe(true);
     });
 
-    it("emits an error frame for missing input", async () => {
-      const frames = await collectFrames(createReviewStream({}));
-      expect(frames.at(0)).toMatchObject({ type: "status" });
-      expect(frames.at(-1)).toMatchObject({
-        type: "error",
-        message: "Provide a PR URL or a PR number to run a review.",
-      });
+    it("attaches a duplicate submit to the in-flight run", async () => {
+      const first = startPRReview({ pr: 7, write: false });
+      const second = startPRReview({ pr: 7, write: false });
+      expect(second).toEqual({ runId: first.runId, attached: true });
+
+      await collectFrames(streamRun(first.runId, 0) as ReadableStream<Uint8Array>);
     });
 
-    it("emits an error frame for an invalid PR number", async () => {
-      const frames = await collectFrames(createReviewStream({ pr: -1 }));
-      expect(frames.at(-1)).toMatchObject({
-        type: "error",
-        message: "PR number must be a positive integer.",
-      });
+    it("starts a distinct run when the write mode differs", async () => {
+      const dry = startPRReview({ pr: 7, write: false });
+      const write = startPRReview({ pr: 7, write: true });
+      expect(write.attached).toBe(false);
+      expect(write.runId).not.toBe(dry.runId);
+
+      await Promise.all([
+        collectFrames(streamRun(dry.runId, 0) as ReadableStream<Uint8Array>),
+        collectFrames(streamRun(write.runId, 0) as ReadableStream<Uint8Array>),
+      ]);
+    });
+
+    it("starts a distinct run when the strategy differs", async () => {
+      const fast = startPRReview({ pr: 7, strategy: "fast" });
+      const multi = startPRReview({ pr: 7, strategy: "multi-agent" });
+      expect(multi.attached).toBe(false);
+      expect(multi.runId).not.toBe(fast.runId);
+
+      await Promise.all([
+        collectFrames(streamRun(fast.runId, 0) as ReadableStream<Uint8Array>),
+        collectFrames(streamRun(multi.runId, 0) as ReadableStream<Uint8Array>),
+      ]);
+    });
+
+    it("rejects missing input", () => {
+      expect(() => startPRReview({})).toThrow("Provide a PR URL or a PR number to run a review.");
+    });
+
+    it("rejects an invalid PR number", () => {
+      expect(() => startPRReview({ pr: -1 })).toThrow("PR number must be a positive integer.");
     });
   });
 });
