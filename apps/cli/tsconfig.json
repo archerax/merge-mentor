@@ -1,4 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*", "../../libs/*/src/**/*.d.ts"]
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist-types",
+    "tsBuildInfoFile": "dist-types/.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../libs/domain" },
+    { "path": "../../libs/config" },
+    { "path": "../../libs/platforms" },
+    { "path": "../../libs/shared" },
+    { "path": "../../libs/core" }
+  ]
 }

@@ -9,6 +9,6 @@
     "@merge-mentor/shared": "workspace:*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --build"
   }
 }

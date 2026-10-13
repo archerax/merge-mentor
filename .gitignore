@@ -5,6 +5,10 @@ node_modules/
 dist/
 .output/
 
+# TypeScript project references build output
+dist-types/
+*.tsbuildinfo
+
 # Environment files
 .env
 .env.local

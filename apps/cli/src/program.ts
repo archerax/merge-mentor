@@ -579,7 +579,8 @@ program
   .optionsGroup("General Options")
   .option("--port <port>", "Port for the dashboard server", parseUiPort, DEFAULT_UI_PORT)
   .option("--host <host>", "Bind the dashboard server to a specific host (e.g. 0.0.0.0)")
-  .option("--open", "Open the dashboard in the default browser", false)
+  .option("--open", "Open the dashboard in the default browser")
+  .option("--no-open", "Do not open the dashboard in the default browser")
   .action(async (options: UiOptions) => {
     try {
       await executeUiCommand(options);

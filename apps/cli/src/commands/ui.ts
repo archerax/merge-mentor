@@ -11,8 +11,49 @@ import type { UiOptions } from "./types.js";
 /** Default port for the dashboard server. */
 export const DEFAULT_UI_PORT = 3000;
 
+/**
+ * Default host for the dashboard server.
+ *
+ * Binding to loopback keeps the unauthenticated dashboard reachable only from
+ * the local machine. Pass `--host` to opt in to a broader bind (e.g. `0.0.0.0`
+ * inside a container).
+ */
+export const DEFAULT_UI_HOST = "127.0.0.1";
+
 const MIN_UI_PORT = 1;
 const MAX_UI_PORT = 65535;
+
+/**
+ * Returns whether a bind host refers to the local machine.
+ *
+ * @param host - Candidate bind host
+ * @returns `true` for loopback aliases (`127.0.0.1`, `localhost`, `::1`)
+ */
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
+/**
+ * Decides whether the command should open the dashboard in a browser.
+ *
+ * Opening is suppressed when the user passed `--no-open`, when stdout is not an
+ * interactive terminal (CI, pipes), or when the server is bound to a
+ * non-loopback address (for example a container publishing on `0.0.0.0`).
+ *
+ * @param options - Resolved UI command options
+ * @param host - Resolved bind host
+ * @param isTTY - Whether stdout is attached to an interactive terminal
+ * @returns `true` when the dashboard should be opened in the default browser
+ */
+export function shouldOpenBrowser(options: UiOptions, host: string, isTTY: boolean): boolean {
+  if (options.open === false) {
+    return false;
+  }
+  if (!isTTY) {
+    return false;
+  }
+  return isLoopbackHost(host);
+}
 
 /**
  * Validates a dashboard port number.
@@ -94,6 +135,7 @@ function openBrowser(url: string): void {
 export async function executeUiCommand(options: UiOptions): Promise<void> {
   const output = consoleOutputWriter;
   const port = options.port === undefined ? DEFAULT_UI_PORT : validateUiPort(options.port);
+  const host = options.host ?? DEFAULT_UI_HOST;
   const entry = resolveServerEntry();
 
   if (!entry) {
@@ -103,7 +145,7 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
     );
   }
 
-  const url = `http://localhost:${port}`;
+  const url = `http://${host}:${port}`;
   output.log(`\n🖥️  Starting merge-mentor dashboard on ${url}\n`);
 
   await new Promise<void>((resolvePromise, rejectPromise) => {
@@ -112,7 +154,9 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
       env: {
         ...process.env,
         PORT: String(port),
-        ...(options.host ? { HOST: options.host } : {}),
+        HOST: host,
+        NITRO_HOST: host,
+        NITRO_PORT: String(port),
       },
     });
 
@@ -127,7 +171,7 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
       resolvePromise();
     });
 
-    if (options.open) {
+    if (shouldOpenBrowser(options, host, process.stdout.isTTY === true)) {
       setTimeout(() => openBrowser(url), 1500);
     }
   });

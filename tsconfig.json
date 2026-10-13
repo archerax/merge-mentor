@@ -1,5 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["apps/cli/src/**/*", "libs/*/src/**/*.d.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "files": [],
+  "references": [
+    { "path": "./libs/domain" },
+    { "path": "./libs/shared" },
+    { "path": "./libs/config" },
+    { "path": "./libs/platforms" },
+    { "path": "./libs/core" },
+    { "path": "./apps/cli" }
+  ]
 }

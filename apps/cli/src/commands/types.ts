@@ -407,7 +407,7 @@ export interface UiOptions {
   port?: number;
   /** Bind the dashboard server to a specific host (e.g. `0.0.0.0`). */
   host?: string;
-  /** Open the dashboard in the default browser once it is ready. Default: `false`. */
+  /** Open the dashboard in the default browser once it is ready. Default: `true`. */
   open?: boolean;
 }
 
