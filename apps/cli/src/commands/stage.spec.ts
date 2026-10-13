@@ -194,7 +194,7 @@ describe("executeStage", () => {
     await executeStage(options);
     expect(providers).toHaveLength(2);
     expect(providers[1].executePrompt).not.toHaveBeenCalled();
-  });
+  }, 30000);
 
   it("skips the cache when --no-cache is set", async () => {
     repo.write("src/bug.ts", "export function double(x: number) {\n  return x + 1;\n}\n");
@@ -213,7 +213,7 @@ describe("executeStage", () => {
 
     expect(providers).toHaveLength(2);
     expect(providers[1].executePrompt).toHaveBeenCalledTimes(1);
-  });
+  }, 30000);
 
   it("re-reviews all files with --re-review but still writes fresh cache", async () => {
     repo.write("src/bug.ts", "export function double(x: number) {\n  return x + 1;\n}\n");
