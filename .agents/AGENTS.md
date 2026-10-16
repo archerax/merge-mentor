@@ -46,6 +46,7 @@ TypeScript 6.x (strict mode), Node.js (ES Modules), pnpm, Vitest, Oxlint linter,
 
 ```typescript
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
+
 import type { File } from "./types.js";
 
 async function fetchPullRequestFiles(owner: string, repo: string): Promise<File[]> {
