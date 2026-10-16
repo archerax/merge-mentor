@@ -27,6 +27,7 @@ import {
 import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import { delay } from "../shared/delay.js";
+import { getStrictJsonSchema } from "../shared/jsonSchemas.js";
 import { parseJsonResponse } from "../shared/parseJsonResponse.js";
 import { inferPromptType, type PromptType } from "../shared/promptType.js";
 import {
@@ -36,6 +37,12 @@ import {
   parseFileReview as parseFileReviewShared,
 } from "../shared/responseParsers.js";
 import { saveTranscript } from "../shared/saveTranscript.js";
+import { buildSchemaRepairPrompt, collectSchemaRepairReasons } from "../shared/schemaRepair.js";
+import {
+  classifyStructuredOutputFailure,
+  type SessionErrorSignal,
+  type StructuredOutputErrorSignal,
+} from "../shared/structuredOutputError.js";
 import {
   combineToolAndJsonFindings,
   convertFindingsToParsedResponse,
@@ -75,6 +82,9 @@ const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set(
 ]);
 
 const READ_ONLY_REVIEW_TOOLS = ["grep", "glob", "view"] as const;
+
+/** A live Copilot session, as returned by {@link CopilotClient.createSession}. */
+type ReviewSession = Awaited<ReturnType<CopilotClient["createSession"]>>;
 
 /**
  * Write-capable built-in tools enabled by `enableWriteTools`. Uses the runtime's
@@ -160,6 +170,12 @@ export class CopilotSdkProvider implements AIProviderClient {
   private readonly clock: Clock;
   private client?: CopilotClient;
   private isAuthVerified = false;
+  /**
+   * Set once the provider rejects a `responseSchema`. Skips native structured
+   * output for the rest of this provider instance instead of re-sending a schema
+   * that is known to be rejected.
+   */
+  private structuredOutputDisabled = false;
 
   constructor(options?: AIProviderOptions) {
     this.maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -220,6 +236,7 @@ export class CopilotSdkProvider implements AIProviderClient {
       try {
         const { raw, parsed } = await this.runSdk(
           prompt,
+          promptType,
           options,
           (usage) => {
             accumulatedUsage = mergeTokenUsage(accumulatedUsage, usage);
@@ -351,6 +368,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
   private async runSdk(
     prompt: string,
+    promptType: PromptType,
     options?: ExecutePromptOptions,
     onUsageCollected?: (usage: TokenUsage | undefined) => void,
     attempt = 1
@@ -480,9 +498,19 @@ export class CopilotSdkProvider implements AIProviderClient {
       }
 
       try {
-        const response = await session.sendAndWait(
-          { prompt, ...(attachments.length > 0 ? { attachments } : {}) },
-          this.timeoutMs
+        const promptOptions: {
+          prompt: string;
+          attachments?: Array<{ type: "file"; path: string }>;
+        } = {
+          prompt,
+          ...(attachments.length > 0 ? { attachments } : {}),
+        };
+
+        const response = await this.sendStructured(
+          session,
+          promptOptions,
+          promptType,
+          sessionEvents
         );
         const content = response?.data.content ?? chunks.join("");
 
@@ -496,6 +524,16 @@ export class CopilotSdkProvider implements AIProviderClient {
           parsed = parseJsonResponse(content);
         } catch (error) {
           jsonParseError = error;
+        }
+
+        if (!jsonParseError) {
+          parsed = await this.repairMissingFields(
+            session,
+            parsed,
+            promptType,
+            chunks,
+            sessionEvents
+          );
         }
 
         if (this.experimentalTools) {
@@ -606,6 +644,163 @@ export class CopilotSdkProvider implements AIProviderClient {
       } catch {
         // Best-effort session cleanup
       }
+    }
+  }
+
+  /**
+   * Sends a prompt with provider-native structured output for the given prompt
+   * type, so the runtime enforces the schema (every required key present, blanks
+   * allowed). If the provider rejects the schema itself, the same session is
+   * retried without it and native structured output is disabled for the rest of
+   * the provider's lifetime. Timeouts, disconnects, and auth/quota/rate-limit
+   * failures propagate untouched so existing recovery/retry logic still applies.
+   */
+  private async sendStructured(
+    session: ReviewSession,
+    options: { prompt: string; attachments?: Array<{ type: "file"; path: string }> },
+    promptType: PromptType,
+    sessionEvents: readonly SessionEvent[]
+  ): Promise<Awaited<ReturnType<ReviewSession["sendAndWait"]>>> {
+    const responseSchema = this.structuredOutputDisabled
+      ? undefined
+      : getStrictJsonSchema(promptType);
+    if (!responseSchema) {
+      return session.sendAndWait(options, this.timeoutMs);
+    }
+
+    const errorEventStart = sessionEvents.length;
+    try {
+      return await session.sendAndWait({ ...options, responseSchema }, this.timeoutMs);
+    } catch (error) {
+      const sessionErrors = this.collectSessionErrorSignals(sessionEvents, errorEventStart);
+      const decision = classifyStructuredOutputFailure(
+        this.toStructuredOutputErrorSignal(error),
+        sessionErrors
+      );
+      if (!decision.fallback) {
+        throw error;
+      }
+      if (decision.permanent) {
+        this.structuredOutputDisabled = true;
+      }
+      this.logger.warn(
+        {
+          error: (error as Error).message,
+          promptType,
+          sessionErrors,
+          permanent: decision.permanent,
+        },
+        decision.permanent
+          ? "Provider-native structured output rejected; disabling responseSchema for this provider"
+          : "Provider-native structured output rejected; retrying without responseSchema"
+      );
+      return session.sendAndWait(options, this.timeoutMs);
+    }
+  }
+
+  /**
+   * Extracts the structured fields of `session.error` events captured since
+   * `fromIndex`. The SDK discards these when it converts the event into a thrown
+   * `Error`, so they are read directly from the event stream instead.
+   */
+  private collectSessionErrorSignals(
+    events: readonly SessionEvent[],
+    fromIndex: number
+  ): SessionErrorSignal[] {
+    const signals: SessionErrorSignal[] = [];
+    for (let index = fromIndex; index < events.length; index++) {
+      const event = events[index];
+      if (event.type !== "session.error") {
+        continue;
+      }
+      signals.push({
+        errorType: event.data.errorType,
+        errorCode: event.data.errorCode,
+        statusCode: event.data.statusCode,
+        message: event.data.message,
+      });
+    }
+    return signals;
+  }
+
+  private toStructuredOutputErrorSignal(error: unknown): StructuredOutputErrorSignal {
+    const candidate = error as {
+      message?: unknown;
+      name?: unknown;
+      code?: unknown;
+    };
+    return {
+      message: typeof candidate?.message === "string" ? candidate.message : String(error),
+      name: typeof candidate?.name === "string" ? candidate.name : undefined,
+      code:
+        typeof candidate?.code === "number" || typeof candidate?.code === "string"
+          ? candidate.code
+          : undefined,
+    };
+  }
+
+  /**
+   * Re-prompts the model inside the SAME agent session when the response omits
+   * critical finding fields (e.g. an empty `message`). Reusing the session keeps
+   * the original prompt, attachments, and prior output in context, so only a
+   * short reminder plus the JSON schema is sent instead of a full re-review.
+   *
+   * Best-effort: on any failure the original parsed response is returned, so a
+   * repair turn never fails the review.
+   *
+   * @param session - The live Copilot session to send the reminder into.
+   * @param parsed - The parsed JSON from the first turn.
+   * @param promptType - Detected prompt type, used to pick the required fields.
+   * @param chunks - Accumulated streaming deltas, used as a fallback if the
+   *   repair turn returns no explicit content.
+   * @param sessionEvents - Buffered session events, used to classify send failures.
+   * @returns The repaired parsed response, or the original when no repair was needed.
+   */
+  private async repairMissingFields(
+    session: ReviewSession,
+    parsed: unknown,
+    promptType: PromptType,
+    chunks: string[],
+    sessionEvents: readonly SessionEvent[]
+  ): Promise<unknown> {
+    const reasons = collectSchemaRepairReasons(parsed, promptType);
+    if (reasons.length === 0) {
+      return parsed;
+    }
+
+    this.logger.warn(
+      { promptType, reasons },
+      "AI response is missing required finding fields; requesting a same-session schema repair"
+    );
+
+    const repairPrompt = buildSchemaRepairPrompt(promptType, reasons);
+    const preRepairLength = chunks.length;
+    try {
+      const repairResponse = await this.sendStructured(
+        session,
+        { prompt: repairPrompt },
+        promptType,
+        sessionEvents
+      );
+      const repairContent = repairResponse?.data.content ?? chunks.slice(preRepairLength).join("");
+
+      if (!repairContent) {
+        this.logger.warn("Schema repair turn returned no content; keeping the original response");
+        return parsed;
+      }
+
+      const repaired = parseJsonResponse(repairContent);
+      const remaining = collectSchemaRepairReasons(repaired, promptType);
+      if (remaining.length > 0) {
+        this.logger.warn({ remaining }, "Schema repair turn still missing required finding fields");
+      }
+      return repaired;
+    } catch (error) {
+      this.logger.warn(
+        { error: (error as Error).message },
+        "Schema repair turn failed; keeping the original response"
+      );
+      return parsed;
     }
   }
 

@@ -25,8 +25,14 @@ const CrossFileFindingCategorySchema = z
 // File-Level Finding Schema
 const FileFindingSchema = z.object({
   line: z.coerce.number().int().nonnegative().default(0),
-  start_line: z.coerce.number().int().positive().optional(),
-  end_line: z.coerce.number().int().positive().optional(),
+  start_line: z.preprocess(
+    (value) => (value === null || value === 0 ? undefined : value),
+    z.coerce.number().int().positive().optional()
+  ),
+  end_line: z.preprocess(
+    (value) => (value === null || value === 0 ? undefined : value),
+    z.coerce.number().int().positive().optional()
+  ),
   severity: FindingSeveritySchema,
   confidence: FindingConfidenceSchema,
   category: FileFindingCategorySchema,

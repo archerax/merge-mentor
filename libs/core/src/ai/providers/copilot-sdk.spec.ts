@@ -1462,6 +1462,227 @@ describe("CopilotSdkProvider", () => {
       );
     });
   });
+
+  describe("schema repair", () => {
+    it("re-prompts in the same session when a finding is missing its message", async () => {
+      const provider = createProvider();
+      const incomplete = {
+        findings: [{ line: 5, severity: "high", category: "bug", title: "missing message" }],
+      };
+      const repaired = {
+        findings: [{ line: 5, severity: "high", category: "bug", message: "Real message" }],
+      };
+      mockSession.sendAndWait
+        .mockResolvedValueOnce({
+          type: "assistant.message",
+          data: { content: JSON.stringify(incomplete) },
+        })
+        .mockResolvedValueOnce({
+          type: "assistant.message",
+          data: { content: JSON.stringify(repaired) },
+        });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(2);
+      const repairOptions = mockSession.sendAndWait.mock.calls[1][0] as {
+        prompt: string;
+        responseSchema?: unknown;
+      };
+      expect(repairOptions.prompt).toContain("findings[0].message");
+      expect(repairOptions.responseSchema).toBeDefined();
+      expect(result.parsed).toEqual(repaired);
+    });
+
+    it("does not re-prompt when a file-review finding omits its line number", async () => {
+      const provider = createProvider();
+      const wholeFile = {
+        findings: [{ severity: "high", category: "bug", message: "Applies to the whole file" }],
+      };
+      mockSuccessfulPrompt(wholeFile);
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(1);
+      expect(result.parsed).toEqual(wholeFile);
+    });
+
+    it("does not re-prompt when all required fields are present", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({
+        findings: [{ line: 3, severity: "low", category: "bug", message: "Looks fine" }],
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the original response when the repair turn returns no content", async () => {
+      const provider = createProvider();
+      const incomplete = {
+        findings: [{ line: 5, severity: "high", category: "bug", title: "missing message" }],
+      };
+      mockSession.sendAndWait
+        .mockResolvedValueOnce({
+          type: "assistant.message",
+          data: { content: JSON.stringify(incomplete) },
+        })
+        .mockResolvedValueOnce({ type: "assistant.message", data: { content: "" } });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(2);
+      expect(result.parsed).toEqual(incomplete);
+    });
+
+    it("keeps the original response when the repair turn throws", async () => {
+      const provider = createProvider();
+      const incomplete = {
+        findings: [{ line: 5, severity: "high", category: "bug", title: "missing message" }],
+      };
+      mockSession.sendAndWait
+        .mockResolvedValueOnce({
+          type: "assistant.message",
+          data: { content: JSON.stringify(incomplete) },
+        })
+        .mockRejectedValueOnce(new Error("repair turn failed"));
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(2);
+      expect(result.parsed).toEqual(incomplete);
+    });
+  });
+
+  describe("provider-native structured output", () => {
+    it("requests the strict schema for file-review prompts", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({
+        findings: [{ line: 1, severity: "high", category: "bug", message: "ok" }],
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const options = mockSession.sendAndWait.mock.calls[0][0] as {
+        responseSchema?: Record<string, unknown>;
+      };
+      expect(options.responseSchema).toBeDefined();
+      expect(options.responseSchema?.required).toEqual(["findings"]);
+    });
+
+    it("omits responseSchema when the prompt type has no schema", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Please analyze the general quality");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const options = mockSession.sendAndWait.mock.calls[0][0] as { responseSchema?: unknown };
+      expect(options.responseSchema).toBeUndefined();
+    });
+
+    it("retries without responseSchema when the provider rejects structured output", async () => {
+      const provider = createProvider();
+      const complete = {
+        findings: [{ line: 1, severity: "high", category: "bug", message: "ok" }],
+      };
+      mockSession.sendAndWait
+        .mockRejectedValueOnce(new Error("Unsupported response format for this model"))
+        .mockResolvedValueOnce({
+          type: "assistant.message",
+          data: { content: JSON.stringify(complete) },
+        });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(2);
+      const retryOptions = mockSession.sendAndWait.mock.calls[1][0] as {
+        responseSchema?: unknown;
+      };
+      expect(retryOptions.responseSchema).toBeUndefined();
+      expect(result.parsed).toEqual(complete);
+    });
+
+    it("propagates non-schema errors from the structured send without retrying inline", async () => {
+      const provider = createProvider(1);
+      mockSession.sendAndWait.mockRejectedValue(new Error("network down"));
+
+      const promise = provider.executePrompt("Review the following file test.ts");
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      const error = await rejection;
+
+      expect((error as Error).message).toContain("network down");
+      expect(mockSession.sendAndWait).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops sending responseSchema for the provider after a rejection", async () => {
+      const provider = createProvider();
+      const complete = {
+        findings: [{ line: 1, severity: "high", category: "bug", message: "ok" }],
+      };
+      mockSession.sendAndWait
+        .mockRejectedValueOnce(new Error("Unsupported response format for this model"))
+        .mockResolvedValue({
+          type: "assistant.message",
+          data: { content: JSON.stringify(complete) },
+        });
+
+      const first = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await first;
+
+      mockSession.sendAndWait.mockClear();
+
+      const second = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await second;
+
+      const options = mockSession.sendAndWait.mock.calls[0][0] as { responseSchema?: unknown };
+      expect(options.responseSchema).toBeUndefined();
+    });
+
+    it("keeps responseSchema for later prompts after a weak invalid-request rejection", async () => {
+      const provider = createProvider();
+      const complete = {
+        findings: [{ line: 1, severity: "high", category: "bug", message: "ok" }],
+      };
+      const invalidParams = Object.assign(new Error("Invalid params"), { code: -32602 });
+      mockSession.sendAndWait.mockRejectedValueOnce(invalidParams).mockResolvedValue({
+        type: "assistant.message",
+        data: { content: JSON.stringify(complete) },
+      });
+
+      const first = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await first;
+
+      mockSession.sendAndWait.mockClear();
+
+      const second = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await second;
+
+      const options = mockSession.sendAndWait.mock.calls[0][0] as { responseSchema?: unknown };
+      expect(options.responseSchema).toBeDefined();
+    });
+  });
 });
 
 function createStubLogger() {

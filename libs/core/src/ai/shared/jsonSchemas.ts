@@ -9,41 +9,60 @@ export const FILE_REVIEW_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          line: { type: "number", description: "Line number in the file" },
+          line: {
+            type: "number",
+            description:
+              "Line number in the file, or null when the comment applies to the whole file or is not line-specific",
+          },
           start_line: {
             type: "number",
-            description: "First changed file line replaced by a native suggestion (optional)",
+            description:
+              "First changed file line replaced by a native suggestion, or null when not applicable",
           },
           end_line: {
             type: "number",
-            description: "Last changed file line replaced by a native suggestion (optional)",
+            description:
+              "Last changed file line replaced by a native suggestion, or null when not applicable",
           },
           severity: {
             type: "string",
-            description: "Finding severity: critical, high, medium, or low",
+            enum: ["critical", "high", "medium", "low"],
+            description: "Finding severity",
           },
-          confidence: { type: "string", description: "Confidence level: high, medium, or low" },
+          confidence: {
+            type: "string",
+            enum: ["high", "medium", "low"],
+            description: "Confidence level",
+          },
           category: {
             type: "string",
-            description: "Finding category: bug, security, performance, quality, or documentation",
+            enum: ["bug", "security", "performance", "quality", "documentation"],
+            description: "Finding category",
           },
-          message: { type: "string", description: "Description of the finding" },
-          suggestion: { type: "string", description: "Suggested fix or improvement" },
+          message: {
+            type: "string",
+            description: "Description of the finding; must not be empty",
+          },
+          suggestion: {
+            type: "string",
+            description: "Suggested fix, or an empty string when there is none",
+          },
           replacement: {
             type: "string",
             description:
-              "Exact replacement code for a native suggestion; omit when a safe localized replacement is not possible",
+              "Exact replacement code for a native suggestion, or an empty string when a safe localized replacement is not possible",
           },
           reasoning: {
             type: "string",
-            description: "Concise rationale citing code evidence, checked context, and impact",
+            description:
+              "Concise rationale citing code evidence, checked context, and impact; empty string when not needed",
           },
           isPreExisting: {
             type: "boolean",
             description: "Whether this issue existed before the PR changes",
           },
         },
-        required: ["line", "severity", "category", "message"],
+        required: ["severity", "category", "message"],
       },
     },
   },
@@ -62,24 +81,41 @@ export const CROSS_FILE_REVIEW_SCHEMA = {
         properties: {
           severity: {
             type: "string",
-            description: "Finding severity: critical, high, medium, or low",
+            enum: ["critical", "high", "medium", "low"],
+            description: "Finding severity",
           },
-          confidence: { type: "string", description: "Confidence level: high, medium, or low" },
+          confidence: {
+            type: "string",
+            enum: ["high", "medium", "low"],
+            description: "Confidence level",
+          },
           category: {
             type: "string",
-            description:
-              "Category: architecture, design, testing, documentation, bug, security, performance, or quality",
+            enum: [
+              "architecture",
+              "design",
+              "testing",
+              "documentation",
+              "bug",
+              "security",
+              "performance",
+              "quality",
+            ],
+            description: "Finding category",
           },
-          message: { type: "string", description: "Description of the finding" },
+          message: {
+            type: "string",
+            description: "Description of the finding; must not be empty",
+          },
           reasoning: {
             type: "string",
             description:
-              "Concise rationale citing cross-file evidence, checked context, and impact",
+              "Concise rationale citing cross-file evidence, checked context, and impact; empty string when not needed",
           },
           affected_files: {
             type: "array",
             items: { type: "string" },
-            description: "List of affected file paths",
+            description: "List of affected file paths; empty array when unknown",
           },
         },
         required: ["severity", "category", "message"],
@@ -109,19 +145,32 @@ export const BATCHED_FILE_REVIEW_SCHEMA = {
             items: {
               type: "object",
               properties: {
-                line: { type: "number" },
-                start_line: { type: "number" },
-                end_line: { type: "number" },
-                severity: { type: "string" },
-                confidence: { type: "string" },
-                category: { type: "string" },
-                message: { type: "string" },
-                suggestion: { type: "string" },
-                replacement: { type: "string" },
-                reasoning: { type: "string" },
+                line: {
+                  type: "number",
+                  description:
+                    "Line number, or null when the finding applies to the whole file or is not line-specific",
+                },
+                start_line: { type: "number", description: "Suggestion start line, or null" },
+                end_line: { type: "number", description: "Suggestion end line, or null" },
+                severity: {
+                  type: "string",
+                  enum: ["critical", "high", "medium", "low"],
+                },
+                confidence: { type: "string", enum: ["high", "medium", "low"] },
+                category: {
+                  type: "string",
+                  enum: ["bug", "security", "performance", "quality", "documentation"],
+                },
+                message: { type: "string", description: "Finding description; must not be empty" },
+                suggestion: { type: "string", description: "Suggested fix, or empty string" },
+                replacement: {
+                  type: "string",
+                  description: "Native suggestion replacement, or empty string",
+                },
+                reasoning: { type: "string", description: "Rationale, or empty string" },
                 isPreExisting: { type: "boolean" },
               },
-              required: ["line", "severity", "category", "message"],
+              required: ["severity", "category", "message"],
             },
           },
         },
@@ -142,17 +191,42 @@ export const FAST_REVIEW_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          file: { type: "string", description: "File path (omit for cross-file findings)" },
-          line: { type: "number", description: "Line number in the file" },
-          start_line: { type: "number" },
-          end_line: { type: "number" },
-          severity: { type: "string" },
-          confidence: { type: "string" },
-          category: { type: "string" },
-          message: { type: "string" },
-          suggestion: { type: "string" },
-          replacement: { type: "string" },
-          reasoning: { type: "string" },
+          file: {
+            type: "string",
+            description: "File path, or an empty string for cross-file/PR-level findings",
+          },
+          line: {
+            type: "number",
+            description:
+              "Line number, or null for file-level and cross-file findings that are not line-specific",
+          },
+          start_line: { type: "number", description: "Suggestion start line, or null" },
+          end_line: { type: "number", description: "Suggestion end line, or null" },
+          severity: {
+            type: "string",
+            enum: ["critical", "high", "medium", "low"],
+          },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+          category: {
+            type: "string",
+            enum: [
+              "bug",
+              "security",
+              "performance",
+              "quality",
+              "documentation",
+              "architecture",
+              "design",
+              "testing",
+            ],
+          },
+          message: { type: "string", description: "Finding description; must not be empty" },
+          suggestion: { type: "string", description: "Suggested fix, or empty string" },
+          replacement: {
+            type: "string",
+            description: "Native suggestion replacement, or empty string",
+          },
+          reasoning: { type: "string", description: "Rationale, or empty string" },
           isPreExisting: { type: "boolean" },
         },
         required: ["severity", "category", "message"],
@@ -294,4 +368,102 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
     default:
       return undefined;
   }
+}
+
+/**
+ * Numeric finding fields that may be legitimately absent. Provider-strict JSON
+ * schema cannot leave a property out (every property must be required), so these
+ * are widened to also accept `null`, meaning "not applicable". `line` is included
+ * because a comment may apply to a whole file rather than a specific line.
+ */
+const NULLABLE_NUMERIC_PROPS: ReadonlySet<string> = new Set(["line", "start_line", "end_line"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function strictifyProperties(properties: unknown): Record<string, unknown> {
+  if (!isRecord(properties)) {
+    return {};
+  }
+  const result: Record<string, unknown> = {};
+  for (const [name, schema] of Object.entries(properties)) {
+    result[name] = strictifySchema(schema, name);
+  }
+  return result;
+}
+
+/**
+ * Recursively rewrites a JSON schema into the provider-strict form required by
+ * native structured output: every object gets `additionalProperties: false` and
+ * lists ALL of its properties in `required`.
+ *
+ * Crucially, "required" only means the key must be present — it does not mean
+ * the value must be non-empty. Optional string fields (e.g. `suggestion`,
+ * `replacement`, `reasoning`) therefore remain blankable: the model emits `""`
+ * when it has nothing to add, instead of omitting the key or inventing one.
+ * Optional numeric fields are widened to accept `null` because numbers cannot be
+ * blank.
+ */
+function strictifySchema(node: unknown, propName?: string): unknown {
+  if (Array.isArray(node)) {
+    return node.map((item) => strictifySchema(item));
+  }
+  if (!isRecord(node)) {
+    return node;
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "required") {
+      continue;
+    }
+    result[key] = key === "properties" ? strictifyProperties(value) : strictifySchema(value, key);
+  }
+
+  if (isRecord(node.properties)) {
+    result.additionalProperties = false;
+    result.required = Object.keys(node.properties);
+  }
+
+  if (propName && NULLABLE_NUMERIC_PROPS.has(propName) && node.type === "number") {
+    result.type = ["number", "null"];
+  }
+
+  return result;
+}
+
+/**
+ * Returns a provider-strict variant of the JSON schema for the given prompt
+ * type, suitable for native structured output enforcement. Returns undefined
+ * when the prompt type has no schema or when the schema cannot be represented in
+ * strict form (e.g. the batched response uses an open-ended map).
+ */
+export function getStrictJsonSchema(promptType: PromptType): Record<string, unknown> | undefined {
+  const schema = getJsonSchema(promptType);
+  if (!schema) {
+    return undefined;
+  }
+  if (containsOpenMap(schema)) {
+    return undefined;
+  }
+  return strictifySchema(schema) as Record<string, unknown>;
+}
+
+/**
+ * Detects a map-style `additionalProperties` object schema (as opposed to the
+ * boolean `false` added by strictify). OpenAI strict mode rejects open-ended
+ * maps, so schemas that use them fall back to the non-strict path.
+ */
+function containsOpenMap(node: unknown): boolean {
+  if (Array.isArray(node)) {
+    return node.some((item) => containsOpenMap(item));
+  }
+  if (!isRecord(node)) {
+    return false;
+  }
+  if (isRecord(node.additionalProperties)) {
+    return true;
+  }
+  return Object.values(node).some((value) => containsOpenMap(value));
 }
