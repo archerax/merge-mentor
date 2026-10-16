@@ -1160,6 +1160,7 @@ export class ReviewEngine {
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
+          promptType: "batched-file-review",
           workingDirectory: repoPath,
           onStreamData: streaming.callback,
           ...(shouldAttach ? { diffFiles } : {}),
@@ -1247,6 +1248,7 @@ export class ReviewEngine {
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
+          promptType: "cross-file-review",
           workingDirectory: repoPath,
           onStreamData: streaming.callback,
         });
@@ -1418,6 +1420,7 @@ export class ReviewEngine {
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
+          promptType: "fast-review",
           workingDirectory: repoPath,
           onStreamData: streaming.callback,
           ...(shouldAttach ? { diffFiles } : {}),
