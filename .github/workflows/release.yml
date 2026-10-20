@@ -87,4 +87,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to npm
-        run: npm publish merge-mentor-${{ steps.version.outputs.VERSION }}.tgz
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          # Prereleases (e.g. 4.0.0-rc1) go on the "next" tag so they never become "latest".
+          if [[ "$VERSION" == *-* ]]; then TAG=next; else TAG=latest; fi
+          npm publish "merge-mentor-${VERSION}.tgz" --tag "$TAG"
