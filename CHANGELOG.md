@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0-rc1] - 2026-10-20
+
+Release candidate for 4.0.0.
+
 ### Changed
 
 - **Existing-Comment Dedup Moved to the Lead Synthesizer**: multi-agent
