@@ -23,7 +23,7 @@ describe("reports.server", () => {
 
     expect(mockListReports).toHaveBeenCalledWith({
       limit: 200,
-      reportsDir: path.join("/tmp/mm-reports", "reports"),
+      reportsDir: path.resolve("/tmp/mm-reports", "reports"),
     });
   });
 
@@ -32,7 +32,7 @@ describe("reports.server", () => {
 
     expect(mockListReports).toHaveBeenCalledWith({
       limit: 5,
-      reportsDir: path.join("/tmp/mm-reports", "reports"),
+      reportsDir: path.resolve("/tmp/mm-reports", "reports"),
     });
   });
 
@@ -40,7 +40,7 @@ describe("reports.server", () => {
     await loadReport("report-1.md");
 
     expect(mockReadReport).toHaveBeenCalledWith("report-1.md", {
-      reportsDir: path.join("/tmp/mm-reports", "reports"),
+      reportsDir: path.resolve("/tmp/mm-reports", "reports"),
     });
   });
 });
