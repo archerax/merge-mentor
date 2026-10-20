@@ -7,9 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.0.0-rc1] - 2026-10-20
+## [4.0.0-rc2] - 2026-10-20
 
 Release candidate for 4.0.0.
+
+### Fixed
+
+- **npm Publishing**: removed `"private": true` from the root `package.json`,
+  which blocked `npm publish` for 4.0.0-rc1. Prereleases are published under
+  the `next` dist-tag so `latest` stays on the stable release.
+- **Security Audit**: replaced `micromatch` with `picomatch` for ignore-pattern
+  matching, removing the unpatched `braces` dependency (GHSA-vfj7-8cjw-p6xm).
+  Negated patterns and a leading `./` keep their previous behavior.
+- **Windows Tests**: web server specs now resolve expected directories with
+  `path.resolve` so they pass with drive-letter paths.
+- **Release Workflow**: GitHub release notes are now extracted correctly from
+  the changelog.
 
 ### Changed
 
@@ -83,6 +96,10 @@ Release candidate for 4.0.0.
   deterministic Markdown rendering, `hasUncommittedChanges`/`switchBranch`/`pull`
   to both git backends, and `attachWorkItemFile` to the platform adapters.
   Azure DevOps only — GitHub issues are rejected. Includes docs and tests.
+
+## [4.0.0-rc1] - 2026-10-20
+
+Tagged but not published to npm (superseded by 4.0.0-rc2). See 4.0.0-rc2.
 
 ## [3.1.1] - 2026-08-04
 

@@ -1,12 +1,11 @@
 {
   "name": "merge-mentor",
-  "version": "4.0.0-rc1",
+  "version": "4.0.0-rc2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/archerax/merge-mentor.git"
   },
   "description": "Automated code review bot powered by AI CLI tools (Copilot, OpenCode)",
-  "private": true,
   "main": "dist/cli.js",
   "bin": {
     "merge-mentor": "dist/cli.js"
