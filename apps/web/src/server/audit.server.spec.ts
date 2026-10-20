@@ -21,7 +21,7 @@ describe("audit.server", () => {
 
     expect(mockReadAuditEvents).toHaveBeenCalledWith({
       limit: 500,
-      logsDir: path.join("/tmp/mm-audit", "logs"),
+      logsDir: path.resolve("/tmp/mm-audit", "logs"),
     });
   });
 
@@ -30,7 +30,7 @@ describe("audit.server", () => {
 
     expect(mockReadAuditEvents).toHaveBeenCalledWith({
       limit: 10,
-      logsDir: path.join("/tmp/mm-audit", "logs"),
+      logsDir: path.resolve("/tmp/mm-audit", "logs"),
     });
   });
 });
