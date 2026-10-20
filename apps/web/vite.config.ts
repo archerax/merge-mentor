@@ -20,7 +20,7 @@ const runtimeExternals = [
   "diff",
   "dotenv",
   "isomorphic-git",
-  "micromatch",
+  "picomatch",
   "pino",
   "zod",
 ].map((pkg) => new RegExp(`^${pkg}(/|$)`));

@@ -134,6 +134,34 @@ describe("ignoreFilter", () => {
       expect(shouldIgnoreFile("src/image.svg", patterns)).toBe(false);
       expect(shouldIgnoreFile("src/main.ts", patterns)).toBe(false);
     });
+
+    it("excludes negated paths from other patterns", () => {
+      const patterns = ["dist/**", "!dist/keep/**"];
+      expect(shouldIgnoreFile("dist/x.js", patterns)).toBe(true);
+      expect(shouldIgnoreFile("dist/keep/a.js", patterns)).toBe(false);
+      expect(shouldIgnoreFile("src/a.ts", patterns)).toBe(false);
+    });
+
+    it("treats negation-only patterns as ignoring everything else", () => {
+      expect(shouldIgnoreFile("src/a.ts", ["!src/**"])).toBe(false);
+      expect(shouldIgnoreFile("docs/a.md", ["!src/**"])).toBe(true);
+    });
+
+    it("does not treat extglob !(...) as negation", () => {
+      expect(shouldIgnoreFile("src/a.ts", ["src/!(b).ts"])).toBe(true);
+      expect(shouldIgnoreFile("src/b.ts", ["src/!(b).ts"])).toBe(false);
+    });
+
+    it("ignores a leading ./ on patterns and paths", () => {
+      expect(shouldIgnoreFile("src/a.ts", ["./src/**"])).toBe(true);
+      expect(shouldIgnoreFile("./src/a.ts", ["src/**"])).toBe(true);
+    });
+
+    it("supports brace alternation and ranges", () => {
+      expect(shouldIgnoreFile("a.spec.ts", ["**/*.{test,spec}.ts"])).toBe(true);
+      expect(shouldIgnoreFile("file2.txt", ["file{1..3}.txt"])).toBe(true);
+      expect(shouldIgnoreFile("file4.txt", ["file{1..3}.txt"])).toBe(false);
+    });
   });
 
   describe("filterPRFiles", () => {

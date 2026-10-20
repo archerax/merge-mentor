@@ -1,11 +1,11 @@
 import type { PRFile } from "@merge-mentor/domain/platform.js";
-import micromatch from "micromatch";
+import picomatch from "picomatch";
 
 /**
  * File ignore filtering utilities for PR reviews.
  *
  * Determines which files in a PR should be skipped during code review based on
- * glob pattern matching. Uses micromatch for pattern matching against file paths.
+ * glob pattern matching. Uses picomatch for pattern matching against file paths.
  *
  * Default patterns are empty (all files reviewed by default), but users can
  * specify patterns via the CLI --ignore flag to exclude specific files.
@@ -100,7 +100,21 @@ export function shouldIgnoreFile(filePath: string, patterns: string[]): boolean 
   if (patterns.length === 0) {
     return false;
   }
-  return micromatch.match([filePath], patterns).length > 0;
+  const positive: string[] = [];
+  const negative: string[] = [];
+  for (const pattern of patterns) {
+    const normalized = pattern.replace(/^(?:\.\/)+/, "");
+    if (normalized.startsWith("!") && !normalized.startsWith("!(")) {
+      negative.push(normalized.slice(1));
+    } else {
+      positive.push(normalized);
+    }
+  }
+  const path = filePath.replace(/^(?:\.\/)+/, "");
+  if (negative.length > 0 && picomatch(negative)(path)) {
+    return false;
+  }
+  return positive.length === 0 || picomatch(positive)(path);
 }
 
 /**

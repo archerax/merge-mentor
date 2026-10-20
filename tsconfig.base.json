@@ -1,5 +1,5 @@
 {
-  "files": ["types/micromatch.d.ts"],
+  "files": ["types/picomatch.d.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",

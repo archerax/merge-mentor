@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx", "../../types/micromatch.d.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "../../types/picomatch.d.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

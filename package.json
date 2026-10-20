@@ -72,7 +72,7 @@
     "diff": "^9.0.0",
     "dotenv": "^18.0.8",
     "isomorphic-git": "^1.44.2",
-    "micromatch": "^4.0.8",
+    "picomatch": "^4.0.7",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
   },
