@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0-rc3] - 2026-10-21
+
+Release candidate for 4.0.0.
+
+### Changed
+
+- **Dependencies**: bumped `@github/copilot-sdk` to 1.0.23, `@opencode-ai/sdk` to
+  1.19.3, `isomorphic-git` to 1.44.3, and updated development tooling (Vitest,
+  knip, oxfmt, oxlint, typedoc-plugin-markdown).
+
 ## [4.0.0-rc2] - 2026-10-20
 
 Release candidate for 4.0.0.
