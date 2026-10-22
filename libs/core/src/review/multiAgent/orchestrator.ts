@@ -22,6 +22,7 @@ import {
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
 import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
+import { runWithConcurrency } from "../batching.js";
 import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
@@ -104,37 +105,6 @@ interface AgentExecution {
   readonly findings: readonly FileFinding[];
   /** Token usage reported by the agent's AI call. */
   readonly tokenUsage?: TokenUsage;
-}
-
-/**
- * Runs `fn` over `items` concurrently, processing at most `limit` items at a
- * time while preserving input order in the results.
- *
- * @param items - Values to process.
- * @param limit  - Maximum number of concurrent executions.
- * @param fn     - Async function applied to each item and its index.
- * @returns Results in the same order as `items`.
- */
-async function runWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = Array.from<R>({ length: items.length });
-  let nextIndex = 0;
-
-  const worker = async (): Promise<void> => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex++;
-      results[index] = await fn(items[index], index);
-    }
-  };
-
-  const workerCount = Math.max(1, Math.min(limit, items.length));
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-
-  return results;
 }
 
 /**

@@ -95,6 +95,13 @@ import {
   buildGeneralFileReviewPrompt,
   type GeneralCrossFileContext,
 } from "../ai/prompts/specialists/general.js";
+import type { FastReviewResult } from "../ai/types.js";
+import {
+  DEFAULT_BATCH_MAX_BYTES,
+  DEFAULT_BATCH_MAX_FILES,
+  planReviewBatches,
+  runWithConcurrency,
+} from "./batching.js";
 import { CommentManager } from "./commentManager.js";
 import { DiffStorage } from "./diffStorage.js";
 import { createGitClient } from "./gitClients/factory.js";
@@ -243,6 +250,12 @@ interface ReviewEngineOptions {
   readonly reReview?: boolean;
   /** Maximum concurrent subagents for the multi-agent strategy (default: 2). */
   readonly multiAgentMaxParallel?: number;
+  /** Estimated byte budget for the diffs of one fast-review batch (default: 100 KB). */
+  readonly batchMaxBytes?: number;
+  /** Maximum number of files in one fast-review batch (default: 15). */
+  readonly batchMaxFiles?: number;
+  /** Maximum fast-review batches run concurrently (default: 3; 1 while streaming is displayed). */
+  readonly batchMaxParallel?: number;
 }
 
 /**
@@ -1377,71 +1390,35 @@ export class ReviewEngine {
       };
     }
 
-    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
-    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
-
     try {
-      // Store diffs to disk
-      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesToReview);
-      this.logger.info(
-        { prNumber, fileCount: manifest.files.length, diffDir },
-        "Stored diffs for fast review"
-      );
+      const batches = planReviewBatches(filesToReview, {
+        maxBytes: this.options.batchMaxBytes ?? DEFAULT_BATCH_MAX_BYTES,
+        maxFiles: this.options.batchMaxFiles ?? DEFAULT_BATCH_MAX_FILES,
+      });
 
-      // Copy diff files to repo's .mergementor directory for AI access
-      const { paths: diffFiles, totalSize } = await this.workspaceManager.copyDiffsToRepoDir(
-        diffDir,
-        manifest,
-        repoPath
-      );
-
-      // Build combined prompt for fast review
-      const commentsContext = formatExistingCommentsContext(existingComments);
-      const prompt = buildFastReviewPrompt(
-        prDetails,
-        manifest,
-        commentsContext || undefined,
-        repoPath
-      );
-
-      this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
-
-      // Single AI call for combined analysis
-      const shouldAttach = totalSize <= ATTACHMENT_SIZE_THRESHOLD_BYTES;
-      this.logger.info(
-        { totalSize, shouldAttach, threshold: ATTACHMENT_SIZE_THRESHOLD_BYTES },
-        "Evaluated diff size for fast review attachments"
-      );
-
-      const streaming = this.createStreamingCallback(
-        "Fast review (file + architecture)...",
-        "file-review"
-      );
-      let response: AIResponse;
-      try {
-        response = await this.provider.executePrompt(prompt, {
-          promptType: "fast-review",
-          workingDirectory: repoPath,
-          onStreamData: streaming.callback,
-          ...(shouldAttach ? { diffFiles } : {}),
+      let result: FastReviewResult;
+      if (batches.length <= 1) {
+        result = await this.reviewBatchWithCoverage({
+          storageId: prIdentifier,
+          label: "Fast review (file + architecture)...",
+          prIdentifier,
+          prDetails,
+          files: filesToReview,
+          existingComments,
+          repoPath,
+          onTokenUsage,
         });
-      } finally {
-        streaming.finish();
-      }
-      onTokenUsage?.(response.tokenUsage);
-
-      // Parse combined response
-      const result = this.provider.parseFastReview(response);
-
-      // Verify per-file coverage. The fast prompt requires the model to read
-      // every diff and list them in `reviewed_files`; warn (without failing the
-      // review) when a changed file was not reported so skipped files stay visible.
-      const missingFiles = this.findUnreviewedFiles(result.reviewedFiles, filesToReview);
-      if (missingFiles.length > 0) {
-        this.logger.warn(
-          { missingCount: missingFiles.length, missing: missingFiles.map((f) => f.filename) },
-          "Fast review did not report coverage for all files"
-        );
+      } else {
+        result = await this.reviewInBatches({
+          batches,
+          prIdentifier,
+          prDetails,
+          filesToReview,
+          cachedResults,
+          existingComments,
+          repoPath,
+          onTokenUsage,
+        });
       }
 
       // Validate line numbers specifically on filesToReview
@@ -1503,6 +1480,223 @@ export class ReviewEngine {
   }
 
   /**
+   * Reviews a large set of files as several size-capped batches of related
+   * files, then merges the per-batch results in code and runs one cross-file
+   * pass over the findings (not the raw diffs) to catch issues that span batches.
+   */
+  private async reviewInBatches(params: {
+    batches: readonly PRFile[][];
+    prIdentifier: string;
+    prDetails: PRDetails;
+    filesToReview: PRFile[];
+    cachedResults: readonly FileReviewResult[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FastReviewResult> {
+    const { batches, prIdentifier, prDetails, filesToReview, existingComments, repoPath } = params;
+
+    this.log(`Reviewing ${filesToReview.length} file(s) in ${batches.length} batches...`);
+    this.logger.info(
+      { batchCount: batches.length, batchSizes: batches.map((batch) => batch.length) },
+      "Planned fast review batches"
+    );
+
+    // Concurrent batches would interleave in a single streaming display.
+    const concurrency = this.streamingEnabled ? 1 : (this.options.batchMaxParallel ?? 3);
+    const batchResults = await runWithConcurrency(batches, concurrency, (batch, index) =>
+      this.reviewBatchWithCoverage({
+        storageId: `${prIdentifier}-batch${index + 1}`,
+        label: `Review batch ${index + 1}/${batches.length}...`,
+        prIdentifier,
+        prDetails,
+        files: batch,
+        existingComments,
+        repoPath,
+        onTokenUsage: params.onTokenUsage,
+      })
+    );
+
+    const merged = this.mergeFastReviewResults(batchResults);
+
+    // Cross-batch pass over summarized findings only; failure keeps batch-level results.
+    try {
+      const crossPass = await this.runPhase("cross-file", "Cross-file analysis", () =>
+        this.performCrossFileAnalysis(
+          prDetails,
+          filesToReview,
+          [...params.cachedResults, ...merged.fileResults],
+          existingComments,
+          repoPath,
+          params.onTokenUsage
+        )
+      );
+      return {
+        ...merged,
+        crossFileResult: this.combineCrossFileResults(merged.crossFileResult, crossPass),
+      };
+    } catch (error) {
+      this.logger.warn(
+        { error: (error as Error).message },
+        "Cross-batch analysis failed; using batch-level cross-file results"
+      );
+      return merged;
+    }
+  }
+
+  /**
+   * Reviews `files` in one AI call and, if the model did not report some of
+   * them, re-reviews just the missing files once in a small follow-up call.
+   */
+  private async reviewBatchWithCoverage(params: {
+    storageId: string;
+    label: string;
+    prIdentifier: string;
+    prDetails: PRDetails;
+    files: PRFile[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FastReviewResult> {
+    const result = await this.runFastReviewCall(params);
+    const missing = this.findUnreviewedFiles(result.reviewedFiles, params.files);
+    if (missing.length === 0) {
+      return result;
+    }
+
+    this.logger.warn(
+      { missingCount: missing.length, missing: missing.map((f) => f.filename) },
+      "Fast review did not report coverage for all files; retrying missing files"
+    );
+
+    const retry = await this.runFastReviewCall({
+      ...params,
+      storageId: `${params.storageId}-retry`,
+      label: `Retrying ${missing.length} unreviewed file(s)...`,
+      files: missing,
+    });
+
+    const stillMissing = this.findUnreviewedFiles(retry.reviewedFiles, missing);
+    if (stillMissing.length > 0) {
+      this.logger.warn(
+        { missingCount: stillMissing.length, missing: stillMissing.map((f) => f.filename) },
+        "Files still unreported after coverage retry"
+      );
+    }
+
+    return this.mergeFastReviewResults([result, retry]);
+  }
+
+  /** Stores the given files' diffs, runs one fast-review AI call over them, and parses it. */
+  private async runFastReviewCall(params: {
+    storageId: string;
+    label: string;
+    prIdentifier: string;
+    prDetails: PRDetails;
+    files: PRFile[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FastReviewResult> {
+    const { storageId, files, repoPath } = params;
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
+
+    try {
+      // Store diffs to disk
+      const { diffDir, manifest } = await diffStorage.storeDiffs(storageId, files);
+      this.logger.info(
+        { storageId, fileCount: manifest.files.length, diffDir },
+        "Stored diffs for fast review"
+      );
+
+      // Copy diff files to repo's .mergementor directory for AI access
+      const { paths: diffFiles, totalSize } = await this.workspaceManager.copyDiffsToRepoDir(
+        diffDir,
+        manifest,
+        repoPath
+      );
+
+      // Build combined prompt for fast review
+      const commentsContext = formatExistingCommentsContext(params.existingComments);
+      const prompt = buildFastReviewPrompt(
+        params.prDetails,
+        manifest,
+        commentsContext || undefined,
+        repoPath
+      );
+
+      this.logger.info({ promptLength: prompt.length }, "Built fast review prompt");
+
+      const shouldAttach = totalSize <= ATTACHMENT_SIZE_THRESHOLD_BYTES;
+      this.logger.info(
+        { totalSize, shouldAttach, threshold: ATTACHMENT_SIZE_THRESHOLD_BYTES },
+        "Evaluated diff size for fast review attachments"
+      );
+
+      const streaming = this.createStreamingCallback(params.label, "file-review");
+      let response: AIResponse;
+      try {
+        response = await this.provider.executePrompt(prompt, {
+          promptType: "fast-review",
+          workingDirectory: repoPath,
+          onStreamData: streaming.callback,
+          ...(shouldAttach ? { diffFiles } : {}),
+        });
+      } finally {
+        streaming.finish();
+      }
+      params.onTokenUsage?.(response.tokenUsage);
+
+      return this.provider.parseFastReview(response);
+    } finally {
+      await diffStorage.cleanup(storageId);
+    }
+  }
+
+  /** Merges fast-review results in code: per-file findings are concatenated and cross-file findings de-duplicated. */
+  private mergeFastReviewResults(results: readonly FastReviewResult[]): FastReviewResult {
+    const fileMap = new Map<string, FileReviewResult>();
+    for (const result of results) {
+      for (const fileResult of result.fileResults) {
+        const existing = fileMap.get(fileResult.filename);
+        fileMap.set(
+          fileResult.filename,
+          existing
+            ? { ...existing, findings: [...existing.findings, ...fileResult.findings] }
+            : fileResult
+        );
+      }
+    }
+
+    const crossFindings = new Map<string, CrossFileReviewResult["findings"][number]>();
+    for (const { crossFileResult } of results) {
+      for (const finding of crossFileResult.findings) {
+        const key = `${finding.message}:${(finding.affectedFiles ?? []).join(",")}`;
+        if (!crossFindings.has(key)) {
+          crossFindings.set(key, finding);
+        }
+      }
+    }
+
+    const assessments = Array.from(
+      new Set(results.map((r) => r.crossFileResult.overallAssessment).filter(Boolean))
+    );
+
+    return {
+      fileResults: [...fileMap.values()],
+      crossFileResult: {
+        overallAssessment: assessments.join(" "),
+        findings: [...crossFindings.values()],
+        recommendations: Array.from(
+          new Set(results.flatMap((r) => r.crossFileResult.recommendations))
+        ),
+      },
+      reviewedFiles: results.flatMap((r) => r.reviewedFiles),
+    };
+  }
+
+  /**
    * Returns the subset of `filesToReview` that the model did not report in
    * `reviewedFiles`. Returns an empty array when the provider reported no
    * coverage (e.g. the multi-agent synthesizer or legacy callers) so that
@@ -1517,14 +1711,23 @@ export class ReviewEngine {
     }
 
     const normalized = reviewedFiles.map((file) => normalizeRepoPath(file));
-    const bases = new Set(normalized.map((file) => path.posix.basename(file)));
+
+    // A bare basename ("index.ts") only counts when it identifies exactly one
+    // file in this batch; otherwise one reported file would mask all its namesakes.
+    const basenameCounts = new Map<string, number>();
+    for (const file of filesToReview) {
+      const base = path.posix.basename(normalizeRepoPath(file.filename));
+      basenameCounts.set(base, (basenameCounts.get(base) ?? 0) + 1);
+    }
 
     return filesToReview.filter((file) => {
       const target = normalizeRepoPath(file.filename);
-      return (
-        !normalized.includes(target) &&
-        !normalized.some((reviewed) => reviewed.endsWith(`/${target}`)) &&
-        !bases.has(path.posix.basename(target))
+      const base = path.posix.basename(target);
+      return !normalized.some(
+        (reviewed) =>
+          reviewed === target ||
+          reviewed.endsWith(`/${target}`) ||
+          (reviewed === base && basenameCounts.get(base) === 1)
       );
     });
   }

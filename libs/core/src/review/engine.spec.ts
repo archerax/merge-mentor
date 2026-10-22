@@ -181,6 +181,23 @@ function createPRDetails(): PRDetails {
   };
 }
 
+function setupFastReview(
+  mockPlatform: PlatformAdapter,
+  files: PRFile[],
+  options: Record<string, unknown> = {}
+) {
+  const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+    verbose: false,
+    reviewStrategy: "fast",
+    ...options,
+  });
+  vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+  vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+  vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+  mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+  return engine;
+}
+
 function createPRFile(overrides: Partial<PRFile> = {}): PRFile {
   return {
     filename: "test.ts",
@@ -1210,6 +1227,92 @@ describe("ReviewEngine", () => {
         "file1.ts",
         "file2.ts",
       ]);
+    });
+
+    describe("fast review batching and coverage", () => {
+      const emptyCrossFile = { overallAssessment: "ok", findings: [], recommendations: [] };
+      const finding = {
+        line: 2,
+        severity: "medium" as const,
+        confidence: "high" as const,
+        category: "bug",
+        message: "Missing null check",
+        reasoning: "Value can be undefined here, which throws at runtime.",
+      };
+
+      it("re-reviews files the model did not report and keeps their findings", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "file1.ts" }),
+          createPRFile({ filename: "file2.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file1.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file2.ts", findings: [finding] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file2.ts"],
+          });
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+        const file2 = result.fileResults.find((r) => r.filename === "file2.ts");
+        expect(file2?.findings).toHaveLength(1);
+      });
+
+      it("does not treat one reported file as coverage for others with the same basename", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "a/index.ts" }),
+          createPRFile({ filename: "b/index.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["a/index.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "b/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["b/index.ts"],
+          });
+
+        await engine.reviewPR(123);
+
+        // b/index.ts was missing, so a follow-up call must have been made for it
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      });
+
+      it("splits large reviews into batches and adds a cross-file pass", async () => {
+        const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"].map((filename) =>
+          createPRFile({ filename })
+        );
+        const engine = setupFastReview(mockPlatform, files, { batchMaxFiles: 2 });
+        mockParseFastReview.mockImplementation(() => ({
+          fileResults: [],
+          crossFileResult: emptyCrossFile,
+          reviewedFiles: files.map((f) => f.filename),
+        }));
+
+        const result = await engine.reviewPR(123);
+
+        const promptTypes = mockExecutePrompt.mock.calls.map(
+          (call) => (call[1] as { promptType: string }).promptType
+        );
+        expect(promptTypes.filter((t) => t === "fast-review")).toHaveLength(3);
+        expect(promptTypes.filter((t) => t === "cross-file-review")).toHaveLength(1);
+        expect(result.fileResults.map((r) => r.filename).toSorted()).toEqual([
+          "a.ts",
+          "b.ts",
+          "c.ts",
+          "d.ts",
+          "e.ts",
+        ]);
+      });
     });
 
     it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
