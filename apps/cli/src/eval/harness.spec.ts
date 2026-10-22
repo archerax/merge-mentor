@@ -302,6 +302,54 @@ describe("Evaluation Harness Engine", () => {
       expect(mockProviderExecute).toHaveBeenCalled();
     });
 
+    it("runs non-mock providers in a diff-only sandbox without ground truth", async () => {
+      const writes: string[] = [];
+      const removed: string[] = [];
+      const fs: FileSystem = {
+        ...scenarioFs({
+          "ground-truth.json": JSON.stringify({
+            scenarioId: "s",
+            name: "S",
+            expectedFindings: [],
+            forbiddenFindings: [],
+            maxAllowedDuplicates: 0,
+          }),
+          "diffs/manifest.json": JSON.stringify({
+            prIdentifier: "s",
+            files: [
+              {
+                filename: "a.ts",
+                status: "modified",
+                diffPath: "a.diff",
+                additions: 1,
+                deletions: 0,
+              },
+            ],
+          }),
+          "a.diff": "+x",
+        }),
+        writeFile: async (p: string) => {
+          writes.push(p);
+        },
+        rm: async (p: string) => {
+          removed.push(p);
+        },
+      };
+      mockProviderExecute.mockClear();
+
+      await evaluateScenario("/test/corpus/x", { fileSystem: fs, provider: "copilot-sdk" });
+
+      const [, options] = mockProviderExecute.mock.calls[0] as unknown as [
+        string,
+        { workingDirectory: string; diffFiles: string[] },
+      ];
+      expect(options.workingDirectory).not.toContain("/test/corpus/x");
+      expect(options.diffFiles).toHaveLength(1);
+      expect(options.diffFiles[0].startsWith(options.workingDirectory)).toBe(true);
+      expect(writes).toEqual(options.diffFiles);
+      expect(removed).toEqual([options.workingDirectory]);
+    });
+
     it("records missed findings and false positives", async () => {
       const fs = scenarioFs({
         "ground-truth.json": JSON.stringify({

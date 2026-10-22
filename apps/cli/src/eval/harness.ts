@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 import { buildGeneralFileReviewPrompt } from "@merge-mentor/core/ai/prompts/specialists/general.js";
@@ -153,26 +154,58 @@ export async function evaluateScenario(
     });
   }
 
-  let prompt =
-    "Review all changed files in this pull request scenario. Return a JSON object with a fileResults array containing findings for each file.";
-  let diffFiles: string[] | undefined;
+  // Real providers get a sandbox holding only the diffs. Pointing them at the scenario
+  // directory would expose ground-truth.json and mock-response.json, and a git checkout
+  // would pull in unrelated repo files and instructions.
+  const sandboxDir =
+    providerType === "mock"
+      ? undefined
+      : path.join(os.tmpdir(), `mm-eval-${scenarioId}-${process.pid}-${Date.now()}`);
+  const workDir = sandboxDir ?? scenarioDir;
 
-  const diffManifestPath = path.join(scenarioDir, "diffs", "manifest.json");
-  if (await pathExists(fs, diffManifestPath)) {
-    try {
-      const manifestContent = await fs.readFile(diffManifestPath, "utf-8");
-      const manifest = JSON.parse(manifestContent) as DiffManifest;
-      prompt = buildGeneralFileReviewPrompt(manifest, undefined, scenarioDir);
-      diffFiles = manifest.files.map((f) => path.join(scenarioDir, "diffs", f.diffPath));
-    } catch {
-      // Fall back to default prompt on error loading manifest
+  let response: AIResponse;
+  try {
+    let prompt =
+      "Review all changed files in this pull request scenario. Return a JSON object with a fileResults array containing findings for each file.";
+    let diffFiles: string[] | undefined;
+
+    const diffManifestPath = path.join(scenarioDir, "diffs", "manifest.json");
+    if (await pathExists(fs, diffManifestPath)) {
+      try {
+        const manifestContent = await fs.readFile(diffManifestPath, "utf-8");
+        const manifest = JSON.parse(manifestContent) as DiffManifest;
+        const files: string[] = [];
+        for (const f of manifest.files) {
+          const source = path.join(scenarioDir, "diffs", f.diffPath);
+          if (sandboxDir) {
+            const target = path.join(sandboxDir, ".mergementor", "diffs", f.diffPath);
+            await fs.mkdir(path.dirname(target), { recursive: true });
+            await fs.writeFile(target, await fs.readFile(source, "utf-8"), "utf-8");
+            files.push(target);
+          } else {
+            files.push(source);
+          }
+        }
+        prompt = buildGeneralFileReviewPrompt(manifest, undefined, workDir);
+        diffFiles = files;
+      } catch {
+        // Fall back to default prompt on error loading manifest
+      }
+    }
+
+    if (sandboxDir) {
+      await fs.mkdir(sandboxDir, { recursive: true });
+    }
+
+    response = await provider.executePrompt(prompt, {
+      workingDirectory: workDir,
+      ...(diffFiles ? { diffFiles } : {}),
+    });
+  } finally {
+    if (sandboxDir) {
+      await fs.rm(sandboxDir, { recursive: true, force: true });
     }
   }
-
-  const response: AIResponse = await provider.executePrompt(prompt, {
-    workingDirectory: scenarioDir,
-    ...(diffFiles ? { diffFiles } : {}),
-  });
 
   const fileResults: FileReviewResult[] = provider.parseBatchedFileReview(response);
   const fastResults = provider.parseFastReview(response);
