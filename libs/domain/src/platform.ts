@@ -157,6 +157,11 @@ export interface UnresolvedComment {
   readonly createdAt?: string;
   /** Whether the comment was written by the bot. */
   readonly isBot?: boolean;
+  /**
+   * Whether the author has write-level standing on the repository (owner,
+   * member or collaborator). Left undefined when the platform cannot tell.
+   */
+  readonly isTrustedAuthor?: boolean;
 }
 
 /** A thread of comments on a specific file line that is not yet resolved. */

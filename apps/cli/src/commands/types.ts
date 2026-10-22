@@ -109,6 +109,11 @@ export interface FixOptions extends ReviewOptions {
   allowDirty?: boolean;
   /** Interactively prompt before applying fixes. Default: `false`. */
   interactive?: boolean;
+  /**
+   * Also act on threads containing comments from authors without write-level
+   * standing on the repository. Default: `false`.
+   */
+  allowUntrustedComments?: boolean;
 }
 
 /** Result of a successful `describe` command execution. */

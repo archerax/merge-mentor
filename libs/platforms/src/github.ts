@@ -19,6 +19,13 @@ import { extractMoSCoWTag } from "@merge-mentor/shared/utils/moscow.js";
 import { withRateLimitHandling } from "@merge-mentor/shared/utils/rateLimitHandler.js";
 import { Octokit } from "@octokit/rest";
 
+/** GraphQL `CommentAuthorAssociation` values that imply write-level standing. */
+const TRUSTED_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+  "OWNER",
+  "MEMBER",
+  "COLLABORATOR",
+]);
+
 /**
  * Platform adapter for GitHub pull requests.
  */
@@ -392,6 +399,7 @@ export class GitHubAdapter implements PlatformAdapter {
                       author {
                         login
                       }
+                      authorAssociation
                       body
                     }
                   }
@@ -419,6 +427,7 @@ export class GitHubAdapter implements PlatformAdapter {
                     author?: {
                       login?: string;
                     };
+                    authorAssociation?: string;
                     body?: string;
                   }>;
                 };
@@ -452,6 +461,9 @@ export class GitHubAdapter implements PlatformAdapter {
                 ...(c.databaseId || c.id ? { id: c.databaseId ?? c.id } : {}),
                 ...(c.createdAt ? { createdAt: c.createdAt } : {}),
                 ...(isBot ? { isBot: true } : {}),
+                ...(c.authorAssociation
+                  ? { isTrustedAuthor: TRUSTED_AUTHOR_ASSOCIATIONS.has(c.authorAssociation) }
+                  : {}),
               };
             }) ?? [];
 

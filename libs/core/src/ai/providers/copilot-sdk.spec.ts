@@ -1697,9 +1697,11 @@ function createStubLogger() {
 describe("createReviewPermissionHandler", () => {
   it("approves read permission requests", () => {
     const logger = createStubLogger();
-    const handler = createReviewPermissionHandler(logger);
+    const handler = createReviewPermissionHandler(logger, false, false, process.cwd());
 
-    const result = handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
+    const result = handler({ kind: "read", path: "src/index.ts" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
 
     expect(result).toEqual({ kind: "approve-once" });
   });
@@ -1771,11 +1773,14 @@ describe("createReviewPermissionHandler", () => {
 
   it("approves write but still denies shell when only write tools are enabled", () => {
     const logger = createStubLogger();
-    const handler = createReviewPermissionHandler(logger, true);
+    const handler = createReviewPermissionHandler(logger, true, false, process.cwd());
 
-    const writeResult = handler({ kind: "write" } as unknown as PermissionRequest, {
-      sessionId: "s1",
-    });
+    const writeResult = handler(
+      { kind: "write", fileName: "src/a.ts" } as unknown as PermissionRequest,
+      {
+        sessionId: "s1",
+      }
+    );
     const shellResult = handler({ kind: "shell" } as unknown as PermissionRequest, {
       sessionId: "s1",
     });
@@ -1811,7 +1816,9 @@ describe("createReviewPermissionHandler", () => {
     const logger = createStubLogger();
     const handler = createReviewPermissionHandler(logger);
 
-    handler({ kind: "read" } as unknown as PermissionRequest, { sessionId: "s1" });
+    handler({ kind: "read", path: "src/a.ts" } as unknown as PermissionRequest, {
+      sessionId: "s1",
+    });
 
     expect(logger.warn).not.toHaveBeenCalled();
   });

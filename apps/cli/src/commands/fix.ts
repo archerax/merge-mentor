@@ -152,7 +152,22 @@ export async function executeFixCommand(
     output: outputWriter,
   });
 
-  const unresolvedThreads = await adapter.getUnresolvedCommentThreads(resolvedOptions.pr);
+  const allThreads = await adapter.getUnresolvedCommentThreads(resolvedOptions.pr);
+  // Comment bodies steer a write-capable agent, so by default only threads whose
+  // every comment comes from someone with write-level standing are acted on.
+  // Platforms that cannot tell (trust undefined) are not filtered.
+  const unresolvedThreads = resolvedOptions.allowUntrustedComments
+    ? allThreads
+    : allThreads.filter((thread) =>
+        thread.comments.every((comment) => comment.isTrustedAuthor !== false)
+      );
+  const skippedUntrusted = allThreads.length - unresolvedThreads.length;
+  if (skippedUntrusted > 0) {
+    outputWriter.log(
+      `🔒 Skipping ${skippedUntrusted} thread(s) with comments from non-collaborators. ` +
+        "Pass --allow-untrusted-comments to include them.\n"
+    );
+  }
   if (unresolvedThreads.length === 0) {
     outputWriter.log("🎉 No active/unresolved review comments found on this PR!");
     return;

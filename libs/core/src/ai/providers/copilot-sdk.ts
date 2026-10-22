@@ -4,6 +4,7 @@ import type {
   GetAuthStatusResponse,
   PermissionHandler,
   PermissionRequest,
+  PermissionRequestResult,
   SessionEvent,
 } from "@github/copilot-sdk";
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
@@ -58,6 +59,7 @@ import type {
   ReasoningEffort,
   TokenUsage,
 } from "../types.js";
+import { isDeniedWritePath, relativeInsideWorkingTree } from "./permissionPolicy.js";
 
 /** Configuration for a bring-your-own-key OpenAI-compatible provider session. */
 interface CopilotSdkByokProviderConfig {
@@ -70,16 +72,6 @@ interface CopilotSdkByokProviderConfig {
   /** Optional wire API variant; "responses" is used for models requiring it. */
   readonly wireApi?: "responses";
 }
-
-const DENIED_PERMISSION_KINDS: ReadonlySet<PermissionRequest["kind"]> = new Set([
-  "shell",
-  "write",
-  "mcp",
-  "url",
-  "custom-tool",
-  "memory",
-  "hook",
-]);
 
 const READ_ONLY_REVIEW_TOOLS = ["grep", "glob", "view"] as const;
 
@@ -103,39 +95,72 @@ const SHELL_TOOLS = ["bash", "read_bash", "list_bash", "stop_bash"] as const;
 /**
  * Creates a permission handler for review sessions.
  *
- * Approves read-only workspace access (needed to inspect source files) and
- * denies all other permission categories — shell execution, file writes, MCP
- * calls, URL fetches, custom tools, memory writes, and hooks — so that
- * attacker-controlled content inside a PR cannot trigger destructive side
- * effects. File writes and shell execution can be enabled separately via
- * `enableWriteTools` / `enableShellTools` for agentic flows; shell execution
- * must never be enabled when the prompt contains untrusted input.
+ * Deny by default: only `read` (and `write` / `shell` when enabled) are ever
+ * approved, every other kind - including kinds added by future SDK versions -
+ * is rejected, so attacker-controlled content inside a PR cannot trigger side
+ * effects. File access is confined to `workingDirectory` with symlinks
+ * resolved, writes additionally refuse `.git/`, `.husky/`, `.github/`,
+ * `.vscode/` and package-manager config, and requests asking to bypass the
+ * sandbox are never approved. Shell execution must never be enabled when the
+ * prompt contains untrusted input.
  *
  * @param logger - Child logger used to emit warn-level entries for denied requests.
  * @param enableWriteTools - Allow file write/edit permission requests.
  * @param enableShellTools - Allow shell execution permission requests.
+ * @param workingDirectory - Root that file requests must stay inside (default: the current directory).
  */
 export function createReviewPermissionHandler(
   logger: ReturnType<typeof createChildLogger>,
   enableWriteTools = false,
-  enableShellTools = false
+  enableShellTools = false,
+  workingDirectory: string = process.cwd()
 ): PermissionHandler {
+  const deny = (request: PermissionRequest, reason: string): PermissionRequestResult => {
+    logger.warn(
+      { permissionKind: request.kind, toolCallId: request.toolCallId, reason },
+      "Blocked tool request during review (tool allowlist)"
+    );
+    return { kind: "reject" };
+  };
+
   return (request) => {
-    const blockedKinds = new Set(DENIED_PERMISSION_KINDS);
-    if (enableWriteTools) {
-      blockedKinds.delete("write");
+    if ("requestSandboxBypass" in request && request.requestSandboxBypass) {
+      return deny(request, "sandbox bypass requested");
     }
-    if (enableShellTools) {
-      blockedKinds.delete("shell");
+    switch (request.kind) {
+      case "read": {
+        const paths = [request.path, request.resolvedPath].filter(
+          (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0
+        );
+        if (paths.length === 0) return deny(request, "no path");
+        return paths.every(
+          (candidate) => relativeInsideWorkingTree(workingDirectory, candidate) !== undefined
+        )
+          ? { kind: "approve-once" }
+          : deny(request, "read outside working directory");
+      }
+      case "write": {
+        if (!enableWriteTools) return deny(request, "writes disabled");
+        const paths = [
+          request.fileName,
+          request.resolvedPath,
+          ...(request.fileEdits ?? []).flatMap((edit) => [edit.before?.path, edit.after?.path]),
+        ].filter(
+          (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0
+        );
+        if (paths.length === 0) return deny(request, "no path");
+        for (const candidate of paths) {
+          const relativePath = relativeInsideWorkingTree(workingDirectory, candidate);
+          if (relativePath === undefined) return deny(request, "write outside working directory");
+          if (isDeniedWritePath(relativePath)) return deny(request, "write to protected path");
+        }
+        return { kind: "approve-once" };
+      }
+      case "shell":
+        return enableShellTools ? { kind: "approve-once" } : deny(request, "shell disabled");
+      default:
+        return deny(request, "permission kind not allowed");
     }
-    if (blockedKinds.has(request.kind)) {
-      logger.warn(
-        { permissionKind: request.kind, toolCallId: request.toolCallId },
-        "Blocked tool request during review (tool allowlist)"
-      );
-      return { kind: "reject" };
-    }
-    return { kind: "approve-once" };
   };
 }
 
@@ -434,7 +459,8 @@ export class CopilotSdkProvider implements AIProviderClient {
         onPermissionRequest: createReviewPermissionHandler(
           this.logger,
           this.enableWriteTools,
-          this.enableShellTools
+          this.enableShellTools,
+          options?.workingDirectory
         ),
         contextTier: this.longContext ? "long_context" : undefined,
         reasoningEffort: this.reasoningEffort,

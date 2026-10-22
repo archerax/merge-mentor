@@ -810,6 +810,11 @@ program
     false
   )
   .option("--interactive", "Interactively prompt before applying fixes", false)
+  .option(
+    "--allow-untrusted-comments",
+    "Also fix threads with comments from authors who are not repository owners, members or collaborators (comments are untrusted input)",
+    false
+  )
   .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")

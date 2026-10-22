@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Copilot SDK provider**: the permission handler is now deny-by-default. Only
+  `read` (and `write`/`shell` when enabled) are approved; unknown or future
+  permission kinds and sandbox-bypass requests are rejected. Reads and writes
+  must resolve (symlinks included) inside the working directory.
+- **Fix**: refuses writes to `.git/`, `.husky/`, `.github/`, `.vscode/`,
+  `package.json` and package-manager config, and by default only acts on threads
+  whose comments come from repository owners, members or collaborators. Use
+  `--allow-untrusted-comments` to restore the previous behavior.
 - **Web dashboard**: the dashboard now refuses requests with a foreign `Host`
   (DNS rebinding), cross-origin writes, non-JSON `/api/*` bodies, and requests
   without a per-launch access token. Open the URL printed by `merge-mentor ui`,

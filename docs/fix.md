@@ -16,6 +16,8 @@ The `fix` command interactively addresses active review comments on a pull reque
 - A **security preamble** marks all PR-supplied content as untrusted data to be acted on, never as instructions to follow.
 - Every comment body is wrapped in explicit `<untrusted-review-comment>` delimiters.
 - The AI agent runs with **file read/edit tools only — it has no shell or terminal access** on any provider, so injected text cannot trick it into executing commands. Validation is left to you.
+- File access is **confined to the working tree** (symlinks resolved) on the Copilot SDK provider, and writes to `.git/`, `.husky/`, `.github/`, `.vscode/`, `package.json`, `.npmrc`, `.yarnrc*` and `.envrc` are refused, because those paths run code the next time you use git, your editor, CI or a package manager. Any other permission kind, and any request to bypass the sandbox, is rejected.
+- By default only threads whose comments all come from **repository owners, members or collaborators** are fixed (GitHub). Pass `--allow-untrusted-comments` to include the rest.
 - All changes remain **uncommitted** in your local workspace. Review `git diff` and run your test suite yourself before committing.
 
 ## Usage
@@ -45,6 +47,7 @@ merge-mentor fix --pr 123 --allow-dirty
 | `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `github`         |
 | `--allow-dirty`                 | Allow execution even if the local Git workspace has uncommitted changes   | -                | `false`          |
 | `--interactive`                 | Interactively prompt before applying fixes for each review comment        | -                | `false`          |
+| `--allow-untrusted-comments`    | Also fix threads with comments from non-collaborators (GitHub)            | -                | `false`          |
 | `--temp-path <path>`            | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH`   | `./.mergementor` |
 | `--local-workspace-path <path>` | Path to a pre-existing local repository checkout                          | -                | -                |
 | `--git-backend <backend>`       | Git backend for cloning/fetching (`cli` or `isomorphic`)                  | `MM_GIT_BACKEND` | `cli`            |
