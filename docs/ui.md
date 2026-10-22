@@ -43,6 +43,21 @@ example in CI) or when the server is bound to a non-loopback host.
 
 ---
 
+## Access protection
+
+The dashboard holds your platform and AI credentials, so it rejects anything a
+web page you happen to visit could send it:
+
+- Requests whose `Host` is not `localhost`, `127.0.0.1`, `[::1]` or the value of
+  `--host` are refused with 403 (this blocks DNS rebinding).
+- State-changing requests must be same-origin, and `/api/*` bodies must be
+  `application/json`.
+- Each launch generates a random access token. Open the URL printed at startup
+  (it ends in `?token=...`); the token is exchanged for a `SameSite=Strict`
+  cookie and removed from the address bar. Requests without it get 403.
+
+---
+
 ## Troubleshooting
 
 If the command reports that the web dashboard is not bundled, the install is missing its prebuilt assets. From a repository checkout, run `pnpm build` to build and bundle the dashboard. For local development of the dashboard itself, run `pnpm --filter @merge-mentor/web dev`.

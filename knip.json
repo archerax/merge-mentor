@@ -3,7 +3,7 @@
   "tags": ["-lintignore"],
   "workspaces": {
     "apps/web": {
-      "entry": ["src/router.tsx"]
+      "entry": ["src/router.tsx", "src/start.ts"]
     }
   }
 }

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -145,8 +146,11 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
     );
   }
 
-  const url = `http://${host}:${port}`;
-  output.log(`\n🖥️  Starting merge-mentor dashboard on ${url}\n`);
+  const token = randomBytes(24).toString("base64url");
+  const url = `http://${host}:${port}/?token=${token}`;
+  output.log(
+    `\n🖥️  Starting merge-mentor dashboard. Open this URL (it contains a one-time access token):\n   ${url}\n`
+  );
 
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const child = spawn(process.execPath, [entry], {
@@ -157,6 +161,8 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
         HOST: host,
         NITRO_HOST: host,
         NITRO_PORT: String(port),
+        MM_UI_TOKEN: token,
+        MM_UI_ALLOWED_HOSTS: host,
       },
     });
 

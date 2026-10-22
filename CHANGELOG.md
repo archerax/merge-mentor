@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Web dashboard**: the dashboard now refuses requests with a foreign `Host`
+  (DNS rebinding), cross-origin writes, non-JSON `/api/*` bodies, and requests
+  without a per-launch access token. Open the URL printed by `merge-mentor ui`,
+  which contains the token. Previously any website could drive the dashboard
+  with your configured tokens.
+
 ### Fixed
 
 - **Review**: the `fast`, `deep` and `multi-agent` strategies now split large PRs into
