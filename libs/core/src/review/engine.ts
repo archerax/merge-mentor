@@ -116,7 +116,7 @@ import {
   type ReviewProgressEvent,
 } from "./progress.js";
 import { RepoManager } from "./repoManager.js";
-import { ReviewStateCache } from "./reviewStateCache.js";
+import { buildReviewFingerprint, ReviewStateCache } from "./reviewStateCache.js";
 import { WorkspaceManager } from "./workspaceManager.js";
 
 /** Threshold size (150 KB) below which all file diffs are attached to the initial AI prompt. */
@@ -319,6 +319,8 @@ export class ReviewEngine {
   private readonly provider: AIProviderClient;
   private readonly commentManager: CommentManager;
   private readonly stateCache: ReviewStateCache;
+  /** Identifies the strategy, passes and model, so cached results are only reused by the same configuration. */
+  private readonly reviewFingerprint: string;
   private readonly repoManager: RepoManager;
   private readonly workspaceManager: WorkspaceManager;
   private readonly pbiVerifier: PbiVerifier;
@@ -391,6 +393,11 @@ export class ReviewEngine {
       model: model || (providerType === "copilot-sdk" ? "GitHub Copilot" : "OpenCode"),
     });
     this.stateCache = new ReviewStateCache(tempPath);
+    this.reviewFingerprint = buildReviewFingerprint({
+      strategy: this.reviewProfile.strategy,
+      passes: this.reviewProfile.passes,
+      model,
+    });
     this.repoManager = new RepoManager(
       tempPath,
       { ciMode: options?.ciMode },
@@ -660,11 +667,16 @@ export class ReviewEngine {
     const cachedState =
       this.options.noCache || this.options.reReview
         ? undefined
-        : await this.stateCache.getState(prIdentifier);
+        : await this.loadCachedState(prIdentifier);
 
     // Use pre-existing workspace (CI checkout) or clone the PR branch for CLI agent access
     const repoPath = await this.runPhase("workspace", "Preparing workspace", () =>
-      this.workspaceManager.resolveWorkspace(prDetails.headBranch)
+      this.workspaceManager.resolveWorkspace(
+        prDetails.headBranch,
+        prDetails.checkoutRef
+          ? { ref: prDetails.checkoutRef, baseBranch: prDetails.baseBranch }
+          : undefined
+      )
     );
 
     return this.runReviewPipeline({
@@ -678,6 +690,26 @@ export class ReviewEngine {
       postComments: true,
       saveState: !this.options.noCache,
     });
+  }
+
+  /**
+   * Loads the cached review state, discarding it when it was produced by a
+   * different strategy, pass list or model (or by a version that did not record
+   * one), so changing configuration never silently reuses stale results.
+   */
+  private async loadCachedState(
+    prIdentifier: string
+  ): Promise<Awaited<ReturnType<ReviewStateCache["getState"]>>> {
+    const state = await this.stateCache.getState(prIdentifier);
+    if (state && !this.stateCache.isCompatible(state, this.reviewFingerprint)) {
+      this.log("Ignoring cached review results from a different strategy, passes or model");
+      this.logger.info(
+        { prIdentifier },
+        "Cached review state does not match the current review configuration; ignoring it"
+      );
+      return undefined;
+    }
+    return state;
   }
 
   /**
@@ -717,7 +749,7 @@ export class ReviewEngine {
     const cachedState =
       this.options.noCache || this.options.reReview
         ? undefined
-        : await this.stateCache.getState(prIdentifier);
+        : await this.loadCachedState(prIdentifier);
 
     // Use the local checkout directly for CLI agent access (never clones).
     const repoPath = await this.runPhase("workspace", "Preparing workspace", () =>
@@ -926,7 +958,13 @@ export class ReviewEngine {
     // Save state for future re-reviews
     if (saveState) {
       const fileShaMap = this.buildFileShaMap(files);
-      await this.stateCache.saveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
+      await this.stateCache.saveState(
+        prIdentifier,
+        fileResults,
+        fileShaMap,
+        crossFileResult,
+        this.reviewFingerprint
+      );
     }
 
     if (commentErrors.length > 0) {

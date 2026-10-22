@@ -1,7 +1,12 @@
-import { createStubProcessRunner } from "@merge-mentor/shared/ports/processRunner.test-helper.js";
-import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { buildAuthArgs, buildGitEnv, CliGitClient } from "./cliGitClient.js";
+import { createStubProcessRunner } from "@merge-mentor/shared/ports/processRunner.test-helper.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { buildAuthEnv, buildGitEnv, CliGitClient } from "./cliGitClient.js";
 import { createScratchRepo } from "./gitRepo.test-helper.js";
 
 function makeClient() {
@@ -11,6 +16,14 @@ function makeClient() {
 }
 
 describe("CliGitClient", () => {
+  // Keep the GIT_CONFIG_* indexes deterministic regardless of the host environment.
+  beforeEach(() => {
+    vi.stubEnv("GIT_CONFIG_COUNT", "");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   // ── clone ──────────────────────────────────────────────────────────────────
 
   describe("clone", () => {
@@ -63,7 +76,7 @@ describe("CliGitClient", () => {
       );
     });
 
-    it("injects GitHub auth header via -c, not in URL", async () => {
+    it("injects GitHub auth header via env, not argv or URL", async () => {
       const { client, runner } = makeClient();
 
       await client.clone(
@@ -75,10 +88,12 @@ describe("CliGitClient", () => {
 
       const args = (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock
         .calls[0][1] as string[];
-      expect(args).toContain("-c");
-      const header = args.find((a) => a.startsWith("http.https://github.com/.extraHeader="));
-      expect(header).toBeDefined();
-      expect(header).toContain("Authorization: Basic");
+      const call = (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock.calls[0];
+      const env = (call[2] as { env: Record<string, string> }).env;
+      expect(args).not.toContain("-c");
+      expect(args.join(" ")).not.toContain("Authorization");
+      expect(env.GIT_CONFIG_KEY_0).toBe("http.https://github.com/.extraHeader");
+      expect(env.GIT_CONFIG_VALUE_0).toContain("Authorization: Basic");
       // URL must not contain the raw token
       const url = args.find((a) => a.startsWith("https://github.com"));
       expect(url).not.toContain("my-token");
@@ -94,11 +109,13 @@ describe("CliGitClient", () => {
         { branch: "main" }
       );
 
-      const args = (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock
-        .calls[0][1] as string[];
-      const header = args.find((a) => a.startsWith("http.https://dev.azure.com/.extraHeader="));
-      expect(header).toBeDefined();
-      const encoded = header?.split("Authorization: Basic ")[1] ?? "";
+      const env = (
+        (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock.calls[0][2] as {
+          env: Record<string, string>;
+        }
+      ).env;
+      expect(env.GIT_CONFIG_KEY_0).toBe("http.https://dev.azure.com/.extraHeader");
+      const encoded = env.GIT_CONFIG_VALUE_0?.split("Authorization: Basic ")[1] ?? "";
       const decoded = Buffer.from(encoded, "base64").toString();
       expect(decoded).toBe(":azure-pat");
     });
@@ -208,9 +225,9 @@ describe("CliGitClient", () => {
 
       await client.fetch("/tmp/repo", "main", { type: "token", token: "tok", platform: "github" });
 
-      const args = (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock
-        .calls[0][1] as string[];
-      expect(args).toContain("-c");
+      const call = (runner.execFile as ReturnType<typeof import("vitest").vi.fn>).mock.calls[0];
+      expect(call[1] as string[]).not.toContain("-c");
+      expect((call[2] as { env: Record<string, string> }).env.GIT_CONFIG_COUNT).toBeDefined();
     });
   });
 
@@ -350,33 +367,39 @@ describe("CliGitClient", () => {
 
 // ── pure helper unit tests ───────────────────────────────────────────────────
 
-describe("buildAuthArgs", () => {
-  it("returns empty array for CI mode", () => {
-    expect(buildAuthArgs({ type: "ci" })).toEqual([]);
+describe("buildAuthEnv", () => {
+  it("returns no overrides for CI mode", () => {
+    expect(buildAuthEnv({ type: "ci" }, {})).toEqual({});
   });
 
-  it("returns -c arg for GitHub token", () => {
-    const args = buildAuthArgs({ type: "token", token: "ghp_abc", platform: "github" });
-    expect(args).toHaveLength(2);
-    expect(args[0]).toBe("-c");
-    expect(args[1]).toMatch(/^http\.https:\/\/github\.com\/\.extraHeader=Authorization: Basic /);
+  it("passes the GitHub header through GIT_CONFIG_* env, not argv", () => {
+    const env = buildAuthEnv({ type: "token", token: "ghp_abc", platform: "github" }, {});
+    expect(env.GIT_CONFIG_COUNT).toBe("1");
+    expect(env.GIT_CONFIG_KEY_0).toBe("http.https://github.com/.extraHeader");
+    expect(env.GIT_CONFIG_VALUE_0).toMatch(/^Authorization: Basic /);
   });
 
   it("encodes GitHub credentials as x-access-token:<token>", () => {
-    const args = buildAuthArgs({ type: "token", token: "my-token", platform: "github" });
-    const encoded = (args[1] as string).split("Authorization: Basic ")[1];
+    const env = buildAuthEnv({ type: "token", token: "my-token", platform: "github" }, {});
+    const encoded = env.GIT_CONFIG_VALUE_0.split("Authorization: Basic ")[1];
     expect(Buffer.from(encoded, "base64").toString()).toBe("x-access-token:my-token");
   });
 
-  it("encodes Azure credentials as :<token> (empty username)", () => {
-    const args = buildAuthArgs({ type: "token", token: "azure-pat", platform: "azure" });
-    const encoded = (args[1] as string).split("Authorization: Basic ")[1];
+  it("encodes Azure credentials as :<token> (empty username) scoped to dev.azure.com", () => {
+    const env = buildAuthEnv({ type: "token", token: "azure-pat", platform: "azure" }, {});
+    expect(env.GIT_CONFIG_KEY_0).toMatch(/^http\.https:\/\/dev\.azure\.com\//);
+    const encoded = env.GIT_CONFIG_VALUE_0.split("Authorization: Basic ")[1];
     expect(Buffer.from(encoded, "base64").toString()).toBe(":azure-pat");
   });
 
-  it("scopes header to dev.azure.com for Azure", () => {
-    const args = buildAuthArgs({ type: "token", token: "t", platform: "azure" });
-    expect(args[1]).toMatch(/^http\.https:\/\/dev\.azure\.com\//);
+  it("appends after GIT_CONFIG_* entries already in the environment", () => {
+    const env = buildAuthEnv(
+      { type: "token", token: "t", platform: "github" },
+      { GIT_CONFIG_COUNT: "2" }
+    );
+    expect(env.GIT_CONFIG_COUNT).toBe("3");
+    expect(env.GIT_CONFIG_KEY_2).toBe("http.https://github.com/.extraHeader");
+    expect(env.GIT_CONFIG_KEY_0).toBeUndefined();
   });
 });
 
@@ -517,6 +540,45 @@ describe("CliGitClient local diffs (real git)", () => {
       expect(await client.getRemoteUrl(repo.path)).toBeUndefined();
     } finally {
       repo.cleanup();
+    }
+  });
+});
+
+describe("CliGitClient fetchRef (real git)", () => {
+  it("checks out a fork PR ref even when its branch name matches an upstream branch", async () => {
+    const upstream = createScratchRepo();
+    const workDir = mkdtempSync(join(tmpdir(), "mm-fork-clone-"));
+    try {
+      const baseSha = upstream.git("rev-parse", "HEAD");
+      // The fork's "main" diverges from upstream's and only exists as a PR ref here.
+      upstream.git("checkout", "-q", "-b", "fork-main");
+      upstream.write("fork-only.txt", "from the fork\n");
+      upstream.git("add", ".");
+      upstream.git("commit", "-qm", "fork change");
+      const forkSha = upstream.git("rev-parse", "HEAD");
+      upstream.git("update-ref", "refs/pull/7/head", forkSha);
+      upstream.git("checkout", "-q", "main");
+      upstream.git("branch", "-D", "fork-main");
+
+      const client = new CliGitClient();
+      const target = join(workDir, "clone");
+      const auth = { type: "ci" } as const;
+      await client.clone(`file://${upstream.path}`, target, auth, { branch: "main", depth: 1 });
+      expect(
+        execFileSync("git", ["-C", target, "rev-parse", "HEAD"], { encoding: "utf-8" }).trim()
+      ).toBe(baseSha);
+
+      await client.fetchRef(target, "refs/pull/7/head", "mm-pull-7-head", auth);
+      await client.checkout(target, "mm-pull-7-head");
+
+      const head = execFileSync("git", ["-C", target, "rev-parse", "HEAD"], {
+        encoding: "utf-8",
+      }).trim();
+      expect(head).toBe(forkSha);
+      expect(existsSync(join(target, "fork-only.txt"))).toBe(true);
+    } finally {
+      upstream.cleanup();
+      rmSync(workDir, { recursive: true, force: true });
     }
   });
 });

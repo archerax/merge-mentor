@@ -96,7 +96,8 @@ describe("WorkspaceManager", () => {
       expect(repoManager.ensureRepo).toHaveBeenCalledWith(
         { owner: "octocat", repo: "Hello-World", platform: "github" },
         "feature-branch",
-        "github_pat_12345"
+        "github_pat_12345",
+        undefined
       );
     });
   });

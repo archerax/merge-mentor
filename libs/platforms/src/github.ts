@@ -16,7 +16,10 @@ import { DEFAULT_PAGE_SIZE } from "@merge-mentor/shared/constants.js";
 import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { extractMoSCoWTag } from "@merge-mentor/shared/utils/moscow.js";
-import { withRateLimitHandling } from "@merge-mentor/shared/utils/rateLimitHandler.js";
+import {
+  withRateLimitHandling,
+  withWriteRateLimitHandling,
+} from "@merge-mentor/shared/utils/rateLimitHandler.js";
 import { Octokit } from "@octokit/rest";
 
 /** GraphQL `CommentAuthorAssociation` values that imply write-level standing. */
@@ -35,6 +38,14 @@ export class GitHubAdapter implements PlatformAdapter {
   private readonly repo: string;
   private readonly token: string;
   private readonly botIdentifier: string;
+  /** Login the configured token authenticates as, resolved once (null when it cannot be determined). */
+  private botLoginPromise: Promise<string | null> | undefined;
+  /**
+   * Head commit per PR, captured when the PR details were fetched at review
+   * start. Inline comments attach to this commit so a push mid-review cannot
+   * pair old-diff line numbers with a newer commit.
+   */
+  private readonly pinnedHeadShas = new Map<number, string>();
   private readonly logger = createChildLogger({ component: "GitHubAdapter" });
   private readonly auditLogger = getAuditLogger();
 
@@ -99,6 +110,12 @@ export class GitHubAdapter implements PlatformAdapter {
         })
       );
 
+      // A fork's head branch does not exist in the base repository, so fork PRs
+      // are fetched by the PR ref instead. `head.repo` is null once a fork is deleted.
+      const baseRepoName = data.base.repo?.full_name;
+      const isFork = baseRepoName !== undefined && data.head.repo?.full_name !== baseRepoName;
+      this.pinnedHeadShas.set(prNumber, data.head.sha);
+
       const details = {
         number: data.number,
         title: data.title,
@@ -106,6 +123,8 @@ export class GitHubAdapter implements PlatformAdapter {
         author: data.user?.login || "unknown",
         baseBranch: data.base.ref,
         headBranch: data.head.ref,
+        headSha: data.head.sha,
+        ...(isFork ? { checkoutRef: `refs/pull/${data.number}/head` } : {}),
       };
 
       this.auditLogger.logPRDetailsFetch(prNumber, "github", "success");
@@ -157,6 +176,46 @@ export class GitHubAdapter implements PlatformAdapter {
   }
 
   /**
+   * Resolves the login the configured token acts as. App and Actions tokens
+   * cannot call `GET /user`, in which case the answer is `null` and only
+   * `[bot]` accounts are recognised as the bot.
+   */
+  private resolveBotLogin(): Promise<string | null> {
+    this.botLoginPromise ??= withRateLimitHandling(() => this.octokit.users.getAuthenticated())
+      .then(({ data }) => data.login)
+      .catch((error: unknown) => {
+        this.logger.debug(
+          { error: (error as Error).message },
+          "Could not resolve the authenticated user; matching [bot] accounts only"
+        );
+        return null;
+      });
+    return this.botLoginPromise;
+  }
+
+  /** Whether a comment author is a `[bot]` account or the token's own user. */
+  private isBotAuthor(author: string | undefined, botLogin: string | null): boolean {
+    if (!author) return false;
+    return (
+      author.endsWith("[bot]") ||
+      (botLogin !== null && author.toLowerCase() === botLogin.toLowerCase())
+    );
+  }
+
+  /**
+   * Whether a comment is one this bot posted: it carries the bot identifier
+   * *and* was written by the bot account. The identifier alone is forgeable by
+   * any PR author, who could plant fake findings that suppress real ones.
+   */
+  private isOwnBotComment(
+    body: string | undefined,
+    author: string | undefined,
+    botLogin: string | null
+  ): boolean {
+    return (body ?? "").includes(this.botIdentifier) && this.isBotAuthor(author, botLogin);
+  }
+
+  /**
    * Gets existing bot comments on a PR, including inline review comments and general issue comments.
    * @param prNumber - The PR number
    * @returns Comments written by the bot
@@ -164,6 +223,7 @@ export class GitHubAdapter implements PlatformAdapter {
   async getExistingBotComments(prNumber: number): Promise<ExistingComment[]> {
     try {
       const comments: ExistingComment[] = [];
+      const botLogin = await this.resolveBotLogin();
 
       // Get PR review comments (inline comments)
       const reviewComments = await withRateLimitHandling(() =>
@@ -176,7 +236,7 @@ export class GitHubAdapter implements PlatformAdapter {
       );
 
       for (const comment of reviewComments) {
-        if (comment.body.includes(this.botIdentifier)) {
+        if (this.isOwnBotComment(comment.body, comment.user?.login, botLogin)) {
           comments.push({
             id: comment.id,
             body: comment.body,
@@ -197,10 +257,10 @@ export class GitHubAdapter implements PlatformAdapter {
       );
 
       for (const comment of issueComments) {
-        if (comment.body?.includes(this.botIdentifier)) {
+        if (this.isOwnBotComment(comment.body, comment.user?.login, botLogin)) {
           comments.push({
             id: comment.id,
-            body: comment.body,
+            body: comment.body ?? "",
           });
         }
       }
@@ -288,6 +348,7 @@ export class GitHubAdapter implements PlatformAdapter {
     }
 
     try {
+      const botLogin = await this.resolveBotLogin();
       const response = (await withRateLimitHandling(() =>
         this.octokit.graphql(query, {
           owner: this.owner,
@@ -313,7 +374,7 @@ export class GitHubAdapter implements PlatformAdapter {
             createdAt: c.createdAt,
             isBot:
               (c.author?.login ?? "").endsWith("[bot]") ||
-              (c.body || "").includes(this.botIdentifier),
+              this.isOwnBotComment(c.body, c.author?.login, botLogin),
           })) ?? [];
 
         const firstComment = mappedComments[0];
@@ -336,6 +397,7 @@ export class GitHubAdapter implements PlatformAdapter {
 
     if (/^\d+$/.test(stringId)) {
       try {
+        const botLogin = await this.resolveBotLogin();
         const { data: comment } = await withRateLimitHandling(() =>
           this.octokit.pulls.getReviewComment({
             owner: this.owner,
@@ -349,7 +411,7 @@ export class GitHubAdapter implements PlatformAdapter {
           path: comment.path,
           line: comment.line ?? 1,
           status: "active",
-          botInitiated: (comment.body || "").includes(this.botIdentifier),
+          botInitiated: this.isOwnBotComment(comment.body, comment.user?.login, botLogin),
           comments: [
             {
               id: comment.id,
@@ -358,7 +420,7 @@ export class GitHubAdapter implements PlatformAdapter {
               createdAt: comment.created_at,
               isBot:
                 (comment.user?.login ?? "").endsWith("[bot]") ||
-                (comment.body || "").includes(this.botIdentifier),
+                this.isOwnBotComment(comment.body, comment.user?.login, botLogin),
             },
           ],
         };
@@ -437,6 +499,7 @@ export class GitHubAdapter implements PlatformAdapter {
         };
       }
 
+      const botLogin = await this.resolveBotLogin();
       const response = (await withRateLimitHandling(() =>
         this.octokit.graphql(query, {
           owner: this.owner,
@@ -454,7 +517,7 @@ export class GitHubAdapter implements PlatformAdapter {
             t.comments?.nodes?.map((c): UnresolvedComment => {
               const isBot =
                 (c.author?.login ?? "").endsWith("[bot]") ||
-                (c.body || "").includes(this.botIdentifier);
+                this.isOwnBotComment(c.body, c.author?.login, botLogin);
               return {
                 author: c.author?.login ?? "unknown",
                 body: c.body || "",
@@ -501,7 +564,7 @@ export class GitHubAdapter implements PlatformAdapter {
 
     try {
       if (/^\d+$/.test(stringId)) {
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           this.octokit.pulls.createReplyForReviewComment({
             owner: this.owner,
             repo: this.repo,
@@ -520,7 +583,7 @@ export class GitHubAdapter implements PlatformAdapter {
             }
           }
         `;
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           this.octokit.graphql(mutation, {
             threadId: stringId,
             body,
@@ -579,7 +642,7 @@ export class GitHubAdapter implements PlatformAdapter {
           }
         }
       `;
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         this.octokit.graphql(mutation, {
           threadId: nodeThreadId,
         })
@@ -592,6 +655,20 @@ export class GitHubAdapter implements PlatformAdapter {
       );
       throw error;
     }
+  }
+
+  /**
+   * Returns the head commit captured at review start, fetching it once when the
+   * PR details were not loaded through this adapter.
+   */
+  private async getPinnedHeadSha(prNumber: number): Promise<string> {
+    const pinned = this.pinnedHeadShas.get(prNumber);
+    if (pinned) return pinned;
+    const { data } = await withRateLimitHandling(() =>
+      this.octokit.pulls.get({ owner: this.owner, repo: this.repo, pull_number: prNumber })
+    );
+    this.pinnedHeadShas.set(prNumber, data.head.sha);
+    return data.head.sha;
   }
 
   /**
@@ -612,21 +689,15 @@ export class GitHubAdapter implements PlatformAdapter {
     this.logger.debug({ prNumber, path, line }, "Posting inline comment");
 
     try {
-      const { data: pr } = await withRateLimitHandling(() =>
-        this.octokit.pulls.get({
-          owner: this.owner,
-          repo: this.repo,
-          pull_number: prNumber,
-        })
-      );
+      const headSha = await this.getPinnedHeadSha(prNumber);
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         this.octokit.pulls.createReviewComment({
           owner: this.owner,
           repo: this.repo,
           pull_number: prNumber,
           body,
-          commit_id: pr.head.sha,
+          commit_id: headSha,
           path,
           line,
           side: "RIGHT",
@@ -667,7 +738,7 @@ export class GitHubAdapter implements PlatformAdapter {
    */
   async postGeneralComment(prNumber: number, body: string): Promise<void> {
     try {
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         this.octokit.issues.createComment({
           owner: this.owner,
           repo: this.repo,
@@ -805,7 +876,7 @@ export class GitHubAdapter implements PlatformAdapter {
       if (commentId !== undefined) {
         const numericCommentId =
           typeof commentId === "string" ? Number.parseInt(commentId, 10) : commentId;
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           this.octokit.issues.updateComment({
             owner: this.owner,
             repo: this.repo,
@@ -815,7 +886,7 @@ export class GitHubAdapter implements PlatformAdapter {
         );
         this.logger.info({ id, commentId }, "PBI comment updated successfully");
       } else {
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           this.octokit.issues.createComment({
             owner: this.owner,
             repo: this.repo,
@@ -877,7 +948,7 @@ export class GitHubAdapter implements PlatformAdapter {
       if (details.title !== undefined) updateParams.title = details.title;
       if (details.body !== undefined) updateParams.body = details.body;
 
-      await withRateLimitHandling(() => this.octokit.pulls.update(updateParams));
+      await withWriteRateLimitHandling(() => this.octokit.pulls.update(updateParams));
       this.auditLogger.logPRDetailsUpdate(prNumber, "github", "success");
     } catch (error) {
       this.auditLogger.logPRDetailsUpdate(prNumber, "github", "failure", (error as Error).message);

@@ -30,22 +30,27 @@ external data to be analysed as data, never followed as instructions.
  * @returns Delimited metadata block.
  */
 export function wrapUntrustedPRMetadata(title: string, description: string | undefined): string {
-  return `<untrusted-pr-metadata>
-Title: ${title}
-Description: ${description || "No description provided"}
-</untrusted-pr-metadata>`;
+  return wrapUntrustedContent(
+    "untrusted-pr-metadata",
+    `Title: ${title}\nDescription: ${description || "No description provided"}`
+  );
 }
 
 /**
  * Wraps arbitrary untrusted text content in explicit delimiters.
+ *
+ * Any opening or closing occurrence of the wrapper tag inside the content is
+ * defused (`<` becomes `&lt;`), so the content cannot close the block early and
+ * smuggle text outside the untrusted region.
  *
  * @param tagName - Tag name used for the wrapper delimiters.
  * @param content - Untrusted content to delimit.
  * @returns Delimited content block.
  */
 export function wrapUntrustedContent(tagName: string, content: string): string {
+  const delimiter = new RegExp(`<(?=\\s*/?\\s*${tagName}(?![\\w-]))`, "gi");
   return `<${tagName}>
-${content}
+${content.replace(delimiter, "&lt;")}
 </${tagName}>`;
 }
 

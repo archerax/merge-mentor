@@ -7,6 +7,7 @@ export function createStubGitClient(overrides?: Partial<GitClient>): GitClient {
   return {
     clone: vi.fn().mockResolvedValue(undefined),
     fetch: vi.fn().mockResolvedValue(undefined),
+    fetchRef: vi.fn().mockResolvedValue(undefined),
     checkout: vi.fn().mockResolvedValue(undefined),
     hasUncommittedChanges: vi.fn().mockResolvedValue(false),
     switchBranch: vi.fn().mockResolvedValue(undefined),

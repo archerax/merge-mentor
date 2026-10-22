@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Prompts**: untrusted content (PR description, diffs, comments, work items) can
+  no longer close its own wrapper tag to smuggle text outside the untrusted block.
+- **Git**: the clone/fetch credentials are passed through `GIT_CONFIG_*` environment
+  variables instead of a `-c` argument, so the token no longer shows in `ps`.
+- **GitHub**: a comment is only treated as one of the bot's own when its author is
+  the bot account (the authenticated user or a `[bot]` app) as well as carrying the
+  marker, so a PR author can no longer plant fake findings. Comments are only
+  written once per request: writes are retried on rate limits (429, 403 rate limit)
+  but no longer on 5xx or dropped connections, which could post duplicates.
 - **Copilot SDK provider**: the permission handler is now deny-by-default. Only
   `read` (and `write`/`shell` when enabled) are approved; unknown or future
   permission kinds and sandbox-bypass requests are rejected. Reads and writes
@@ -25,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Review**: PRs from forks are reviewed against the fork's code. The workspace is
+  fetched from the base repository's PR ref (`refs/pull/<n>/head` on GitHub, the
+  merge ref on Azure DevOps) instead of a branch that does not exist there, or
+  worse, shares a name with an unrelated upstream branch.
+- **Review**: inline comments attach to the head commit captured when the review
+  started, so a push mid-review can no longer pair old-diff line numbers with a
+  newer commit; this also removes one API call per comment.
+- **Review**: cached results are only reused when the strategy, passes and model
+  match, so a `deep` run no longer inherits `fast` results for unchanged files.
+  Caches written by earlier versions are re-reviewed once.
 - **Review**: the `fast`, `deep` and `multi-agent` strategies now split large PRs into
   batches of related files so the model no longer skims or skips files. `fast` and
   `deep` re-review any file the model fails to report; batch results are merged in

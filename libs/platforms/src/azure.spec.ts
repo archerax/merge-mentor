@@ -133,6 +133,26 @@ describe("AzureDevOpsAdapter", () => {
       });
     });
 
+    it("reports the PR merge ref for fork PRs only", async () => {
+      const adapter = new AzureDevOpsAdapter(createTestConfig());
+      const pr = {
+        pullRequestId: 55,
+        title: "t",
+        description: "",
+        createdBy: { displayName: "u" },
+        targetRefName: "refs/heads/main",
+        sourceRefName: "refs/heads/main",
+      };
+      mockGitApiInstance.getPullRequestById.mockResolvedValueOnce({
+        ...pr,
+        forkSource: { repository: { id: "fork-repo" } },
+      });
+      mockGitApiInstance.getPullRequestById.mockResolvedValueOnce(pr);
+
+      expect((await adapter.getPRDetails(55)).checkoutRef).toBe("refs/pull/55/merge");
+      expect((await adapter.getPRDetails(55)).checkoutRef).toBeUndefined();
+    });
+
     it("handles missing optional fields", async () => {
       const adapter = new AzureDevOpsAdapter(createTestConfig());
       mockGitApiInstance.getPullRequestById.mockResolvedValue({

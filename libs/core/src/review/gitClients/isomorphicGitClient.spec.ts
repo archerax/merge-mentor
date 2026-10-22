@@ -176,6 +176,38 @@ describe("IsomorphicGitClient", () => {
 
   // ── fetch ──────────────────────────────────────────────────────────────────
 
+  describe("fetchRef", () => {
+    it("fetches the remote ref and stores the fetched head under refs/remotes/origin/<local>", async () => {
+      mockedGit.fetch.mockResolvedValueOnce({ fetchHead: "b".repeat(40) } as never);
+
+      await client.fetchRef("/tmp/repo", "refs/pull/7/head", "mm-pull-7-head", { type: "ci" });
+
+      expect(mockedGit.fetch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dir: "/tmp/repo",
+          remote: "origin",
+          remoteRef: "refs/pull/7/head",
+          singleBranch: true,
+          depth: 1,
+        })
+      );
+      expect(mockedGit.writeRef).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ref: "refs/remotes/origin/mm-pull-7-head",
+          value: "b".repeat(40),
+        })
+      );
+    });
+
+    it("throws when the remote ref does not exist", async () => {
+      mockedGit.fetch.mockResolvedValueOnce({ fetchHead: null } as never);
+
+      await expect(
+        client.fetchRef("/tmp/repo", "refs/pull/9/head", "mm-pull-9-head", { type: "ci" })
+      ).rejects.toThrow("refs/pull/9/head");
+    });
+  });
+
   describe("fetch", () => {
     it("calls git.fetch with dir, ref and singleBranch", async () => {
       await client.fetch("/tmp/repo", "develop", { type: "ci" });

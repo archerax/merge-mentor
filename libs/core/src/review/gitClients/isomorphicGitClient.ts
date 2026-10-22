@@ -141,6 +141,53 @@ export class IsomorphicGitClient implements GitClient {
   }
 
   /**
+   * Fetches `remoteRef` from `origin` into `refs/remotes/origin/<localBranch>`.
+   *
+   * @param repoPath    - Absolute path to the working tree.
+   * @param remoteRef   - Full remote ref name to fetch (e.g. `refs/pull/7/head`).
+   * @param localBranch - Name under `refs/remotes/origin/` to store it as.
+   * @param auth        - Authentication context.
+   * @param depth       - Shallow fetch depth (defaults to 1).
+   */
+  async fetchRef(
+    repoPath: string,
+    remoteRef: string,
+    localBranch: string,
+    auth: GitAuth,
+    depth = 1
+  ): Promise<void> {
+    const onAuth = buildOnAuth(auth);
+    const result = await withTimeout(
+      git.fetch({
+        fs,
+        http,
+        dir: repoPath,
+        remote: "origin",
+        remoteRef,
+        depth,
+        singleBranch: true,
+        tags: false,
+        ...(onAuth ? { onAuth } : {}),
+        onAuthFailure: (failUrl) => {
+          logger.warn({ url: failUrl }, "isomorphic-git auth failure");
+          return { cancel: true };
+        },
+      }),
+      DEFAULT_TIMEOUT_MS
+    );
+    if (!result.fetchHead) {
+      throw new Error(`Remote ref ${remoteRef} was not found`);
+    }
+    await git.writeRef({
+      fs,
+      dir: repoPath,
+      ref: `refs/remotes/origin/${localBranch}`,
+      value: result.fetchHead,
+      force: true,
+    });
+  }
+
+  /**
    * Checks out `branch` in an existing clone, resetting tracked files.
    *
    * Points the local branch at the freshly fetched remote tip and updates

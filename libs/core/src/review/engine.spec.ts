@@ -16,6 +16,7 @@ import type { AIProviderType } from "../ai/types.js";
 import { DiffStorage } from "./diffStorage.js";
 import { ReviewEngine as OriginalReviewEngine } from "./engine.js";
 import type { ReviewProgressEvent } from "./progress.js";
+import { ReviewStateCache } from "./reviewStateCache.js";
 
 class ReviewEngine extends OriginalReviewEngine {
   constructor(
@@ -90,7 +91,9 @@ vi.mock("./repoManager.js", () => ({
 const mockCacheGetState = vi.fn();
 const mockCacheSaveState = vi.fn();
 
-vi.mock("./reviewStateCache.js", () => ({
+vi.mock("./reviewStateCache.js", async (importOriginal) => ({
+  buildReviewFingerprint: (await importOriginal<typeof import("./reviewStateCache.js")>())
+    .buildReviewFingerprint,
   ReviewStateCache: class MockReviewStateCache {
     private stateMap = new Map<
       string,
@@ -99,6 +102,7 @@ vi.mock("./reviewStateCache.js", () => ({
         lastReviewedAt: string;
         files: Record<string, { sha: string; result: unknown }>;
         crossFileResult?: unknown;
+        fingerprint?: string;
       }
     >();
 
@@ -111,7 +115,8 @@ vi.mock("./reviewStateCache.js", () => ({
       prIdentifier: string,
       fileResults: Array<{ filename: string }>,
       fileShaMap: Map<string, string>,
-      crossFileResult?: unknown
+      crossFileResult?: unknown,
+      fingerprint?: string
     ) {
       mockCacheSaveState(prIdentifier, fileResults, fileShaMap, crossFileResult);
       const files: Record<string, { sha: string; result: unknown }> = {};
@@ -124,7 +129,12 @@ vi.mock("./reviewStateCache.js", () => ({
         lastReviewedAt: new Date().toISOString(),
         files,
         crossFileResult,
+        fingerprint,
       });
+    }
+
+    isCompatible(state: { fingerprint?: string }, fingerprint: string) {
+      return state.fingerprint === fingerprint;
     }
 
     getCachedFileReview(
@@ -303,7 +313,26 @@ describe("ReviewEngine", () => {
       expect(mockEnsureRepo).toHaveBeenCalledWith(
         expect.anything(),
         prDetails.headBranch,
-        expect.anything()
+        expect.anything(),
+        undefined
+      );
+    });
+
+    it("fetches the PR ref from the base repo for fork PRs", async () => {
+      const prDetails = { ...createPRDetails(), checkoutRef: "refs/pull/123/head" };
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(prDetails);
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
+
+      await engine.reviewPR(123);
+
+      expect(mockEnsureRepo).toHaveBeenCalledWith(
+        expect.anything(),
+        prDetails.headBranch,
+        expect.anything(),
+        { ref: "refs/pull/123/head", baseBranch: prDetails.baseBranch }
       );
     });
 
@@ -892,6 +921,35 @@ describe("ReviewEngine", () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    it("ignores cached results produced by a different strategy, passes or model", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk");
+      const files = [createPRFile({ filename: "test.ts", sha: "unchanged-sha" })];
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+      mockParseFileReview.mockReturnValue({ filename: "test.ts", findings: [] });
+      mockParseCrossFileReview.mockReturnValue({
+        overallAssessment: "Fresh",
+        findings: [],
+        recommendations: [],
+      });
+      const staleState = {
+        prIdentifier: "x",
+        lastReviewedAt: new Date().toISOString(),
+        files: {
+          "test.ts": { sha: "unchanged-sha", result: { filename: "test.ts", findings: [] } },
+        },
+        fingerprint: JSON.stringify(["some-other-strategy", [], ""]),
+      };
+      vi.spyOn(ReviewStateCache.prototype, "getState").mockResolvedValueOnce(staleState);
+
+      const result = await engine.reviewPR(123);
+
+      expect(mockExecutePrompt).toHaveBeenCalled();
+      expect(result.filesSkipped).toBe(0);
     });
 
     it("re-reviews all files when reReview is set but still writes fresh cache", async () => {

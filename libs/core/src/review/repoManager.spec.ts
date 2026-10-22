@@ -68,6 +68,40 @@ describe("RepoManager", () => {
       expect(gitClient.fetch).toHaveBeenCalledOnce();
     });
 
+    describe("fork PRs", () => {
+      const fork = { ref: "refs/pull/7/head", baseBranch: "main" };
+
+      it("clones the base branch, then fetches and checks out the PR ref", async () => {
+        fileSystem.stat.mockRejectedValue(new Error("ENOENT"));
+
+        await repoManager.ensureRepo(repoInfo, "main", token, fork);
+
+        expect(gitClient.clone).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          expect.any(Object),
+          expect.objectContaining({ branch: "main" })
+        );
+        expect(gitClient.fetchRef).toHaveBeenCalledWith(
+          expect.any(String),
+          "refs/pull/7/head",
+          "mm-pull-7-head",
+          expect.any(Object)
+        );
+        expect(gitClient.checkout).toHaveBeenCalledWith(expect.any(String), "mm-pull-7-head");
+      });
+
+      it("never checks out the same-named upstream branch of an existing clone", async () => {
+        fileSystem.stat.mockResolvedValue({ isDirectory: () => true } as unknown as Stats);
+
+        await repoManager.ensureRepo(repoInfo, "main", token, fork);
+
+        expect(gitClient.fetch).not.toHaveBeenCalled();
+        expect(gitClient.checkout).toHaveBeenCalledTimes(1);
+        expect(gitClient.checkout).toHaveBeenCalledWith(expect.any(String), "mm-pull-7-head");
+      });
+    });
+
     it("generates correct path for Azure DevOps repository", async () => {
       const azureRepoInfo: RepoInfo = {
         owner: "azureowner",

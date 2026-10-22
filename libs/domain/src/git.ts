@@ -90,6 +90,27 @@ export interface GitClient {
   fetch(repoPath: string, branch: string, auth: GitAuth, depth?: number): Promise<void>;
 
   /**
+   * Fetches an arbitrary remote ref (for example `refs/pull/7/head`) from
+   * `origin` into `refs/remotes/origin/<localBranch>`.
+   *
+   * Used for fork PRs, whose head branch is not in the base repository.
+   *
+   * @param repoPath    - Absolute path to the working tree.
+   * @param remoteRef   - Full remote ref name to fetch.
+   * @param localBranch - Name under `refs/remotes/origin/` to store it as.
+   * @param auth        - Authentication context.
+   * @param depth       - Shallow depth (defaults to `1`).
+   * @throws On network failure or unknown ref.
+   */
+  fetchRef(
+    repoPath: string,
+    remoteRef: string,
+    localBranch: string,
+    auth: GitAuth,
+    depth?: number
+  ): Promise<void>;
+
+  /**
    * Checks out `branch` in an existing clone, resetting tracked files.
    *
    * Equivalent to `git checkout -B <branch> origin/<branch>`.

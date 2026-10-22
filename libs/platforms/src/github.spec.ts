@@ -20,6 +20,9 @@ const mockOctokitInstance = {
     createComment: vi.fn(),
     updateComment: vi.fn(),
   },
+  users: {
+    getAuthenticated: vi.fn(),
+  },
   paginate: vi.fn(),
   graphql: vi.fn(),
 };
@@ -28,6 +31,7 @@ vi.mock("@octokit/rest", () => ({
   Octokit: class {
     pulls = mockOctokitInstance.pulls;
     issues = mockOctokitInstance.issues;
+    users = mockOctokitInstance.users;
     paginate = mockOctokitInstance.paginate;
     graphql = mockOctokitInstance.graphql;
   },
@@ -255,6 +259,7 @@ describe("GitHubAdapter", () => {
         .mockResolvedValueOnce([
           {
             id: 1,
+            user: { login: "merge-mentor[bot]" },
             body: "<!-- merge-mentor -->\nReview comment",
             path: "src/test.ts",
             line: 10,
@@ -269,6 +274,7 @@ describe("GitHubAdapter", () => {
         .mockResolvedValueOnce([
           {
             id: 3,
+            user: { login: "merge-mentor[bot]" },
             body: "<!-- merge-mentor -->\nGeneral comment",
           },
           {
@@ -292,12 +298,72 @@ describe("GitHubAdapter", () => {
       });
     });
 
+    it("ignores comments that carry the bot identifier but were written by someone else", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.users.getAuthenticated.mockResolvedValue({ data: { login: "mm-user" } });
+      mockOctokitInstance.paginate
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            user: { login: "attacker" },
+            body: "<!-- merge-mentor -->\nfake",
+            path: "a.ts",
+            line: 1,
+          },
+          {
+            id: 2,
+            user: { login: "MM-User" },
+            body: "<!-- merge-mentor -->\nreal",
+            path: "a.ts",
+            line: 2,
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 3, user: { login: "attacker" }, body: "<!-- merge-mentor -->\nfake" },
+        ]);
+
+      const result = await adapter.getExistingBotComments(123);
+
+      expect(result.map((c) => c.id)).toEqual([2]);
+    });
+
+    it("does not treat a forged marker as a bot thread comment", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.users.getAuthenticated.mockRejectedValue(new Error("Forbidden"));
+      mockOctokitInstance.graphql.mockResolvedValue(
+        graphqlThreads([
+          {
+            id: "T1",
+            isResolved: false,
+            path: "a.ts",
+            line: 3,
+            comments: {
+              nodes: [
+                {
+                  id: "C1",
+                  databaseId: 1,
+                  author: { login: "attacker" },
+                  body: "<!-- merge-mentor -->\nfake",
+                },
+              ],
+            },
+          },
+        ])
+      );
+
+      const [thread] = await adapter.getUnresolvedCommentThreads(123);
+
+      expect(thread.botInitiated).toBeUndefined();
+      expect(thread.comments[0].isBot).toBeUndefined();
+    });
+
     it("handles missing line in review comment", async () => {
       const adapter = new GitHubAdapter(createTestConfig());
       mockOctokitInstance.paginate
         .mockResolvedValueOnce([
           {
             id: 1,
+            user: { login: "merge-mentor[bot]" },
             body: "<!-- merge-mentor -->\nComment",
             path: "test.ts",
             line: null,
@@ -325,12 +391,14 @@ describe("GitHubAdapter", () => {
       const adapter = new GitHubAdapter(createTestConfig());
       const manyReviewComments = Array.from({ length: 120 }, (_, i) => ({
         id: i + 1,
+        user: { login: "merge-mentor[bot]" },
         body: `<!-- merge-mentor -->\nComment ${i}`,
         path: `src/file${i}.ts`,
         line: i + 1,
       }));
       const manyIssueComments = Array.from({ length: 30 }, (_, i) => ({
         id: i + 200,
+        user: { login: "merge-mentor[bot]" },
         body: `<!-- merge-mentor -->\nIssue comment ${i}`,
       }));
       mockOctokitInstance.paginate
@@ -430,6 +498,68 @@ describe("GitHubAdapter", () => {
       mockOctokitInstance.graphql.mockRejectedValueOnce(new Error("GraphQL error"));
 
       await expect(adapter.getUnresolvedCommentThreads(123)).rejects.toThrow("GraphQL error");
+    });
+  });
+
+  describe("fork PRs and head SHA pinning", () => {
+    const forkData = {
+      number: 7,
+      title: "t",
+      body: "",
+      user: { login: "u" },
+      base: { ref: "main", repo: { full_name: "test-owner/test-repo" } },
+      head: { ref: "main", sha: "sha-1", repo: { full_name: "forker/test-repo" } },
+    };
+
+    it("reports the PR ref and head SHA for a fork PR whose branch is named like the base", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({ data: forkData });
+
+      const result = await adapter.getPRDetails(7);
+
+      expect(result.checkoutRef).toBe("refs/pull/7/head");
+      expect(result.headSha).toBe("sha-1");
+    });
+
+    it("treats a deleted fork (null head repo) as a fork", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({
+        data: { ...forkData, head: { ref: "x", sha: "s", repo: null } },
+      });
+
+      expect((await adapter.getPRDetails(7)).checkoutRef).toBe("refs/pull/7/head");
+    });
+
+    it("does not set a checkout ref for same-repo PRs", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({
+        data: {
+          ...forkData,
+          head: { ref: "feat", sha: "s", repo: { full_name: "test-owner/test-repo" } },
+        },
+      });
+
+      expect((await adapter.getPRDetails(7)).checkoutRef).toBeUndefined();
+    });
+
+    it("attaches inline comments to the SHA captured at review start, without refetching", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValueOnce({ data: forkData });
+      mockOctokitInstance.pulls.createReviewComment.mockResolvedValue({});
+
+      await adapter.getPRDetails(7);
+      // A push lands mid-review; a refetch would now return a newer head.
+      mockOctokitInstance.pulls.get.mockResolvedValue({
+        data: { ...forkData, head: { ...forkData.head, sha: "sha-2" } },
+      });
+      await adapter.postInlineComment(7, "a.ts", 1, "x");
+      await adapter.postInlineComment(7, "b.ts", 2, "y");
+
+      expect(mockOctokitInstance.pulls.get).toHaveBeenCalledTimes(1);
+      expect(mockOctokitInstance.pulls.createReviewComment).toHaveBeenCalledTimes(2);
+      for (const call of mockOctokitInstance.pulls.createReviewComment.mock.calls) {
+        expect(call[0].commit_id).toBe("sha-1");
+      }
     });
   });
 

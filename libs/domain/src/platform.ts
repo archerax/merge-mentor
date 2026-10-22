@@ -23,6 +23,14 @@ export interface PRDetails {
   readonly baseBranch: string;
   /** Branch the pull request sources changes from. */
   readonly headBranch: string;
+  /** Commit SHA of the pull request head when the details were fetched, when known. */
+  readonly headSha?: string;
+  /**
+   * Ref to fetch from the base repository instead of `headBranch`. Set for fork
+   * PRs, whose head branch does not exist in the base repository (or, worse,
+   * shares a name with an unrelated upstream branch).
+   */
+  readonly checkoutRef?: string;
 }
 
 /** File status in a pull request. */

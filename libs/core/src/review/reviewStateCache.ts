@@ -77,6 +77,12 @@ interface ReviewState {
   readonly files: Record<string, CachedFileReview>;
   /** Cached cross-file analysis result (if available) */
   readonly crossFileResult?: import("@merge-mentor/domain/platform.js").CrossFileReviewResult;
+  /**
+   * Fingerprint of the review configuration (strategy, passes, model) that
+   * produced these results. Results are only reused by an identical
+   * configuration, so a `deep` run never silently inherits `fast` results.
+   */
+  readonly fingerprint?: string;
 }
 
 /**
@@ -160,6 +166,7 @@ export class ReviewStateCache {
    * @param fileResults - Results from file reviews (source of truth)
    * @param fileShaMap - Map of filenames to their SHA256 hashes
    * @param crossFileResult - Optional cross-file analysis result
+   * @param fingerprint - Review configuration fingerprint (see {@link buildReviewFingerprint})
    *
    * @example
    * ```typescript
@@ -178,7 +185,8 @@ export class ReviewStateCache {
     prIdentifier: string,
     fileResults: readonly FileReviewResult[],
     fileShaMap: Map<string, string>,
-    crossFileResult?: import("@merge-mentor/domain/platform.js").CrossFileReviewResult
+    crossFileResult?: import("@merge-mentor/domain/platform.js").CrossFileReviewResult,
+    fingerprint?: string
   ): Promise<void> {
     try {
       await this.fileSystem.mkdir(this.cacheDir, { recursive: true });
@@ -196,6 +204,7 @@ export class ReviewStateCache {
         lastReviewedAt: this.clock.timestamp(),
         files,
         crossFileResult,
+        ...(fingerprint === undefined ? {} : { fingerprint }),
       };
 
       const filePath = this.getCachePath(prIdentifier);
@@ -250,6 +259,17 @@ export class ReviewStateCache {
   }
 
   /**
+   * Whether a cached state was produced by the given review configuration.
+   * State without a fingerprint (written by an older version) is incompatible.
+   *
+   * @param state - The cached state
+   * @param fingerprint - Fingerprint of the current review configuration
+   */
+  isCompatible(state: ReviewState, fingerprint: string): boolean {
+    return state.fingerprint === fingerprint;
+  }
+
+  /**
    * Clears the cache for a specific PR.
    *
    * Deletes the cache file for this PR. Safe to call even if cache doesn't exist.
@@ -279,4 +299,18 @@ export class ReviewStateCache {
   private getCachePath(prIdentifier: string): string {
     return path.join(this.cacheDir, `${prIdentifier}.json`);
   }
+}
+
+/**
+ * Builds the fingerprint that identifies a review configuration for caching.
+ *
+ * @param config - Strategy, ordered passes and configured model (undefined = provider default)
+ * @returns A stable string; equal configurations yield equal fingerprints
+ */
+export function buildReviewFingerprint(config: {
+  readonly strategy: string;
+  readonly passes: readonly string[];
+  readonly model?: string;
+}): string {
+  return JSON.stringify([config.strategy, [...config.passes], config.model ?? ""]);
 }

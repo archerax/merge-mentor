@@ -4,7 +4,7 @@ import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { createStubFileSystem } from "@merge-mentor/shared/ports/fileSystem.test-helper.js";
 import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
-import { ReviewStateCache } from "./reviewStateCache.js";
+import { buildReviewFingerprint, ReviewStateCache } from "./reviewStateCache.js";
 
 describe("ReviewStateCache", () => {
   const testCacheDir = ".test-cache";
@@ -312,6 +312,47 @@ describe("ReviewStateCache", () => {
       await expect(
         cache.saveState("Github-testrepo-PR555", [{ filename: "test.ts", findings: [] }], new Map())
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("review fingerprint", () => {
+    const fast = buildReviewFingerprint({ strategy: "fast", passes: ["bugs"], model: "m1" });
+
+    it("differs when the strategy, passes or model differ", () => {
+      expect(buildReviewFingerprint({ strategy: "deep", passes: ["bugs"], model: "m1" })).not.toBe(
+        fast
+      );
+      expect(
+        buildReviewFingerprint({ strategy: "fast", passes: ["bugs", "security"], model: "m1" })
+      ).not.toBe(fast);
+      expect(buildReviewFingerprint({ strategy: "fast", passes: ["bugs"], model: "m2" })).not.toBe(
+        fast
+      );
+      expect(buildReviewFingerprint({ strategy: "fast", passes: ["bugs"], model: "m1" })).toBe(
+        fast
+      );
+    });
+
+    it("round-trips through saveState and only matches the same configuration", async () => {
+      await cache.saveState("PR1", [], new Map(), undefined, fast);
+      const state = await cache.getState("PR1");
+
+      if (!state) throw new Error("expected saved state");
+      expect(cache.isCompatible(state, fast)).toBe(true);
+      expect(
+        cache.isCompatible(
+          state,
+          buildReviewFingerprint({ strategy: "deep", passes: ["bugs"], model: "m1" })
+        )
+      ).toBe(false);
+    });
+
+    it("treats state written without a fingerprint as incompatible", async () => {
+      await cache.saveState("PR2", [], new Map());
+      const state = await cache.getState("PR2");
+
+      if (!state) throw new Error("expected saved state");
+      expect(cache.isCompatible(state, fast)).toBe(false);
     });
   });
 });

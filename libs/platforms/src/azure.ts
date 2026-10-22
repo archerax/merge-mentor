@@ -23,7 +23,10 @@ import { PlatformApiError } from "@merge-mentor/shared/errors/index.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import { getIgnorePatterns, shouldIgnoreFile } from "@merge-mentor/shared/utils/ignoreFilter.js";
 import { extractMoSCoWTag } from "@merge-mentor/shared/utils/moscow.js";
-import { withRateLimitHandling } from "@merge-mentor/shared/utils/rateLimitHandler.js";
+import {
+  withRateLimitHandling,
+  withWriteRateLimitHandling,
+} from "@merge-mentor/shared/utils/rateLimitHandler.js";
 import * as azdev from "azure-devops-node-api";
 import type { JsonPatchDocument } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
 import type {
@@ -138,6 +141,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         author: pr.createdBy?.displayName || "unknown",
         baseBranch: pr.targetRefName?.replace("refs/heads/", "") || "",
         headBranch: pr.sourceRefName?.replace("refs/heads/", "") || "",
+        // Fork PRs: the source branch lives in another repository, so fetch the
+        // PR's merge ref from this one instead.
+        ...(pr.forkSource
+          ? { checkoutRef: `refs/pull/${pr.pullRequestId || prNumber}/merge` }
+          : {}),
       };
 
       this.auditLogger.logPRDetailsFetch(prNumber, "azure", "success");
@@ -829,7 +837,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         commentType: AzureCommentType.TEXT,
       };
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         gitApi.createComment(comment, this.repoName, prNumber, numericThreadId, this.project)
       );
 
@@ -871,7 +879,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         status: AzureThreadStatus.CLOSED,
       };
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         gitApi.updateThread(threadUpdate, this.repoName, prNumber, numericThreadId, this.project)
       );
 
@@ -918,7 +926,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         status: AzureThreadStatus.ACTIVE,
       };
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         gitApi.createThread(thread, this.repoName, prNumber, this.project)
       );
       this.auditLogger.logInlineCommentPost(prNumber, path, line, "azure", "success");
@@ -954,7 +962,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         status: AzureThreadStatus.ACTIVE,
       };
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         gitApi.createThread(thread, this.repoName, prNumber, this.project)
       );
       this.auditLogger.logGeneralCommentPost(prNumber, "azure", "success");
@@ -1168,7 +1176,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           }
         ).createRequestOptions("application/json", verData.apiVersion);
 
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           (
             witApi as unknown as {
               rest: {
@@ -1207,7 +1215,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
           }
         ).createRequestOptions("application/json", verData.apiVersion);
 
-        await withRateLimitHandling(() =>
+        await withWriteRateLimitHandling(() =>
           (
             witApi as unknown as {
               rest: {
@@ -1244,9 +1252,11 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
     }
 
     try {
-      const witApi = await withRateLimitHandling(() => this.connection.getWorkItemTrackingApi());
+      const witApi = await withWriteRateLimitHandling(() =>
+        this.connection.getWorkItemTrackingApi()
+      );
 
-      const attachment = await withRateLimitHandling(() =>
+      const attachment = await withWriteRateLimitHandling(() =>
         witApi.createAttachment({}, Readable.from([content]), fileName, "simple", this.project)
       );
 
@@ -1265,7 +1275,9 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
         },
       ];
 
-      await withRateLimitHandling(() => witApi.updateWorkItem({}, patch, workItemId, this.project));
+      await withWriteRateLimitHandling(() =>
+        witApi.updateWorkItem({}, patch, workItemId, this.project)
+      );
 
       this.logger.info({ id, fileName }, "Work item attachment created successfully");
     } catch (error) {
@@ -1341,7 +1353,7 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       if (details.title !== undefined) updateData.title = details.title;
       if (details.body !== undefined) updateData.description = details.body;
 
-      await withRateLimitHandling(() =>
+      await withWriteRateLimitHandling(() =>
         gitApi.updatePullRequest(updateData, repositoryId, prNumber, this.project)
       );
       this.auditLogger.logPRDetailsUpdate(prNumber, "azure", "success");

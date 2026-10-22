@@ -5,7 +5,7 @@ import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 import type { FileSystem, OutputWriter } from "@merge-mentor/shared/ports/index.js";
 
-import type { RepoManager } from "./repoManager.js";
+import type { ForkCheckout, RepoManager } from "./repoManager.js";
 
 /**
  * Options for the workspace manager.
@@ -56,7 +56,7 @@ export class WorkspaceManager {
    * Uses a pre-existing local checkout when available (e.g. in CI), otherwise
    * clones the repository to a local temp directory.
    */
-  async resolveWorkspace(branch: string): Promise<string> {
+  async resolveWorkspace(branch: string, fork?: ForkCheckout): Promise<string> {
     const localPath = this.options.localWorkspacePath;
     if (localPath) {
       try {
@@ -71,7 +71,7 @@ export class WorkspaceManager {
       this.logger.info({ localPath }, "Using pre-existing CI workspace, skipping clone");
       return localPath;
     }
-    return this.ensureRepoCloned(branch);
+    return this.ensureRepoCloned(branch, fork);
   }
 
   /**
@@ -79,7 +79,7 @@ export class WorkspaceManager {
    * Returns the path to the cloned repository.
    * @throws {Error} If repository cloning fails
    */
-  async ensureRepoCloned(branch: string): Promise<string> {
+  async ensureRepoCloned(branch: string, fork?: ForkCheckout): Promise<string> {
     this.log("📦 Cloning repository for workspace access...");
     this.logger.debug({ branch }, "Ensuring repository is cloned");
 
@@ -87,7 +87,7 @@ export class WorkspaceManager {
     const token = this.platform.getToken();
 
     try {
-      const repoPath = await this.repoManager.ensureRepo(repoInfo, branch, token);
+      const repoPath = await this.repoManager.ensureRepo(repoInfo, branch, token, fork);
 
       this.log(`  ✓ Repository ready at: ${repoPath}`);
       this.logger.info({ repoPath }, "Repository cloned successfully");

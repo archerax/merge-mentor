@@ -396,3 +396,24 @@ export function withRateLimit<TArgs extends unknown[], TResult>(
     return withRateLimitHandling(() => fn(...args), options);
   };
 }
+
+/**
+ * Like {@link withRateLimitHandling}, but for non-idempotent writes (posting or
+ * updating comments, creating threads).
+ *
+ * Only genuine rate-limit rejections (HTTP 429, or 403 "rate limit") are
+ * retried: the server refused the request, so nothing was created. A 5xx or a
+ * dropped connection may arrive *after* the server created the resource, and
+ * retrying it would post a duplicate.
+ *
+ * @param fn - The write to execute
+ * @param options - Rate limit configuration options
+ * @returns The result of the function
+ * @throws The last error if all retries are exhausted
+ */
+export async function withWriteRateLimitHandling<T>(
+  fn: () => Promise<T>,
+  options: RateLimitOptions = {}
+): Promise<T> {
+  return withRateLimitHandling(fn, { isRateLimitError, ...options });
+}

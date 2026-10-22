@@ -71,11 +71,9 @@ export class CliGitClient implements GitClient {
     auth: GitAuth,
     opts: GitCloneOptions
   ): Promise<void> {
-    const authArgs = buildAuthArgs(auth);
     const env = buildGitEnv(auth);
     await this.execFile(
       [
-        ...authArgs,
         "clone",
         "--depth",
         String(opts.depth ?? 1),
@@ -99,11 +97,9 @@ export class CliGitClient implements GitClient {
    * @param depth    - Shallow fetch depth (defaults to 1).
    */
   async fetch(repoPath: string, branch: string, auth: GitAuth, depth = 1): Promise<void> {
-    const authArgs = buildAuthArgs(auth);
     const env = buildGitEnv(auth);
     await this.execFile(
       [
-        ...authArgs,
         "-C",
         repoPath,
         "fetch",
@@ -114,6 +110,37 @@ export class CliGitClient implements GitClient {
       ],
       this.timeoutMs,
       env
+    );
+  }
+
+  /**
+   * Fetches `remoteRef` from `origin` into `refs/remotes/origin/<localBranch>`.
+   *
+   * @param repoPath    - Absolute path to the working tree.
+   * @param remoteRef   - Full remote ref name to fetch (e.g. `refs/pull/7/head`).
+   * @param localBranch - Name under `refs/remotes/origin/` to store it as.
+   * @param auth        - Authentication context.
+   * @param depth       - Shallow fetch depth (defaults to 1).
+   */
+  async fetchRef(
+    repoPath: string,
+    remoteRef: string,
+    localBranch: string,
+    auth: GitAuth,
+    depth = 1
+  ): Promise<void> {
+    await this.execFile(
+      [
+        "-C",
+        repoPath,
+        "fetch",
+        "--depth",
+        String(depth),
+        "origin",
+        `+${remoteRef}:refs/remotes/origin/${localBranch}`,
+      ],
+      this.timeoutMs,
+      buildGitEnv(auth)
     );
   }
 
@@ -402,38 +429,51 @@ export class CliGitClient implements GitClient {
 }
 
 /**
- * Builds `git -c` arguments that inject credentials as an HTTP Authorization
- * header for the duration of this command only.
+ * Builds the environment that injects credentials as an HTTP Authorization
+ * header for the duration of one git command.
  *
- * The header is scoped to the specific host so it cannot leak to unrelated
- * remotes. Nothing is written to `.git/config` or any file on disk.
+ * The header travels in `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` /
+ * `GIT_CONFIG_VALUE_n` rather than a `-c` argument, so the token never appears
+ * in the process listing (`ps`) of other local users. It is scoped to the
+ * specific host so it cannot leak to unrelated remotes, and nothing is written
+ * to `.git/config` or any file on disk. Any `GIT_CONFIG_*` entries already in
+ * the environment are preserved.
  *
  * GitHub  → `x-access-token:<token>` (standard PAT / OAuth format)
  * Azure   → `:<token>`               (empty username + PAT, per Microsoft docs)
- * CI mode → no args (environment supplies credentials)
+ * CI mode → no overrides (environment supplies credentials)
  */
-export function buildAuthArgs(auth: GitAuth): string[] {
+export function buildAuthEnv(
+  auth: GitAuth,
+  baseEnv: NodeJS.ProcessEnv = process.env
+): Record<string, string> {
   if (auth.type === "ci") {
-    return [];
+    return {};
   }
 
   const host = auth.platform === "azure" ? "https://dev.azure.com" : "https://github.com";
   const credentials = auth.platform === "azure" ? `:${auth.token}` : `x-access-token:${auth.token}`;
   const encoded = Buffer.from(credentials).toString("base64");
 
-  return ["-c", `http.${host}/.extraHeader=Authorization: Basic ${encoded}`];
+  const existing = Number.parseInt(baseEnv.GIT_CONFIG_COUNT ?? "0", 10);
+  const index = Number.isInteger(existing) && existing > 0 ? existing : 0;
+  return {
+    GIT_CONFIG_COUNT: String(index + 1),
+    [`GIT_CONFIG_KEY_${index}`]: `http.${host}/.extraHeader`,
+    [`GIT_CONFIG_VALUE_${index}`]: `Authorization: Basic ${encoded}`,
+  };
 }
 
 /**
  * Builds environment variables for git commands.
  *
  * Sets `GIT_TERMINAL_PROMPT=0` to prevent git from falling back to interactive
- * credential prompts — authentication is handled via `buildAuthArgs` instead.
+ * credential prompts and adds the credentials from {@link buildAuthEnv}.
  * In CI mode no overrides are needed.
  */
 export function buildGitEnv(auth: GitAuth): Record<string, string> {
   if (auth.type === "ci") {
     return {};
   }
-  return { GIT_TERMINAL_PROMPT: "0" };
+  return { GIT_TERMINAL_PROMPT: "0", ...buildAuthEnv(auth) };
 }

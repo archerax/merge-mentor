@@ -58,6 +58,24 @@ export interface RepoInfo {
   readonly project?: string;
 }
 
+/** Describes a fork PR head that must be fetched by ref from the base repository. */
+export interface ForkCheckout {
+  /** Full ref to fetch from the base repository (for example `refs/pull/7/head`). */
+  readonly ref: string;
+  /** Existing base-repository branch used to seed a fresh clone. */
+  readonly baseBranch: string;
+}
+
+/**
+ * Derives the local branch name used for a fork PR ref.
+ *
+ * Namespaced so it can never collide with (or be mistaken for) a same-named
+ * upstream branch such as `main`.
+ */
+function forkLocalBranch(ref: string): string {
+  return `mm-${ref.replace(/^refs\//, "").replaceAll(/[^A-Za-z0-9._-]+/g, "-")}`;
+}
+
 /**
  * Configuration options for repository operations.
  *
@@ -141,7 +159,12 @@ export class RepoManager {
    * );
    * ```
    */
-  async ensureRepo(repoInfo: RepoInfo, branch: string, token: string): Promise<string> {
+  async ensureRepo(
+    repoInfo: RepoInfo,
+    branch: string,
+    token: string,
+    fork?: ForkCheckout
+  ): Promise<string> {
     const repoPath = this.getRepoPath(repoInfo);
 
     try {
@@ -149,10 +172,10 @@ export class RepoManager {
 
       if (exists) {
         this.logger.info({ repoPath, branch }, "Updating existing repository");
-        await this.updateRepo(repoPath, branch, token, repoInfo);
+        await this.updateRepo(repoPath, branch, token, repoInfo, fork);
       } else {
         this.logger.info({ repoPath, branch }, "Cloning repository");
-        await this.cloneRepo(repoInfo, branch, token, repoPath);
+        await this.cloneRepo(repoInfo, branch, token, repoPath, fork);
       }
 
       return repoPath;
@@ -266,7 +289,8 @@ export class RepoManager {
     repoInfo: RepoInfo,
     branch: string,
     token: string,
-    repoPath: string
+    repoPath: string,
+    fork?: ForkCheckout
   ): Promise<void> {
     const cloneUrl = this.buildCloneUrl(repoInfo);
 
@@ -275,7 +299,14 @@ export class RepoManager {
 
     try {
       const auth = this.buildGitAuth(token, repoInfo.platform);
-      await this.gitClient.clone(cloneUrl, repoPath, auth, { branch });
+      // A fork PR's head branch is not in this repository: clone the base branch
+      // and fetch the PR ref on top of it.
+      await this.gitClient.clone(cloneUrl, repoPath, auth, {
+        branch: fork ? fork.baseBranch : branch,
+      });
+      if (fork) {
+        await this.checkoutForkRef(repoPath, fork, auth);
+      }
       this.logger.info({ repoPath, branch }, "Repository cloned successfully");
     } catch (error) {
       // Clean up partial clone on failure
@@ -298,7 +329,8 @@ export class RepoManager {
     repoPath: string,
     branch: string,
     token: string,
-    repoInfo: RepoInfo
+    repoInfo: RepoInfo,
+    fork?: ForkCheckout
   ): Promise<void> {
     const remoteUrl = this.buildCloneUrl(repoInfo);
 
@@ -311,11 +343,15 @@ export class RepoManager {
       // Update remote URL (keeps credentials out of stored config)
       await this.gitClient.setRemoteUrl(repoPath, remoteUrl);
 
-      // Fetch the latest state of the branch
-      await this.gitClient.fetch(repoPath, branch, auth);
+      if (fork) {
+        await this.checkoutForkRef(repoPath, fork, auth);
+      } else {
+        // Fetch the latest state of the branch
+        await this.gitClient.fetch(repoPath, branch, auth);
 
-      // Reset the working tree to the fetched branch
-      await this.gitClient.checkout(repoPath, branch);
+        // Reset the working tree to the fetched branch
+        await this.gitClient.checkout(repoPath, branch);
+      }
 
       this.logger.info({ repoPath, branch }, "Repository updated successfully");
     } catch (error) {
@@ -328,7 +364,7 @@ export class RepoManager {
       await this.fileSystem.rm(repoPath, { recursive: true, force: true }).catch(() => {});
 
       try {
-        await this.cloneRepo(repoInfo, branch, token, repoPath);
+        await this.cloneRepo(repoInfo, branch, token, repoPath, fork);
         this.logger.info({ repoPath, branch }, "Repository re-cloned successfully");
       } catch (cloneError) {
         throw new Error(
@@ -337,6 +373,17 @@ export class RepoManager {
         );
       }
     }
+  }
+
+  /** Fetches a fork PR's ref from the base repository and checks it out. */
+  private async checkoutForkRef(
+    repoPath: string,
+    fork: ForkCheckout,
+    auth: GitAuth
+  ): Promise<void> {
+    const localBranch = forkLocalBranch(fork.ref);
+    await this.gitClient.fetchRef(repoPath, fork.ref, localBranch, auth);
+    await this.gitClient.checkout(repoPath, localBranch);
   }
 
   /**

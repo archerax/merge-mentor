@@ -6,6 +6,7 @@ import {
   isTransientError,
   withRateLimit,
   withRateLimitHandling,
+  withWriteRateLimitHandling,
 } from "./rateLimitHandler.js";
 
 function customCheck(error: unknown): boolean {
@@ -465,5 +466,48 @@ describe("rateLimitHandler", () => {
 
       vi.useRealTimers();
     });
+  });
+});
+
+describe("withWriteRateLimitHandling", () => {
+  it.each([500, 502, 503, 504])(
+    "does not retry a %i, because the write may already have been applied",
+    async (status) => {
+      const fn = vi.fn().mockRejectedValue({ status });
+
+      await expect(withWriteRateLimitHandling(fn, { baseDelayMs: 1 })).rejects.toEqual({ status });
+      expect(fn).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it("does not retry a dropped connection", async () => {
+    const fn = vi.fn().mockRejectedValue(Object.assign(new Error("reset"), { code: "ECONNRESET" }));
+
+    await expect(withWriteRateLimitHandling(fn, { baseDelayMs: 1 })).rejects.toThrow("reset");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("still retries a 429", async () => {
+    const fn = vi.fn().mockRejectedValueOnce({ status: 429 }).mockResolvedValue("ok");
+
+    await expect(withWriteRateLimitHandling(fn, { baseDelayMs: 1 })).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("still retries a GitHub 403 rate limit", async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce({ status: 403, message: "API rate limit exceeded" })
+      .mockResolvedValue("ok");
+
+    await expect(withWriteRateLimitHandling(fn, { baseDelayMs: 1 })).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves read retries on 5xx unchanged", async () => {
+    const fn = vi.fn().mockRejectedValueOnce({ status: 503 }).mockResolvedValue("ok");
+
+    await expect(withRateLimitHandling(fn, { baseDelayMs: 1 })).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 });
