@@ -130,6 +130,11 @@ function normalizeRepoPath(filePath: string): string {
   return filePath.trim().replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
+/** Identity of a file finding, used to drop repeats when merging a coverage retry. */
+function findingKey(finding: FileReviewResult["findings"][number]): string {
+  return `${finding.line}:${finding.category}:${finding.message}`;
+}
+
 /**
  * Complete results from a pull request review.
  *
@@ -1659,12 +1664,19 @@ export class ReviewEngine {
     for (const list of lists) {
       for (const fileResult of list) {
         const existing = fileMap.get(fileResult.filename);
-        fileMap.set(
-          fileResult.filename,
-          existing
-            ? { ...existing, findings: [...existing.findings, ...fileResult.findings] }
-            : fileResult
-        );
+        if (!existing) {
+          fileMap.set(fileResult.filename, fileResult);
+          continue;
+        }
+        // A coverage retry can repeat a finding already reported for the file.
+        const seen = new Set(existing.findings.map(findingKey));
+        fileMap.set(fileResult.filename, {
+          ...existing,
+          findings: [
+            ...existing.findings,
+            ...fileResult.findings.filter((f) => !seen.has(findingKey(f))),
+          ],
+        });
       }
     }
     return [...fileMap.values()];
@@ -1822,26 +1834,38 @@ export class ReviewEngine {
       return [...filesToReview];
     }
 
-    const normalized = reviewedFiles.map((file) => normalizeRepoPath(file));
+    const targets = filesToReview.map((file) => normalizeRepoPath(file.filename));
+    const targetSet = new Set(targets);
 
-    // A bare basename ("index.ts") only counts when it identifies exactly one
-    // file in this batch; otherwise one reported file would mask all its namesakes.
     const basenameCounts = new Map<string, number>();
-    for (const file of filesToReview) {
-      const base = path.posix.basename(normalizeRepoPath(file.filename));
+    for (const target of targets) {
+      const base = path.posix.basename(target);
       basenameCounts.set(base, (basenameCounts.get(base) ?? 0) + 1);
     }
 
-    return filesToReview.filter((file) => {
-      const target = normalizeRepoPath(file.filename);
-      const base = path.posix.basename(target);
-      return !normalized.some(
-        (reviewed) =>
-          reviewed === target ||
-          reviewed.endsWith(`/${target}`) ||
-          (reviewed === base && basenameCounts.get(base) === 1)
-      );
-    });
+    // Attribute each reported path to at most one file in this batch, so one
+    // reported file can never mask a namesake or a path-suffix lookalike.
+    const covered = new Set<string>();
+    for (const reported of reviewedFiles.map((file) => normalizeRepoPath(file))) {
+      if (targetSet.has(reported)) {
+        covered.add(reported);
+        continue;
+      }
+      // A repo-prefixed path ("repo/src/a.ts") matches the longest file it ends with.
+      const suffixMatch = targets
+        .filter((target) => reported.endsWith(`/${target}`))
+        .toSorted((x, y) => y.length - x.length)[0];
+      if (suffixMatch) {
+        covered.add(suffixMatch);
+        continue;
+      }
+      // A bare basename only counts when it identifies exactly one file.
+      if (!reported.includes("/") && basenameCounts.get(reported) === 1) {
+        covered.add(targets.find((target) => path.posix.basename(target) === reported) ?? "");
+      }
+    }
+
+    return filesToReview.filter((file) => !covered.has(normalizeRepoPath(file.filename)));
   }
 
   /**

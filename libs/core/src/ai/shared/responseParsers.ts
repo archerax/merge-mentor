@@ -232,7 +232,13 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
     recommendations: [],
   };
 
-  return { fileResults, crossFileResult, reviewedFiles: Object.keys(data.file_results) };
+  // A file with an entry in file_results, or with any file-attributed finding in
+  // the flat format, was clearly reviewed.
+  const reviewedFiles = Array.from(
+    new Set([...Object.keys(data.file_results), ...fileFindings.keys()])
+  );
+
+  return { fileResults, crossFileResult, reviewedFiles };
 }
 
 /**

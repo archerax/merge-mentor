@@ -125,7 +125,7 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.overallAssessment).toBe("Fast review completed");
     expect(result.fileResults).toHaveLength(1);
     expect(result.fileResults[0].filename).toBe("main.ts");
-    expect(result.reviewedFiles).toEqual([]);
+    expect(result.reviewedFiles).toEqual(["main.ts"]);
   });
 
   it("parseFastReview reports files with an entry in file_results, even without findings", () => {

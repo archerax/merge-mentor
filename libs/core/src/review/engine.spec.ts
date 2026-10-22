@@ -1295,6 +1295,54 @@ describe("ReviewEngine", () => {
         expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
       });
 
+      it("does not let a longer path mask a file whose path is its suffix", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "a/index.ts" }),
+          createPRFile({ filename: "src/a/index.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "src/a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["src/a/index.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["a/index.ts"],
+          });
+
+        await engine.reviewPR(123);
+
+        // a/index.ts must be retried; src/a/index.ts must not
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not duplicate a finding the coverage retry repeats", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "file1.ts" }),
+          createPRFile({ filename: "file2.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file1.ts", findings: [finding] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [
+              { filename: "file1.ts", findings: [finding] },
+              { filename: "file2.ts", findings: [] },
+            ],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts", "file2.ts"],
+          });
+
+        const result = await engine.reviewPR(123);
+
+        expect(result.fileResults.find((r) => r.filename === "file1.ts")?.findings).toHaveLength(1);
+      });
+
       it("treats a response that reports no files as nothing reviewed and retries once", async () => {
         const engine = setupFastReview(mockPlatform, [createPRFile({ filename: "file1.ts" })]);
         mockParseFastReview.mockReturnValue({
