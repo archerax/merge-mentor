@@ -1,12 +1,12 @@
 {
+  "prIdentifier": "08-repo-rules-compliance",
   "files": [
     {
       "filename": "src/analytics/user.ts",
       "status": "modified",
+      "diffPath": "src__analytics__user.ts.diff",
       "additions": 8,
-      "deletions": 2,
-      "changes": 10,
-      "patchFile": "src__analytics__user.ts.diff"
+      "deletions": 2
     }
   ]
 }

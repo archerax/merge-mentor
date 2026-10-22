@@ -50,3 +50,18 @@ The evaluation harness compares detected findings against expected findings in t
 - **Quality Gate**: The command returns exit code `0` if overall recall and precision meet or exceed the specified thresholds (`--min-recall` and `--min-precision`), or exit code `1` if thresholds are violated.
 
 If the AI provider fails on a scenario (for example, it returns no content), that scenario is recorded as failed with 0% recall and the error message, and the remaining scenarios still run. The report is always written, so the quality gate fails but you can see every scenario's result.
+
+---
+
+## Corpus Format
+
+Each scenario directory holds `ground-truth.json`, `mock-response.json` and a `diffs/` folder with a `manifest.json`. Every manifest entry needs a `diffPath` pointing to a file in `diffs/`; an entry without one is an error.
+
+`ground-truth.json` classifies reported findings:
+
+- `expectedFindings`: must be caught. Missing one lowers recall.
+- `forbiddenFindings`: must not be reported for the given file. Reporting one is a false positive.
+- `acceptableFindings` (optional): genuine issues in the diff that are not required, for example a second real bug in the same change. A matching finding is neutral: it is neither a catch nor a false positive.
+- Any other finding is a false positive when the scenario lists at least one expected finding.
+
+Real providers run in a temporary directory that holds only the scenario's diffs, so they cannot read the ground truth.

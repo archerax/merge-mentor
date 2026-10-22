@@ -12,5 +12,14 @@
     }
   ],
   "forbiddenFindings": [],
+  "acceptableFindings": [
+    {
+      "id": "ok-01",
+      "filePath": "src/types/user.ts",
+      "category": "bug|quality|architecture|design",
+      "minSeverity": "low",
+      "containsKeywords": ["tenantid|required|breaking"]
+    }
+  ],
   "maxAllowedDuplicates": 0
 }

@@ -19,5 +19,14 @@
     }
   ],
   "forbiddenFindings": [],
+  "acceptableFindings": [
+    {
+      "id": "ok-01",
+      "filePath": "src/api/authMiddleware.ts",
+      "category": "security|bug",
+      "minSeverity": "low",
+      "containsKeywords": ["decode|null|unauthenticated|verif"]
+    }
+  ],
   "maxAllowedDuplicates": 0
 }

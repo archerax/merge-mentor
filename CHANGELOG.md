@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Eval**: the `eval` command now accepts `--ai-model`, `--ai-base-url` and
+  `--ai-api-key` (or `MM_AI_MODEL`, `MM_AI_BASE_URL`, `MM_AI_API_KEY`), so real
+  providers and BYOK endpoints such as DeepSeek can be evaluated. Real providers run
+  in a temporary diff-only sandbox, so the model can no longer read `ground-truth.json`
+  or `mock-response.json`. A provider error now fails that scenario instead of
+  aborting the whole run, and the report is still written. The `08`-`10` corpus
+  manifests used `patchFile` instead of `diffPath`, so those scenarios silently ran
+  without any diff; a manifest entry without `diffPath` is now an error. Ground truth
+  gained `acceptableFindings` for genuine extra issues, which are no longer counted
+  as false positives.
 - **Review**: PRs from forks are reviewed against the fork's code. The workspace is
   fetched from the base repository's PR ref (`refs/pull/<n>/head` on GitHub, the
   merge ref on Azure DevOps) instead of a branch that does not exist there, or

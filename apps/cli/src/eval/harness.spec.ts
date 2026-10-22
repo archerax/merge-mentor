@@ -1,4 +1,6 @@
 import type { Dirent, Stats } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 import type { FileFinding } from "@merge-mentor/domain/platform.js";
 import { AIProviderError, CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
@@ -45,10 +47,25 @@ function makeFinding(overrides: Partial<FileFinding & { filePath: string }> = {}
   } as FileFinding & { filePath: string };
 }
 
+function securityFinding(overrides: Record<string, unknown>) {
+  return {
+    line: 1,
+    severity: "high",
+    category: "security",
+    confidence: "high",
+    suggestion: "x",
+    reasoning: "y",
+    ...overrides,
+  };
+}
+
 function scenarioFs(files: Record<string, string>, accessFails: string[] = []): FileSystem {
   return {
     access: async (p: string) => {
       if (accessFails.some((suffix) => p.endsWith(suffix))) throw new Error("no access");
+      if (p.endsWith("diffs/manifest.json") && !Object.keys(files).some((k) => p.endsWith(k))) {
+        throw new Error("no access");
+      }
     },
     readFile: async (p: string) => {
       for (const [suffix, content] of Object.entries(files)) {
@@ -208,7 +225,9 @@ describe("Evaluation Harness Engine", () => {
           if (p.endsWith("mock-response.json")) return mockResponseJson;
           throw new Error("File not found");
         },
-        access: async () => {},
+        access: async (p: string) => {
+          if (p.endsWith("diffs/manifest.json")) throw new Error("no access");
+        },
         writeFile: async () => {},
         mkdir: async () => undefined,
         stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 100 }) as Stats,
@@ -462,6 +481,104 @@ describe("Evaluation Harness Engine", () => {
       expect(result.falsePositives).toHaveLength(2);
     });
 
+    it("treats acceptable findings as neutral but still penalises unlisted ones", async () => {
+      const fs = scenarioFs({
+        "ground-truth.json": JSON.stringify({
+          scenarioId: "s",
+          name: "S",
+          expectedFindings: [
+            {
+              id: "exp-1",
+              filePath: "src/auth/login.ts",
+              category: "security",
+              containsKeywords: ["sql injection"],
+            },
+          ],
+          forbiddenFindings: [],
+          acceptableFindings: [
+            {
+              id: "ok-1",
+              filePath: "src/auth/login.ts",
+              category: "security",
+              containsKeywords: ["plaintext"],
+            },
+          ],
+          maxAllowedDuplicates: 0,
+        }),
+        "mock-response.json": JSON.stringify({
+          fileResults: [
+            {
+              filename: "src/auth/login.ts",
+              findings: [
+                securityFinding({ message: "SQL injection in query" }),
+                securityFinding({ line: 2, message: "Password compared in plaintext" }),
+              ],
+            },
+          ],
+        }),
+      });
+
+      const accepted = await evaluateScenario("/test/corpus/s", {
+        fileSystem: fs,
+        provider: "mock",
+      });
+      expect(accepted.falsePositives).toEqual([]);
+      expect(accepted.precision).toBe(1);
+      expect(accepted.passed).toBe(true);
+
+      const strict = await evaluateScenario("/test/corpus/s", {
+        fileSystem: scenarioFs({
+          "ground-truth.json": JSON.stringify({
+            scenarioId: "s",
+            name: "S",
+            expectedFindings: [
+              {
+                id: "exp-1",
+                filePath: "src/auth/login.ts",
+                category: "security",
+                containsKeywords: ["sql injection"],
+              },
+            ],
+            forbiddenFindings: [],
+            maxAllowedDuplicates: 0,
+          }),
+          "mock-response.json": JSON.stringify({
+            fileResults: [
+              {
+                filename: "src/auth/login.ts",
+                findings: [
+                  securityFinding({ message: "SQL injection in query" }),
+                  securityFinding({ line: 2, message: "Password compared in plaintext" }),
+                ],
+              },
+            ],
+          }),
+        }),
+        provider: "mock",
+      });
+      expect(strict.falsePositives).toHaveLength(1);
+      expect(strict.precision).toBe(0.5);
+    });
+
+    it("rejects a manifest entry without diffPath instead of silently skipping diffs", async () => {
+      const fs = scenarioFs({
+        "ground-truth.json": JSON.stringify({
+          scenarioId: "s",
+          name: "S",
+          expectedFindings: [],
+          forbiddenFindings: [],
+          maxAllowedDuplicates: 0,
+        }),
+        "diffs/manifest.json": JSON.stringify({
+          files: [{ filename: "a.ts", status: "modified", patchFile: "a.diff" }],
+        }),
+      });
+
+      await expect(
+        evaluateScenario("/test/corpus/s", { fileSystem: fs, provider: "mock" })
+      ).rejects.toThrow(/no "diffPath"/);
+    });
+
     it("counts duplicate findings", async () => {
       const duplicate = {
         line: 1,
@@ -543,7 +660,9 @@ describe("Evaluation Harness Engine", () => {
     it("writes the report to outputFile when requested", async () => {
       const writeFile = vi.fn(async () => {});
       const fs: FileSystem = {
-        access: async () => {},
+        access: async (p: string) => {
+          if (p.endsWith("diffs/manifest.json")) throw new Error("no access");
+        },
         readFile: async (p: string) => {
           if (p.endsWith("ground-truth.json")) {
             return JSON.stringify({
@@ -610,4 +729,28 @@ describe("Evaluation Harness Engine", () => {
       expect(summary).toContain("Overall Status: ❌ FAIL");
     });
   });
+});
+
+describe("Evaluation corpus integrity", () => {
+  const corpusDir = path.join(process.cwd(), "test/eval/corpus");
+  const scenarios = readdirSync(corpusDir, { withFileTypes: true }).filter((d) => d.isDirectory());
+
+  it("contains scenarios", () => {
+    expect(scenarios.length).toBeGreaterThan(0);
+  });
+
+  it.each(scenarios.map((d) => d.name))(
+    "%s: every manifest entry points at a diff file",
+    (name) => {
+      const diffsDir = path.join(corpusDir, name, "diffs");
+      const manifest = JSON.parse(readFileSync(path.join(diffsDir, "manifest.json"), "utf-8")) as {
+        files: Array<{ filename: string; diffPath?: string }>;
+      };
+      expect(manifest.files.length).toBeGreaterThan(0);
+      for (const entry of manifest.files) {
+        expect(typeof entry.diffPath, `${entry.filename} needs diffPath`).toBe("string");
+        expect(existsSync(path.join(diffsDir, entry.diffPath as string))).toBe(true);
+      }
+    }
+  );
 });

@@ -183,35 +183,44 @@ export async function evaluateScenario(
 
     const diffManifestPath = path.join(scenarioDir, "diffs", "manifest.json");
     if (await pathExists(fs, diffManifestPath)) {
+      let manifest: DiffManifest;
       try {
-        const manifestContent = await fs.readFile(diffManifestPath, "utf-8");
-        const manifest = JSON.parse(manifestContent) as DiffManifest;
-        const files: string[] = [];
-        for (const f of manifest.files) {
-          const source = path.join(scenarioDir, "diffs", f.diffPath);
-          if (sandboxDir) {
-            const target = path.join(sandboxDir, ".mergementor", "diffs", f.diffPath);
-            await fs.mkdir(path.dirname(target), { recursive: true });
-            await fs.mkdir(path.join(sandboxDir, "diffs"), { recursive: true });
-            const content = await fs.readFile(source, "utf-8");
-            await fs.writeFile(target, content, "utf-8");
-            // Visible copy: directory listings omit the hidden folder above.
-            await fs.writeFile(path.join(sandboxDir, "diffs", f.diffPath), content, "utf-8");
-            files.push(target);
-          } else {
-            files.push(source);
-          }
-        }
-        prompt = buildGeneralFileReviewPrompt(manifest, undefined, workDir);
-        if (sandboxDir) {
-          // The diffs sit in the hidden .mergementor folder, which directory listings
-          // omit, and a read outside the sandbox is rejected and aborts the session.
-          prompt += SANDBOX_NOTE;
-        }
-        diffFiles = files;
-      } catch {
-        // Fall back to default prompt on error loading manifest
+        manifest = JSON.parse(await fs.readFile(diffManifestPath, "utf-8")) as DiffManifest;
+      } catch (err) {
+        throw new CorpusEvalError(
+          scenarioId,
+          `Failed to parse diffs/manifest.json: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
+      const files: string[] = [];
+      for (const f of manifest.files ?? []) {
+        if (typeof f.diffPath !== "string" || f.diffPath.length === 0) {
+          throw new CorpusEvalError(
+            scenarioId,
+            `diffs/manifest.json entry for "${f.filename}" has no "diffPath"`
+          );
+        }
+        const source = path.join(scenarioDir, "diffs", f.diffPath);
+        if (sandboxDir) {
+          const target = path.join(sandboxDir, ".mergementor", "diffs", f.diffPath);
+          await fs.mkdir(path.dirname(target), { recursive: true });
+          await fs.mkdir(path.join(sandboxDir, "diffs"), { recursive: true });
+          const content = await fs.readFile(source, "utf-8");
+          await fs.writeFile(target, content, "utf-8");
+          // Visible copy: directory listings omit the hidden folder above.
+          await fs.writeFile(path.join(sandboxDir, "diffs", f.diffPath), content, "utf-8");
+          files.push(target);
+        } else {
+          files.push(source);
+        }
+      }
+      prompt = buildGeneralFileReviewPrompt(manifest, undefined, workDir);
+      if (sandboxDir) {
+        // The diffs sit in the hidden .mergementor folder, which directory listings
+        // omit, and a read outside the sandbox is rejected and aborts the session.
+        prompt += SANDBOX_NOTE;
+      }
+      diffFiles = files;
     }
 
     if (sandboxDir) {
@@ -289,7 +298,14 @@ export async function evaluateScenario(
       }
     }
 
-    if (isForbidden || (!matchedFindingIndexes.has(i) && groundTruth.expectedFindings.length > 0)) {
+    const isAcceptable =
+      !isForbidden &&
+      (groundTruth.acceptableFindings ?? []).some((ok) => matchFinding(finding, ok));
+
+    if (
+      isForbidden ||
+      (!matchedFindingIndexes.has(i) && !isAcceptable && groundTruth.expectedFindings.length > 0)
+    ) {
       falsePositives.push(`${finding.filePath}:${finding.line} - ${finding.message}`);
     }
   }

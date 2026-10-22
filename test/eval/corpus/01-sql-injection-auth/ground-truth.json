@@ -18,5 +18,21 @@
       "reason": "Standard console logger refactor should not trigger security or performance flags"
     }
   ],
+  "acceptableFindings": [
+    {
+      "id": "ok-01",
+      "filePath": "src/auth/login.ts",
+      "category": "security",
+      "minSeverity": "low",
+      "containsKeywords": ["plaintext|plain text|hash|bcrypt|argon|scrypt", "password"]
+    },
+    {
+      "id": "ok-02",
+      "filePath": "src/auth/login.ts",
+      "category": "security|performance|quality",
+      "minSeverity": "low",
+      "containsKeywords": ["select *|columns|over-fetch|overfetch|sensitive"]
+    }
+  ],
   "maxAllowedDuplicates": 0
 }

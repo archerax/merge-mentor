@@ -48,6 +48,11 @@ export interface GroundTruth {
   readonly expectedFindings: readonly ExpectedFinding[];
   /** Forbidden false-positive findings that must not be reported. */
   readonly forbiddenFindings: readonly ForbiddenFinding[];
+  /**
+   * Genuine issues in the diff that are not required findings. A reported finding
+   * that matches one is neutral: it is neither a catch nor a false positive.
+   */
+  readonly acceptableFindings?: readonly ExpectedFinding[];
   /** Maximum number of duplicate findings tolerated before failing. */
   readonly maxAllowedDuplicates: number;
   /** Optional multi-pass re-review configuration. */
