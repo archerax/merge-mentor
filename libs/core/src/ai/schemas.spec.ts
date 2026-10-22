@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BatchedFileReviewResponseSchema,
   CrossFileReviewResponseSchema,
-  FastReviewResponseSchema,
   FileReviewResponseSchema,
   PBIAlignmentResponseSchema,
+  ReviewResponseSchema,
 } from "./schemas.js";
 
 describe("AI response schemas", () => {
@@ -54,14 +53,13 @@ describe("AI response schemas", () => {
     expect(parsed.findings[0].line).toBe(0);
   });
 
-  it("defaults empty cross-file, batched, and fast responses", () => {
+  it("defaults empty cross-file and review responses", () => {
     expect(CrossFileReviewResponseSchema.parse({})).toEqual({
       overall_assessment: "Review completed",
       findings: [],
       recommendations: [],
     });
-    expect(BatchedFileReviewResponseSchema.parse({})).toEqual({ file_results: {} });
-    expect(FastReviewResponseSchema.parse({})).toEqual({
+    expect(ReviewResponseSchema.parse({})).toEqual({
       summary: "Review completed",
       file_results: {},
       cross_file_findings: [],
@@ -81,5 +79,19 @@ describe("AI response schemas", () => {
     });
 
     expect(() => PBIAlignmentResponseSchema.parse({ title: "Missing id" })).toThrow("pbiId");
+  });
+
+  it("keeps architecture, design and testing categories on file and cross-file findings", () => {
+    const parsed = ReviewResponseSchema.parse({
+      file_results: {
+        "a.ts": {
+          findings: [{ severity: "medium", category: "testing", message: "No test covers this" }],
+        },
+      },
+      cross_file_findings: [{ severity: "high", category: "architecture", message: "Layering" }],
+    });
+
+    expect(parsed.file_results["a.ts"].findings[0].category).toBe("testing");
+    expect(parsed.cross_file_findings[0].category).toBe("architecture");
   });
 });

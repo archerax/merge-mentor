@@ -129,3 +129,68 @@ export async function runWithConcurrency<T, R>(
 
   return results;
 }
+
+/**
+ * Normalizes a repository path reported by the model so it can be compared
+ * against manifest filenames, stripping leading "./" and normalizing
+ * Windows-style backslashes to forward slashes.
+ */
+export function normalizeRepoPath(filePath: string): string {
+  return filePath.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/**
+ * Returns the filenames the model did not report a result for. An empty report
+ * means nothing was reviewed, so every file is returned.
+ *
+ * Each reported path is attributed to at most one expected file (an exact
+ * match, else the longest expected file it ends with, else a unique bare
+ * basename), so one reported file can never mask a namesake or a path-suffix
+ * lookalike.
+ *
+ * @param reported - Paths the model returned results for.
+ * @param expected - Filenames that should have been reported.
+ * @returns The expected filenames with no matching reported path.
+ */
+export function findUnreportedFiles(
+  reported: readonly string[],
+  expected: readonly string[]
+): string[] {
+  if (!reported || reported.length === 0) {
+    return [...expected];
+  }
+
+  const targets = expected.map((file) => normalizeRepoPath(file));
+  const targetSet = new Set(targets);
+
+  const basenameCounts = new Map<string, number>();
+  for (const target of targets) {
+    const base = path.posix.basename(target);
+    basenameCounts.set(base, (basenameCounts.get(base) ?? 0) + 1);
+  }
+
+  const covered = new Set<string>();
+  for (const reportedPath of reported.map((file) => normalizeRepoPath(file))) {
+    if (targetSet.has(reportedPath)) {
+      covered.add(reportedPath);
+      continue;
+    }
+    // A repo-prefixed path ("repo/src/a.ts") matches the longest file it ends with.
+    const suffixMatch = targets
+      .filter((target) => reportedPath.endsWith(`/${target}`))
+      .toSorted((x, y) => y.length - x.length)[0];
+    if (suffixMatch) {
+      covered.add(suffixMatch);
+      continue;
+    }
+    // A bare basename only counts when it identifies exactly one file.
+    if (!reportedPath.includes("/") && basenameCounts.get(reportedPath) === 1) {
+      const match = targets.find((target) => path.posix.basename(target) === reportedPath);
+      if (match) {
+        covered.add(match);
+      }
+    }
+  }
+
+  return expected.filter((file) => !covered.has(normalizeRepoPath(file)));
+}

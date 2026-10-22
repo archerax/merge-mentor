@@ -4,10 +4,7 @@ import type { PRDetails } from "@merge-mentor/domain/platform.js";
 import { buildSecurityPreamble, wrapUntrustedPRMetadata } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
-import {
-  buildBatchedFileResultsOutputFormat,
-  buildCrossFileOutputFormat,
-} from "./outputFormats.js";
+import { buildReviewOutputFormat, buildCrossFileOutputFormat } from "./outputFormats.js";
 import type { TestingCrossFileContext, TestingReviewContext } from "./types.js";
 
 const TESTING_WORKSPACE_BULLETS = [
@@ -490,7 +487,8 @@ Why skip: Arbitrary metric. Focus on important gaps, not percentage goals.
 Message: "Missing unit tests for API endpoint handler"
 Why skip: Didn't verify - comprehensive integration tests exist in tests/integration/. Not all code needs unit tests.
 
-${buildBatchedFileResultsOutputFormat({
+${buildReviewOutputFormat({
+  crossFile: "skip",
   analysisInstruction: "Document your testing analysis step-by-step",
   severityExample: "medium",
   categoryExample: "testing",

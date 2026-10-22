@@ -20,9 +20,9 @@ import {
   NO_INLINE_COMMENTS,
 } from "../../ai/prompts/commentContext.js";
 import { buildAgentPrompt, buildSynthesizerPrompt } from "../../ai/prompts/multiAgent/prompts.js";
-import { parseAgentReview, parseFastReview } from "../../ai/shared/responseParsers.js";
+import { parseAgentReviewResult, parseFastReview } from "../../ai/shared/responseParsers.js";
 import type { AIProviderClient, AIResponse, TokenUsage } from "../../ai/types.js";
-import { runWithConcurrency } from "../batching.js";
+import { findUnreportedFiles, runWithConcurrency } from "../batching.js";
 import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { getAllAgentIds, resolveAgentsFromPasses } from "./agents.js";
 
@@ -285,9 +285,24 @@ export class MultiAgentOrchestrator {
       promptType: "multi-agent-subagent",
     });
 
+    const parsed = parseAgentReviewResult(this.logger, response);
+
+    // Subagents return a result per file like every other strategy; flag any
+    // they skipped so thin coverage is visible rather than silently treated as clean.
+    const unreported = findUnreportedFiles(
+      parsed.reviewedFiles,
+      input.manifest.files.map((file) => file.filename)
+    );
+    if (unreported.length > 0) {
+      this.logger.warn(
+        { agent, unreportedCount: unreported.length, unreported },
+        "Subagent did not report a result for all files"
+      );
+    }
+
     return {
       agent,
-      findings: parseAgentReview(this.logger, response),
+      findings: parsed.findings,
       tokenUsage: response.tokenUsage,
     };
   }

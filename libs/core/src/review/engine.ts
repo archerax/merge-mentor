@@ -99,6 +99,7 @@ import type { FastReviewResult } from "../ai/types.js";
 import {
   DEFAULT_BATCH_MAX_BYTES,
   DEFAULT_BATCH_MAX_FILES,
+  findUnreportedFiles,
   planReviewBatches,
   runWithConcurrency,
 } from "./batching.js";
@@ -120,15 +121,6 @@ import { WorkspaceManager } from "./workspaceManager.js";
 
 /** Threshold size (150 KB) below which all file diffs are attached to the initial AI prompt. */
 const ATTACHMENT_SIZE_THRESHOLD_BYTES = 150 * 1024;
-
-/**
- * Normalizes a repository path reported by the model so it can be compared
- * against manifest filenames, stripping leading "./", separators, and
- * normalizing Windows-style backslashes to forward slashes.
- */
-function normalizeRepoPath(filePath: string): string {
-  return filePath.trim().replace(/\\/g, "/").replace(/^\.\//, "");
-}
 
 /** Identity of a file finding, used to drop repeats when merging a coverage retry. */
 function findingKey(finding: FileReviewResult["findings"][number]): string {
@@ -1823,49 +1815,20 @@ export class ReviewEngine {
 
   /**
    * Returns the subset of `filesToReview` that the model did not report in
-   * `reviewedFiles` (the files it returned an entry for). An empty report means
-   * nothing was reviewed, so every file is returned.
+   * `reviewedFiles` (the files it returned a result for). An empty report
+   * means nothing was reviewed, so every file is returned.
    */
   private findUnreviewedFiles(
     reviewedFiles: readonly string[],
     filesToReview: readonly PRFile[]
   ): PRFile[] {
-    if (!reviewedFiles || reviewedFiles.length === 0) {
-      return [...filesToReview];
-    }
-
-    const targets = filesToReview.map((file) => normalizeRepoPath(file.filename));
-    const targetSet = new Set(targets);
-
-    const basenameCounts = new Map<string, number>();
-    for (const target of targets) {
-      const base = path.posix.basename(target);
-      basenameCounts.set(base, (basenameCounts.get(base) ?? 0) + 1);
-    }
-
-    // Attribute each reported path to at most one file in this batch, so one
-    // reported file can never mask a namesake or a path-suffix lookalike.
-    const covered = new Set<string>();
-    for (const reported of reviewedFiles.map((file) => normalizeRepoPath(file))) {
-      if (targetSet.has(reported)) {
-        covered.add(reported);
-        continue;
-      }
-      // A repo-prefixed path ("repo/src/a.ts") matches the longest file it ends with.
-      const suffixMatch = targets
-        .filter((target) => reported.endsWith(`/${target}`))
-        .toSorted((x, y) => y.length - x.length)[0];
-      if (suffixMatch) {
-        covered.add(suffixMatch);
-        continue;
-      }
-      // A bare basename only counts when it identifies exactly one file.
-      if (!reported.includes("/") && basenameCounts.get(reported) === 1) {
-        covered.add(targets.find((target) => path.posix.basename(target) === reported) ?? "");
-      }
-    }
-
-    return filesToReview.filter((file) => !covered.has(normalizeRepoPath(file.filename)));
+    const missing = new Set(
+      findUnreportedFiles(
+        reviewedFiles,
+        filesToReview.map((file) => file.filename)
+      )
+    );
+    return filesToReview.filter((file) => missing.has(file.filename));
   }
 
   /**

@@ -8,7 +8,7 @@ import {
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
-import { buildFastReviewOutputFormat } from "./outputFormats.js";
+import { buildReviewOutputFormat } from "./outputFormats.js";
 
 /**
  * Builds the single-pass fast review prompt combining file-level analysis,
@@ -155,6 +155,6 @@ Only report findings that survive this check.
 - **File-level**: Include file and omit line number
 - **General/PR-level**: Omit both file and line
 
-${buildFastReviewOutputFormat(true)}
+${buildReviewOutputFormat()}
 `;
 }

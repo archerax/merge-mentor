@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   parseAgentReview,
+  parseAgentReviewResult,
   parseBatchedFileReview,
   parseCrossFileReview,
   parseFastReview,
   parseFileReview,
-  parseSynthesizedReview,
 } from "./responseParsers.js";
 
 describe("responseParsers", () => {
@@ -245,11 +245,11 @@ describe("responseParsers", () => {
     );
   });
 
-  it("parseSynthesizedReview splits file and cross-file findings", () => {
-    const response = {
+  it("parseReviewResponse also accepts the legacy flat findings list", () => {
+    const result = parseFastReview(mockLogger, {
       raw: "",
       parsed: {
-        overall_assessment: "Solid PR with minor concerns.",
+        summary: "Legacy",
         findings: [
           {
             file: "auth.ts",
@@ -258,9 +258,7 @@ describe("responseParsers", () => {
             confidence: "high",
             category: "security",
             message: "SQL injection risk",
-            suggestion: "Use parameterized queries",
-            reasoning:
-              "User input is concatenated into a SQL query on an added line, enabling injection.",
+            reasoning: "User input is concatenated into a SQL query on an added line.",
           },
           {
             severity: "high",
@@ -268,23 +266,59 @@ describe("responseParsers", () => {
             category: "architecture",
             message: "Layering violation across modules",
             reasoning:
-              "The new module reaches across layers on added lines, coupling presentation to data access.",
+              "The new module reaches across layers, coupling presentation to data access.",
             affected_files: ["auth.ts", "db.ts"],
           },
         ],
-        recommendations: ["Add integration tests"],
       },
-    };
+    });
 
-    const result = parseSynthesizedReview(mockLogger, response);
-
-    expect(result.overallAssessment).toBe("Solid PR with minor concerns.");
-    expect(result.fileResults).toHaveLength(1);
-    expect(result.fileResults[0].filename).toBe("auth.ts");
-    expect(result.fileResults[0].findings[0].line).toBe(12);
-    expect(result.crossFileResult.findings).toHaveLength(1);
+    expect(result.fileResults.map((r) => r.filename)).toEqual(["auth.ts"]);
+    expect(result.reviewedFiles).toEqual(["auth.ts"]);
     expect(result.crossFileResult.findings[0].affectedFiles).toEqual(["auth.ts", "db.ts"]);
-    expect(result.crossFileResult.recommendations).toEqual(["Add integration tests"]);
+  });
+
+  it("parseAgentReviewResult flattens file_results and cross_file_findings and reports covered files", () => {
+    const result = parseAgentReviewResult(mockLogger, {
+      raw: "",
+      parsed: {
+        file_results: {
+          "a.ts": {
+            findings: [
+              {
+                line: 4,
+                severity: "high",
+                confidence: "high",
+                category: "testing",
+                message: "No test",
+                reasoning: "The added branch has no test, so regressions go unnoticed here.",
+              },
+            ],
+          },
+          "b.ts": { findings: [] },
+        },
+        cross_file_findings: [
+          {
+            severity: "medium",
+            confidence: "high",
+            category: "design",
+            message: "Inconsistent API",
+            reasoning: "The two modules expose different signatures for the same concept.",
+            affected_files: ["a.ts", "b.ts"],
+          },
+        ],
+      },
+    });
+
+    expect(result.reviewedFiles).toEqual(["a.ts", "b.ts"]);
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings[0]).toMatchObject({ file: "a.ts", line: 4, category: "testing" });
+    expect(result.findings[1]).toMatchObject({
+      line: 0,
+      category: "design",
+      affectedFiles: ["a.ts", "b.ts"],
+    });
+    expect(result.findings[1].file).toBeUndefined();
   });
 
   it("warns on schema drift for every parser and falls back to defaults", () => {
@@ -312,23 +346,13 @@ describe("responseParsers", () => {
       reviewedFiles: [],
     });
     expect(parseAgentReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual([]);
-    expect(parseSynthesizedReview(logger, { raw: "", parsed: { findings: "nope" } })).toEqual({
-      overallAssessment: "Review completed",
-      fileResults: [],
-      crossFileResult: {
-        overallAssessment: "Review completed",
-        findings: [],
-        recommendations: [],
-      },
-    });
 
     expect(logger.warn.mock.calls.map((call) => call[1])).toEqual([
       "File review schema drift detected",
       "Cross-file review schema drift detected",
-      "Batched file review schema drift detected",
-      "Fast review schema drift detected",
-      "Subagent review schema drift detected",
-      "Synthesizer review schema drift detected",
+      "Review result schema drift detected",
+      "Review result schema drift detected",
+      "Review result schema drift detected",
     ]);
   });
 });

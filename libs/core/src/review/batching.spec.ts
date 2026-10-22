@@ -1,7 +1,13 @@
 import type { PRFile } from "@merge-mentor/domain/platform.js";
 import { describe, expect, it } from "vitest";
 
-import { estimateDiffBytes, planReviewBatches, runWithConcurrency } from "./batching.js";
+import {
+  estimateDiffBytes,
+  findUnreportedFiles,
+  normalizeRepoPath,
+  planReviewBatches,
+  runWithConcurrency,
+} from "./batching.js";
 
 function file(filename: string, patchLines = 3): PRFile {
   return {
@@ -77,5 +83,42 @@ describe("runWithConcurrency", () => {
     });
     expect(results).toEqual([2, 4, 6, 8, 10]);
     expect(peak).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("findUnreportedFiles", () => {
+  it("returns every file when nothing was reported", () => {
+    expect(findUnreportedFiles([], ["a.ts", "b.ts"])).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("accepts exact paths, ./ prefixes and backslashes", () => {
+    expect(findUnreportedFiles(["./src/a.ts", "src\\b.ts"], ["src/a.ts", "src/b.ts"])).toEqual([]);
+  });
+
+  it("attributes a repo-prefixed path to the longest matching file only", () => {
+    expect(findUnreportedFiles(["x/src/a/index.ts"], ["a/index.ts", "src/a/index.ts"])).toEqual([
+      "a/index.ts",
+    ]);
+  });
+
+  it("lets an exact path cover only itself, not a suffix lookalike", () => {
+    expect(findUnreportedFiles(["src/a/index.ts"], ["a/index.ts", "src/a/index.ts"])).toEqual([
+      "a/index.ts",
+    ]);
+  });
+
+  it("accepts a bare basename only when it identifies exactly one file", () => {
+    expect(findUnreportedFiles(["index.ts"], ["a/index.ts", "b/other.ts"])).toEqual(["b/other.ts"]);
+    expect(findUnreportedFiles(["index.ts"], ["a/index.ts", "b/index.ts"])).toEqual([
+      "a/index.ts",
+      "b/index.ts",
+    ]);
+  });
+});
+
+describe("normalizeRepoPath", () => {
+  it("trims, converts backslashes and strips a leading ./", () => {
+    expect(normalizeRepoPath("  .\\src\\a.ts ")).toBe("src/a.ts");
+    expect(normalizeRepoPath("./src/a.ts")).toBe("src/a.ts");
   });
 });

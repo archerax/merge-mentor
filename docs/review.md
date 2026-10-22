@@ -120,6 +120,10 @@ merge-mentor review --pr 123 --strategy multi-agent --passes security,performanc
 - **`deep`**: Highest issue detection rate. Uses multiple API calls. Under GitHub Copilot's usage-based billing, `deep` consumes roughly **2x the AI credits/tokens** compared to `fast`.
 - **`multi-agent`**: Deconstructs PR analysis into independent domain-specialized subagents (General Logic & Correctness, Security & Trust, Performance & Scalability, Test Coverage & Quality, Architecture & Style) that run concurrently, coordinated by a **Lead Synthesizer** that merges genuine duplicates, resolves conflicting recommendations, and applies a confidence threshold. Every enabled subagent runs on every review, so coverage is maximized — `multi-agent` is designed to surface **more** findings than the single-pass `fast` strategy.
 
+### Response Format
+
+All strategies ask the model for the same JSON response: a `summary`, a `file_results` map with an entry for **every** changed file (an empty `findings` array for files with nothing to report), and `cross_file_findings` for concerns that span files. An entry per file lets Merge Mentor tell a clean file from a skipped one. `deep` leaves `cross_file_findings` empty because it runs a separate cross-file pass, and the multi-agent synthesizer returns the same format after consolidating the subagents' findings.
+
 ### Multi-Agent Strategy Details
 
 The `multi-agent` strategy is a separate execution mode that reuses the existing review profiles, finding types, aggregation, comment lifecycle, and platform adapters. It does not replace `deep` or `fast`.

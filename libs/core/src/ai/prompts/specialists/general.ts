@@ -8,10 +8,7 @@ import {
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
-import {
-  buildBatchedFileResultsOutputFormat,
-  buildCrossFileOutputFormat,
-} from "./outputFormats.js";
+import { buildReviewOutputFormat, buildCrossFileOutputFormat } from "./outputFormats.js";
 import type { BaseCrossFileContext } from "./types.js";
 
 const FILE_REVIEW_ALLOWED_CATEGORIES = [
@@ -180,14 +177,15 @@ Before reporting ANY finding, ask yourself:
 
 Only report findings that survive this check.
 
-${buildBatchedFileResultsOutputFormat({
+${buildReviewOutputFormat({
   analysisInstruction: "Document your analysis step-by-step",
   severityExample: "high",
   categoryExample: "bug",
   messageExample: "Clear description of the problem",
   suggestionExample: "Specific fix with code example",
   reasoningExample: "Why this is a real issue and its concrete impact",
-  footer: `Return ONLY the JSON code block. Use only these categories: ${FILE_REVIEW_ALLOWED_CATEGORIES.join(", ")}. Include entry for EVERY file listed, even with empty findings.`,
+  fileCategories: FILE_REVIEW_ALLOWED_CATEGORIES,
+  crossFile: "skip",
 })}
 `;
 }
