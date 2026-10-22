@@ -74,6 +74,8 @@ export interface ScenarioEvalResult {
   readonly missedFindings: readonly string[];
   /** IDs of findings that were reported but not expected. */
   readonly falsePositives: readonly string[];
+  /** AI provider error that prevented this scenario from being reviewed, if any. */
+  readonly error?: string;
 }
 
 /** Aggregated evaluation report across all scenarios in the corpus. */

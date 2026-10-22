@@ -48,3 +48,5 @@ The evaluation harness compares detected findings against expected findings in t
 - **Recall**: Percentage of expected issues in the corpus correctly identified by the review process.
 - **Precision**: Percentage of detected findings that correspond to genuine expected issues (minimizing false positives).
 - **Quality Gate**: The command returns exit code `0` if overall recall and precision meet or exceed the specified thresholds (`--min-recall` and `--min-precision`), or exit code `1` if thresholds are violated.
+
+If the AI provider fails on a scenario (for example, it returns no content), that scenario is recorded as failed with 0% recall and the error message, and the remaining scenarios still run. The report is always written, so the quality gate fails but you can see every scenario's result.

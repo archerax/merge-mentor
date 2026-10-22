@@ -1,7 +1,7 @@
 import type { Dirent, Stats } from "node:fs";
 
 import type { FileFinding } from "@merge-mentor/domain/platform.js";
-import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import { AIProviderError, CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -349,6 +349,56 @@ describe("Evaluation Harness Engine", () => {
       expect(options.diffFiles[0].startsWith(options.workingDirectory)).toBe(true);
       expect(writes).toEqual(options.diffFiles);
       expect(removed).toEqual([options.workingDirectory]);
+    });
+
+    it("records a provider failure as a failed scenario instead of throwing", async () => {
+      const fs = scenarioFs({
+        "ground-truth.json": JSON.stringify({
+          scenarioId: "s",
+          name: "S",
+          expectedFindings: [
+            {
+              id: "exp-1",
+              filePath: "a.ts",
+              category: "security",
+              minSeverity: "high",
+              containsKeywords: ["x"],
+            },
+          ],
+          forbiddenFindings: [],
+          maxAllowedDuplicates: 0,
+        }),
+      });
+      mockProviderExecute.mockRejectedValueOnce(
+        new AIProviderError("copilot-sdk", "No content in response from Copilot SDK")
+      );
+
+      const result = await evaluateScenario("/test/corpus/x", {
+        fileSystem: fs,
+        provider: "copilot-sdk",
+      });
+
+      expect(result.passed).toBe(false);
+      expect(result.recall).toBe(0);
+      expect(result.missedFindings).toEqual(["exp-1"]);
+      expect(result.error).toContain("No content in response");
+    });
+
+    it("rethrows non-provider errors", async () => {
+      const fs = scenarioFs({
+        "ground-truth.json": JSON.stringify({
+          scenarioId: "s",
+          name: "S",
+          expectedFindings: [],
+          forbiddenFindings: [],
+          maxAllowedDuplicates: 0,
+        }),
+      });
+      mockProviderExecute.mockRejectedValueOnce(new TypeError("boom"));
+
+      await expect(
+        evaluateScenario("/test/corpus/x", { fileSystem: fs, provider: "copilot-sdk" })
+      ).rejects.toThrow("boom");
     });
 
     it("records missed findings and false positives", async () => {

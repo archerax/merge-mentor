@@ -9,7 +9,7 @@ import type {
   FileReviewResult,
   FindingSeverity,
 } from "@merge-mentor/domain/platform.js";
-import { CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
+import { AIProviderError, CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { nodeFs } from "@merge-mentor/shared/ports/fileSystem.js";
 
@@ -173,7 +173,8 @@ export async function evaluateScenario(
       : path.join(os.tmpdir(), `mm-eval-${scenarioId}-${process.pid}-${Date.now()}`);
   const workDir = sandboxDir ?? scenarioDir;
 
-  let response: AIResponse;
+  let response: AIResponse | undefined;
+  let providerError: string | undefined;
   try {
     let prompt =
       "Review all changed files in this pull request scenario. Return a JSON object with a fileResults array containing findings for each file.";
@@ -216,10 +217,29 @@ export async function evaluateScenario(
       workingDirectory: workDir,
       ...(diffFiles ? { diffFiles } : {}),
     });
+  } catch (err) {
+    // A provider failure fails this scenario, not the whole corpus run.
+    if (!(err instanceof AIProviderError)) throw err;
+    providerError = err.message;
   } finally {
     if (sandboxDir) {
       await fs.rm(sandboxDir, { recursive: true, force: true });
     }
+  }
+
+  if (response === undefined) {
+    return {
+      scenarioId: groundTruth.scenarioId || scenarioId,
+      name: groundTruth.name || scenarioId,
+      passed: false,
+      recall: 0,
+      precision: 0,
+      duplicateCount: 0,
+      caughtFindings: [],
+      missedFindings: groundTruth.expectedFindings.map((ef) => ef.id),
+      falsePositives: [],
+      error: providerError ?? "AI provider returned no response",
+    };
   }
 
   const fileResults: FileReviewResult[] = provider.parseBatchedFileReview(response);
@@ -376,6 +396,9 @@ export function formatTerminalSummary(report: FullEvalReport): string {
     lines.push(
       `[${status.padEnd(4)}] ${res.scenarioId.padEnd(28)} | Recall: ${recallPct.padStart(4)} | Prec: ${precPct.padStart(4)} | Dups: ${res.duplicateCount}`
     );
+    if (res.error) {
+      lines.push(`       Error: ${res.error}`);
+    }
     if (!res.passed) {
       if (res.missedFindings.length > 0) {
         lines.push(`       Missed Findings: ${res.missedFindings.join(", ")}`);
