@@ -130,13 +130,30 @@ export const CROSS_FILE_REVIEW_SCHEMA = {
   required: ["findings"],
 } as const;
 
-/** JSON schema for batched file review structured output. */
-export const BATCHED_FILE_REVIEW_SCHEMA = {
+const REVIEW_FINDING_CATEGORIES = [
+  "bug",
+  "security",
+  "performance",
+  "quality",
+  "documentation",
+  "architecture",
+  "design",
+  "testing",
+] as const;
+
+/**
+ * JSON schema for the review result returned by every review strategy (fast,
+ * deep, and the multi-agent subagents and synthesizer): a `file_results` entry
+ * for every changed file plus cross-file findings.
+ */
+export const REVIEW_RESULT_SCHEMA = {
   type: "object",
   properties: {
+    summary: { type: "string", description: "Brief summary of the review" },
     file_results: {
       type: "object",
-      description: "Map of filename to review results",
+      description:
+        "Map of filename to review results; MUST contain an entry for every changed file, with an empty findings array when a file has no findings",
       additionalProperties: {
         type: "object",
         properties: {
@@ -157,10 +174,7 @@ export const BATCHED_FILE_REVIEW_SCHEMA = {
                   enum: ["critical", "high", "medium", "low"],
                 },
                 confidence: { type: "string", enum: ["high", "medium", "low"] },
-                category: {
-                  type: "string",
-                  enum: ["bug", "security", "performance", "quality", "documentation"],
-                },
+                category: { type: "string", enum: REVIEW_FINDING_CATEGORIES },
                 message: { type: "string", description: "Finding description; must not be empty" },
                 suggestion: { type: "string", description: "Suggested fix, or empty string" },
                 replacement: {
@@ -177,63 +191,12 @@ export const BATCHED_FILE_REVIEW_SCHEMA = {
         required: ["findings"],
       },
     },
-  },
-  required: ["file_results"],
-} as const;
-
-/** JSON schema for fast review structured output. */
-export const FAST_REVIEW_SCHEMA = {
-  type: "object",
-  properties: {
-    summary: { type: "string", description: "Brief summary of the review" },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          file: {
-            type: "string",
-            description: "File path, or an empty string for cross-file/PR-level findings",
-          },
-          line: {
-            type: "number",
-            description:
-              "Line number, or null for file-level and cross-file findings that are not line-specific",
-          },
-          start_line: { type: "number", description: "Suggestion start line, or null" },
-          end_line: { type: "number", description: "Suggestion end line, or null" },
-          severity: {
-            type: "string",
-            enum: ["critical", "high", "medium", "low"],
-          },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          category: {
-            type: "string",
-            enum: [
-              "bug",
-              "security",
-              "performance",
-              "quality",
-              "documentation",
-              "architecture",
-              "design",
-              "testing",
-            ],
-          },
-          message: { type: "string", description: "Finding description; must not be empty" },
-          suggestion: { type: "string", description: "Suggested fix, or empty string" },
-          replacement: {
-            type: "string",
-            description: "Native suggestion replacement, or empty string",
-          },
-          reasoning: { type: "string", description: "Rationale, or empty string" },
-          isPreExisting: { type: "boolean" },
-        },
-        required: ["severity", "category", "message"],
-      },
+    cross_file_findings: {
+      ...CROSS_FILE_REVIEW_SCHEMA.properties.findings,
+      description: "Findings that span multiple files or are not tied to one file",
     },
   },
-  required: ["findings"],
+  required: ["file_results"],
 } as const;
 
 const BUILD_ANALYSIS_SCHEMA = {
@@ -356,15 +319,14 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
     case "cross-file-review":
       return CROSS_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "batched-file-review":
-      return BATCHED_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "fast-review":
-      return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
+    case "multi-agent-subagent":
+    case "multi-agent-synthesizer":
+      return REVIEW_RESULT_SCHEMA as unknown as Record<string, unknown>;
     case "build-analysis":
       return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
     case "project":
       return PROJECT_REVIEW_SCHEMA as unknown as Record<string, unknown>;
-    case "multi-agent-synthesizer":
-      return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     default:
       return undefined;
   }

@@ -181,6 +181,29 @@ function createPRDetails(): PRDetails {
   };
 }
 
+function capturedPromptTypes(): (string | undefined)[] {
+  return mockExecutePrompt.mock.calls.map(
+    (call) => (call[1] as { promptType?: string } | undefined)?.promptType
+  );
+}
+
+function setupFastReview(
+  mockPlatform: PlatformAdapter,
+  files: PRFile[],
+  options: Record<string, unknown> = {}
+) {
+  const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+    verbose: false,
+    reviewStrategy: "fast",
+    ...options,
+  });
+  vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+  vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+  vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+  mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+  return engine;
+}
+
 function createPRFile(overrides: Partial<PRFile> = {}): PRFile {
   return {
     filename: "test.ts",
@@ -1130,6 +1153,7 @@ describe("ReviewEngine", () => {
             ],
           },
         ],
+        reviewedFiles: ["test.ts"],
         crossFileResult: {
           overallAssessment: "Fast review complete",
           findings: [],
@@ -1163,6 +1187,7 @@ describe("ReviewEngine", () => {
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
       mockParseFastReview.mockReturnValue({
         fileResults: [],
+        reviewedFiles: ["file1.ts", "file2.ts"],
         crossFileResult: {
           overallAssessment: "Clean",
           findings: [],
@@ -1210,6 +1235,219 @@ describe("ReviewEngine", () => {
         "file1.ts",
         "file2.ts",
       ]);
+    });
+
+    describe("fast review batching and coverage", () => {
+      const emptyCrossFile = { overallAssessment: "ok", findings: [], recommendations: [] };
+      const finding = {
+        line: 2,
+        severity: "medium" as const,
+        confidence: "high" as const,
+        category: "bug",
+        message: "Missing null check",
+        reasoning: "Value can be undefined here, which throws at runtime.",
+      };
+
+      it("re-reviews files the model did not report and keeps their findings", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "file1.ts" }),
+          createPRFile({ filename: "file2.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file1.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file2.ts", findings: [finding] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file2.ts"],
+          });
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+        const file2 = result.fileResults.find((r) => r.filename === "file2.ts");
+        expect(file2?.findings).toHaveLength(1);
+      });
+
+      it("does not treat one reported file as coverage for others with the same basename", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "a/index.ts" }),
+          createPRFile({ filename: "b/index.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["a/index.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "b/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["b/index.ts"],
+          });
+
+        await engine.reviewPR(123);
+
+        // b/index.ts was missing, so a follow-up call must have been made for it
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not let a longer path mask a file whose path is its suffix", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "a/index.ts" }),
+          createPRFile({ filename: "src/a/index.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "src/a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["src/a/index.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "a/index.ts", findings: [] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["a/index.ts"],
+          });
+
+        await engine.reviewPR(123);
+
+        // a/index.ts must be retried; src/a/index.ts must not
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not duplicate a finding the coverage retry repeats", async () => {
+        const engine = setupFastReview(mockPlatform, [
+          createPRFile({ filename: "file1.ts" }),
+          createPRFile({ filename: "file2.ts" }),
+        ]);
+        mockParseFastReview
+          .mockReturnValueOnce({
+            fileResults: [{ filename: "file1.ts", findings: [finding] }],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts"],
+          })
+          .mockReturnValueOnce({
+            fileResults: [
+              { filename: "file1.ts", findings: [finding] },
+              { filename: "file2.ts", findings: [] },
+            ],
+            crossFileResult: emptyCrossFile,
+            reviewedFiles: ["file1.ts", "file2.ts"],
+          });
+
+        const result = await engine.reviewPR(123);
+
+        expect(result.fileResults.find((r) => r.filename === "file1.ts")?.findings).toHaveLength(1);
+      });
+
+      it("treats a response that reports no files as nothing reviewed and retries once", async () => {
+        const engine = setupFastReview(mockPlatform, [createPRFile({ filename: "file1.ts" })]);
+        mockParseFastReview.mockReturnValue({
+          fileResults: [],
+          crossFileResult: emptyCrossFile,
+          reviewedFiles: [],
+        });
+
+        const result = await engine.reviewPR(123);
+
+        // One call plus one retry; the second empty report does not loop further
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+        expect(result.fileResults).toHaveLength(1);
+      });
+
+      it("splits large reviews into batches and adds a cross-file pass", async () => {
+        const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"].map((filename) =>
+          createPRFile({ filename })
+        );
+        const engine = setupFastReview(mockPlatform, files, { batchMaxFiles: 2 });
+        mockParseFastReview.mockImplementation(() => ({
+          fileResults: [],
+          crossFileResult: emptyCrossFile,
+          reviewedFiles: files.map((f) => f.filename),
+        }));
+
+        const result = await engine.reviewPR(123);
+
+        const promptTypes = mockExecutePrompt.mock.calls.map(
+          (call) => (call[1] as { promptType: string }).promptType
+        );
+        expect(promptTypes.filter((t) => t === "fast-review")).toHaveLength(3);
+        expect(promptTypes.filter((t) => t === "cross-file-review")).toHaveLength(1);
+        expect(result.fileResults.map((r) => r.filename).toSorted()).toEqual([
+          "a.ts",
+          "b.ts",
+          "c.ts",
+          "d.ts",
+          "e.ts",
+        ]);
+      });
+    });
+
+    describe("deep and multi-agent batching", () => {
+      const finding = {
+        line: 2,
+        severity: "medium" as const,
+        confidence: "high" as const,
+        category: "bug",
+        message: "Missing null check",
+        reasoning: "Value can be undefined here, which throws at runtime.",
+      };
+      it("deep review splits large reviews into batches and retries files missing from a response", async () => {
+        const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"].map((filename) =>
+          createPRFile({ filename })
+        );
+        const engine = setupFastReview(mockPlatform, files, {
+          reviewStrategy: "deep",
+          batchMaxFiles: 2,
+        });
+        mockParseBatchedFileReview.mockReturnValue([]);
+
+        const result = await engine.reviewPR(123);
+
+        // 3 batches, each retried once because the model returned nothing
+        expect(capturedPromptTypes().filter((t) => t === "batched-file-review")).toHaveLength(6);
+        expect(result.fileResults).toHaveLength(5);
+      });
+
+      it("deep review keeps findings returned by the coverage retry", async () => {
+        const engine = setupFastReview(
+          mockPlatform,
+          [createPRFile({ filename: "file1.ts" }), createPRFile({ filename: "file2.ts" })],
+          { reviewStrategy: "deep" }
+        );
+        mockParseBatchedFileReview
+          .mockReturnValueOnce([{ filename: "file1.ts", findings: [] }])
+          .mockReturnValueOnce([{ filename: "file2.ts", findings: [finding] }]);
+
+        const result = await engine.reviewPR(123);
+
+        expect(capturedPromptTypes().filter((t) => t === "batched-file-review")).toHaveLength(2);
+        expect(result.fileResults.find((r) => r.filename === "file2.ts")?.findings).toHaveLength(1);
+      });
+
+      it("multi-agent review runs the pipeline per batch and adds a cross-file pass", async () => {
+        const files = ["a.ts", "b.ts", "c.ts"].map((filename) => createPRFile({ filename }));
+        const engine = setupFastReview(mockPlatform, files, {
+          reviewStrategy: "multi-agent",
+          streamingEnabled: false,
+          batchMaxFiles: 2,
+        });
+
+        const result = await engine.reviewPR(123);
+
+        expect(capturedPromptTypes().filter((t) => t === "multi-agent-synthesizer")).toHaveLength(
+          2
+        );
+        expect(capturedPromptTypes().filter((t) => t === "cross-file-review")).toHaveLength(1);
+        expect(result.fileResults.map((r) => r.filename).toSorted()).toEqual([
+          "a.ts",
+          "b.ts",
+          "c.ts",
+        ]);
+      });
     });
 
     it("uses the multi-agent strategy with subagents and a lead synthesizer", async () => {
@@ -1454,6 +1692,7 @@ describe("ReviewEngine", () => {
             findings: [],
           },
         ],
+        reviewedFiles: ["file1.ts", "file2.ts"],
         crossFileResult: {
           overallAssessment: "Pass 1 Assessment",
           findings: [
@@ -1498,6 +1737,7 @@ describe("ReviewEngine", () => {
             ],
           },
         ],
+        reviewedFiles: ["file2.ts"],
         crossFileResult: {
           overallAssessment: "Pass 2 Assessment",
           findings: [

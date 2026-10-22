@@ -9,7 +9,7 @@ import {
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
-import { buildFastReviewOutputFormat } from "../specialists/outputFormats.js";
+import { buildReviewOutputFormat } from "../specialists/outputFormats.js";
 
 /** Focus-area instructions for each specialized subagent role. */
 interface AgentFocus {
@@ -123,6 +123,18 @@ Changed Files:
 ${filesListing}`;
 }
 
+/** Categories accepted for findings in the multi-agent review result. */
+const REVIEW_FINDING_CATEGORIES = [
+  "bug",
+  "security",
+  "performance",
+  "quality",
+  "documentation",
+  "architecture",
+  "design",
+  "testing",
+];
+
 /**
  * Builds the prompt for a single specialized subagent.
  */
@@ -228,41 +240,16 @@ Before reporting ANY finding, ask yourself:
 Only report findings that survive this check, but do not use uncertainty about
 one finding as a reason to omit other independently supported findings.
 
-# OUTPUT FORMAT
-
-Return ONLY the JSON object below in a markdown code block:
-\`\`\`json
-{
-  "findings": [
-    {
-      "file": "path/to/file.ts",
-      "line": 45,
-      "severity": "high",
-      "confidence": "high",
-      "category": "security",
-      "message": "Clear description of the problem",
-      "suggestion": "Specific fix with code example",
-      "reasoning": "Why this is a real issue and its concrete impact",
-      "isPreExisting": false
-    },
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "architecture",
-      "message": "Cross-file concern spanning multiple files",
-      "reasoning": "System-level impact and verification",
-      "affected_files": ["file1.ts", "file2.ts"]
-    }
-  ]
-}
-\`\`\`
+${buildReviewOutputFormat({
+  categoryExample: "security",
+  fileCategories: REVIEW_FINDING_CATEGORIES,
+})}
 
 Rules:
-- Every FILE-LEVEL finding must include \`file\` and \`line\`. Line numbers are pre-calculated in the diff.
-- For a CROSS-FILE / PR-LEVEL concern that spans multiple files, omit \`file\` and \`line\` and list every affected file in \`affected_files\`. Use this only for genuine overarching issues (e.g. an API contract broken across call sites, a layering violation spanning modules) — not for a problem that lives in one file.
-- \`category\` must be one of: bug, security, performance, quality, documentation, architecture, design, testing
+- Put every FILE-LEVEL finding under its file in \`file_results\`, with the \`line\` from the diff. Line numbers are pre-calculated in the diff.
+- For a CROSS-FILE / PR-LEVEL concern that spans multiple files, use \`cross_file_findings\` and list every affected file in \`affected_files\`. Use this only for genuine overarching issues (e.g. an API contract broken across call sites, a layering violation spanning modules) — not for a problem that lives in one file.
 - Only report NEW issues on added lines (+). Set \`isPreExisting\` for issues existing in removed lines.
-- Return an empty \`findings\` array when no substantive issues survive the checks.
+- Return an empty \`findings\` array for each file with no substantive issues that survive the checks.
 `;
 }
 
@@ -373,15 +360,18 @@ ${formatAgentFindings(options.agentResults)}
    judgment and explain the winning reasoning in the finding's \`reasoning\`.
 4. **PRIORITIZE:** Order findings by severity (critical first, then high, medium, low).
 5. **ATTRIBUTION:**
-   - Line-specific finding → include \`file\` and \`line\`.
-   - File-level finding → include \`file\`, omit \`line\`.
-   - Cross-file / PR-level finding → omit \`file\` and \`line\`, list \`affected_files\`.
-6. **CROSS-FILE FINDINGS:** This pass uses the fast-review flat findings contract. A genuine cross-file finding may omit \`file\` and \`line\`; do not add an \`affected_files\` field.
+   - Line-specific finding → place it under its file in \`file_results\` and include \`line\`.
+   - File-level finding → place it under its file in \`file_results\`, omit \`line\`.
+   - Cross-file / PR-level finding → place it in \`cross_file_findings\` and list every affected file in \`affected_files\`.
+6. **COVERAGE:** Return an entry in \`file_results\` for every changed file listed above, with an empty \`findings\` array for files that have no findings.
 
 Before finalizing, account for every substantive subagent finding. Re-check the
 actual diff only to validate location, impact, and conflicts; do not discard a
 finding because it is inconvenient to explain or would make the report longer.
 
-${buildFastReviewOutputFormat()}
+${buildReviewOutputFormat({
+  fileCategories: REVIEW_FINDING_CATEGORIES,
+  role: "synthesizer",
+})}
 `;
 }

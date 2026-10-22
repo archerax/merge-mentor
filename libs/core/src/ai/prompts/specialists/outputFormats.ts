@@ -1,19 +1,46 @@
-/** Options controlling the JSON schema and surrounding instructions of the batched file results output format. */
-interface BatchedFileResultsOutputFormatOptions {
+/** Categories allowed for file-level findings unless a prompt widens them. */
+const DEFAULT_FILE_CATEGORIES = ["bug", "security", "performance", "quality", "documentation"];
+
+/** Categories allowed for cross-file findings. */
+const CROSS_FILE_CATEGORIES = [
+  "architecture",
+  "design",
+  "testing",
+  "documentation",
+  "bug",
+  "security",
+  "performance",
+  "quality",
+];
+
+/** Options controlling the shared review result output format used by every review strategy. */
+interface ReviewOutputFormatOptions {
   /** Optional step-by-step analysis instruction prepended to the RESPONSE directive. */
   readonly analysisInstruction?: string;
   /** Example severity value shown in the JSON schema. */
-  readonly severityExample: string;
+  readonly severityExample?: string;
   /** Example category value shown in the JSON schema. */
-  readonly categoryExample: string;
+  readonly categoryExample?: string;
   /** Example finding message shown in the JSON schema. */
-  readonly messageExample: string;
+  readonly messageExample?: string;
   /** Example suggestion value shown in the JSON schema. */
-  readonly suggestionExample: string;
+  readonly suggestionExample?: string;
   /** Example reasoning value shown in the JSON schema. */
-  readonly reasoningExample: string;
-  /** Footer text appended after the JSON schema, typically category and completeness rules. */
-  readonly footer: string;
+  readonly reasoningExample?: string;
+  /** Categories allowed for file-level findings (default: bug, security, performance, quality, documentation). */
+  readonly fileCategories?: readonly string[];
+  /**
+   * `report` (default) asks for cross-file findings. `skip` leaves
+   * `cross_file_findings` empty because a separate pass handles cross-file analysis.
+   */
+  readonly crossFile?: "report" | "skip";
+  /**
+   * `reviewer` (default) reads every diff and returns a result for each file.
+   * `synthesizer` consolidates subagent findings and returns a result for each listed file.
+   */
+  readonly role?: "reviewer" | "synthesizer";
+  /** Extra rules appended after the JSON schema, before the shared coverage rules. */
+  readonly footer?: string;
 }
 
 /** Options controlling the JSON schema and surrounding instructions of the cross-file output format. */
@@ -74,53 +101,6 @@ ${footer}${nativeSuggestionRules}`;
 }
 
 /**
- * Builds the batched file results output format section with a file_results
- * JSON schema containing a per-file findings array.
- *
- * @param options - Options providing the example values and footer text.
- * @returns The batched file results output format markdown section.
- */
-export function buildBatchedFileResultsOutputFormat(
-  options: BatchedFileResultsOutputFormatOptions
-): string {
-  const {
-    analysisInstruction,
-    severityExample,
-    categoryExample,
-    messageExample,
-    suggestionExample,
-    reasoningExample,
-    footer,
-  } = options;
-
-  return buildOutputFormatSection(
-    `${analysisInstruction ? `1. REVIEW: ${analysisInstruction}\n` : ""}${analysisInstruction ? "2" : "1"}. RESPONSE: Return ONLY the JSON object below in a markdown code block`,
-    `{
-  "file_results": {
-    "path/to/file.ts": {
-      "findings": [
-        {
-          "line": 45,
-          "start_line": 45,
-          "end_line": 45,
-          "severity": "${severityExample}",
-          "confidence": "high",
-          "category": "${categoryExample}",
-          "message": "${messageExample}",
-          "suggestion": "${suggestionExample}",
-          "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
-          "reasoning": "${reasoningExample}",
-          "isPreExisting": false
-        }
-      ]
-    }
-  }
-}`,
-    footer
-  );
-}
-
-/**
  * Builds the cross-file output format section with a flat findings array plus
  * overall assessment and recommendations in JSON.
  *
@@ -161,77 +141,99 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
-/**
- * Builds the fast review output format section describing the combined
- * summary/findings JSON schema, attribution rules, and native suggestion rules.
- *
- * @param includeCoverage - When true, require a `reviewed_files` list so that
- *   per-file coverage is verifiable. Enabled for the fast file review; omitted
- *   for the multi-agent synthesizer, which does not review files directly.
- * @returns The fast review output format markdown section.
- */
-export function buildFastReviewOutputFormat(includeCoverage = false): string {
-  const coverageField = includeCoverage
-    ? `
-  "reviewed_files": ["path/to/file.ts", "path/to/other.ts"],`
-    : "";
-  const coverageFooter = includeCoverage
-    ? `
+/** Indents every line of `text` by `spaces` spaces. */
+function indent(text: string, spaces: number): string {
+  return text
+    .split("\n")
+    .map((line) => " ".repeat(spaces) + line)
+    .join("\n");
+}
 
-COVERAGE:
+/**
+ * Builds the output format section shared by every review strategy (fast,
+ * deep, and the multi-agent subagents and synthesizer): a summary, a
+ * `file_results` entry for every changed file (even with no findings, so a
+ * skipped file is detectable), and `cross_file_findings`.
+ *
+ * @param options - Optional example values, categories, role and extra rules.
+ * @returns The review result output format markdown section.
+ */
+export function buildReviewOutputFormat(options: ReviewOutputFormatOptions = {}): string {
+  const {
+    analysisInstruction,
+    severityExample = "high",
+    categoryExample = "bug",
+    messageExample = "Clear description of the problem",
+    suggestionExample = "Specific fix with code example",
+    reasoningExample = "Complete verification including data flow, impact, and severity justification",
+    fileCategories = DEFAULT_FILE_CATEGORIES,
+    crossFile = "report",
+    role = "reviewer",
+    footer,
+  } = options;
+
+  const findingExample = `{
+  "line": 45,
+  "start_line": 45,
+  "end_line": 45,
+  "severity": "${severityExample}",
+  "confidence": "high",
+  "category": "${categoryExample}",
+  "message": "${messageExample}",
+  "suggestion": "${suggestionExample}",
+  "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
+  "reasoning": "${reasoningExample}",
+  "isPreExisting": false
+}`;
+  const crossFileExample = `{
+  "severity": "high",
+  "confidence": "high",
+  "category": "architecture",
+  "message": "Cross-file or system-level concern",
+  "reasoning": "System-wide impact and verification",
+  "affected_files": ["path/to/file.ts", "path/to/other.ts"]
+}`;
+
+  const crossFileSchema = crossFile === "report" ? `[\n${indent(crossFileExample, 4)}\n  ]` : "[]";
+
+  const schema = `{
+  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
+  "file_results": {
+    "path/to/file.ts": {
+      "findings": [
+${indent(findingExample, 8)}
+      ]
+    },
+    "path/to/other.ts": { "findings": [] }
+  },
+  "cross_file_findings": ${crossFileSchema}
+}`;
+
+  const defaultFooter = `Use only these categories for file findings: ${fileCategories.join(", ")}.${
+    crossFile === "report"
+      ? `
+Put concerns that span files, or are not tied to one file, in \`cross_file_findings\` (categories: ${CROSS_FILE_CATEGORIES.join(", ")}) and list every affected file in \`affected_files\`. Do not use it for a problem that lives in one file.`
+      : `
+Leave \`cross_file_findings\` as an empty array: cross-file analysis is a separate pass.`
+  }`;
+
+  const coverageRules =
+    role === "synthesizer"
+      ? `COVERAGE:
+- \`file_results\` MUST contain an entry for EVERY changed file listed above, with \`"findings": []\` for files with no findings.
+- Put each consolidated file-level finding under its file; put cross-file findings in \`cross_file_findings\`.`
+      : `COVERAGE:
 - You MUST review EVERY changed file thoroughly before responding.
 - Read every file's diff IN FULL; do not skim, sample, or skip any file.
-- \`reviewed_files\` MUST list EVERY changed file, including files with no findings.
-- Do not omit a file because it looks small, trivial, repetitive, or test-only.`
-    : "";
+- \`file_results\` MUST contain an entry for EVERY changed file, with \`"findings": []\` for files with no findings.
+- Do not omit a file because it looks small, trivial, repetitive, or test-only.`;
 
   return buildOutputFormatSection(
-    "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",
-    `{
-  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",${coverageField}
-  "findings": [
-    {
-      "file": "path/to/file.ts",
-      "line": 45,
-      "start_line": 45,
-      "end_line": 45,
-      "severity": "high",
-      "confidence": "high",
-      "category": "bug",
-      "message": "Clear description of the problem",
-      "suggestion": "Specific fix with code example",
-      "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
-      "reasoning": "Complete verification including data flow, impact, and severity justification",
-      "isPreExisting": false
-    },
-    {
-      "file": "path/to/file.ts",
-      "severity": "medium",
-      "confidence": "high",
-      "category": "maintainability",
-      "message": "File-level concern without specific line",
-      "suggestion": "How to address the issue",
-      "reasoning": "Why this matters for the file overall"
-    },
-    {
-      "severity": "high",
-      "confidence": "high",
-      "category": "architecture",
-      "message": "Cross-file or system-level concern",
-      "suggestion": "How to address across affected files",
-      "reasoning": "System-wide impact and verification"
-    }
-  ]
-}`,
-    `## Attribution Rules:
-- **Line-specific**: Include both \`file\` and \`line\` (e.g., specific bug at line 45)
-- **File-level**: Include \`file\` but omit \`line\` (e.g., overall complexity concern)
-- **General/PR-level**: Omit both \`file\` and \`line\` (e.g., architectural pattern violation)
+    `${analysisInstruction ? `1. REVIEW: ${analysisInstruction}\n` : ""}${analysisInstruction ? "2" : "1"}. RESPONSE: Return ONLY the JSON object below in a markdown code block`,
+    schema,
+    `${footer ?? defaultFooter}
 
-REMEMBER:
-- Consider BOTH file-level AND architectural concerns in your analysis
-- Use appropriate attribution for each finding type
-- The summary should cover both individual code quality and overall architecture${coverageFooter}`,
+${coverageRules}`,
     true
   );
 }

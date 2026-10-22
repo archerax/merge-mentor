@@ -46,6 +46,7 @@ vi.mock("@merge-mentor/core/ai/index.js", async (importOriginal) => {
               findings: [makeFinding({ line: 1, severity: "critical" })],
             },
           ],
+          reviewedFiles: ["src/bug.ts"],
           crossFileResult: {
             overallAssessment: "One blocking issue found.",
             findings: [],

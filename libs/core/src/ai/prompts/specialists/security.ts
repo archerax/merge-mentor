@@ -8,10 +8,7 @@ import {
 } from "../securityPreamble.js";
 import { buildSeverityContextSection } from "../severityContext.js";
 import { buildFilesListing, buildWorkspaceSection } from "../shared/workspaceSection.js";
-import {
-  buildBatchedFileResultsOutputFormat,
-  buildCrossFileOutputFormat,
-} from "./outputFormats.js";
+import { buildReviewOutputFormat, buildCrossFileOutputFormat } from "./outputFormats.js";
 import type { BaseCrossFileContext } from "./types.js";
 
 /**
@@ -317,7 +314,8 @@ Before reporting ANY finding, challenge yourself:
 
 For security findings that could be questioned, apply the self-challenge above before reporting. Only include findings where the attack vector is realistic and not already mitigated.
 
-${buildBatchedFileResultsOutputFormat({
+${buildReviewOutputFormat({
+  crossFile: "skip",
   analysisInstruction: "Document your security analysis step-by-step",
   severityExample: "critical",
   categoryExample: "security",

@@ -67,27 +67,49 @@ export const CrossFileReviewResponseSchema = z.object({
   recommendations: z.array(z.coerce.string()).default([]),
 });
 
-// Batched File Review Schema
-/** Zod schema validating the batched file review response, keyed by filename to per-file results. */
-export const BatchedFileReviewResponseSchema = z.object({
-  file_results: z.record(z.string(), FileReviewResponseSchema).default({}),
+// Review result (shared by the fast, deep and multi-agent strategies)
+
+/** Categories accepted for any finding in a review result (file-level and cross-file). */
+const ReviewFindingCategorySchema = z
+  .enum([
+    "bug",
+    "security",
+    "performance",
+    "quality",
+    "documentation",
+    "architecture",
+    "design",
+    "testing",
+  ])
+  .catch("quality");
+
+/** A file-level finding inside a review result's `file_results` map. */
+const ReviewFileFindingSchema = FileFindingSchema.extend({
+  category: ReviewFindingCategorySchema,
 });
 
-// Fast Review (Flat combined findings list)
-const FastReviewFindingSchema = FileFindingSchema.extend({
+/** Legacy flat finding: file-level when `file` is set, otherwise a cross-file concern. */
+const ReviewFlatFindingSchema = ReviewFileFindingSchema.extend({
   file: z.coerce.string().optional(),
+  /** Files affected by a cross-file (PR-level) finding. */
+  affected_files: z.array(z.coerce.string()).default([]),
 });
 
 /**
- * Zod schema validating the fast review response: a summary, the list of files
- * the model actually read, and a flat findings list. `reviewed_files` makes
- * per-file coverage verifiable so skipped files are detectable rather than
- * silently treated as clean.
+ * Zod schema validating the review result returned by every review strategy
+ * (fast, deep, and the multi-agent subagents and synthesizer): a summary, a
+ * `file_results` entry for every changed file (even with no findings, so a
+ * missing file is detectable rather than silently treated as clean), and
+ * `cross_file_findings` for concerns that span files. A legacy flat `findings`
+ * list is still accepted when parsing.
  */
-export const FastReviewResponseSchema = z.object({
+export const ReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
-  reviewed_files: z.array(z.coerce.string()).default([]),
-  findings: z.array(FastReviewFindingSchema).default([]),
+  file_results: z
+    .record(z.string(), z.object({ findings: z.array(ReviewFileFindingSchema).default([]) }))
+    .default({}),
+  cross_file_findings: z.array(CrossFileFindingSchema).default([]),
+  findings: z.array(ReviewFlatFindingSchema).default([]),
 });
 
 /** Zod schema validating the PBI alignment review response (criteria statuses and assessment). */
@@ -106,50 +128,4 @@ export const PBIAlignmentResponseSchema = z.object({
   missingCriteria: z.array(z.coerce.string()).default([]),
   scopeCreep: z.array(z.coerce.string()).default([]),
   overallAssessment: z.coerce.string().default(""),
-});
-
-// Multi-agent review schemas
-
-/** Category union shared by multi-agent file findings and synthesized findings. */
-const MultiAgentFindingCategorySchema = z
-  .enum([
-    "bug",
-    "security",
-    "performance",
-    "quality",
-    "documentation",
-    "architecture",
-    "design",
-    "testing",
-  ])
-  .catch("quality");
-
-/** A finding reported by a specialized subagent or the lead synthesizer. */
-const MultiAgentFindingSchema = z.object({
-  file: z.coerce.string().optional(),
-  line: z.coerce.number().int().nonnegative().default(0),
-  start_line: z.coerce.number().int().positive().optional(),
-  end_line: z.coerce.number().int().positive().optional(),
-  severity: FindingSeveritySchema,
-  confidence: FindingConfidenceSchema,
-  category: MultiAgentFindingCategorySchema,
-  message: z.coerce.string().default(""),
-  suggestion: z.coerce.string().default(""),
-  replacement: z.coerce.string().optional(),
-  reasoning: z.coerce.string().default("Reasoning not provided by the model."),
-  isPreExisting: z.boolean().default(false),
-  /** Files affected by a cross-file (pr-level) finding. Only used by the synthesizer. */
-  affected_files: z.array(z.coerce.string()).default([]),
-});
-
-/** Response from a single specialized subagent. */
-export const AgentReviewResponseSchema = z.object({
-  findings: z.array(MultiAgentFindingSchema).default([]),
-});
-
-/** Response from the lead synthesizer (deduplicated, filtered, prioritized). */
-export const SynthesizedReviewResponseSchema = z.object({
-  overall_assessment: z.coerce.string().default("Review completed"),
-  findings: z.array(MultiAgentFindingSchema).default([]),
-  recommendations: z.array(z.coerce.string()).default([]),
 });

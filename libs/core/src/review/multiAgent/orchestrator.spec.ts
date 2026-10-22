@@ -227,13 +227,13 @@ describe("MultiAgentOrchestrator", () => {
       switch (options?.promptType) {
         case "multi-agent-subagent":
           return createResponse({
-            findings: [
+            file_results: {},
+            cross_file_findings: [
               {
                 severity: "high",
                 confidence: "high",
                 category: "architecture",
                 message: "Layering violation spans modules",
-                suggestion: "Move shared types into a common package",
                 reasoning:
                   "Callers across multiple modules break the API contract; system-level impact.",
                 affected_files: ["src/auth.ts", "src/api.ts"],
@@ -243,7 +243,8 @@ describe("MultiAgentOrchestrator", () => {
         case "multi-agent-synthesizer":
           return createResponse({
             summary: "Architecture concerns found.",
-            findings: [
+            file_results: {},
+            cross_file_findings: [
               {
                 severity: "high",
                 confidence: "high",
@@ -254,7 +255,6 @@ describe("MultiAgentOrchestrator", () => {
                 affected_files: ["src/auth.ts", "src/api.ts"],
               },
             ],
-            recommendations: ["Restructure the modules"],
           });
         default:
           return createResponse({});
@@ -280,7 +280,7 @@ describe("MultiAgentOrchestrator", () => {
     expect(output.crossFileResult.findings).toEqual([
       expect.objectContaining({
         message: "Layering violation spans modules",
-        affectedFiles: [],
+        affectedFiles: ["src/auth.ts", "src/api.ts"],
       }),
     ]);
     expect(output.agentResults[0].findings[0].affectedFiles).toEqual(["src/auth.ts", "src/api.ts"]);
@@ -436,7 +436,7 @@ describe("MultiAgentOrchestrator", () => {
     expect(output.crossFileResult.findings).toHaveLength(1);
   });
 
-  it("parses cross-file findings using the fast-review contract", async () => {
+  it("parses cross-file findings from the shared review result and keeps affected files", async () => {
     const { provider, setResponder } = createMockProvider();
 
     setResponder(async (_prompt: string, options?: ExecutePromptOptions) => {
@@ -445,8 +445,9 @@ describe("MultiAgentOrchestrator", () => {
           return createResponse({ findings: [] });
         case "multi-agent-synthesizer":
           return createResponse({
-            overall_assessment: "Review completed",
-            findings: [
+            summary: "Review completed",
+            file_results: {},
+            cross_file_findings: [
               {
                 severity: "high",
                 confidence: "high",
@@ -456,7 +457,6 @@ describe("MultiAgentOrchestrator", () => {
                 affected_files: ["src/auth.ts"],
               },
             ],
-            recommendations: ["Restructure the module"],
           });
         default:
           return createResponse({});
@@ -470,7 +470,7 @@ describe("MultiAgentOrchestrator", () => {
     });
 
     expect(output.crossFileResult.findings).toHaveLength(1);
-    expect(output.crossFileResult.findings[0].affectedFiles).toEqual([]);
+    expect(output.crossFileResult.findings[0].affectedFiles).toEqual(["src/auth.ts"]);
     expect(output.crossFileResult.recommendations).toEqual([]);
   });
 

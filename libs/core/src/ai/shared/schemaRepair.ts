@@ -21,11 +21,16 @@ interface FindingRequirements {
 const FINDING_REQUIREMENTS: Partial<Record<PromptType, FindingRequirements>> = {
   "file-review": { message: true },
   "cross-file-review": { message: true },
-  "fast-review": { message: true },
-  "multi-agent-synthesizer": { message: true },
-  "multi-agent-subagent": { message: true },
   project: { issue: true },
 };
+
+/** Prompt types whose response is the shared review result (`file_results` + `cross_file_findings`). */
+const REVIEW_RESULT_PROMPT_TYPES: ReadonlySet<PromptType> = new Set([
+  "batched-file-review",
+  "fast-review",
+  "multi-agent-subagent",
+  "multi-agent-synthesizer",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -84,7 +89,7 @@ export function collectSchemaRepairReasons(parsed: unknown, promptType: PromptTy
     return reasons;
   }
 
-  if (promptType === "batched-file-review") {
+  if (REVIEW_RESULT_PROMPT_TYPES.has(promptType)) {
     const fileResults = parsed.file_results;
     if (isRecord(fileResults)) {
       for (const [filename, fileData] of Object.entries(fileResults)) {
@@ -97,6 +102,8 @@ export function collectSchemaRepairReasons(parsed: unknown, promptType: PromptTy
         );
       }
     }
+    checkFindings(parsed.cross_file_findings, "cross_file_findings", { message: true }, reasons);
+    checkFindings(parsed.findings, "findings", { message: true }, reasons);
     return reasons;
   }
 

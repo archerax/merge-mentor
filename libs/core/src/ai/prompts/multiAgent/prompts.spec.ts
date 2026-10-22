@@ -139,9 +139,22 @@ describe("multi-agent prompts", () => {
         manifest: createManifest(),
       });
 
-      expect(prompt).toContain('"affected_files": ["file1.ts", "file2.ts"]');
-      expect(prompt).toContain("Every FILE-LEVEL finding must include");
+      expect(prompt).toContain('"affected_files": ["path/to/file.ts", "path/to/other.ts"]');
+      expect(prompt).toContain('"cross_file_findings"');
+      expect(prompt).toContain("Put every FILE-LEVEL finding under its file in `file_results`");
       expect(prompt).toContain("CROSS-FILE / PR-LEVEL concern");
+    });
+
+    it("asks for a result for every file using the shared review result format", () => {
+      const prompt = buildAgentPrompt({
+        agent: "security",
+        prDetails: createPRDetails(),
+        manifest: createManifest(),
+      });
+
+      expect(prompt).toContain('"file_results"');
+      expect(prompt).toContain("`file_results` MUST contain an entry for EVERY changed file");
+      expect(prompt).toContain("architecture, design, testing");
     });
   });
 
@@ -241,7 +254,10 @@ describe("multi-agent prompts", () => {
 
       expect(prompt).toContain('"affectedFiles": [');
       expect(prompt).toContain("Layering violation spans modules");
-      expect(prompt).toContain("CROSS-FILE FINDINGS");
+      expect(prompt).toContain("place it in `cross_file_findings`");
+      expect(prompt).toContain(
+        "`file_results` MUST contain an entry for EVERY changed file listed above"
+      );
     });
 
     it("includes full existing-comment context and root-cause suppression rule", () => {
