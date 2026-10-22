@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "AI Provider for evaluation (mock, copilot-sdk, opencode-sdk). Use copilot-sdk for DeepSeek (BYOK)"
+        description: "AI Provider for evaluation (mock, copilot-sdk, opencode-sdk). copilot-sdk runs DeepSeek (BYOK); mock is offline"
         required: true
-        default: "mock"
+        default: "copilot-sdk"
       model:
         description: "Model name (e.g. deepseek-flash). Overrides the MM_AI_MODEL variable"
         required: false
@@ -51,7 +51,7 @@ jobs:
           MM_AI_MODEL: ${{ github.event.inputs.model || vars.MM_AI_MODEL || 'deepseek-flash' }}
           MM_AI_API_KEY: ${{ secrets.MM_AI_API_KEY }}
           LOG_LEVEL: debug
-          EVAL_PROVIDER: ${{ github.event.inputs.provider || 'mock' }}
+          EVAL_PROVIDER: ${{ github.event.inputs.provider || 'copilot-sdk' }}
           EVAL_MIN_RECALL: ${{ github.event.inputs.min_recall || '0.90' }}
           EVAL_MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.85' }}
         run: |
