@@ -167,6 +167,40 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.findings).toHaveLength(1);
   });
 
+  it("parseFastReview keeps cross-file categories and affected files from cross_file_findings", () => {
+    const result = parseFastReview(mockLogger, {
+      raw: "",
+      parsed: {
+        summary: "Done",
+        file_results: { "a.ts": { findings: [] } },
+        cross_file_findings: [
+          {
+            severity: "high",
+            confidence: "high",
+            category: "architecture",
+            message: "Layering violation",
+            reasoning: "The controller calls the repository directly, bypassing the service layer.",
+            affected_files: ["a.ts", "b.ts"],
+          },
+          {
+            severity: "medium",
+            confidence: "high",
+            category: "testing",
+            message: "No test covers the new branch",
+            reasoning: "The added branch in a.ts has no corresponding test in the PR.",
+            affected_files: ["a.ts"],
+          },
+        ],
+      },
+    });
+
+    expect(result.crossFileResult.findings.map((f) => f.category)).toEqual([
+      "architecture",
+      "testing",
+    ]);
+    expect(result.crossFileResult.findings[0].affectedFiles).toEqual(["a.ts", "b.ts"]);
+  });
+
   it("parseAgentReview splits file and cross-file findings", () => {
     const response = {
       raw: "",

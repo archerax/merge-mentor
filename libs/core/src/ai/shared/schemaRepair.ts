@@ -21,7 +21,6 @@ interface FindingRequirements {
 const FINDING_REQUIREMENTS: Partial<Record<PromptType, FindingRequirements>> = {
   "file-review": { message: true },
   "cross-file-review": { message: true },
-  "fast-review": { message: true },
   "multi-agent-synthesizer": { message: true },
   "multi-agent-subagent": { message: true },
   project: { issue: true },
@@ -84,7 +83,7 @@ export function collectSchemaRepairReasons(parsed: unknown, promptType: PromptTy
     return reasons;
   }
 
-  if (promptType === "batched-file-review") {
+  if (promptType === "batched-file-review" || promptType === "fast-review") {
     const fileResults = parsed.file_results;
     if (isRecord(fileResults)) {
       for (const [filename, fileData] of Object.entries(fileResults)) {
@@ -96,6 +95,10 @@ export function collectSchemaRepairReasons(parsed: unknown, promptType: PromptTy
           reasons
         );
       }
+    }
+    if (promptType === "fast-review") {
+      checkFindings(parsed.cross_file_findings, "cross_file_findings", { message: true }, reasons);
+      checkFindings(parsed.findings, "findings", { message: true }, reasons);
     }
     return reasons;
   }

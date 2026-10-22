@@ -199,8 +199,8 @@ export function buildFastReviewOutputFormat(perFileResults = false): string {
   "confidence": "high",
   "category": "architecture",
   "message": "Cross-file or system-level concern",
-  "suggestion": "How to address across affected files",
-  "reasoning": "System-wide impact and verification"
+  "reasoning": "System-wide impact and verification",
+  "affected_files": ["path/to/file.ts", "path/to/other.ts"]
 }`;
 
   const perFileSchema = `{

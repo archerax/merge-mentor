@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BATCHED_FILE_REVIEW_SCHEMA,
   CROSS_FILE_REVIEW_SCHEMA,
+  FAST_FILE_REVIEW_SCHEMA,
   FAST_REVIEW_SCHEMA,
   FILE_REVIEW_SCHEMA,
   getJsonSchema,
@@ -24,8 +25,32 @@ describe("jsonSchemas", () => {
       expect(getJsonSchema("batched-file-review")).toBe(BATCHED_FILE_REVIEW_SCHEMA);
     });
 
-    it("returns FAST_REVIEW_SCHEMA for 'fast-review'", () => {
-      expect(getJsonSchema("fast-review")).toBe(FAST_REVIEW_SCHEMA);
+    it("returns FAST_FILE_REVIEW_SCHEMA for 'fast-review'", () => {
+      expect(getJsonSchema("fast-review")).toBe(FAST_FILE_REVIEW_SCHEMA);
+    });
+
+    it("lets the fast review return a per-file entry and cross-file findings", () => {
+      const schema = getJsonSchema("fast-review") as {
+        properties: Record<string, unknown>;
+        required: string[];
+      };
+      expect(Object.keys(schema.properties)).toEqual(
+        expect.arrayContaining(["summary", "file_results", "cross_file_findings"])
+      );
+      expect(schema.required).toContain("file_results");
+    });
+
+    it("keeps cross-file categories valid in fast review cross_file_findings", () => {
+      const schema = getJsonSchema("fast-review") as {
+        properties: {
+          cross_file_findings: {
+            items: { properties: { category: { enum: string[] } } };
+          };
+        };
+      };
+      expect(schema.properties.cross_file_findings.items.properties.category.enum).toEqual(
+        expect.arrayContaining(["architecture", "design", "testing"])
+      );
     });
 
     it("returns FAST_REVIEW_SCHEMA for the multi-agent synthesizer", () => {
@@ -83,6 +108,7 @@ describe("jsonSchemas", () => {
 
     it("returns undefined for the batched schema because it uses an open-ended map", () => {
       expect(getStrictJsonSchema("batched-file-review")).toBeUndefined();
+      expect(getStrictJsonSchema("fast-review")).toBeUndefined();
     });
 
     it("returns undefined when the prompt type has no schema", () => {

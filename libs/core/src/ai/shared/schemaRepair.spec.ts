@@ -49,6 +49,22 @@ describe("collectSchemaRepairReasons", () => {
     expect(collectSchemaRepairReasons(fileLevel, "fast-review")).toEqual([]);
   });
 
+  it("checks findings nested under file_results and cross_file_findings for fast reviews", () => {
+    const parsed = {
+      file_results: {
+        "src/a.ts": { findings: [{ severity: "high", category: "bug", message: "" }] },
+        "src/b.ts": { findings: [] },
+      },
+      cross_file_findings: [{ severity: "high", category: "architecture", message: "" }],
+    };
+
+    const reasons = collectSchemaRepairReasons(parsed, "fast-review");
+
+    expect(reasons).toHaveLength(2);
+    expect(reasons[0]).toContain('file_results["src/a.ts"].findings[0].message');
+    expect(reasons[1]).toContain("cross_file_findings[0].message");
+  });
+
   it("checks findings nested under file_results for batched reviews", () => {
     const parsed = {
       file_results: {

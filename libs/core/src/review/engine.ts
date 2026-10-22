@@ -1072,6 +1072,8 @@ export class ReviewEngine {
       filesToReview.push(file);
     }
 
+    this.logReviewScope(files, filesToReview.length, filesSkipped);
+
     // If no files to review, return cached results only
     if (filesToReview.length === 0) {
       if (filesSkipped > 0) {
@@ -1426,6 +1428,8 @@ export class ReviewEngine {
       filesToReview.push(file);
     }
 
+    this.logReviewScope(files, filesToReview.length, filesSkipped);
+
     // Full cache hit check
     if (filesToReview.length === 0) {
       if (cachedState?.crossFileResult) {
@@ -1626,6 +1630,19 @@ export class ReviewEngine {
       );
       return merged;
     }
+  }
+
+  /**
+   * Logs how many of the PR's files go to the model, so files dropped before the
+   * model call (reused from the review cache, deleted, or without a patch) are
+   * visible instead of silently skipped.
+   */
+  private logReviewScope(files: readonly PRFile[], toReview: number, cachedCount: number): void {
+    const unreviewable = files.filter((file) => this.shouldSkipFile(file)).length;
+    this.log(
+      `Reviewing ${toReview} of ${files.length} file(s): ${cachedCount} reused from cache` +
+        `, ${unreviewable} deleted or without a diff${cachedCount > 0 ? " (use --re-review to review cached files again)" : ""}`
+    );
   }
 
   /** Splits files into size-capped batches of related files using the configured limits. */
@@ -1878,6 +1895,8 @@ export class ReviewEngine {
 
       filesToReview.push(file);
     }
+
+    this.logReviewScope(files, filesToReview.length, filesSkipped);
 
     // Full cache hit check
     if (filesToReview.length === 0) {

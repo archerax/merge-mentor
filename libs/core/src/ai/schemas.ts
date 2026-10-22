@@ -89,7 +89,7 @@ const FastReviewFindingSchema = FileFindingSchema.extend({
 export const FastReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
   file_results: z.record(z.string(), FileReviewResponseSchema).default({}),
-  cross_file_findings: z.array(FastReviewFindingSchema).default([]),
+  cross_file_findings: z.array(CrossFileFindingSchema).default([]),
   findings: z.array(FastReviewFindingSchema).default([]),
 });
 

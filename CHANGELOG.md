@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file missing from the response is detected and re-reviewed. A response that reports
   no files is treated as nothing reviewed. The eval mock provider now scopes results
   to the files in each call.
+- **Review**: the `fast` strategy's provider JSON schema now allows `file_results` and
+  `cross_file_findings`. It previously allowed only a flat findings list, so the model
+  could not report which files it reviewed, and cross-file findings keep their
+  `architecture`, `design` and `testing` categories.
+- **Review**: each strategy now logs how many files go to the model and how many were
+  reused from the review cache or had no diff, so silently skipped files are visible.
 - **Review**: the coverage check no longer treats one reported file as covering every
   other file that shares its basename (for example `index.ts`).
 

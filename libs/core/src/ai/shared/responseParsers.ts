@@ -169,7 +169,7 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
     fileFindings.set(filename, findings);
   }
 
-  for (const finding of [...data.findings, ...data.cross_file_findings]) {
+  for (const finding of data.findings) {
     const file = finding.file;
     const line = finding.line;
     const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
@@ -203,6 +203,23 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
         affectedFiles: [],
       });
     }
+  }
+
+  for (const finding of data.cross_file_findings) {
+    validateReasoning(
+      logger,
+      finding.reasoning,
+      "cross-file",
+      finding.affected_files.join(", ") || "unknown"
+    );
+    crossFileFindings.push({
+      severity: finding.severity,
+      confidence: finding.confidence,
+      category: finding.category,
+      message: finding.message,
+      reasoning: finding.reasoning,
+      affectedFiles: finding.affected_files,
+    });
   }
 
   const fileResults: FileReviewResult[] = Array.from(fileFindings.entries()).map(

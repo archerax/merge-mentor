@@ -181,6 +181,28 @@ export const BATCHED_FILE_REVIEW_SCHEMA = {
   required: ["file_results"],
 } as const;
 
+/**
+ * JSON schema for the fast file review: an entry per changed file (as in the
+ * batched review) plus cross-file findings, so the response can account for
+ * every file. The multi-agent synthesizer keeps the flat {@link FAST_REVIEW_SCHEMA}.
+ */
+export const FAST_FILE_REVIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "Brief summary of the review" },
+    file_results: {
+      ...BATCHED_FILE_REVIEW_SCHEMA.properties.file_results,
+      description:
+        "Map of filename to review results; MUST contain an entry for every changed file, with an empty findings array when a file has no findings",
+    },
+    cross_file_findings: {
+      ...CROSS_FILE_REVIEW_SCHEMA.properties.findings,
+      description: "Findings that span multiple files or are not tied to one file",
+    },
+  },
+  required: ["file_results"],
+} as const;
+
 /** JSON schema for fast review structured output. */
 export const FAST_REVIEW_SCHEMA = {
   type: "object",
@@ -358,7 +380,7 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
     case "batched-file-review":
       return BATCHED_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "fast-review":
-      return FAST_REVIEW_SCHEMA as unknown as Record<string, unknown>;
+      return FAST_FILE_REVIEW_SCHEMA as unknown as Record<string, unknown>;
     case "build-analysis":
       return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
     case "project":
