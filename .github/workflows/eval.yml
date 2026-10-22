@@ -50,6 +50,7 @@ jobs:
           MM_AI_BASE_URL: ${{ vars.MM_AI_BASE_URL || 'https://api.deepseek.com' }}
           MM_AI_MODEL: ${{ github.event.inputs.model || vars.MM_AI_MODEL || 'deepseek-flash' }}
           MM_AI_API_KEY: ${{ secrets.MM_AI_API_KEY }}
+          LOG_LEVEL: debug
           EVAL_PROVIDER: ${{ github.event.inputs.provider || 'mock' }}
           EVAL_MIN_RECALL: ${{ github.event.inputs.min_recall || '0.90' }}
           EVAL_MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.85' }}
@@ -70,3 +71,12 @@ jobs:
         with:
           name: golden-pr-eval-report
           path: eval-report.json
+
+      - name: Upload Debug Logs & Transcripts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: golden-pr-eval-logs
+          path: .mergementor/
+          include-hidden-files: true
+          if-no-files-found: ignore
