@@ -82,7 +82,7 @@ For each finding, \`reasoning\` must confirm the issue is real, state its concre
    - **Line-specific**: Include both file and line number
    - **File-level**: Include file but omit line number
    - **General/PR-level**: Omit both file and line (architectural concerns)
-5. You MUST read and review EVERY file listed above IN FULL, then list them ALL in \`reviewed_files\` - even files with no findings. Skipping or skimming any file is a failure of this task
+5. You MUST read and review EVERY file listed above IN FULL, then return an entry for EVERY file in \`file_results\` - even files with no findings. Skipping or skimming any file is a failure of this task
 ${existingCommentsContext ? "6. AVOID duplicating issues in EXISTING COMMENTS above" : ""}
 
 # SEVERITY THRESHOLDS

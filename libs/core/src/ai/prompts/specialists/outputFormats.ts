@@ -161,34 +161,80 @@ export function buildCrossFileOutputFormat(options: CrossFileOutputFormatOptions
   );
 }
 
+/** Indents every line of `text` by `spaces` spaces. */
+function indent(text: string, spaces: number): string {
+  return text
+    .split("\n")
+    .map((line) => " ".repeat(spaces) + line)
+    .join("\n");
+}
+
 /**
  * Builds the fast review output format section describing the combined
  * summary/findings JSON schema, attribution rules, and native suggestion rules.
  *
- * @param includeCoverage - When true, require a `reviewed_files` list so that
- *   per-file coverage is verifiable. Enabled for the fast file review; omitted
- *   for the multi-agent synthesizer, which does not review files directly.
+ * @param perFileResults - When true, require a `file_results` entry for every
+ *   changed file (even with no findings) plus a separate `cross_file_findings`
+ *   list, so per-file coverage is verifiable. Enabled for the fast file review;
+ *   omitted for the multi-agent synthesizer, which returns a flat findings list
+ *   and does not review files directly.
  * @returns The fast review output format markdown section.
  */
-export function buildFastReviewOutputFormat(includeCoverage = false): string {
-  const coverageField = includeCoverage
-    ? `
-  "reviewed_files": ["path/to/file.ts", "path/to/other.ts"],`
-    : "";
-  const coverageFooter = includeCoverage
+export function buildFastReviewOutputFormat(perFileResults = false): string {
+  const findingExample = `{
+  "line": 45,
+  "start_line": 45,
+  "end_line": 45,
+  "severity": "high",
+  "confidence": "high",
+  "category": "bug",
+  "message": "Clear description of the problem",
+  "suggestion": "Specific fix with code example",
+  "replacement": "Exact replacement code, or omit when a safe localized fix is not possible",
+  "reasoning": "Complete verification including data flow, impact, and severity justification",
+  "isPreExisting": false
+}`;
+  const crossFileExample = `{
+  "severity": "high",
+  "confidence": "high",
+  "category": "architecture",
+  "message": "Cross-file or system-level concern",
+  "suggestion": "How to address across affected files",
+  "reasoning": "System-wide impact and verification"
+}`;
+
+  const perFileSchema = `{
+  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
+  "file_results": {
+    "path/to/file.ts": {
+      "findings": [
+${indent(findingExample, 8)}
+      ]
+    },
+    "path/to/other.ts": { "findings": [] }
+  },
+  "cross_file_findings": [
+${indent(crossFileExample, 4)}
+  ]
+}`;
+
+  const coverageFooter = perFileResults
     ? `
 
 COVERAGE:
 - You MUST review EVERY changed file thoroughly before responding.
 - Read every file's diff IN FULL; do not skim, sample, or skip any file.
-- \`reviewed_files\` MUST list EVERY changed file, including files with no findings.
-- Do not omit a file because it looks small, trivial, repetitive, or test-only.`
+- \`file_results\` MUST contain an entry for EVERY changed file, with \`"findings": []\` for files with no findings.
+- Do not omit a file because it looks small, trivial, repetitive, or test-only.
+- Put system-level concerns that are not tied to one file in \`cross_file_findings\`.`
     : "";
 
   return buildOutputFormatSection(
     "1. RESPONSE: Return ONLY the JSON object below in a markdown code block",
-    `{
-  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",${coverageField}
+    perFileResults
+      ? perFileSchema
+      : `{
+  "summary": "Overall assessment of PR quality, completeness, and architectural soundness",
   "findings": [
     {
       "file": "path/to/file.ts",

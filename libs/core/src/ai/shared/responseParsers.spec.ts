@@ -104,7 +104,6 @@ describe("responseParsers", () => {
       raw: "",
       parsed: {
         summary: "Fast review completed",
-        reviewed_files: ["main.ts"],
         findings: [
           {
             file: "main.ts",
@@ -126,7 +125,46 @@ describe("responseParsers", () => {
     expect(result.crossFileResult.overallAssessment).toBe("Fast review completed");
     expect(result.fileResults).toHaveLength(1);
     expect(result.fileResults[0].filename).toBe("main.ts");
-    expect(result.reviewedFiles).toEqual(["main.ts"]);
+    expect(result.reviewedFiles).toEqual([]);
+  });
+
+  it("parseFastReview reports files with an entry in file_results, even without findings", () => {
+    const result = parseFastReview(mockLogger, {
+      raw: "",
+      parsed: {
+        summary: "Done",
+        file_results: {
+          "a.ts": {
+            findings: [
+              {
+                line: 3,
+                severity: "high",
+                confidence: "high",
+                category: "bug",
+                message: "Bug",
+                reasoning:
+                  "Unchecked value flows into a call and throws at runtime on the added line.",
+              },
+            ],
+          },
+          "b.ts": { findings: [] },
+        },
+        cross_file_findings: [
+          {
+            severity: "medium",
+            confidence: "high",
+            category: "architecture",
+            message: "Inconsistent error handling across modules",
+            reasoning: "Callers in a.ts and b.ts handle failures differently, hiding errors.",
+          },
+        ],
+      },
+    });
+
+    expect(result.reviewedFiles).toEqual(["a.ts", "b.ts"]);
+    expect(result.fileResults.map((r) => r.filename)).toEqual(["a.ts", "b.ts"]);
+    expect(result.fileResults[0].findings).toHaveLength(1);
+    expect(result.crossFileResult.findings).toHaveLength(1);
   });
 
   it("parseAgentReview splits file and cross-file findings", () => {

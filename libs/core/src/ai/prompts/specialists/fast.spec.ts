@@ -107,10 +107,12 @@ describe("buildFastReviewPrompt", () => {
   test("requires per-file coverage in the output schema", () => {
     const prompt = buildFastReviewPrompt(mockPRDetails, mockManifest);
 
-    expect(prompt).toContain('"reviewed_files"');
+    expect(prompt).toContain('"file_results"');
+    expect(prompt).toContain('"cross_file_findings"');
+    expect(prompt).not.toContain("reviewed_files");
     expect(prompt).toContain("You MUST review EVERY file listed below");
-    expect(prompt).toContain("list them ALL in `reviewed_files`");
-    expect(prompt).toContain("MUST list EVERY changed file");
+    expect(prompt).toContain("return an entry for EVERY file in `file_results`");
+    expect(prompt).toContain("MUST contain an entry for EVERY changed file");
   });
 
   test("contains severity thresholds", () => {

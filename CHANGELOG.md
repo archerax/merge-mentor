@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batches of related files so the model no longer skims or skips files. `fast` and
   `deep` re-review any file the model fails to report; batch results are merged in
   code, with a final cross-file pass for `fast` and `multi-agent`.
+- **Review**: the `fast` strategy now asks for an entry per changed file in
+  `file_results` (as `deep` does) instead of a separate `reviewed_files` list, so a
+  file missing from the response is detected and re-reviewed.
 - **Review**: the coverage check no longer treats one reported file as covering every
   other file that shares its basename (for example `index.ts`).
 

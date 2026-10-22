@@ -14,8 +14,8 @@ export interface FastReviewResult {
   /** Cross-file review result built from the non-file findings and summary. */
   readonly crossFileResult: CrossFileReviewResult;
   /**
-   * Files the model reported actually reading, used to verify per-file coverage.
-   * Empty when the provider (e.g. the multi-agent synthesizer) does not report it.
+   * Files the model returned a `file_results` entry for, used to verify per-file
+   * coverage. Empty when the provider (e.g. the multi-agent synthesizer) does not report it.
    */
   readonly reviewedFiles: string[];
 }

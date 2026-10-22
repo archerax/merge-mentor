@@ -63,7 +63,8 @@ describe("AI response schemas", () => {
     expect(BatchedFileReviewResponseSchema.parse({})).toEqual({ file_results: {} });
     expect(FastReviewResponseSchema.parse({})).toEqual({
       summary: "Review completed",
-      reviewed_files: [],
+      file_results: {},
+      cross_file_findings: [],
       findings: [],
     });
   });

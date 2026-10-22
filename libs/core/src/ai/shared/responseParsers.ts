@@ -142,11 +142,34 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
 
   const data = result.success
     ? result.data
-    : { summary: "Review completed", reviewed_files: [], findings: [] };
+    : { summary: "Review completed", file_results: {}, cross_file_findings: [], findings: [] };
   const fileFindings = new Map<string, FileFinding[]>();
   const crossFileFindings: CrossFileFinding[] = [];
 
-  for (const finding of data.findings) {
+  // Per-file entries: a file the model returned an entry for counts as reviewed,
+  // even when it has no findings.
+  for (const [filename, fileData] of Object.entries(data.file_results)) {
+    const findings = fileFindings.get(filename) ?? [];
+    for (const finding of fileData.findings) {
+      validateReasoning(logger, finding.reasoning, `${filename}:${finding.line}`, finding.line);
+      findings.push({
+        line: finding.line,
+        startLine: finding.start_line,
+        endLine: finding.end_line,
+        severity: finding.severity,
+        confidence: finding.confidence,
+        category: finding.category,
+        message: finding.message,
+        suggestion: finding.suggestion,
+        replacement: finding.replacement,
+        reasoning: finding.reasoning,
+        isPreExisting: finding.isPreExisting,
+      });
+    }
+    fileFindings.set(filename, findings);
+  }
+
+  for (const finding of [...data.findings, ...data.cross_file_findings]) {
     const file = finding.file;
     const line = finding.line;
     const context = file ? (line ? `${file}:${line}` : file) : "cross-file";
@@ -192,7 +215,7 @@ export function parseFastReview(logger: ParserLogger, response: AIResponse): Fas
     recommendations: [],
   };
 
-  return { fileResults, crossFileResult, reviewedFiles: data.reviewed_files };
+  return { fileResults, crossFileResult, reviewedFiles: Object.keys(data.file_results) };
 }
 
 /**

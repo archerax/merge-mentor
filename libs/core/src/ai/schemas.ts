@@ -79,14 +79,17 @@ const FastReviewFindingSchema = FileFindingSchema.extend({
 });
 
 /**
- * Zod schema validating the fast review response: a summary, the list of files
- * the model actually read, and a flat findings list. `reviewed_files` makes
- * per-file coverage verifiable so skipped files are detectable rather than
- * silently treated as clean.
+ * Zod schema validating the fast review response: a summary plus findings.
+ * The fast file review returns `file_results` (an entry for every file, even
+ * with no findings, as the deep review does) and `cross_file_findings`, so a
+ * file missing from the response is detectable rather than silently treated as
+ * clean. A flat `findings` list is also accepted (used by the multi-agent
+ * synthesizer).
  */
 export const FastReviewResponseSchema = z.object({
   summary: z.coerce.string().default("Review completed"),
-  reviewed_files: z.array(z.coerce.string()).default([]),
+  file_results: z.record(z.string(), FileReviewResponseSchema).default({}),
+  cross_file_findings: z.array(FastReviewFindingSchema).default([]),
   findings: z.array(FastReviewFindingSchema).default([]),
 });
 
