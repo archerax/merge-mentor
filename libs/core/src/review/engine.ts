@@ -1190,8 +1190,7 @@ export class ReviewEngine {
     // The deep prompt requires an entry for every file, so an absent file was not reviewed.
     const missing = this.findUnreviewedFiles(
       results.map((r) => r.filename),
-      params.files,
-      true
+      params.files
     );
     if (missing.length === 0) {
       return results;
@@ -1211,8 +1210,7 @@ export class ReviewEngine {
 
     const stillMissing = this.findUnreviewedFiles(
       retry.map((r) => r.filename),
-      missing,
-      true
+      missing
     );
     if (stillMissing.length > 0) {
       this.logger.warn(
@@ -1796,18 +1794,15 @@ export class ReviewEngine {
 
   /**
    * Returns the subset of `filesToReview` that the model did not report in
-   * `reviewedFiles`. Returns an empty array when the provider reported no
-   * coverage (e.g. the multi-agent synthesizer or legacy callers) so that
-   * coverage is only checked when it can actually be verified. When
-   * `requireReport` is set, an empty report means nothing was reviewed.
+   * `reviewedFiles` (the files it returned an entry for). An empty report means
+   * nothing was reviewed, so every file is returned.
    */
   private findUnreviewedFiles(
     reviewedFiles: readonly string[],
-    filesToReview: readonly PRFile[],
-    requireReport = false
+    filesToReview: readonly PRFile[]
   ): PRFile[] {
     if (!reviewedFiles || reviewedFiles.length === 0) {
-      return requireReport ? [...filesToReview] : [];
+      return [...filesToReview];
     }
 
     const normalized = reviewedFiles.map((file) => normalizeRepoPath(file));

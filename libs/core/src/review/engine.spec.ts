@@ -1153,6 +1153,7 @@ describe("ReviewEngine", () => {
             ],
           },
         ],
+        reviewedFiles: ["test.ts"],
         crossFileResult: {
           overallAssessment: "Fast review complete",
           findings: [],
@@ -1186,6 +1187,7 @@ describe("ReviewEngine", () => {
       mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
       mockParseFastReview.mockReturnValue({
         fileResults: [],
+        reviewedFiles: ["file1.ts", "file2.ts"],
         crossFileResult: {
           overallAssessment: "Clean",
           findings: [],
@@ -1291,6 +1293,21 @@ describe("ReviewEngine", () => {
 
         // b/index.ts was missing, so a follow-up call must have been made for it
         expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+      });
+
+      it("treats a response that reports no files as nothing reviewed and retries once", async () => {
+        const engine = setupFastReview(mockPlatform, [createPRFile({ filename: "file1.ts" })]);
+        mockParseFastReview.mockReturnValue({
+          fileResults: [],
+          crossFileResult: emptyCrossFile,
+          reviewedFiles: [],
+        });
+
+        const result = await engine.reviewPR(123);
+
+        // One call plus one retry; the second empty report does not loop further
+        expect(mockExecutePrompt).toHaveBeenCalledTimes(2);
+        expect(result.fileResults).toHaveLength(1);
       });
 
       it("splits large reviews into batches and adds a cross-file pass", async () => {
@@ -1627,6 +1644,7 @@ describe("ReviewEngine", () => {
             findings: [],
           },
         ],
+        reviewedFiles: ["file1.ts", "file2.ts"],
         crossFileResult: {
           overallAssessment: "Pass 1 Assessment",
           findings: [
@@ -1671,6 +1689,7 @@ describe("ReviewEngine", () => {
             ],
           },
         ],
+        reviewedFiles: ["file2.ts"],
         crossFileResult: {
           overallAssessment: "Pass 2 Assessment",
           findings: [

@@ -28,6 +28,8 @@ export interface MockAIProviderOptions {
  * or returns pre-configured mock responses without making external API calls.
  */
 export class MockAIProvider implements AIProviderClient {
+  /** Files listed in the prompt that produced each response, so parsing can be scoped per call. */
+  private readonly promptFiles = new WeakMap<AIResponse, readonly string[]>();
   private readonly scenarioDir?: string;
   private mockResponse?: unknown;
   private readonly fileSystem: FileSystem;
@@ -50,12 +52,22 @@ export class MockAIProvider implements AIProviderClient {
    * and parses `mock-response.json` from the scenario directory (or the
    * working directory in options). Makes no external API calls.
    *
-   * @param _prompt - The prompt text (ignored by the mock provider)
+   * @param prompt - The prompt text; only its file listing is read, so batched reviews
+   *   get results scoped to the files in each call
    * @param options - Execution options providing the working directory
    * @returns The formatted mock AI response
    * @throws {CorpusEvalError} When no mock response is configured and none can be loaded
    */
-  public async executePrompt(_prompt: string, options?: ExecutePromptOptions): Promise<AIResponse> {
+  public async executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse> {
+    const response = await this.loadResponse(options);
+    const files = extractPromptFiles(prompt);
+    if (files.length > 0) {
+      this.promptFiles.set(response, files);
+    }
+    return response;
+  }
+
+  private async loadResponse(options?: ExecutePromptOptions): Promise<AIResponse> {
     if (this.mockResponse !== undefined) {
       return this.formatResponse(this.mockResponse);
     }
@@ -159,12 +171,34 @@ export class MockAIProvider implements AIProviderClient {
   public parseBatchedFileReview(response: AIResponse): FileReviewResult[] {
     const parsed = response.parsed as Record<string, unknown> | null;
     if (parsed && Array.isArray(parsed.fileResults)) {
-      return parsed.fileResults as FileReviewResult[];
+      return this.scopeToPromptFiles(response, parsed.fileResults as FileReviewResult[]);
     }
     if (Array.isArray(response.parsed)) {
-      return response.parsed as FileReviewResult[];
+      return this.scopeToPromptFiles(response, response.parsed as FileReviewResult[]);
     }
-    return [];
+    return this.scopeToPromptFiles(response, []);
+  }
+
+  /**
+   * Restricts file results to the files listed in the prompt that produced the
+   * response and adds an empty entry for each listed file the fixture has no
+   * result for, mirroring a model that reports every file. Results are returned
+   * unchanged when the prompt listed no files.
+   */
+  private scopeToPromptFiles(
+    response: AIResponse,
+    results: FileReviewResult[]
+  ): FileReviewResult[] {
+    const files = this.promptFiles.get(response);
+    if (!files) {
+      return results;
+    }
+    const inScope = results.filter((result) => files.includes(result.filename));
+    const present = new Set(inScope.map((result) => result.filename));
+    return [
+      ...inScope,
+      ...files.filter((file) => !present.has(file)).map((filename) => ({ filename, findings: [] })),
+    ];
   }
 
   /**
@@ -190,7 +224,11 @@ export class MockAIProvider implements AIProviderClient {
               findings: [],
               recommendations: [],
             };
-      return { fileResults, crossFileResult, reviewedFiles: [] };
+      return {
+        fileResults: this.scopeToPromptFiles(response, fileResults),
+        crossFileResult,
+        reviewedFiles: [...(this.promptFiles.get(response) ?? [])],
+      };
     }
     return {
       fileResults: [],
@@ -223,4 +261,12 @@ export class MockAIProvider implements AIProviderClient {
       },
     };
   }
+}
+
+/** Matches the per-file lines of the prompt's file listing: `- path (status, +a/-d) → @diffPath`. */
+const PROMPT_FILE_LINE = /^- (.+?) \(\w+, \+\d+\/-\d+\) → @/gm;
+
+/** Extracts the changed filenames listed in a review prompt. */
+function extractPromptFiles(prompt: string): string[] {
+  return Array.from(prompt.matchAll(PROMPT_FILE_LINE), (match) => match[1]);
 }

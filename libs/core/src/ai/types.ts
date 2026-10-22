@@ -15,7 +15,8 @@ export interface FastReviewResult {
   readonly crossFileResult: CrossFileReviewResult;
   /**
    * Files the model returned a `file_results` entry for, used to verify per-file
-   * coverage. Empty when the provider (e.g. the multi-agent synthesizer) does not report it.
+   * coverage. Empty means the model reported no files, which the engine treats as
+   * nothing reviewed.
    */
   readonly reviewedFiles: string[];
 }

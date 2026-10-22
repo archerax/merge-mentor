@@ -199,4 +199,47 @@ describe("MockAIProvider", () => {
     expect(result.fileResults).toEqual([]);
     expect(result.crossFileResult.overallAssessment).toBe("No cross-file issues identified.");
   });
+
+  describe("scoping results to the files listed in the prompt", () => {
+    const prompt = [
+      "Files to Review:",
+      "- src/a.ts (modified, +3/-1) → @.mergementor/diffs/src__a.ts.diff",
+      "- src/b (copy).ts (added, +10/-0) → @.mergementor/diffs/src__b (copy).ts.diff",
+    ].join("\n");
+    const finding = {
+      line: 1,
+      severity: "high",
+      confidence: "high",
+      category: "bug",
+      message: "m",
+      reasoning: "r",
+    };
+    const fixture = {
+      fileResults: [
+        { filename: "src/a.ts", findings: [finding] },
+        { filename: "src/other.ts", findings: [finding] },
+      ],
+    };
+
+    it("reports every listed file and drops results for files outside the call", async () => {
+      const provider = new MockAIProvider({ mockResponse: fixture });
+      const response = await provider.executePrompt(prompt);
+
+      const fast = provider.parseFastReview(response);
+      expect(fast.reviewedFiles).toEqual(["src/a.ts", "src/b (copy).ts"]);
+      expect(fast.fileResults.map((r) => r.filename)).toEqual(["src/a.ts", "src/b (copy).ts"]);
+      expect(fast.fileResults[0].findings).toHaveLength(1);
+
+      const batched = provider.parseBatchedFileReview(response);
+      expect(batched.map((r) => r.filename)).toEqual(["src/a.ts", "src/b (copy).ts"]);
+    });
+
+    it("leaves results unscoped when the prompt lists no files", async () => {
+      const provider = new MockAIProvider({ mockResponse: fixture });
+      const response = await provider.executePrompt("no file listing here");
+
+      expect(provider.parseFastReview(response).reviewedFiles).toEqual([]);
+      expect(provider.parseBatchedFileReview(response)).toHaveLength(2);
+    });
+  });
 });

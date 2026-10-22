@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code, with a final cross-file pass for `fast` and `multi-agent`.
 - **Review**: the `fast` strategy now asks for an entry per changed file in
   `file_results` (as `deep` does) instead of a separate `reviewed_files` list, so a
-  file missing from the response is detected and re-reviewed.
+  file missing from the response is detected and re-reviewed. A response that reports
+  no files is treated as nothing reviewed. The eval mock provider now scopes results
+  to the files in each call.
 - **Review**: the coverage check no longer treats one reported file as covering every
   other file that shares its basename (for example `index.ts`).
 
