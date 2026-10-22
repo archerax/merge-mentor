@@ -3,6 +3,8 @@ import path from "node:path";
 
 import dotenv from "dotenv";
 
+import { writeFileAtomic } from "./atomicWrite.server.js";
+
 /**
  * Directory the CLI treats as its working directory.
  *
@@ -171,7 +173,5 @@ export function writeEnvValues(
 
   const hasContent = result.length > 0 && result[result.length - 1] !== "";
   const content = `${result.join("\n")}${hasContent ? "\n" : ""}`;
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, content, "utf8");
-  fs.renameSync(tempPath, filePath);
+  writeFileAtomic(filePath, content);
 }

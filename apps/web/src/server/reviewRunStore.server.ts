@@ -22,6 +22,8 @@ import path from "node:path";
 
 import { isReviewRunId } from "@merge-mentor/shared/utils/reviewRunId.js";
 
+import { writeFileAtomic } from "./atomicWrite.server.js";
+
 /** Which review kind produced a run. */
 export type ReviewRunKind = "pr" | "pbi" | "project";
 
@@ -68,9 +70,7 @@ export function runDir(tempPath: string, runId: string): string | null {
 /** Writes a file atomically (temp file + rename) so readers never see partial content. */
 function writeAtomic(filePath: string, content: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempFile = `${filePath}.tmp`;
-  fs.writeFileSync(tempFile, content, "utf8");
-  fs.renameSync(tempFile, filePath);
+  writeFileAtomic(filePath, content);
 }
 
 /** Persists a run manifest atomically. */

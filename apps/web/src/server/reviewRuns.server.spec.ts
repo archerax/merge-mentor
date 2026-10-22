@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getSnapshot,
@@ -124,6 +124,23 @@ describe("reviewRuns.server", () => {
     const frames = await collect(streamRun(runId, 0) as ReadableStream<Uint8Array>);
     expect(frames).toEqual([{ type: "error", message: "boom" }, { type: "done" }]);
     expect(getSnapshot(runId)?.manifest.status).toBe("error");
+  });
+
+  it("releases the target when persisting the final frames fails", async () => {
+    const options: StartRunOptions = {
+      ...simpleOptions("t-disk-failure"),
+      execute: async () => {
+        // Replace the runs directory with a file so every later write fails.
+        fs.rmSync(path.join(tempPath, "runs"), { recursive: true, force: true });
+        fs.writeFileSync(path.join(tempPath, "runs"), "");
+      },
+    };
+    const { runId } = startOrAttach(options);
+    await vi.waitFor(() => expect(hasRun(runId)).toBe(false));
+    fs.rmSync(path.join(tempPath, "runs"), { force: true });
+
+    const next = startOrAttach({ ...simpleOptions("t-disk-failure"), execute: async () => {} });
+    expect(next.attached).toBe(false);
   });
 
   it("reports a snapshot with the final summary", async () => {

@@ -67,6 +67,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reused from the review cache or had no diff, so silently skipped files are visible.
 - **Review**: the coverage check no longer treats one reported file as covering every
   other file that shares its basename (for example `index.ts`).
+- **Web dashboard**: a disk error while finalizing a review run no longer leaves the PR
+  stuck as "running" until the server restarts, and live subscribers still receive the
+  final frames.
+- **Web dashboard**: the run store, posted-comment store and `.env` writer use a unique
+  temp file per write, so concurrent writes can no longer clobber each other's temp file.
+- **Workspace**: all workspace packages now carry the same version as the root package.
+
+### Changed
+
+- **CI**: the golden-PR evaluation workflow pins actions to commit SHAs, runs with
+  read-only permissions and passes dispatch inputs through `env:`; the self-review
+  workflow also re-reviews pull requests on later pushes.
 
 ## [4.0.0-rc3] - 2026-10-21
 

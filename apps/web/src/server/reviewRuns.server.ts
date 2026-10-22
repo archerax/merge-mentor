@@ -135,15 +135,18 @@ function record(run: LiveRun, event: unknown): void {
   const seq = ++run.lastSeq;
   const entry: StoredRunEvent = { seq, event };
   run.events.push(entry);
-  if (run.logFd !== null) writeEvent(run.logFd, entry);
-  else appendEvent(resolveTempPath(), run.runId, entry);
+  try {
+    if (run.logFd !== null) writeEvent(run.logFd, entry);
+    else appendEvent(resolveTempPath(), run.runId, entry);
 
-  if (isResultFrame(event)) {
-    run.summary = event.summary;
-    writeSummary(resolveTempPath(), run.runId, event.summary);
+    if (isResultFrame(event)) {
+      run.summary = event.summary;
+      writeSummary(resolveTempPath(), run.runId, event.summary);
+    }
+  } finally {
+    // Live subscribers still get the frame when persisting it fails.
+    for (const subscriber of run.subscribers) subscriber(event, seq);
   }
-
-  for (const subscriber of run.subscribers) subscriber(event, seq);
 }
 
 /** Reads the retention policy from the environment, falling back to defaults. */
@@ -174,16 +177,27 @@ async function execute(run: LiveRun, executor: StartRunOptions["execute"]): Prom
     run.emitter.send({ type: "error", message: toMessage(error) });
     run.status = "error";
   } finally {
-    run.emitter.flush();
-    run.emitter.send({ type: "done" });
-    writeManifest(resolveTempPath(), toManifest(run));
-    if (run.logFd !== null) {
-      closeEventLog(run.logFd);
-      run.logFd = null;
+    // Persisting can throw (disk full, permissions); the run must still be
+    // released or the target stays "running" until the process restarts.
+    try {
+      run.emitter.flush();
+      run.emitter.send({ type: "done" });
+      writeManifest(resolveTempPath(), toManifest(run));
+    } catch {
+      // Persistence is best-effort here; `execute` is fire-and-forget, so a
+      // rethrow would be an unhandled rejection.
+    } finally {
+      try {
+        if (run.logFd !== null) {
+          closeEventLog(run.logFd);
+          run.logFd = null;
+        }
+      } finally {
+        activeByTarget.delete(run.targetKey);
+        active.delete(run.runId);
+        run.subscribers.clear();
+      }
     }
-    activeByTarget.delete(run.targetKey);
-    active.delete(run.runId);
-    run.subscribers.clear();
   }
 }
 

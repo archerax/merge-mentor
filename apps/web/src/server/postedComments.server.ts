@@ -14,6 +14,8 @@ import path from "node:path";
 
 import type { Config, Platform } from "@merge-mentor/config/config.js";
 
+import { writeFileAtomic } from "./atomicWrite.server.js";
+
 /** File under `tempPath` that records posted comment fingerprints by target. */
 const STORE_FILE = "posted-comments.json";
 
@@ -80,7 +82,5 @@ export function recordPostedFingerprints(
 
   fs.mkdirSync(tempPath, { recursive: true });
   const file = storePath(tempPath);
-  const tempFile = `${file}.tmp`;
-  fs.writeFileSync(tempFile, `${JSON.stringify({ targets }, null, 2)}\n`, "utf8");
-  fs.renameSync(tempFile, file);
+  writeFileAtomic(file, `${JSON.stringify({ targets }, null, 2)}\n`);
 }
