@@ -61,6 +61,18 @@ export interface ReviewStreamInput {
   readonly write?: boolean;
   /** Overrides the configured review strategy for this run. */
   readonly strategy?: ReviewStrategyInput;
+  /** Ignore cached per-file results and review every file again. Default: `false`. */
+  readonly reReview?: boolean;
+}
+
+/** Whether a PR has cached review state, used to offer a re-review toggle. */
+export interface ReviewCacheStatus {
+  /** True when cached review state exists for the PR. */
+  readonly cached: boolean;
+  /** ISO 8601 timestamp of the cached review, when cached. */
+  readonly lastReviewedAt?: string;
+  /** Number of files with a cached review result, when cached. */
+  readonly cachedFiles?: number;
 }
 
 /** Input accepted by the PBI review stream endpoint. */

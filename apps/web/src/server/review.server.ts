@@ -13,11 +13,16 @@ import {
 import { ReviewEngine, type ReviewResult } from "@merge-mentor/core/review/engine.js";
 import type { ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
 import { saveReviewReport } from "@merge-mentor/core/review/reviewReport.js";
+import { ReviewStateCache } from "@merge-mentor/core/review/reviewStateCache.js";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/index.js";
+import {
+  generatePRIdentifier,
+  sanitizeProjectName,
+} from "@merge-mentor/shared/utils/prIdentifier.js";
 import { parsePRUrl } from "@merge-mentor/shared/utils/prUrl.js";
 
 import { refreshEnv, resolveTempPath } from "./env.server.js";
@@ -31,6 +36,7 @@ import type {
   PendingCommentView,
   PostCommentsInput,
   PostCommentsResult,
+  ReviewCacheStatus,
   ReviewFindingView,
   ReviewStreamInput,
   ReviewSummary,
@@ -44,6 +50,7 @@ interface ReviewTarget {
   readonly pr: number;
   readonly url: string;
   readonly write: boolean;
+  readonly reReview: boolean;
   readonly config: Config;
 }
 
@@ -111,6 +118,7 @@ function resolveTarget(input: ReviewStreamInput): ReviewTarget {
     pr,
     url: originalUrl ?? buildPrUrl(config, platform, pr),
     write: input.write === true,
+    reReview: input.reReview === true,
     config,
   };
 }
@@ -236,6 +244,7 @@ function createEngine(
     experimentalTools: config.experimentalTools,
     verifyPbi: config.verifyPbi,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
+    reReview: target.reReview,
     output,
   });
 }
@@ -254,7 +263,29 @@ function runTargetKey(target: ReviewTarget): string {
     reviewScope(target.platform, target.config),
     target.pr
   );
-  return `${base}:write=${target.write}:strategy=${target.config.reviewStrategy}`;
+  return `${base}:write=${target.write}:strategy=${target.config.reviewStrategy}:reReview=${target.reReview}`;
+}
+
+/**
+ * Reports whether cached review state exists for a PR, so the UI can offer a
+ * re-review toggle that avoids stale results. Never throws for an unresolvable
+ * target; those simply report as not cached.
+ */
+export async function getPRCacheStatus(input: ReviewStreamInput): Promise<ReviewCacheStatus> {
+  try {
+    const target = resolveTarget(input);
+    const projectId = sanitizeProjectName(createAdapter(target).getProjectIdentifier());
+    const prIdentifier = generatePRIdentifier(target.platform, projectId, target.pr);
+    const state = await new ReviewStateCache(target.config.tempPath).getState(prIdentifier);
+    if (!state) return { cached: false };
+    return {
+      cached: true,
+      lastReviewedAt: state.lastReviewedAt,
+      cachedFiles: Object.keys(state.files).length,
+    };
+  } catch {
+    return { cached: false };
+  }
 }
 
 /**

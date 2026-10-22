@@ -93,7 +93,7 @@ vi.mock("@merge-mentor/core/review/commentPosting.js", () => ({
 }));
 
 const { postPlannedComments } = await import("@merge-mentor/core/review/commentPosting.js");
-const { startPRReview, postPRComments } = await import("./review.server.js");
+const { getPRCacheStatus, startPRReview, postPRComments } = await import("./review.server.js");
 const { streamRun } = await import("./reviewRuns.server.js");
 const { saveReviewReport } = await import("@merge-mentor/core/review/reviewReport.js");
 
@@ -202,6 +202,33 @@ describe("review.server", () => {
     });
   });
 
+  describe("getPRCacheStatus", () => {
+    it("reports not cached when no state exists", async () => {
+      expect(await getPRCacheStatus({ pr: 7 })).toEqual({ cached: false });
+    });
+
+    it("reports cached state with timestamp and file count", async () => {
+      fs.mkdirSync(path.join(tempDir, "cache"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempDir, "cache", "Github-widgets-PR7.json"),
+        JSON.stringify({
+          prIdentifier: "Github-widgets-PR7",
+          lastReviewedAt: "2024-04-18T12:34:56Z",
+          files: { "a.ts": {}, "b.ts": {} },
+        })
+      );
+      expect(await getPRCacheStatus({ pr: 7 })).toEqual({
+        cached: true,
+        lastReviewedAt: "2024-04-18T12:34:56Z",
+        cachedFiles: 2,
+      });
+    });
+
+    it("reports not cached for an unresolvable target", async () => {
+      expect(await getPRCacheStatus({})).toEqual({ cached: false });
+    });
+  });
+
   describe("startPRReview", () => {
     it("streams a completed review with findings and planned comments", async () => {
       const frames = await collectRun(() => startPRReview({ pr: 7, write: false }));
@@ -247,6 +274,17 @@ describe("review.server", () => {
       expect(second).toEqual({ runId: first.runId, attached: true });
 
       await collectFrames(streamRun(first.runId, 0) as ReadableStream<Uint8Array>);
+    });
+
+    it("starts a distinct run when re-review is requested", async () => {
+      const normal = startPRReview({ pr: 7 });
+      const re = startPRReview({ pr: 7, reReview: true });
+      expect(re.attached).toBe(false);
+
+      await Promise.all([
+        collectFrames(streamRun(normal.runId, 0) as ReadableStream<Uint8Array>),
+        collectFrames(streamRun(re.runId, 0) as ReadableStream<Uint8Array>),
+      ]);
     });
 
     it("starts a distinct run when the write mode differs", async () => {

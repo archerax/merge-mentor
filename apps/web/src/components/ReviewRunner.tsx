@@ -16,10 +16,12 @@ import {
   Title,
 } from "@mantine/core";
 import { IconSend } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { getReviewCacheStatus } from "../server/review.functions.js";
 import {
   type PendingCommentView,
+  type ReviewCacheStatus,
   REVIEW_STRATEGY_OPTIONS,
   type ReviewFindingView,
   type ReviewStreamInput,
@@ -57,6 +59,8 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     setStrategy,
   } = useReviewForm("pr");
   const [formError, setFormError] = useState<string | null>(null);
+  const [reReview, setReReview] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<ReviewCacheStatus | null>(null);
 
   const {
     run,
@@ -79,7 +83,11 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     const trimmed = prInput.trim();
     if (trimmed.length === 0) return { error: "Enter a PR URL or number." };
 
-    const base = strategy ? { write, strategy } : { write };
+    const base = {
+      write,
+      ...(strategy ? { strategy } : {}),
+      ...(cacheStatus?.cached && reReview ? { reReview: true } : {}),
+    };
 
     if (/^https?:\/\//i.test(trimmed)) {
       return { prUrl: trimmed, ...base };
@@ -91,6 +99,33 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     }
     return { pr, ...base };
   }
+
+  const cacheTarget = useMemo(() => {
+    const trimmed = prInput.trim();
+    if (/^https?:\/\//i.test(trimmed)) return { prUrl: trimmed };
+    const pr = Number(trimmed);
+    return Number.isInteger(pr) && pr > 0 ? { pr } : null;
+  }, [prInput]);
+
+  // Look up cached review state for the entered PR (debounced) so a stale
+  // result can be avoided with the re-review toggle.
+  useEffect(() => {
+    setCacheStatus(null);
+    setReReview(false);
+    if (!cacheTarget) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      getReviewCacheStatus({ data: cacheTarget })
+        .then((status) => {
+          if (!cancelled) setCacheStatus(status);
+        })
+        .catch(() => {});
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [cacheTarget]);
 
   async function handleRun() {
     const input = buildInput();
@@ -123,6 +158,21 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
             clearable
             disabled={running}
           />
+          {cacheStatus?.cached && (
+            <Switch
+              label="Re-review"
+              description={`A cached review exists${
+                cacheStatus.lastReviewedAt
+                  ? ` from ${new Date(cacheStatus.lastReviewedAt).toLocaleString()}`
+                  : ""
+              }${
+                cacheStatus.cachedFiles !== undefined ? ` (${cacheStatus.cachedFiles} files)` : ""
+              }. Turn on to ignore it and review all files again, avoiding stale results.`}
+              checked={reReview}
+              onChange={(event) => setReReview(event.currentTarget.checked)}
+              disabled={running}
+            />
+          )}
           <Switch
             label="Post comments to the PR"
             description="Off runs a dry-run; you can still post the planned comments afterwards."
