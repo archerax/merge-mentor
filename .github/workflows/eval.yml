@@ -75,10 +75,12 @@ jobs:
       - name: Print Debug Logs & Transcripts
         if: failure()
         run: |
-          find .mergementor -type f 2>/dev/null | sort
-          for f in $(find .mergementor -type f 2>/dev/null | sort); do
+          # Skip the (large, repeated) input prompt; show the session timeline and raw response.
+          for f in $(find .mergementor/transcripts -type f 2>/dev/null | sort); do
             echo "::group::$f"
-            head -c 12000 "$f"
+            sed -n '1,/^INPUT PROMPT$/p' "$f" | head -c 2000
+            echo "[...prompt omitted...]"
+            awk '/^SESSION TIMELINE$|^RAW API RESPONSE$/{p=1} p' "$f" | head -c 8000
             echo
             echo "::endgroup::"
           done
