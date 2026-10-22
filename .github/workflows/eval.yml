@@ -8,7 +8,7 @@ on:
         required: true
         default: "mock"
       model:
-        description: "Model name (e.g. deepseek-chat or deepseek-reasoner). Overrides the AI_MODEL variable"
+        description: "Model name (e.g. deepseek-flash). Overrides the MM_AI_MODEL variable"
         required: false
         default: ""
       min_recall:
@@ -47,8 +47,8 @@ jobs:
         env:
           # DeepSeek is OpenAI-compatible, so it runs through copilot-sdk BYOK.
           # Configure under Settings > Secrets and variables > Actions.
-          MM_AI_BASE_URL: ${{ vars.MM_AI_BASE_URL || 'https://api.deepseek.com/v1' }}
-          MM_AI_MODEL: ${{ github.event.inputs.model || vars.MM_AI_MODEL || 'deepseek-chat' }}
+          MM_AI_BASE_URL: ${{ vars.MM_AI_BASE_URL || 'https://api.deepseek.com' }}
+          MM_AI_MODEL: ${{ github.event.inputs.model || vars.MM_AI_MODEL || 'deepseek-flash' }}
           MM_AI_API_KEY: ${{ secrets.MM_AI_API_KEY }}
           EVAL_PROVIDER: ${{ github.event.inputs.provider || 'mock' }}
           EVAL_MIN_RECALL: ${{ github.event.inputs.min_recall || '0.90' }}
