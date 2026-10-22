@@ -1015,6 +1015,12 @@ program
     "AI provider to use (mock, copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER",
     "mock"
   )
+  .option("--ai-model <model>", "Model name for the AI provider. Env: MM_AI_MODEL")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
   .option(
     "--min-recall <number>",
     "Minimum required recall threshold (0.0 - 1.0)",

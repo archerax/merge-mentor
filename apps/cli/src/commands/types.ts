@@ -276,6 +276,12 @@ export interface EvalCommandOptions {
   corpusDir?: string;
   /** AI provider to use ('mock', 'copilot-sdk', 'opencode-sdk'). Default: 'mock'. */
   provider?: string;
+  /** Model name for the AI provider. Env: `MM_AI_MODEL`. */
+  aiModel?: string;
+  /** OpenAI-compatible BYOK base URL. Env: `MM_AI_BASE_URL`. */
+  aiBaseUrl?: string;
+  /** BYOK API key. Env: `MM_AI_API_KEY`. */
+  aiApiKey?: string;
   /** Minimum required recall threshold (0.0 - 1.0). Default: 0.9. */
   minRecall?: number;
   /** Minimum required precision threshold (0.0 - 1.0). Default: 0.85. */

@@ -31,6 +31,9 @@ merge-mentor eval --json --output-file ./eval-report.json
 | -------------------------- | ---------------------------------------------------------- | -------------------- |
 | `--corpus-dir <path>`      | Path to test corpus directory                              | `./test/eval/corpus` |
 | `--provider <name>`        | AI provider to use (`mock`, `copilot-sdk`, `opencode-sdk`) | `mock`               |
+| `--ai-model <model>`       | Model name for the AI provider (`MM_AI_MODEL`)             | provider default     |
+| `--ai-base-url <url>`      | OpenAI-compatible BYOK base URL (`MM_AI_BASE_URL`)         | -                    |
+| `--ai-api-key <key>`       | BYOK API key (`MM_AI_API_KEY`)                             | -                    |
 | `--min-recall <number>`    | Minimum required recall threshold (0.0 - 1.0)              | `0.9` (90%)          |
 | `--min-precision <number>` | Minimum required precision threshold (0.0 - 1.0)           | `0.85` (85%)         |
 | `--json`                   | Output raw JSON report to stdout                           | `false`              |

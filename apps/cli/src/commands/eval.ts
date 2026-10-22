@@ -17,6 +17,9 @@ export async function executeEval(
   const report = await evaluateCorpus({
     corpusDir: options.corpusDir,
     provider: (options.provider as AIProviderType | "mock") ?? "mock",
+    model: options.aiModel ?? process.env.MM_AI_MODEL,
+    aiBaseUrl: options.aiBaseUrl ?? process.env.MM_AI_BASE_URL,
+    aiApiKey: options.aiApiKey ?? process.env.MM_AI_API_KEY,
     minRecall: options.minRecall,
     minPrecision: options.minPrecision,
     json: options.json,

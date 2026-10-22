@@ -146,7 +146,11 @@ export async function evaluateScenario(
     provider = new MockAIProvider({ scenarioDir, fileSystem: fs });
   } else {
     const { createAIProvider } = await import("@merge-mentor/core/ai/providerFactory.js");
-    provider = createAIProvider(providerType);
+    provider = createAIProvider(providerType, {
+      model: options?.model,
+      aiBaseUrl: options?.aiBaseUrl,
+      aiApiKey: options?.aiApiKey,
+    });
   }
 
   let prompt =

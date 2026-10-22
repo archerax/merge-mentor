@@ -98,6 +98,12 @@ export interface EvalHarnessOptions {
   readonly corpusDir?: string;
   /** AI provider to use during evaluation (mock, copilot-sdk, opencode-sdk). */
   readonly provider?: AIProviderType | "mock";
+  /** Model identifier passed to the AI provider. */
+  readonly model?: string;
+  /** OpenAI-compatible BYOK base URL (copilot-sdk only). */
+  readonly aiBaseUrl?: string;
+  /** BYOK API key (copilot-sdk only). */
+  readonly aiApiKey?: string;
   /** Minimum required recall threshold (0.0 - 1.0). Defaults to 0.90. */
   readonly minRecall?: number;
   /** Minimum required precision threshold (0.0 - 1.0). Defaults to 0.85. */
