@@ -119,10 +119,11 @@ export function matchForbiddenFinding(
 const SANDBOX_NOTE = `
 
 # EVALUATION SANDBOX
-The working directory contains only the diff files listed above, under the hidden
-.mergementor/diffs folder (directory listings do not show hidden folders). The
-repository itself is not available: do not read any path outside the working
-directory, and do not call bash. Review from the diffs alone and return the JSON result.
+The working directory contains only the diff files listed above, in the hidden
+.mergementor/diffs folder and as copies in the visible diffs folder. The repository
+itself is not available, so source files other than these diffs do not exist. Do not
+read any path outside the working directory and do not call bash. Review from the
+diffs alone and return the JSON result.
 `;
 
 /** Evaluates a single evaluation scenario directory. */
@@ -191,7 +192,11 @@ export async function evaluateScenario(
           if (sandboxDir) {
             const target = path.join(sandboxDir, ".mergementor", "diffs", f.diffPath);
             await fs.mkdir(path.dirname(target), { recursive: true });
-            await fs.writeFile(target, await fs.readFile(source, "utf-8"), "utf-8");
+            await fs.mkdir(path.join(sandboxDir, "diffs"), { recursive: true });
+            const content = await fs.readFile(source, "utf-8");
+            await fs.writeFile(target, content, "utf-8");
+            // Visible copy: directory listings omit the hidden folder above.
+            await fs.writeFile(path.join(sandboxDir, "diffs", f.diffPath), content, "utf-8");
             files.push(target);
           } else {
             files.push(source);

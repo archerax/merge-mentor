@@ -347,7 +347,10 @@ describe("Evaluation Harness Engine", () => {
       expect(options.workingDirectory).not.toContain("/test/corpus/x");
       expect(options.diffFiles).toHaveLength(1);
       expect(options.diffFiles[0].startsWith(options.workingDirectory)).toBe(true);
-      expect(writes).toEqual(options.diffFiles);
+      expect(writes).toEqual([
+        ...options.diffFiles,
+        options.diffFiles[0].replace(".mergementor/diffs", "diffs"),
+      ]);
       expect(removed).toEqual([options.workingDirectory]);
     });
 
