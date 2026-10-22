@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Review**: the `fast` strategy now splits large PRs into batches of related files
-  so the model no longer skims or skips files, re-reviews any file the model fails to
-  report, and merges batch results in code with a final cross-file pass.
+- **Review**: the `fast`, `deep` and `multi-agent` strategies now split large PRs into
+  batches of related files so the model no longer skims or skips files. `fast` and
+  `deep` re-review any file the model fails to report; batch results are merged in
+  code, with a final cross-file pass for `fast` and `multi-agent`.
 - **Review**: the coverage check no longer treats one reported file as covering every
   other file that shares its basename (for example `index.ts`).
 

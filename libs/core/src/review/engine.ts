@@ -1101,8 +1101,9 @@ export class ReviewEngine {
   }
 
   /**
-   * Reviews multiple files in a single batched AI call.
-   * Stores diffs to disk and asks the AI to review all files at once.
+   * Reviews files with the deep strategy's per-file prompt. Large sets are
+   * split into size-capped batches of related files that run concurrently;
+   * files the model leaves out of a response are re-reviewed once.
    */
   private async reviewFilesBatched(
     prIdentifier: string,
@@ -1111,9 +1112,6 @@ export class ReviewEngine {
     repoPath?: string,
     onTokenUsage?: (usage: TokenUsage | undefined) => void
   ): Promise<FileReviewResult[]> {
-    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
-    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
-
     // Filter files with patches
     const filesWithPatches = files.filter((f) => f.patch);
     if (filesWithPatches.length === 0) {
@@ -1121,14 +1119,130 @@ export class ReviewEngine {
     }
 
     const prNumber = parsePRNumberSafe(prIdentifier);
-    this.auditLogger.logFileReviewStart(`batched-${filesWithPatches.length}-files`, prNumber);
+    const auditId = `batched-${filesWithPatches.length}-files`;
+    this.auditLogger.logFileReviewStart(auditId, prNumber);
+
+    try {
+      const batches = this.planBatches(filesWithPatches);
+      if (batches.length > 1) {
+        this.log(`Reviewing ${filesWithPatches.length} file(s) in ${batches.length} batches...`);
+      }
+
+      // Concurrent batches would interleave in a single streaming display.
+      const concurrency = this.streamingEnabled ? 1 : (this.options.batchMaxParallel ?? 3);
+      const batchResults = await runWithConcurrency(batches, concurrency, (batch, index) =>
+        this.reviewDeepBatchWithCoverage({
+          storageId: batches.length === 1 ? prIdentifier : `${prIdentifier}-batch${index + 1}`,
+          label:
+            batches.length === 1
+              ? "Reviewing files..."
+              : `Review batch ${index + 1}/${batches.length}...`,
+          files: batch,
+          existingComments,
+          repoPath,
+          onTokenUsage,
+        })
+      );
+      const results = this.mergeFileResults(batchResults);
+
+      // Log individual file results
+      const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
+      this.log(
+        `  Batched review found ${totalFindings} total issues across ${results.length} files`
+      );
+
+      for (const result of results) {
+        if (result.findings.length > 0) {
+          this.log(`    ${result.filename}: ${result.findings.length} issues`);
+        }
+      }
+
+      this.auditLogger.logFileReviewComplete(auditId, prNumber, totalFindings);
+
+      // Ensure we have results for all files (fill in missing ones with empty results)
+      const resultMap = new Map(results.map((r) => [r.filename, r]));
+      return filesWithPatches.map(
+        (file) => resultMap.get(file.filename) ?? { filename: file.filename, findings: [] }
+      );
+    } catch (error) {
+      this.auditLogger.logFileReviewComplete(
+        auditId,
+        prNumber,
+        0,
+        "failure",
+        (error as Error).message
+      );
+      throw error;
+    }
+  }
+
+  /** Reviews a deep-strategy batch and re-reviews, once, any file missing from the response. */
+  private async reviewDeepBatchWithCoverage(params: {
+    storageId: string;
+    label: string;
+    files: PRFile[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FileReviewResult[]> {
+    const results = await this.runDeepReviewCall(params);
+
+    // The deep prompt requires an entry for every file, so an absent file was not reviewed.
+    const missing = this.findUnreviewedFiles(
+      results.map((r) => r.filename),
+      params.files,
+      true
+    );
+    if (missing.length === 0) {
+      return results;
+    }
+
+    this.logger.warn(
+      { missingCount: missing.length, missing: missing.map((f) => f.filename) },
+      "Batched review did not return results for all files; retrying missing files"
+    );
+
+    const retry = await this.runDeepReviewCall({
+      ...params,
+      storageId: `${params.storageId}-retry`,
+      label: `Retrying ${missing.length} unreviewed file(s)...`,
+      files: missing,
+    });
+
+    const stillMissing = this.findUnreviewedFiles(
+      retry.map((r) => r.filename),
+      missing,
+      true
+    );
+    if (stillMissing.length > 0) {
+      this.logger.warn(
+        { missingCount: stillMissing.length, missing: stillMissing.map((f) => f.filename) },
+        "Files still unreported after coverage retry"
+      );
+    }
+
+    return this.mergeFileResults([results, retry]);
+  }
+
+  /** Stores the given files' diffs and runs one deep-strategy file-review AI call over them. */
+  private async runDeepReviewCall(params: {
+    storageId: string;
+    label: string;
+    files: PRFile[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FileReviewResult[]> {
+    const { storageId, files, repoPath } = params;
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
 
     try {
       // Store diffs to disk
-      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesWithPatches);
+      const { diffDir, manifest } = await diffStorage.storeDiffs(storageId, files);
       this.logger.info(
         {
-          prNumber,
+          storageId,
           fileCount: manifest.files.length,
           diffDir,
           reviewPasses: this.reviewProfile.passes,
@@ -1145,16 +1259,8 @@ export class ReviewEngine {
       );
 
       // Build prompt from the resolved baseline profile
-      const commentsContext = formatExistingCommentsContext(existingComments);
+      const commentsContext = formatExistingCommentsContext(params.existingComments);
       const prompt = buildGeneralFileReviewPrompt(manifest, commentsContext || undefined, repoPath);
-      this.logger.info(
-        {
-          reviewPasses: this.reviewProfile.passes,
-        },
-        "Built resolved file review prompt"
-      );
-
-      // Single AI call for all files
       const shouldAttach = totalSize <= ATTACHMENT_SIZE_THRESHOLD_BYTES;
       this.logger.debug(
         {
@@ -1169,7 +1275,7 @@ export class ReviewEngine {
         "Batched prompt being sent"
       );
 
-      const streaming = this.createStreamingCallback("Reviewing files...", "file-review");
+      const streaming = this.createStreamingCallback(params.label, "file-review");
       let response: AIResponse;
       try {
         response = await this.provider.executePrompt(prompt, {
@@ -1181,51 +1287,11 @@ export class ReviewEngine {
       } finally {
         streaming.finish();
       }
-      onTokenUsage?.(response.tokenUsage);
-      const results = this.provider.parseBatchedFileReview(response);
-
-      // Log individual file results
-      const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
-      this.log(
-        `  Batched review found ${totalFindings} total issues across ${results.length} files`
-      );
-
-      for (const result of results) {
-        if (result.findings.length > 0) {
-          this.log(`    ${result.filename}: ${result.findings.length} issues`);
-        }
-      }
-
-      this.auditLogger.logFileReviewComplete(
-        `batched-${filesWithPatches.length}-files`,
-        prNumber,
-        totalFindings
-      );
-
-      // Ensure we have results for all files (fill in missing ones with empty results)
-      const resultMap = new Map(results.map((r) => [r.filename, r]));
-      const completeResults: FileReviewResult[] = filesWithPatches.map((file) => {
-        return (
-          resultMap.get(file.filename) ?? {
-            filename: file.filename,
-            findings: [],
-          }
-        );
-      });
-
-      return completeResults;
-    } catch (error) {
-      this.auditLogger.logFileReviewComplete(
-        `batched-${filesWithPatches.length}-files`,
-        prNumber,
-        0,
-        "failure",
-        (error as Error).message
-      );
-      throw error;
+      params.onTokenUsage?.(response.tokenUsage);
+      return this.provider.parseBatchedFileReview(response);
     } finally {
       // Clean up diffs
-      await diffStorage.cleanup(prIdentifier);
+      await diffStorage.cleanup(storageId);
     }
   }
 
@@ -1391,10 +1457,7 @@ export class ReviewEngine {
     }
 
     try {
-      const batches = planReviewBatches(filesToReview, {
-        maxBytes: this.options.batchMaxBytes ?? DEFAULT_BATCH_MAX_BYTES,
-        maxFiles: this.options.batchMaxFiles ?? DEFAULT_BATCH_MAX_FILES,
-      });
+      const batches = this.planBatches(filesToReview);
 
       let result: FastReviewResult;
       if (batches.length <= 1) {
@@ -1517,17 +1580,40 @@ export class ReviewEngine {
       })
     );
 
-    const merged = this.mergeFastReviewResults(batchResults);
+    return this.addCrossBatchAnalysis(this.mergeFastReviewResults(batchResults), {
+      prDetails,
+      filesToReview,
+      cachedResults: params.cachedResults,
+      existingComments,
+      repoPath,
+      onTokenUsage: params.onTokenUsage,
+    });
+  }
 
-    // Cross-batch pass over summarized findings only; failure keeps batch-level results.
+  /**
+   * Runs one cross-file pass over the merged per-batch findings (not the raw
+   * diffs) to catch issues that span batches. A failure keeps the batch-level
+   * cross-file results.
+   */
+  private async addCrossBatchAnalysis(
+    merged: FastReviewResult,
+    params: {
+      prDetails: PRDetails;
+      filesToReview: PRFile[];
+      cachedResults: readonly FileReviewResult[];
+      existingComments: readonly ExistingComment[];
+      repoPath?: string;
+      onTokenUsage?: (usage: TokenUsage | undefined) => void;
+    }
+  ): Promise<FastReviewResult> {
     try {
       const crossPass = await this.runPhase("cross-file", "Cross-file analysis", () =>
         this.performCrossFileAnalysis(
-          prDetails,
-          filesToReview,
+          params.prDetails,
+          params.filesToReview,
           [...params.cachedResults, ...merged.fileResults],
-          existingComments,
-          repoPath,
+          params.existingComments,
+          params.repoPath,
           params.onTokenUsage
         )
       );
@@ -1542,6 +1628,31 @@ export class ReviewEngine {
       );
       return merged;
     }
+  }
+
+  /** Splits files into size-capped batches of related files using the configured limits. */
+  private planBatches(files: PRFile[]): PRFile[][] {
+    return planReviewBatches(files, {
+      maxBytes: this.options.batchMaxBytes ?? DEFAULT_BATCH_MAX_BYTES,
+      maxFiles: this.options.batchMaxFiles ?? DEFAULT_BATCH_MAX_FILES,
+    });
+  }
+
+  /** Merges per-file results from several batches, concatenating findings for repeated files. */
+  private mergeFileResults(lists: readonly (readonly FileReviewResult[])[]): FileReviewResult[] {
+    const fileMap = new Map<string, FileReviewResult>();
+    for (const list of lists) {
+      for (const fileResult of list) {
+        const existing = fileMap.get(fileResult.filename);
+        fileMap.set(
+          fileResult.filename,
+          existing
+            ? { ...existing, findings: [...existing.findings, ...fileResult.findings] }
+            : fileResult
+        );
+      }
+    }
+    return [...fileMap.values()];
   }
 
   /**
@@ -1656,19 +1767,6 @@ export class ReviewEngine {
 
   /** Merges fast-review results in code: per-file findings are concatenated and cross-file findings de-duplicated. */
   private mergeFastReviewResults(results: readonly FastReviewResult[]): FastReviewResult {
-    const fileMap = new Map<string, FileReviewResult>();
-    for (const result of results) {
-      for (const fileResult of result.fileResults) {
-        const existing = fileMap.get(fileResult.filename);
-        fileMap.set(
-          fileResult.filename,
-          existing
-            ? { ...existing, findings: [...existing.findings, ...fileResult.findings] }
-            : fileResult
-        );
-      }
-    }
-
     const crossFindings = new Map<string, CrossFileReviewResult["findings"][number]>();
     for (const { crossFileResult } of results) {
       for (const finding of crossFileResult.findings) {
@@ -1684,7 +1782,7 @@ export class ReviewEngine {
     );
 
     return {
-      fileResults: [...fileMap.values()],
+      fileResults: this.mergeFileResults(results.map((r) => r.fileResults)),
       crossFileResult: {
         overallAssessment: assessments.join(" "),
         findings: [...crossFindings.values()],
@@ -1700,14 +1798,16 @@ export class ReviewEngine {
    * Returns the subset of `filesToReview` that the model did not report in
    * `reviewedFiles`. Returns an empty array when the provider reported no
    * coverage (e.g. the multi-agent synthesizer or legacy callers) so that
-   * coverage is only checked when it can actually be verified.
+   * coverage is only checked when it can actually be verified. When
+   * `requireReport` is set, an empty report means nothing was reviewed.
    */
   private findUnreviewedFiles(
     reviewedFiles: readonly string[],
-    filesToReview: readonly PRFile[]
+    filesToReview: readonly PRFile[],
+    requireReport = false
   ): PRFile[] {
     if (!reviewedFiles || reviewedFiles.length === 0) {
-      return [];
+      return requireReport ? [...filesToReview] : [];
     }
 
     const normalized = reviewedFiles.map((file) => normalizeRepoPath(file));
@@ -1814,45 +1914,39 @@ export class ReviewEngine {
       };
     }
 
-    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
-    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
-
     try {
-      // Store diffs to disk
-      const { diffDir, manifest } = await diffStorage.storeDiffs(prIdentifier, filesToReview);
-      this.logger.info(
-        { prNumber, fileCount: manifest.files.length, diffDir },
-        "Stored diffs for multi-agent review"
-      );
+      const batches = this.planBatches(filesToReview);
+      if (batches.length > 1) {
+        this.log(`Reviewing ${filesToReview.length} file(s) in ${batches.length} batches...`);
+      }
 
-      // Copy diff files to repo's .mergementor directory for AI access
-      const { paths: diffFiles } = await this.workspaceManager.copyDiffsToRepoDir(
-        diffDir,
-        manifest,
-        repoPath
-      );
+      // Each batch runs the full subagent set (which is already parallel) plus the
+      // synthesizer, so batches run one after another.
+      const batchOutputs: FastReviewResult[] = [];
+      for (const [index, batch] of batches.entries()) {
+        batchOutputs.push(
+          await this.runMultiAgentBatch({
+            storageId: batches.length === 1 ? prIdentifier : `${prIdentifier}-batch${index + 1}`,
+            prDetails,
+            files: batch,
+            existingComments,
+            repoPath,
+            onTokenUsage,
+          })
+        );
+      }
 
-      const orchestrator = new MultiAgentOrchestrator(this.provider, {
-        passes: this.reviewProfile.passes,
-        maxParallel: this.options.multiAgentMaxParallel ?? 2,
-        output: this.output,
-        onProgress: this.options.onProgress,
-        streamPhase: "file-review",
-        streaming: {
-          enabled: this.streamingEnabled,
-          lines: this.streamingLines,
-          ciMode: this.options.ciMode ?? false,
-        },
-      });
-
-      const multiAgentOutput = await orchestrator.review({
-        prDetails,
-        manifest,
-        diffFiles,
-        existingComments,
-        repoPath,
-      });
-      onTokenUsage?.(multiAgentOutput.tokenUsage);
+      let multiAgentOutput = this.mergeFastReviewResults(batchOutputs);
+      if (batches.length > 1) {
+        multiAgentOutput = await this.addCrossBatchAnalysis(multiAgentOutput, {
+          prDetails,
+          filesToReview,
+          cachedResults,
+          existingComments,
+          repoPath,
+          onTokenUsage,
+        });
+      }
 
       // Validate line numbers specifically on filesToReview
       const validatedNewResults = this.lineNumberValidator.validate(
@@ -1911,8 +2005,66 @@ export class ReviewEngine {
         (error as Error).message
       );
       throw error;
+    }
+  }
+
+  /** Stores the given files' diffs and runs the full multi-agent pipeline (subagents + synthesizer) over them. */
+  private async runMultiAgentBatch(params: {
+    storageId: string;
+    prDetails: PRDetails;
+    files: PRFile[];
+    existingComments: readonly ExistingComment[];
+    repoPath?: string;
+    onTokenUsage?: (usage: TokenUsage | undefined) => void;
+  }): Promise<FastReviewResult> {
+    const { storageId, repoPath } = params;
+    const tempPath = this.options.tempPath ?? path.join(process.cwd(), ".mergementor");
+    const diffStorage = new DiffStorage(tempPath, this.fileSystem);
+
+    try {
+      // Store diffs to disk
+      const { diffDir, manifest } = await diffStorage.storeDiffs(storageId, params.files);
+      this.logger.info(
+        { storageId, fileCount: manifest.files.length, diffDir },
+        "Stored diffs for multi-agent review"
+      );
+
+      // Copy diff files to repo's .mergementor directory for AI access
+      const { paths: diffFiles } = await this.workspaceManager.copyDiffsToRepoDir(
+        diffDir,
+        manifest,
+        repoPath
+      );
+
+      const orchestrator = new MultiAgentOrchestrator(this.provider, {
+        passes: this.reviewProfile.passes,
+        maxParallel: this.options.multiAgentMaxParallel ?? 2,
+        output: this.output,
+        onProgress: this.options.onProgress,
+        streamPhase: "file-review",
+        streaming: {
+          enabled: this.streamingEnabled,
+          lines: this.streamingLines,
+          ciMode: this.options.ciMode ?? false,
+        },
+      });
+
+      const output = await orchestrator.review({
+        prDetails: params.prDetails,
+        manifest,
+        diffFiles,
+        existingComments: params.existingComments,
+        repoPath,
+      });
+      params.onTokenUsage?.(output.tokenUsage);
+
+      return {
+        fileResults: [...output.fileResults],
+        crossFileResult: output.crossFileResult,
+        reviewedFiles: [],
+      };
     } finally {
-      await diffStorage.cleanup(prIdentifier);
+      await diffStorage.cleanup(storageId);
     }
   }
 
