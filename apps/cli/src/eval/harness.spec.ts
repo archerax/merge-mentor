@@ -339,10 +339,11 @@ describe("Evaluation Harness Engine", () => {
 
       await evaluateScenario("/test/corpus/x", { fileSystem: fs, provider: "copilot-sdk" });
 
-      const [, options] = mockProviderExecute.mock.calls[0] as unknown as [
+      const [prompt, options] = mockProviderExecute.mock.calls[0] as unknown as [
         string,
         { workingDirectory: string; diffFiles: string[] },
       ];
+      expect(prompt).toContain("EVALUATION SANDBOX");
       expect(options.workingDirectory).not.toContain("/test/corpus/x");
       expect(options.diffFiles).toHaveLength(1);
       expect(options.diffFiles[0].startsWith(options.workingDirectory)).toBe(true);

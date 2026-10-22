@@ -115,6 +115,16 @@ export function matchForbiddenFinding(
   return false;
 }
 
+/** Tells sandboxed providers where the diffs are so they do not probe outside it. */
+const SANDBOX_NOTE = `
+
+# EVALUATION SANDBOX
+The working directory contains only the diff files listed above, under the hidden
+.mergementor/diffs folder (directory listings do not show hidden folders). The
+repository itself is not available: do not read any path outside the working
+directory, and do not call bash. Review from the diffs alone and return the JSON result.
+`;
+
 /** Evaluates a single evaluation scenario directory. */
 export async function evaluateScenario(
   scenarioDir: string,
@@ -187,6 +197,11 @@ export async function evaluateScenario(
           }
         }
         prompt = buildGeneralFileReviewPrompt(manifest, undefined, workDir);
+        if (sandboxDir) {
+          // The diffs sit in the hidden .mergementor folder, which directory listings
+          // omit, and a read outside the sandbox is rejected and aborts the session.
+          prompt += SANDBOX_NOTE;
+        }
         diffFiles = files;
       } catch {
         // Fall back to default prompt on error loading manifest
