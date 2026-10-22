@@ -80,7 +80,7 @@ jobs:
             echo "::group::$f"
             sed -n '1,/^INPUT PROMPT$/p' "$f" | head -c 2000
             echo "[...prompt omitted...]"
-            awk '/^SESSION TIMELINE$|^RAW API RESPONSE$/{p=1} p' "$f" | head -c 8000
+            awk '/^SESSION TIMELINE$|^RAW API RESPONSE$/{p=1} p' "$f" | grep -v -e 'streaming_delta' -e 'tool_call_delta' -e 'reasoning_delta' -e 'MESSAGE DELTA' | cut -c1-600 | head -c 12000
             echo
             echo "::endgroup::"
           done
