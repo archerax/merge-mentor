@@ -303,6 +303,8 @@ describe("runPrdReview", () => {
     // Simulates the providers: each call writes a transcript into the requested directory.
     const ai = createFakeAIClient(async (prompt, opts) => {
       expect(opts?.transcriptDir).toBe(path.resolve(tempPath, "prd", "run-1", "transcripts"));
+      // Provider-side session state (Copilot keeps it on disk) must not outlive the call.
+      expect(opts?.discardSession).toBe(true);
       if (opts?.transcriptDir) {
         await mkdir(opts.transcriptDir, { recursive: true });
         await writeFile(

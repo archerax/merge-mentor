@@ -735,6 +735,18 @@ export class CopilotSdkProvider implements AIProviderClient {
       } catch {
         // Best-effort session cleanup
       }
+      if (options?.discardSession) {
+        // disconnect() keeps the conversation on disk for resumption; the
+        // caller asked for nothing to outlive the request.
+        try {
+          await this.withTimeout(client.deleteSession(session.sessionId), this.timeoutMs);
+        } catch (error) {
+          this.logger.warn(
+            { error: (error as Error).message },
+            "Could not delete Copilot session data after the request"
+          );
+        }
+      }
     }
   }
 

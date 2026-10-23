@@ -458,6 +458,7 @@ class PrdReviewRun {
       });
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-section",
+        discardSession: true,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("ai-review") } : {}),
       });
@@ -511,6 +512,7 @@ class PrdReviewRun {
     try {
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-consistency",
+        discardSession: true,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("consistency") } : {}),
       });
@@ -728,6 +730,7 @@ class PrdReviewRun {
       });
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-image",
+        discardSession: true,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         imageFiles,
         ...(this.streaming ? { onStreamData: this.stream("images") } : {}),

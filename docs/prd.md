@@ -144,11 +144,15 @@ The command prints the exact paths when it finishes. If a review fails, its run 
 
 The transcripts include the document text that was sent to the AI provider. For `prd` runs they are kept in the run's own folder, not in the `.mergementor/transcripts/` folder other commands use, so they are deleted with the run.
 
+Reviews started from the dashboard also keep a live log of the run in `.mergementor/runs/<dashboard-run-id>/` (progress messages, the AI output as it streamed in and the final report), so the page can be reloaded while a review is running. It can contain text from the document. Deleting the run from the **Reports** page deletes this log too. The log of a dashboard review that failed (and so has no report to delete) is removed by the dashboard's normal clean-up after 7 days (see `MM_RUN_RETENTION_MS` in the [Configuration Guide](./configuration.md)), or you can delete its folder yourself.
+
+AI providers can keep their own copy of a conversation. For `prd` runs Merge Mentor asks them not to: the `copilot-sdk` provider permanently deletes the Copilot session (which the Copilot runtime otherwise keeps on disk, outside `.mergementor`, so it can be resumed) after each request, and the `opencode-sdk` provider deletes its OpenCode session after each request. What the AI service itself retains is governed by your provider's terms.
+
 ### Deleting a Run
 
 To delete a run, either:
 
-- Open the dashboard (`merge-mentor ui`), go to the **Reports** page and use **Delete** on the run. This removes the report, the copy of the document, the extracted text and images, and the AI transcripts together.
+- Open the dashboard (`merge-mentor ui`), go to the **Reports** page and use **Delete run** on the report. This removes the report, the copy of the document, the extracted text and images, the AI transcripts and, for a review started from the dashboard, its live log together.
 - Or delete the files yourself: the two report files and the run folder listed above, for example:
 
   ```bash

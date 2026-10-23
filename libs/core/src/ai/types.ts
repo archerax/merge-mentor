@@ -97,6 +97,13 @@ export interface ExecutePromptOptions {
    * run produced (e.g. `prd`) point this into their own run directory.
    */
   readonly transcriptDir?: string;
+  /**
+   * Permanently delete any session state the provider keeps for this request
+   * (e.g. the Copilot runtime's on-disk conversation history) once it ends.
+   * Set by flows whose prompts hold confidential content that must not
+   * outlive the run (e.g. `prd`).
+   */
+  readonly discardSession?: boolean;
   /** Hint for the type of review prompt being sent (avoids substring inference). */
   readonly promptType?:
     | "file-review"

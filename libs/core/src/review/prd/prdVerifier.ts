@@ -486,6 +486,7 @@ export class PrdVerifier {
       const { onStreamData, transcriptDir } = this.options;
       const response = await this.provider.executePrompt(prompt, {
         promptType: "prd-verify",
+        discardSession: true,
         ...(onStreamData ? { onStreamData } : {}),
         ...(transcriptDir ? { transcriptDir } : {}),
       });

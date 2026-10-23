@@ -8,6 +8,7 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     on: vi.fn(),
     sendAndWait: vi.fn(),
     disconnect: vi.fn(),
+    sessionId: "session-1",
   };
   const client = {
     start: vi.fn().mockResolvedValue(undefined),
@@ -15,6 +16,7 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
     listModels: vi.fn().mockResolvedValue([]),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
   };
   const ClientCtor = vi.fn().mockImplementation(function () {
     return client;
@@ -106,6 +108,7 @@ describe("CopilotSdkProvider", () => {
     mockClient.start.mockResolvedValue(undefined);
     mockClient.createSession.mockResolvedValue(mockSession);
     mockClient.stop.mockResolvedValue([]);
+    mockClient.deleteSession.mockResolvedValue(undefined);
     mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
   });
 
@@ -767,6 +770,59 @@ describe("CopilotSdkProvider", () => {
       await rejection;
 
       expect(mockSession.disconnect).toHaveBeenCalled();
+    });
+
+    it("keeps session data by default", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.deleteSession).not.toHaveBeenCalled();
+    });
+
+    it("deletes session data after the request when discardSession is set", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockSession.disconnect).toHaveBeenCalled();
+      expect(mockClient.deleteSession).toHaveBeenCalledWith("session-1");
+    });
+
+    it("deletes session data even when the prompt fails", async () => {
+      const provider = createProvider();
+      mockSession.sendAndWait.mockRejectedValue(new Error("SDK error"));
+
+      const promise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      await rejection;
+
+      expect(mockClient.deleteSession).toHaveBeenCalledWith("session-1");
+    });
+
+    it("does not fail if deleting session data throws", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      mockClient.deleteSession.mockRejectedValue(new Error("delete failed"));
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.parsed).toEqual({ findings: [] });
     });
 
     it("does not fail if session.disconnect throws", async () => {
