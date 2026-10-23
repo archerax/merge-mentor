@@ -53,6 +53,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 - **[repos](./repos.md)**: Manages local cloned repositories used for context loading.
 - **[pbi](./pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
 - **[project](./project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
+- **[prd](./prd.md)**: Reviews a PRD or FRD Word document (`.docx`) for gaps, ambiguity and testability before development starts.
 - **[plan](./plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.
 - **[ui](./ui.md)**: Launches the local web dashboard for interactive reviews.

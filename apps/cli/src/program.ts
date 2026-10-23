@@ -15,6 +15,7 @@ import { executeEval } from "./commands/eval.js";
 import { executeFixCommand } from "./commands/fix.js";
 import { executePBIReview } from "./commands/pbi.js";
 import { executePlan } from "./commands/plan.js";
+import { executePrdReview } from "./commands/prd.js";
 import { executeProjectReview } from "./commands/project.js";
 import { executeReplyCommand } from "./commands/reply.js";
 import { executeReposCommand } from "./commands/repos.js";
@@ -39,6 +40,7 @@ import type {
   FixOptions,
   PBIOptions,
   PlanOptions,
+  PrdOptions,
   ProjectOptions,
   ReplyOptions,
   ReviewOptions,
@@ -708,6 +710,41 @@ program
         ...options,
         ...reference,
       });
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// PRD / FRD Review command
+program
+  .command("prd <file>")
+  .description("Review a PRD or FRD Word document (.docx) for gaps, ambiguity and testability")
+  .optionsGroup("General Options")
+  .option("--type <type>", "Document type: prd or frd", "prd")
+  .option(
+    "--include-images",
+    "Also review images in the document; without it, images are listed as not reviewed",
+    false
+  )
+  .option(
+    "--temp-path <path>",
+    "Base path for reports and run data (default ./.mergementor). Env: MM_TEMP_PATH"
+  )
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .action(async (file: string, options: PrdOptions) => {
+    try {
+      await executePrdReview(file, options);
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
