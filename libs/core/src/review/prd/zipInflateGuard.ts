@@ -31,10 +31,7 @@ const FIELD = "docx";
  * @throws {ValidationError} when an entry expands beyond its declared size or
  *   its data is corrupt
  */
-export function assertZipEntriesWithinDeclaredSizes(
-  buffer: Uint8Array,
-  maxEntries?: number
-): void {
+export function assertZipEntriesWithinDeclaredSizes(buffer: Uint8Array, maxEntries?: number): void {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   for (const entry of readCentralDirectory(buffer, maxEntries)) {
     if (entry.method !== METHOD_DEFLATE) continue;

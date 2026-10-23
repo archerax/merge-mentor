@@ -18,7 +18,6 @@ import mammoth from "mammoth";
 
 import { assertDocxSize, type DocxValidationOptions, validateDocxBuffer } from "./docxValidator.js";
 import { extractCommentAnchors, findMainDocumentPath } from "./openXml.js";
-import { assertZipEntriesWithinDeclaredSizes } from "./zipInflateGuard.js";
 import type {
   DocxBlock,
   DocxComment,
@@ -30,6 +29,7 @@ import type {
   DocxTableCell,
   DocxTableRow,
 } from "./types.js";
+import { assertZipEntriesWithinDeclaredSizes } from "./zipInflateGuard.js";
 
 /** Filesystem capabilities needed to load a `.docx` (satisfied by `nodeFs`). */
 export type DocxFileSystem = Pick<FileSystem, "stat" | "readFileBuffer">;
