@@ -32,7 +32,7 @@ part of the MVP, and report language must be plain, not code-review jargon.
 | Custom rubrics   | None in MVP (built-in rubrics only)                                                          |
 | Iteration        | Each run independent; no cross-version comparison                                            |
 | CI               | No `--fail-on` in MVP                                                                        |
-| Confidentiality  | Existing local-only posture; uploaded file stored under `.mergementor`, deletable; documented clearly |
+| Confidentiality  | Existing local-only posture; uploaded file stored under `.mergementor`, deletable per run; documented clearly |
 | Quality checks   | Manual testing on real team documents                                                        |
 | Breakdown        | Epic/feature/story generation is a separate later command, not part of the review            |
 
@@ -118,11 +118,19 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
 - Seeded-flaw eval set in the existing eval harness (revisit if manual testing
   proves too slow to tune quality)
 
-## 8. Open questions
+## 8. Resolved details
 
-- Exact config keys and env vars for the command (follow `pbi` naming).
-- Maximum accepted file size and section size for the web upload.
-- Retention: should the web UI offer "delete uploaded file" per run, or a global
-  cleanup?
-- Do we want the plain-language report tone as a shared style for all
-  non-code reviews, or specific to `prd`?
+- **Config and env vars:** mirror `pbi`. Reuse the shared `MM_*` provider/AI options
+  and `--temp-path`. The only `prd`-specific options are `--type` and
+  `--include-images`.
+- **Size limits:** 20 MB upload cap, enforced in both the web server and the CLI.
+  Sections are split to fit the model context.
+- **Cleanup:** per-run delete only. Deleting a run removes the uploaded `.docx`,
+  its extracted data and its report. No global cleanup in the MVP.
+- **Report tone:** plain-language and specific to `prd`. Existing `pbi` and
+  `project` output is unchanged; revisit sharing a style after the pilot.
+
+## 9. Remaining open items
+
+- Section-size threshold and the fallback chunking parameters for documents with
+  no headings (settle during the spike).
