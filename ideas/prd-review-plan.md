@@ -199,4 +199,5 @@ overridable through `ChunkOptions`.
   threshold because there is no structure to keep related content together.
 - **Input limits:** 20 MB file cap (checked before reading), zip magic bytes,
   and a zip-bomb guard (200 MB total uncompressed, 10,000 entries) via the
-  shared `validateDocxBuffer`.
+  shared `validateDocxBuffer`, plus an inflate check in the parser
+  (`zipInflateGuard.ts`) so no entry can expand beyond the size it declares.
