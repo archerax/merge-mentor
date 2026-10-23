@@ -59,6 +59,7 @@ jobs:
           EVAL_MIN_RECALL: ${{ github.event.inputs.min_recall || '0.90' }}
           EVAL_MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.85' }}
           EVAL_RUNS: ${{ github.event.inputs.runs || '3' }}
+        shell: bash
         run: |
           if [ "$EVAL_PROVIDER" = "mock" ]; then
             unset MM_AI_BASE_URL MM_AI_MODEL MM_AI_API_KEY
@@ -69,7 +70,7 @@ jobs:
             --min-recall "$EVAL_MIN_RECALL" \
             --min-precision "$EVAL_MIN_PRECISION" \
             --runs "$EVAL_RUNS" \
-            --output-file "eval-report.json"
+            --output-file "eval-report.json" 2>&1 | tee eval-summary.txt
 
       - name: Upload Evaluation Artifacts
         if: always()
@@ -78,11 +79,20 @@ jobs:
           name: golden-pr-eval-report
           path: eval-report.json
 
-      - name: Print Debug Logs & Transcripts
+      - name: Publish Evaluation Summary
+        if: always()
+        run: |
+          # Printed before the transcripts so it is never lost to log truncation.
+          if [ -f eval-summary.txt ]; then
+            { echo '```'; cat eval-summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            cat eval-summary.txt
+          fi
+
+      - name: Print Failed Provider Transcripts
         if: failure()
         run: |
-          # Skip the (large, repeated) input prompt; show the session timeline and raw response.
-          for f in $(find .mergementor/transcripts -type f 2>/dev/null | sort); do
+          # Only failed provider attempts; skip the (large, repeated) input prompt.
+          for f in $(find .mergementor/transcripts -type f -name '*failure*' 2>/dev/null | sort); do
             echo "::group::$f"
             sed -n '1,/^INPUT PROMPT$/p' "$f" | head -c 2000
             echo "[...prompt omitted...]"
