@@ -139,6 +139,7 @@ export async function executeReview(
     verifyPbi: config.verifyPbi,
     reReview: resolvedOptions.reReview,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
+    reviewRuns: config.reviewRuns,
   });
 
   const modeLabel = dryRun ? " (dry-run)" : "";

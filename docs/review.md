@@ -82,6 +82,7 @@ unsafe or malformed replacements do not produce native suggestions.
 | `--experimental-tools`    | Enable experimental structured output via Copilot SDK tool calls                | `MM_EXPERIMENTAL_TOOLS` | `false`        |
 | `--long-context`          | Pin the session to the long-context tier                                        | `MM_LONG_CONTEXT`       | `false`        |
 | `--verify-pbi`            | Verify PR changes against linked Product Backlog Items or Issues                | `MM_VERIFY_PBI`         | `false`        |
+| `--runs <number>`         | Sequential review runs; findings are aggregated and deduplicated                | `MM_REVIEW_RUNS`        | `1`            |
 
 ### File Filtering
 

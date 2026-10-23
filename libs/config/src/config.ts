@@ -106,6 +106,11 @@ export interface Config {
    * concurrently. Config-only (no CLI flag). Default: 4
    */
   readonly multiAgentMaxParallel: number;
+  /**
+   * Number of sequential review runs whose findings are aggregated and deduplicated.
+   * Running a smaller model several times can beat one run of a larger model. Default: 1
+   */
+  readonly reviewRuns: number;
 }
 
 const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-sdk");
@@ -123,6 +128,14 @@ const ConfigParserSchema = z.object({
       return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
     },
     z.custom<number>((val) => typeof val === "number").catch(2)
+  ),
+  reviewRuns: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      const parsed = typeof val === "string" ? Number.parseInt(val, 10) : val;
+      return Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined;
+    },
+    z.custom<number>((val) => typeof val === "number").catch(1)
   ),
   streamingEnabled: z.preprocess(
     (val) => val !== "false" && val !== false,
@@ -178,6 +191,7 @@ export function loadConfig(
     gitBackend: cliOverrides?.gitBackend ?? env.get("MM_GIT_BACKEND"),
     reviewStrategy: cliOverrides?.reviewStrategy ?? env.get("MM_REVIEW_STRATEGY"),
     multiAgentMaxParallel: env.get("MM_MULTI_AGENT_MAX_PARALLEL"),
+    reviewRuns: cliOverrides?.reviewRuns ?? env.get("MM_REVIEW_RUNS"),
     streamingEnabled: cliOverrides?.streamingEnabled ?? env.get("MM_STREAMING_ENABLED"),
     streamingLines:
       cliOverrides?.streamingLines ??
@@ -233,6 +247,7 @@ export function loadConfig(
     experimentalTools: parsed.experimentalTools,
     verifyPbi: parsed.verifyPbi,
     multiAgentMaxParallel: parsed.multiAgentMaxParallel,
+    reviewRuns: parsed.reviewRuns,
   };
 }
 
@@ -272,6 +287,8 @@ interface CliOverrides {
   readonly passes?: string;
   /** Override for the review strategy. */
   readonly reviewStrategy?: string;
+  /** Override for the number of aggregated review runs. */
+  readonly reviewRuns?: number;
   /** Override for streaming output of AI providers. */
   readonly streamingEnabled?: boolean;
   /** Override for the number of streaming display lines. */

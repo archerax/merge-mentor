@@ -84,6 +84,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         label: "Multi-agent max parallel",
         type: "number",
       },
+      { envVar: "MM_REVIEW_RUNS", label: "Review runs", type: "number" },
       { envVar: "MM_VERIFY_PBI", label: "Verify linked PBIs", type: "boolean" },
     ],
   },

@@ -406,6 +406,24 @@ describe("Config", () => {
       expect(config.multiAgentMaxParallel).toBe(2);
     });
 
+    it("defaults reviewRuns to 1", () => {
+      expect(loadConfig(undefined, createStubEnvironment()).reviewRuns).toBe(1);
+    });
+
+    it("loads reviewRuns from MM_REVIEW_RUNS and prefers the CLI override", () => {
+      const env = createStubEnvironment({ MM_REVIEW_RUNS: "3" });
+
+      expect(loadConfig(undefined, env).reviewRuns).toBe(3);
+      expect(loadConfig({ reviewRuns: 5 }, env).reviewRuns).toBe(5);
+    });
+
+    it("falls back to 1 run for invalid reviewRuns values", () => {
+      for (const value of ["0", "-2", "abc"]) {
+        const env = createStubEnvironment({ MM_REVIEW_RUNS: value });
+        expect(loadConfig(undefined, env).reviewRuns).toBe(1);
+      }
+    });
+
     it("loads additive review passes", () => {
       const config = loadConfig({
         passes: "security,database",

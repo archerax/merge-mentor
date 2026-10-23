@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`review --runs <n>` / `stage --runs <n>` / `MM_REVIEW_RUNS` restored**: runs the
+  review several times in sequence and aggregates the findings, deduplicating by
+  fingerprint. Several runs of a smaller model can cost less than one run of a
+  larger model. This reverses the 2.0.0 removal of multi-run mode.
+
 ### Security
 
 - **Prompts**: untrusted content (PR description, diffs, comments, work items) can

@@ -244,6 +244,7 @@ function createEngine(
     experimentalTools: config.experimentalTools,
     verifyPbi: config.verifyPbi,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
+    reviewRuns: config.reviewRuns,
     reReview: target.reReview,
     output,
   });

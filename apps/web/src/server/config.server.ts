@@ -50,6 +50,7 @@ function collectValues(config: Config): Record<string, string | undefined> {
     MM_REVIEW_PASSES: config.reviewPasses.length > 0 ? config.reviewPasses.join(", ") : undefined,
     MM_REVIEW_STRATEGY: config.reviewStrategy,
     MM_MULTI_AGENT_MAX_PARALLEL: String(config.multiAgentMaxParallel),
+    MM_REVIEW_RUNS: String(config.reviewRuns),
     MM_VERIFY_PBI: String(config.verifyPbi),
     MM_GIT_BACKEND: config.gitBackend,
     MM_STREAMING_ENABLED: String(config.streamingEnabled),

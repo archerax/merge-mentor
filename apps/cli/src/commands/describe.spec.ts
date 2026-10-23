@@ -55,6 +55,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     experimentalTools = false,
     verifyPbi = false,
     multiAgentMaxParallel = 4,
+    reviewRuns = 1,
     ...restOverrides
   } = overrides;
   const reviewProfile =
@@ -88,6 +89,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     experimentalTools,
     verifyPbi,
     multiAgentMaxParallel,
+    reviewRuns,
     ...restOverrides,
   };
 }

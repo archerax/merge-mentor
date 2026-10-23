@@ -815,6 +815,57 @@ describe("ReviewEngine", () => {
       );
     });
 
+    it("runs the review reviewRuns times and aggregates deduplicated findings", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+        verbose: false,
+        reviewRuns: 2,
+      });
+      const files = [
+        createPRFile({
+          filename: "test.ts",
+          patch: "@@ -1,3 +1,3 @@\n line 1\n-line 2\n+new line 2\n line 3",
+        }),
+      ];
+      const shared = {
+        line: 2,
+        severity: "high" as const,
+        category: "bug",
+        message: "Shared issue",
+        suggestion: "Fix it",
+        isPreExisting: false,
+      };
+      const onlyInSecond = { ...shared, line: 3, message: "Only found in second run" };
+
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue(files);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+      mockParseBatchedFileReview
+        .mockReturnValueOnce([{ filename: "test.ts", findings: [shared] }])
+        .mockReturnValueOnce([{ filename: "test.ts", findings: [shared, onlyInSecond] }]);
+
+      const result = await engine.reviewPR(123);
+
+      expect(mockParseBatchedFileReview).toHaveBeenCalledTimes(2);
+      expect(result.fileResults).toHaveLength(1);
+      expect(result.fileResults[0].findings.map((f) => f.message).toSorted()).toEqual([
+        "Only found in second run",
+        "Shared issue",
+      ]);
+    });
+
+    it("runs the review once by default", async () => {
+      const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
+      vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+      vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([
+        createPRFile({ filename: "test.ts", patch: "@@ -1,3 +1,3 @@\n line" }),
+      ]);
+      vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+
+      await engine.reviewPR(123);
+
+      expect(mockParseBatchedFileReview).toHaveBeenCalledTimes(1);
+    });
+
     it("remaps findings with out-of-range line numbers to the nearest valid diff line", async () => {
       const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
         verbose: false,

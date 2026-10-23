@@ -94,6 +94,7 @@ function createTestConfig(): Config {
     experimentalTools: false,
     verifyPbi: false,
     multiAgentMaxParallel: 4,
+    reviewRuns: 1,
   };
 }
 

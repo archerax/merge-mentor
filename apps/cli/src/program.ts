@@ -136,6 +136,11 @@ program
     "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
   )
   .option(
+    "--runs <number>",
+    "Sequential review runs whose findings are aggregated and deduplicated (default: 1). Env: MM_REVIEW_RUNS",
+    (val: string) => Number.parseInt(val, 10)
+  )
+  .option(
     "--re-review",
     "Re-review all files, ignoring cached results. Fresh cache is still written afterward."
   )
@@ -258,6 +263,7 @@ program
         aiApiKey: options.aiApiKey,
         passes: options.passes,
         reviewStrategy: options.strategy,
+        reviewRuns: options.runs,
         reasoning: options.reasoning,
         experimentalTools: options.experimentalTools,
         verifyPbi: options.verifyPbi,
@@ -325,6 +331,11 @@ program
   .option(
     "--strategy <strategy>",
     "Execution strategy (deep, fast, or multi-agent). Env: MM_REVIEW_STRATEGY"
+  )
+  .option(
+    "--runs <number>",
+    "Sequential review runs whose findings are aggregated and deduplicated (default: 1). Env: MM_REVIEW_RUNS",
+    (val: string) => Number.parseInt(val, 10)
   )
   .optionsGroup("File Filtering")
   .option(
@@ -399,6 +410,7 @@ program
         aiApiKey: options.aiApiKey,
         passes: options.passes,
         reviewStrategy: options.strategy,
+        reviewRuns: options.runs,
         tempPath: options.tempPath,
         gitBackend: options.gitBackend,
       });

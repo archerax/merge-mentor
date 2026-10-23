@@ -23,6 +23,8 @@ export interface ReviewOptions {
   passes?: string;
   /** Execution strategy ('deep', 'fast', or 'multi-agent'). Default: 'fast'. */
   strategy?: string;
+  /** Sequential review runs whose findings are aggregated and deduplicated. Env: `MM_REVIEW_RUNS`. Default: 1. */
+  runs?: number;
   /** Whether to stream AI output live while generating. Default: `true`. */
   streamingEnabled?: boolean;
   /** Number of lines in the streaming display (1-20). Default: 9. */
@@ -308,6 +310,8 @@ export interface StageOptions {
   passes?: string;
   /** Execution strategy ('deep', 'fast', or 'multi-agent'). Default: 'fast'. */
   strategy?: string;
+  /** Sequential review runs whose findings are aggregated and deduplicated. Env: `MM_REVIEW_RUNS`. Default: 1. */
+  runs?: number;
   /** AI provider ('copilot-sdk' or 'opencode-sdk'). Env: `MM_AI_PROVIDER`. */
   provider?: string;
   /** Glob patterns for files to ignore. Default ignores files under `generated/` directories. */

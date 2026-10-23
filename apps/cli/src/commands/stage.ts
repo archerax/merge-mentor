@@ -116,6 +116,7 @@ export async function executeStage(
     longContext: config.longContext,
     reasoningEffort: config.reasoningEffort,
     multiAgentMaxParallel: config.multiAgentMaxParallel,
+    reviewRuns: config.reviewRuns,
     noCache: options.noCache,
     reReview: options.reReview,
   });

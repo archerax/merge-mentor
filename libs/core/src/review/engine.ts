@@ -105,6 +105,7 @@ import {
 } from "./batching.js";
 import { CommentManager } from "./commentManager.js";
 import { DiffStorage } from "./diffStorage.js";
+import { FindingAggregator } from "./findingAggregator.js";
 import { createGitClient } from "./gitClients/factory.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
 import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";
@@ -168,6 +169,15 @@ export interface ReviewResult {
   readonly tokenUsage?: TokenUsage;
 }
 
+/** Unaggregated outcome of one review pass. */
+interface ReviewPassResult {
+  readonly fileResults: FileReviewResult[];
+  readonly crossFileResult: CrossFileReviewResult;
+  readonly filesSkipped: number;
+  /** Files sent to the AI; set by strategies that batch (fast, multi-agent). */
+  readonly filesAnalyzed?: number;
+}
+
 /**
  * Configuration options for ReviewEngine.
  *
@@ -193,6 +203,8 @@ interface ReviewEngineOptions {
   readonly skipPreExisting?: boolean;
   /** Ordered additive review passes; only valid with the multi-agent strategy. */
   readonly reviewPasses?: readonly ReviewPass[];
+  /** Number of sequential review runs whose findings are aggregated and deduplicated (default: 1). */
+  readonly reviewRuns?: number;
   /** Execution strategy used to run the resolved review profile. */
   readonly reviewStrategy?: ReviewStrategy;
   /** Fully resolved review profile. */
@@ -837,89 +849,31 @@ export class ReviewEngine {
       };
     }
 
-    // Fast review combines file and cross-file analysis in a single pass
-    this.phase("file-review", "Reviewing files", "start");
-    let fileReviewComplete = false;
-    try {
-      if (this.reviewProfile.strategy === "fast") {
-        this.log("Using fast review mode (single-pass file + architectural analysis)...");
-        const fastReviewData = await this.performFastReview(
-          prIdentifier,
-          prDetails,
-          files,
-          existingComments,
-          cachedState,
-          repoPath,
-          onTokenUsage
-        );
-        fileResults = fastReviewData.fileResults;
-        crossFileResult = fastReviewData.crossFileResult;
-        filesSkipped = fastReviewData.filesSkipped;
-        filesAnalyzed = fastReviewData.filesAnalyzed;
-        this.phase("file-review", "Reviewing files", "done");
-        fileReviewComplete = true;
-      } else if (this.reviewProfile.strategy === "multi-agent") {
-        this.log("Using multi-agent review mode (specialized subagents + lead synthesizer)...");
-        const multiAgentData = await this.performMultiAgentReview(
-          prIdentifier,
-          prDetails,
-          files,
-          existingComments,
-          cachedState,
-          repoPath,
-          onTokenUsage
-        );
-        fileResults = multiAgentData.fileResults;
-        crossFileResult = multiAgentData.crossFileResult;
-        filesSkipped = multiAgentData.filesSkipped;
-        filesAnalyzed = multiAgentData.filesAnalyzed;
-        this.phase("file-review", "Reviewing files", "done");
-        fileReviewComplete = true;
-      } else {
-        const reviewData = await this.reviewFiles(
-          prIdentifier,
-          files,
-          existingComments,
-          cachedState,
-          repoPath,
-          onTokenUsage
-        );
-        fileResults = reviewData.fileResults;
-        filesSkipped = reviewData.filesSkipped;
-
-        // Validate line numbers against actual diff content
-        fileResults = this.lineNumberValidator.validate(fileResults, files);
-        this.phase("file-review", "Reviewing files", "done");
-        fileReviewComplete = true;
-
-        // Skip cross-file analysis if all files were cached
-        if (
-          filesSkipped > 0 &&
-          filesSkipped === fileResults.length &&
-          cachedState?.crossFileResult
-        ) {
-          this.log("All files unchanged - using cached cross-file analysis");
-          this.logger.info({ prIdentifier }, "Reusing cached cross-file analysis");
-          crossFileResult = cachedState.crossFileResult;
-        } else {
-          crossFileResult = await this.runPhase("cross-file", "Cross-file analysis", () =>
-            this.performCrossFileAnalysis(
-              prDetails,
-              files,
-              fileResults,
-              existingComments,
-              repoPath,
-              onTokenUsage
-            )
-          );
-        }
+    const totalRuns = Math.max(1, Math.floor(this.options.reviewRuns ?? 1));
+    const passParams = { prIdentifier, prDetails, files, existingComments, cachedState, repoPath };
+    const runs: ReviewPassResult[] = [];
+    for (let run = 1; run <= totalRuns; run++) {
+      if (totalRuns > 1) {
+        this.log(`\nReview run ${run}/${totalRuns}...`);
       }
-    } catch (error) {
-      if (!fileReviewComplete) {
-        this.phase("file-review", "Reviewing files", "error");
-      }
-      throw error;
+      runs.push(await this.runReviewPass(passParams, onTokenUsage));
     }
+    if (runs.length > 1) {
+      const aggregator = new FindingAggregator();
+      const fileResultsBefore = runs.reduce(
+        (sum, r) => sum + r.fileResults.reduce((n, f) => n + f.findings.length, 0),
+        0
+      );
+      fileResults = aggregator.aggregateFileFindings(runs.map((r) => r.fileResults));
+      crossFileResult = aggregator.aggregateCrossFileFindings(runs.map((r) => r.crossFileResult));
+      const fileResultsAfter = fileResults.reduce((n, f) => n + f.findings.length, 0);
+      this.log(
+        `Aggregated ${runs.length} runs: ${fileResultsBefore} findings reduced to ${fileResultsAfter} unique`
+      );
+    } else {
+      ({ fileResults, crossFileResult } = runs[0]);
+    }
+    ({ filesSkipped, filesAnalyzed } = runs[0]);
 
     if (this.options.verifyPbi) {
       crossFileResult = await this.runPhase("verify", "Verifying PR alignment", () =>
@@ -1015,6 +969,100 @@ export class ReviewEngine {
       plannedComments,
       tokenUsage,
     };
+  }
+
+  /**
+   * Executes one full review pass (file review plus cross-file analysis) with the
+   * configured strategy and returns its unaggregated results.
+   */
+  private async runReviewPass(
+    params: {
+      readonly prIdentifier: string;
+      readonly prDetails: PRDetails;
+      readonly files: PRFile[];
+      readonly existingComments: readonly ExistingComment[];
+      readonly cachedState?: Awaited<ReturnType<ReviewStateCache["getState"]>>;
+      readonly repoPath?: string;
+    },
+    onTokenUsage: (usage: TokenUsage | undefined) => void
+  ): Promise<ReviewPassResult> {
+    const { prIdentifier, prDetails, files, existingComments, cachedState, repoPath } = params;
+
+    // Fast review combines file and cross-file analysis in a single pass
+    this.phase("file-review", "Reviewing files", "start");
+    let fileReviewComplete = false;
+    try {
+      if (this.reviewProfile.strategy === "fast") {
+        this.log("Using fast review mode (single-pass file + architectural analysis)...");
+        const result = await this.performFastReview(
+          prIdentifier,
+          prDetails,
+          files,
+          existingComments,
+          cachedState,
+          repoPath,
+          onTokenUsage
+        );
+        this.phase("file-review", "Reviewing files", "done");
+        fileReviewComplete = true;
+        return result;
+      }
+      if (this.reviewProfile.strategy === "multi-agent") {
+        this.log("Using multi-agent review mode (specialized subagents + lead synthesizer)...");
+        const result = await this.performMultiAgentReview(
+          prIdentifier,
+          prDetails,
+          files,
+          existingComments,
+          cachedState,
+          repoPath,
+          onTokenUsage
+        );
+        this.phase("file-review", "Reviewing files", "done");
+        fileReviewComplete = true;
+        return result;
+      }
+
+      const reviewData = await this.reviewFiles(
+        prIdentifier,
+        files,
+        existingComments,
+        cachedState,
+        repoPath,
+        onTokenUsage
+      );
+      const filesSkipped = reviewData.filesSkipped;
+
+      // Validate line numbers against actual diff content
+      const fileResults = this.lineNumberValidator.validate(reviewData.fileResults, files);
+      this.phase("file-review", "Reviewing files", "done");
+      fileReviewComplete = true;
+
+      // Skip cross-file analysis if all files were cached
+      let crossFileResult: CrossFileReviewResult;
+      if (filesSkipped > 0 && filesSkipped === fileResults.length && cachedState?.crossFileResult) {
+        this.log("All files unchanged - using cached cross-file analysis");
+        this.logger.info({ prIdentifier }, "Reusing cached cross-file analysis");
+        crossFileResult = cachedState.crossFileResult;
+      } else {
+        crossFileResult = await this.runPhase("cross-file", "Cross-file analysis", () =>
+          this.performCrossFileAnalysis(
+            prDetails,
+            files,
+            fileResults,
+            existingComments,
+            repoPath,
+            onTokenUsage
+          )
+        );
+      }
+      return { fileResults, crossFileResult, filesSkipped };
+    } catch (error) {
+      if (!fileReviewComplete) {
+        this.phase("file-review", "Reviewing files", "error");
+      }
+      throw error;
+    }
   }
 
   private async fetchPRData(prNumber: number): Promise<{
