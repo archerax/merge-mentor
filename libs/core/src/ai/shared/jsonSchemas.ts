@@ -1,3 +1,4 @@
+import { PRD_DIMENSION_IDS } from "../prompts/prd.js";
 import type { PromptType } from "./promptType.js";
 
 /** JSON schema for file review structured output. */
@@ -308,6 +309,84 @@ export const PROJECT_REVIEW_SCHEMA = {
   ],
 } as const;
 
+/** JSON schema for one PRD / FRD finding (shared by the section and consistency passes). */
+const PRD_FINDING_SCHEMA = {
+  type: "object",
+  properties: {
+    severity: {
+      type: "string",
+      enum: ["Blocker", "Major", "Minor"],
+      description: "Blocker, Major or Minor",
+    },
+    dimension: {
+      type: "string",
+      enum: [...PRD_DIMENSION_IDS],
+      description: "Review dimension id from the rubric",
+    },
+    sectionId: { type: "string", description: "Section id the finding refers to, e.g. s2.1" },
+    quote: { type: "string", description: "Exact text copied from the document" },
+    problem: { type: "string", description: "What is wrong, in plain language" },
+    suggestion: { type: "string", description: "How the author could improve the text" },
+    authorQuestion: {
+      type: "string",
+      description: "A question for the author, or empty when not needed",
+    },
+  },
+  required: ["severity", "dimension", "sectionId", "quote", "problem", "suggestion"],
+} as const;
+
+/** JSON schema for the PRD / FRD section pass structured output. */
+export const PRD_SECTION_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "Two or three sentences summarising the section" },
+    keyStatements: {
+      type: "array",
+      items: { type: "string" },
+      description: "Important statements copied exactly from the document",
+    },
+    findings: { type: "array", items: PRD_FINDING_SCHEMA },
+  },
+  required: ["summary", "keyStatements", "findings"],
+} as const;
+
+/** JSON schema for the PRD / FRD whole-document consistency pass structured output. */
+export const PRD_CONSISTENCY_SCHEMA = {
+  type: "object",
+  properties: {
+    readiness: {
+      type: "object",
+      properties: {
+        verdict: { type: "string", enum: ["ready", "needs-work", "not-ready"] },
+        summary: { type: "string", description: "Plain-language overall assessment" },
+      },
+      required: ["verdict", "summary"],
+    },
+    findings: { type: "array", items: PRD_FINDING_SCHEMA },
+  },
+  required: ["readiness", "findings"],
+} as const;
+
+/** JSON schema for the PRD / FRD verifier pass structured output. */
+export const PRD_VERIFY_SCHEMA = {
+  type: "object",
+  properties: {
+    verdicts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Candidate finding id, e.g. F3" },
+          keep: { type: "boolean", description: "True when the finding is supported" },
+          reason: { type: "string", description: "Short reason for the decision" },
+        },
+        required: ["id", "keep", "reason"],
+      },
+    },
+  },
+  required: ["verdicts"],
+} as const;
+
 /**
  * Returns the structured JSON schema corresponding to the prompt type,
  * or undefined if structured schema output is not used for that prompt type.
@@ -327,6 +406,12 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return BUILD_ANALYSIS_SCHEMA as unknown as Record<string, unknown>;
     case "project":
       return PROJECT_REVIEW_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-section":
+      return PRD_SECTION_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-consistency":
+      return PRD_CONSISTENCY_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-verify":
+      return PRD_VERIFY_SCHEMA as unknown as Record<string, unknown>;
     default:
       return undefined;
   }

@@ -39,6 +39,7 @@ const KIND_COLORS: Record<ReportKind, string> = {
   review: "blue",
   pbi: "grape",
   project: "teal",
+  prd: "cyan",
   plan: "indigo",
   stage: "orange",
   report: "gray",

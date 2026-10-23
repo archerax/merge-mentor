@@ -27,6 +27,7 @@ const PHASE_LABELS: Record<ReviewPhaseId, string> = {
   "file-review": "Reviewing files",
   "cross-file": "Cross-file analysis",
   "ai-review": "AI review",
+  consistency: "Whole-document check",
   verify: "Verification",
   post: "Posting comments",
   report: "Saving report",

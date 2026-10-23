@@ -57,6 +57,7 @@ describe("classifyReport", () => {
     ["merge-mentor-plan-42.md", "plan"],
     ["pbi-7-review-report.md", "pbi"],
     ["project-12-review-report.md", "project"],
+    ["prd-20261023-101500-checkout-a1b2c3-review-report.md", "prd"],
     ["stage-feature-branch.md", "stage"],
     ["Github-repo-PR9-review-profile-report.md", "review"],
     ["something-else.md", "report"],

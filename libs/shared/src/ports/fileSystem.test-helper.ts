@@ -10,6 +10,7 @@ export function createStubFileSystem(overrides?: Partial<FileSystem>): FileSyste
     readFile: vi.fn().mockResolvedValue(""),
     readFileBuffer: vi.fn().mockResolvedValue(Buffer.alloc(0)),
     writeFile: vi.fn().mockResolvedValue(undefined),
+    writeFileBuffer: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
     rm: vi.fn().mockResolvedValue(undefined),
     access: vi.fn().mockResolvedValue(undefined),

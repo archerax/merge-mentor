@@ -95,7 +95,10 @@ export interface ExecutePromptOptions {
     | "multi-agent-subagent"
     | "multi-agent-synthesizer"
     | "plan"
-    | "project";
+    | "project"
+    | "prd-section"
+    | "prd-consistency"
+    | "prd-verify";
 }
 
 /**

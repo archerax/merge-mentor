@@ -129,3 +129,72 @@ export const PBIAlignmentResponseSchema = z.object({
   scopeCreep: z.array(z.coerce.string()).default([]),
   overallAssessment: z.coerce.string().default(""),
 });
+
+// PRD / FRD document review
+
+/** Severity of a PRD / FRD finding. Unknown values fall back to `Major`. */
+const PrdSeveritySchema = z
+  .preprocess(
+    (value) =>
+      typeof value === "string"
+        ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+        : value,
+    z.enum(["Blocker", "Major", "Minor"])
+  )
+  .catch("Major");
+
+/** Optional text field: blank strings and null mean "not provided". */
+const OptionalTextSchema = z.preprocess(
+  (value) =>
+    value === null || (typeof value === "string" && value.trim() === "") ? undefined : value,
+  z.coerce.string().optional()
+);
+
+/**
+ * A single finding about a requirements document. `dimension` is validated
+ * against the rubric of the document type by the engine, not here, so one
+ * schema serves both `prd` and `frd`.
+ */
+export const PrdFindingSchema = z.object({
+  severity: PrdSeveritySchema,
+  dimension: z.coerce.string().default(""),
+  sectionId: z.coerce.string().default(""),
+  quote: z.coerce.string().default(""),
+  problem: z.coerce.string().default(""),
+  suggestion: z.coerce.string().default(""),
+  authorQuestion: OptionalTextSchema,
+});
+
+/** Result of reviewing one chunk of a document (one AI call per chunk). */
+export const PrdSectionResultSchema = z.object({
+  /** Two or three plain-language sentences used by the consistency pass. */
+  summary: z.coerce.string().default(""),
+  /** Verbatim statements (goals, numbers, scope, defined terms) for the consistency pass. */
+  keyStatements: z.array(z.coerce.string()).default([]),
+  findings: z.array(PrdFindingSchema).default([]),
+});
+
+/** Overall readiness verdict for a requirements document. */
+const PrdReadinessSchema = z.object({
+  verdict: z.enum(["ready", "needs-work", "not-ready"]).catch("needs-work"),
+  summary: z.coerce.string().default(""),
+});
+
+/** Result of the whole-document consistency pass over the section summaries. */
+export const PrdConsistencyResultSchema = z.object({
+  readiness: PrdReadinessSchema.default({ verdict: "needs-work", summary: "" }),
+  findings: z.array(PrdFindingSchema).default([]),
+});
+
+/** Result of the verifier pass: one verdict per candidate finding id. */
+export const PrdVerifierResultSchema = z.object({
+  verdicts: z
+    .array(
+      z.object({
+        id: z.coerce.string(),
+        keep: z.boolean().catch(true),
+        reason: z.coerce.string().default(""),
+      })
+    )
+    .default([]),
+});

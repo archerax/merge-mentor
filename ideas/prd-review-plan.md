@@ -78,6 +78,11 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
   content, truncated sections).
 - **Prompts** live with the other prompts in `libs/core/src/ai/prompts`; output
   schemas in `libs/core/src/ai/schemas.ts`.
+- **Implementation (Phase 2):** `runPrdReview(options, deps)` in
+  `libs/core/src/review/prd/prdEngine.ts`, with `prdVerifier.ts` (quote check, then
+  an AI double-check) and `prdReport.ts` (JSON shape and Markdown). Prompts are in
+  `libs/core/src/ai/prompts/prd.ts`. Run files follow `prdRunPaths` in
+  `libs/shared/src/reports/prdRuns.ts`, and `deletePrdRun` removes a whole run.
 
 ## 5. Open technical risks
 

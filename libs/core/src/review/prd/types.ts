@@ -134,3 +134,83 @@ export interface DocumentChunk {
   /** Set when one section had to be split across several chunks. */
   readonly part?: { readonly index: number; readonly total: number };
 }
+
+// ---------------------------------------------------------------------------
+// Review results
+// ---------------------------------------------------------------------------
+
+/** Severity of a review finding. */
+export type PrdSeverity = "Blocker" | "Major" | "Minor";
+
+/** Which pass produced a finding. */
+type PrdFindingOrigin = "section" | "consistency";
+
+/** A finding proposed by a section or consistency pass, before verification. */
+export interface PrdCandidateFinding {
+  readonly severity: PrdSeverity;
+  /** Rubric dimension id, or `"general"` when the model gave an unknown one. */
+  readonly dimension: string;
+  readonly sectionId: string;
+  /** Text the model says it copied from the document. */
+  readonly quote: string;
+  readonly problem: string;
+  readonly suggestion: string;
+  readonly authorQuestion?: string;
+  readonly origin: PrdFindingOrigin;
+  /**
+   * Sections the quote may come from (the reviewed chunk's sections), or null
+   * to search the whole document (consistency findings).
+   */
+  readonly scopeSectionIds: readonly string[] | null;
+}
+
+/** A verified finding as it appears in the report. */
+export interface PrdFinding {
+  /** `f1`, `f2`, ... in report order. */
+  readonly id: string;
+  readonly severity: PrdSeverity;
+  readonly dimension: string;
+  /** Human-readable dimension name from the rubric. */
+  readonly dimensionName: string;
+  /** Section the quote was found in (may differ from the one the model cited). */
+  readonly sectionId: string;
+  readonly headingPath: readonly string[];
+  /** Paragraph where the quote starts. */
+  readonly paragraphId?: string;
+  readonly quote: string;
+  readonly problem: string;
+  readonly suggestion: string;
+  readonly authorQuestion?: string;
+  readonly origin: PrdFindingOrigin;
+}
+
+/** Why part of the document was not reviewed. */
+type PrdNotReviewedKind =
+  | "image"
+  | "failed-section"
+  | "skipped-section"
+  | "consistency-check"
+  | "parser-warning";
+
+/** Something the review did not cover, listed in the report. */
+export interface PrdNotReviewedItem {
+  readonly kind: PrdNotReviewedKind;
+  readonly description: string;
+  readonly sectionIds?: readonly string[];
+}
+
+/** Counts recorded by the verifier. */
+export interface PrdVerificationStats {
+  /** Candidates handed to the verifier. */
+  readonly candidates: number;
+  /** Dropped because the quote was not found in the document text. */
+  readonly droppedUnsupportedQuote: number;
+  /** Dropped as an exact duplicate of another candidate. */
+  readonly droppedDuplicate: number;
+  /** Dropped by the AI verifier pass. */
+  readonly droppedByVerifier: number;
+  /** Findings kept. */
+  readonly kept: number;
+  /** True when (part of) the AI verifier pass failed and its findings were kept unchecked. */
+  readonly verifierFailed: boolean;
+}

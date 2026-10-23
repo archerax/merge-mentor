@@ -49,16 +49,29 @@ export async function parseDocxFile(
   fileSystem: DocxFileSystem = nodeFs,
   options: ParseDocxOptions = {}
 ): Promise<DocxDocument> {
-  let buffer: Buffer;
+  return parseDocx(await readDocxFile(path, fileSystem, options), options);
+}
+
+/**
+ * Reads a `.docx` file's bytes, checking the size cap with `stat` first. The
+ * content is not validated; {@link parseDocx} does that.
+ *
+ * @throws {ValidationError} if the file is too large
+ * @throws {DocumentParseError} if the file cannot be read
+ */
+export async function readDocxFile(
+  path: string,
+  fileSystem: DocxFileSystem = nodeFs,
+  options: ParseDocxOptions = {}
+): Promise<Buffer> {
   try {
     const stats = await fileSystem.stat(path);
     assertDocxSize(stats.size, options.validation?.maxBytes);
-    buffer = await fileSystem.readFileBuffer(path);
+    return await fileSystem.readFileBuffer(path);
   } catch (error) {
     if (error instanceof ValidationError) throw error;
     throw new DocumentParseError("docx", `could not read ${path}`, { cause: error });
   }
-  return parseDocx(buffer, options);
 }
 
 /**

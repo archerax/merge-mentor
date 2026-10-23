@@ -84,6 +84,7 @@ function scenarioFs(files: Record<string, string>, accessFails: string[] = []): 
     readdir: async () => [],
     unlink: async () => {},
     readFileBuffer: async () => Buffer.alloc(0),
+    writeFileBuffer: async () => undefined,
     rm: async () => {},
   };
 }
@@ -243,6 +244,7 @@ describe("Evaluation Harness Engine", () => {
             : [],
         unlink: async () => {},
         readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 
@@ -636,6 +638,7 @@ describe("Evaluation Harness Engine", () => {
         readdir: async () => [],
         unlink: async () => {},
         readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       } satisfies FileSystem;
 
@@ -658,6 +661,7 @@ describe("Evaluation Harness Engine", () => {
         ],
         unlink: async () => {},
         readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 
@@ -692,6 +696,7 @@ describe("Evaluation Harness Engine", () => {
         ],
         unlink: async () => {},
         readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 
