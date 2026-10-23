@@ -59,19 +59,24 @@ function securityFinding(overrides: Record<string, unknown>) {
   };
 }
 
+/** Normalizes Windows separators so suffix matches work on every platform. */
+const posix = (p: string) => p.replaceAll("\\", "/");
+
 function scenarioFs(files: Record<string, string>, accessFails: string[] = []): FileSystem {
   return {
-    access: async (p: string) => {
+    access: async (raw: string) => {
+      const p = posix(raw);
       if (accessFails.some((suffix) => p.endsWith(suffix))) throw new Error("no access");
       if (p.endsWith("diffs/manifest.json") && !Object.keys(files).some((k) => p.endsWith(k))) {
         throw new Error("no access");
       }
     },
-    readFile: async (p: string) => {
+    readFile: async (raw: string) => {
+      const p = posix(raw);
       for (const [suffix, content] of Object.entries(files)) {
         if (p.endsWith(suffix)) return content;
       }
-      throw new Error(`File not found: ${p}`);
+      throw new Error(`File not found: ${raw}`);
     },
     writeFile: vi.fn(async () => {}),
     mkdir: async () => undefined,
@@ -226,7 +231,7 @@ describe("Evaluation Harness Engine", () => {
           throw new Error("File not found");
         },
         access: async (p: string) => {
-          if (p.endsWith("diffs/manifest.json")) throw new Error("no access");
+          if (posix(p).endsWith("diffs/manifest.json")) throw new Error("no access");
         },
         writeFile: async () => {},
         mkdir: async () => undefined,
@@ -661,7 +666,7 @@ describe("Evaluation Harness Engine", () => {
       const writeFile = vi.fn(async () => {});
       const fs: FileSystem = {
         access: async (p: string) => {
-          if (p.endsWith("diffs/manifest.json")) throw new Error("no access");
+          if (posix(p).endsWith("diffs/manifest.json")) throw new Error("no access");
         },
         readFile: async (p: string) => {
           if (p.endsWith("ground-truth.json")) {
