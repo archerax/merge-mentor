@@ -360,6 +360,11 @@ describe("runPrdReview", () => {
       },
     ]);
     expect(reportMarkdown).toContain("Partial review");
+    // The terminal summary uses the same plain-language verdict as the report.
+    expect(output.output.some((o) => o.data === "PRD review: 🔴 Not ready for development")).toBe(
+      true
+    );
+    expect(output.output.some((o) => o.data.includes("not-ready"))).toBe(false);
     expect(output.output.some((o) => o.data.includes("review failed (model timeout)"))).toBe(true);
   });
 

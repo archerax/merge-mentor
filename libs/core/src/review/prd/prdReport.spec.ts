@@ -5,6 +5,7 @@ import {
   type PrdReviewReport,
   readinessFromCounts,
   renderPrdReportMarkdown,
+  verdictLabel,
 } from "./prdReport.js";
 import type { PrdFinding } from "./types.js";
 
@@ -58,6 +59,14 @@ function report(overrides: Partial<PrdReviewReport> = {}): PrdReviewReport {
     ...overrides,
   };
 }
+
+describe("verdictLabel", () => {
+  it("gives plain-language labels", () => {
+    expect(verdictLabel("ready")).toBe("✅ Ready for development");
+    expect(verdictLabel("needs-work")).toBe("🟠 Needs work before development");
+    expect(verdictLabel("not-ready")).toBe("🔴 Not ready for development");
+  });
+});
 
 describe("readinessFromCounts", () => {
   it("derives the verdict from the most severe finding", () => {

@@ -80,6 +80,11 @@ const VERDICT_LABELS: Record<PrdReadinessVerdict, string> = {
   "not-ready": "🔴 Not ready for development",
 };
 
+/** Plain-language label for a verdict, as shown in the report heading and terminal summary. */
+export function verdictLabel(verdict: PrdReadinessVerdict): string {
+  return VERDICT_LABELS[verdict];
+}
+
 /** Derives the readiness verdict from the verified findings. */
 export function readinessFromCounts(
   counts: Readonly<Record<PrdSeverity, number>>
@@ -146,7 +151,7 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
   const label = report.documentType.toUpperCase();
   const out: string[] = [`# ${label} review: ${name}`, ""];
 
-  out.push(`## ${VERDICT_LABELS[report.readiness.verdict]}`, "", report.readiness.summary, "");
+  out.push(`## ${verdictLabel(report.readiness.verdict)}`, "", report.readiness.summary, "");
   if (!report.complete) {
     out.push(
       "> ⚠️ **Partial review.** Some parts of the document could not be reviewed; see “Not reviewed” below.",

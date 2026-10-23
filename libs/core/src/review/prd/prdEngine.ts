@@ -65,6 +65,7 @@ import {
   type PrdReviewReport,
   readinessFromCounts,
   renderPrdReportMarkdown,
+  verdictLabel,
 } from "./prdReport.js";
 import { PrdVerifier } from "./prdVerifier.js";
 import { type ChunkOptions, chunkDocument } from "./sectionChunker.js";
@@ -847,7 +848,9 @@ class PrdReviewRun {
   private displaySummary(report: PrdReviewReport): void {
     const { counts } = report;
     this.output.log("=".repeat(60));
-    this.output.log(`📊 ${report.documentType.toUpperCase()} review: ${report.readiness.verdict}`);
+    this.output.log(
+      `${report.documentType.toUpperCase()} review: ${verdictLabel(report.readiness.verdict)}`
+    );
     this.output.log("=".repeat(60));
     this.output.log(report.readiness.summary);
     this.output.log(
