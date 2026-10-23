@@ -13,6 +13,7 @@ import {
 } from "@mantine/core";
 import {
   IconBolt,
+  IconFileDescription,
   IconFileText,
   IconGitPullRequest,
   IconHistory,
@@ -59,6 +60,14 @@ const FEATURES: readonly Feature[] = [
       "Review a project or feature plan hierarchy for dependencies, sequencing, and estimation consistency.",
     to: "/project",
     action: "Run a project review",
+  },
+  {
+    icon: IconFileDescription,
+    title: "PRD / FRD Review",
+    description:
+      "Upload a PRD or FRD Word document and get a plain-language review of gaps, ambiguity, and untestable requirements.",
+    to: "/prd",
+    action: "Review a document",
   },
   {
     icon: IconFileText,

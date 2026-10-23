@@ -66,6 +66,58 @@ describe("checkRequest", () => {
     expect(checkRequest(request, config)).toMatchObject({ action: "deny", status: 415 });
   });
 
+  it("allows a same-origin octet-stream upload to the PRD endpoint", () => {
+    const request = req("/api/prd/stream", {
+      method: "POST",
+      body: "PK",
+      headers: { "content-type": "application/octet-stream", origin: "http://127.0.0.1:4321" },
+    });
+    expect(checkRequest(request, config)).toEqual({ action: "allow" });
+  });
+
+  it("rejects an octet-stream body on a non-upload API path", () => {
+    const request = req("/api/review/stream", {
+      method: "POST",
+      body: "PK",
+      headers: { "content-type": "application/octet-stream", origin: "http://127.0.0.1:4321" },
+    });
+    expect(checkRequest(request, config)).toMatchObject({ action: "deny", status: 415 });
+  });
+
+  it("rejects a multipart form POST to the PRD upload endpoint", () => {
+    const request = req("/api/prd/stream", {
+      method: "POST",
+      body: "x",
+      headers: {
+        "content-type": "multipart/form-data; boundary=x",
+        origin: "http://127.0.0.1:4321",
+      },
+    });
+    expect(checkRequest(request, config)).toMatchObject({ action: "deny", status: 415 });
+  });
+
+  it("rejects a cross-site upload to the PRD endpoint", () => {
+    const request = req("/api/prd/stream", {
+      method: "POST",
+      body: "PK",
+      headers: { "content-type": "application/octet-stream", origin: "https://evil.example" },
+    });
+    expect(checkRequest(request, config)).toMatchObject({ action: "deny", status: 403 });
+  });
+
+  it("rejects an upload without the token cookie", () => {
+    const request = req("/api/prd/stream", {
+      method: "POST",
+      body: "PK",
+      headers: {
+        cookie: "",
+        "content-type": "application/octet-stream",
+        origin: "http://127.0.0.1:4321",
+      },
+    });
+    expect(checkRequest(request, config)).toMatchObject({ action: "deny", status: 403 });
+  });
+
   it("rejects requests without the token", () => {
     const request = new Request("http://127.0.0.1:4321/api/review/runs/x", {
       headers: { host: "127.0.0.1:4321" },

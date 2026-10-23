@@ -1,4 +1,10 @@
-export { deletePrdRun, type PrdRunPaths, prdRunPaths } from "./prdRuns.js";
+export {
+  deletePrdRun,
+  isSafePrdRunId,
+  prdRunIdFromReportName,
+  type PrdRunPaths,
+  prdRunPaths,
+} from "./prdRuns.js";
 export {
   listReports,
   readReport,

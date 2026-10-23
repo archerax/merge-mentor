@@ -1,16 +1,28 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockListReports = vi.fn(async () => []);
+import type { ReviewRunManifest } from "./reviewRunStore.server.js";
+
+const mockListReports = vi.fn<() => Promise<unknown[]>>(async () => []);
 const mockReadReport = vi.fn(async () => undefined);
+const mockDeletePrdRun = vi.fn(async () => undefined);
 
-vi.mock("@merge-mentor/shared/reports/index.js", () => ({
-  listReports: mockListReports,
-  readReport: mockReadReport,
-}));
+vi.mock("@merge-mentor/shared/reports/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@merge-mentor/shared/reports/index.js")>();
+  return {
+    isSafePrdRunId: actual.isSafePrdRunId,
+    prdRunIdFromReportName: actual.prdRunIdFromReportName,
+    listReports: mockListReports,
+    readReport: mockReadReport,
+    deletePrdRun: mockDeletePrdRun,
+  };
+});
 
-const { loadReport, loadReports } = await import("./reports.server.js");
+const { loadReport, loadReports, removePrdRun } = await import("./reports.server.js");
+const { writeManifest, writeSummary } = await import("./reviewRunStore.server.js");
 
 describe("reports.server", () => {
   beforeEach(() => {
@@ -41,6 +53,73 @@ describe("reports.server", () => {
 
     expect(mockReadReport).toHaveBeenCalledWith("report-1.md", {
       reportsDir: path.resolve("/tmp/mm-reports", "reports"),
+    });
+  });
+
+  it("adds the PRD run id to prd reports only", async () => {
+    mockListReports.mockResolvedValueOnce([
+      { name: "prd-20261023-120000-spec-abc123-review-report.md", kind: "prd" },
+      { name: "pbi-42-review-report.md", kind: "pbi" },
+    ]);
+
+    const reports = await loadReports();
+
+    expect(reports[0]).toMatchObject({ prdRunId: "20261023-120000-spec-abc123" });
+    expect(reports[1]).not.toHaveProperty("prdRunId");
+  });
+
+  describe("removePrdRun", () => {
+    it("deletes a run with a safe id under the temp path", async () => {
+      await removePrdRun("20261023-120000-spec-abc123");
+
+      expect(mockDeletePrdRun).toHaveBeenCalledWith("20261023-120000-spec-abc123", {
+        tempPath: path.resolve("/tmp/mm-reports"),
+      });
+    });
+
+    it("also deletes the web stream log that holds the run's report", async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mm-prd-delete-"));
+      process.env.MM_TEMP_PATH = tempDir;
+      try {
+        const base: Omit<ReviewRunManifest, "runId" | "createdAt"> = {
+          kind: "prd",
+          targetKey: "t",
+          input: {},
+          label: "l",
+          status: "done",
+        };
+        writeManifest(tempDir, { ...base, runId: "web-run-1", createdAt: 1 });
+        writeSummary(tempDir, "web-run-1", { prdRunId: "20261023-120000-spec-abc123" });
+        writeManifest(tempDir, { ...base, runId: "web-run-2", createdAt: 2 });
+        writeSummary(tempDir, "web-run-2", { prdRunId: "20261023-120000-other-def456" });
+
+        await removePrdRun("20261023-120000-spec-abc123");
+
+        expect(fs.existsSync(path.join(tempDir, "runs", "web-run-1"))).toBe(false);
+        expect(fs.existsSync(path.join(tempDir, "runs", "web-run-2"))).toBe(true);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      "../reports",
+      "..",
+      "a/b",
+      "a\\b",
+      "/etc/passwd",
+      "",
+      "run id",
+      "run.id",
+      "x".repeat(200),
+    ])("rejects the unsafe run id %j without deleting anything", async (runId) => {
+      await expect(removePrdRun(runId)).rejects.toThrow(/not a valid PRD run id/);
+      expect(mockDeletePrdRun).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-string run id", async () => {
+      await expect(removePrdRun({ runId: "x" })).rejects.toThrow(/not a valid PRD run id/);
+      expect(mockDeletePrdRun).not.toHaveBeenCalled();
     });
   });
 });
