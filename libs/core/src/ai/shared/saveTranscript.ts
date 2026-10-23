@@ -22,6 +22,11 @@ export interface SaveTranscriptDeps {
   logger: SaveTranscriptLogger;
   /** Base path under which the transcripts directory is created. */
   tempPath: string;
+  /**
+   * Directory to write the transcript to instead of `<tempPath>/transcripts`,
+   * e.g. a run directory that is deleted with the run.
+   */
+  transcriptDir?: string;
   /** Label rendered at the top of the transcript identifying the provider. */
   providerLabel: string;
   /** Prefix used for the generated transcript filename. */
@@ -82,7 +87,7 @@ function formatAttachmentLines(attachments?: readonly string[]): string[] {
 
 /**
  * Writes a debugging transcript of an AI exchange to a timestamped file under
- * `<tempPath>/transcripts`. Failures are logged as warnings rather than
+ * `<tempPath>/transcripts` (or `deps.transcriptDir` when set). Failures are logged as warnings rather than
  * throwing, so transcript writing never breaks the review flow.
  *
  * @param deps - Injected dependencies (filesystem, clock, logger, paths, labels).
@@ -94,7 +99,7 @@ export async function saveTranscript(
   data: SaveTranscriptData
 ): Promise<void> {
   try {
-    const transcriptDir = path.join(deps.tempPath, "transcripts");
+    const transcriptDir = deps.transcriptDir ?? path.join(deps.tempPath, "transcripts");
     await deps.fileSystem.mkdir(transcriptDir, { recursive: true });
 
     const timestamp = deps.clock.timestamp().replace(/[:.]/g, "-");

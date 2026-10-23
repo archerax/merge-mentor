@@ -102,6 +102,22 @@ describe("saveTranscript", () => {
     );
   });
 
+  it("writes to the transcript directory override instead of <tempPath>/transcripts", async () => {
+    const { deps, writtenFiles, createdDirs } = createMockDeps({
+      transcriptDir: "/tmp/test/prd/run-1/transcripts",
+    });
+
+    await saveTranscript(deps, { prompt: "Doc text", success: true, attempt: 2 });
+
+    expect(createdDirs).toEqual(["/tmp/test/prd/run-1/transcripts"]);
+    expect(Object.keys(writtenFiles)).toEqual([
+      path.join(
+        "/tmp/test/prd/run-1/transcripts",
+        "transcript-test-2026-07-24T12-00-00-000Z-attempt-2-success.txt"
+      ),
+    ]);
+  });
+
   it("records attached files when diffs were attached", async () => {
     const { deps, writtenFiles } = createMockDeps();
 

@@ -156,7 +156,8 @@ function displayRunSummary(result: PrdReviewResult, output: OutputWriter): void 
   output.log("📁 Saved on this computer only:");
   output.log(`   Report (Markdown): ${paths.reportMarkdown}`);
   output.log(`   Report (JSON):     ${paths.reportJson}`);
-  output.log(`   Document copy:     ${paths.runDir}`);
+  output.log(`   Run data:          ${paths.runDir}`);
+  output.log("                      (document copy, extracted text, images, AI transcripts)");
   output.log(
     `\n🗑️  To delete this run, use Delete on the Reports page (merge-mentor ui) or remove the files above.\n`
   );

@@ -209,7 +209,8 @@ function ReportsPage() {
         <Stack gap="md">
           <Text size="sm">
             This permanently deletes the report for <b>{pendingDelete?.title}</b>, the stored copy
-            of the uploaded document, and the data extracted from it. This cannot be undone.
+            of the uploaded document, the data and images extracted from it, and the AI transcripts
+            of the review. This cannot be undone.
           </Text>
           {deleteError && (
             <Alert color="red" title="Could not delete">

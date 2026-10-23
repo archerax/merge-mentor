@@ -54,6 +54,7 @@ vi.mock("@merge-mentor/shared/ports/index.js", async (importOriginal) => {
 });
 
 import { AIProviderError, ValidationError } from "@merge-mentor/shared/errors/index.js";
+import { nodeFs } from "@merge-mentor/shared/ports/index.js";
 
 import type { AIResponse } from "../types.js";
 import { OpenCodeSdkProvider } from "./opencode-sdk.js";
@@ -219,6 +220,22 @@ describe("OpenCodeSdkProvider", () => {
           }),
         })
       );
+    });
+
+    it("should write transcripts to the per-request transcript directory when given", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the changes", {
+        transcriptDir: "/runs/run-1/transcripts",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(nodeFs.mkdir).toHaveBeenCalledWith("/runs/run-1/transcripts", { recursive: true });
+      const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.startsWith("/runs/run-1/transcripts/transcript-opencode-")).toBe(true);
     });
 
     it("should forward streamed text deltas to onStreamData", async () => {

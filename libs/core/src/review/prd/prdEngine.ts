@@ -8,7 +8,8 @@
  * model accepts images) → verifier (quote check + AI double-check) → Markdown
  * + JSON report.
  *
- * Every artefact of a run (report, source copy, extracted data) is written
+ * Every artefact of a run (report, source copy, extracted data and images,
+ * AI transcripts via the provider's `transcriptDir` option) is written
  * under the temp path using the layout in `@merge-mentor/shared/reports`
  * (`prdRunPaths`), so `deletePrdRun` removes the whole run.
  *
@@ -222,6 +223,8 @@ class PrdReviewRun {
   private readonly ai: AIProviderClient;
   private readonly streaming: boolean;
   private tokenUsage: TokenUsage | undefined;
+  /** Where the provider writes this run's AI transcripts (inside the run directory). */
+  private transcriptDir: string | undefined;
 
   constructor(
     private readonly options: PrdReviewOptions,
@@ -240,6 +243,9 @@ class PrdReviewRun {
     const fileName = sourceFileName(options.source);
     const runId = options.runId ?? createRunId(createdAt, fileName);
     const paths = prdRunPaths(options.tempPath ?? "./.mergementor", runId);
+    // Keep transcripts (which contain document text) inside the run directory,
+    // so deleting the run removes them too.
+    this.transcriptDir = path.resolve(paths.transcriptsDir);
     const rubric = PRD_RUBRICS[options.documentType];
 
     this.output.log(`\n🔍 Reviewing ${fileName} as a ${rubric.label}...\n`);
@@ -315,6 +321,7 @@ class PrdReviewRun {
       new PrdVerifier(this.ai, {
         documentType: options.documentType,
         onTokenUsage: (usage) => this.addUsage(usage),
+        ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("verify") } : {}),
       }).verify(document, candidates)
     );
@@ -450,6 +457,7 @@ class PrdReviewRun {
       });
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-section",
+        ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("ai-review") } : {}),
       });
       this.addUsage(response.tokenUsage);
@@ -502,6 +510,7 @@ class PrdReviewRun {
     try {
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-consistency",
+        ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("consistency") } : {}),
       });
       this.addUsage(response.tokenUsage);
@@ -718,6 +727,7 @@ class PrdReviewRun {
       });
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-image",
+        ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         imageFiles,
         ...(this.streaming ? { onStreamData: this.stream("images") } : {}),
       });

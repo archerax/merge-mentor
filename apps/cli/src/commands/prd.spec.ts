@@ -56,6 +56,7 @@ function createResult(overrides: { complete?: boolean } = {}): PrdReviewResult {
       sourceDocx: `${TEMP_PATH}/prd/${runId}/source.docx`,
       documentJson: `${TEMP_PATH}/prd/${runId}/document.json`,
       imagesDir: `${TEMP_PATH}/prd/${runId}/images`,
+      transcriptsDir: `${TEMP_PATH}/prd/${runId}/transcripts`,
       reportMarkdown: `${TEMP_PATH}/reports/prd-${runId}-review-report.md`,
       reportJson: `${TEMP_PATH}/reports/prd-${runId}-review-report.json`,
     },

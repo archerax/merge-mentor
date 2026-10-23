@@ -30,6 +30,7 @@ describe("prdRuns", () => {
         sourceDocx: path.join("/tmp/mm", "prd", "run-1", "source.docx"),
         documentJson: path.join("/tmp/mm", "prd", "run-1", "document.json"),
         imagesDir: path.join("/tmp/mm", "prd", "run-1", "images"),
+        transcriptsDir: path.join("/tmp/mm", "prd", "run-1", "transcripts"),
         reportMarkdown: path.join("/tmp/mm", "reports", "prd-run-1-review-report.md"),
         reportJson: path.join("/tmp/mm", "reports", "prd-run-1-review-report.json"),
       });
@@ -72,6 +73,8 @@ describe("prdRuns", () => {
         await mkdir(path.dirname(paths.reportMarkdown), { recursive: true });
         await writeFile(paths.sourceDocx, "docx");
         await writeFile(paths.documentJson, "{}");
+        await mkdir(paths.transcriptsDir, { recursive: true });
+        await writeFile(path.join(paths.transcriptsDir, "transcript-sdk-1.txt"), "doc text");
         await writeFile(paths.reportMarkdown, "# Report");
         await writeFile(paths.reportJson, "{}");
       }

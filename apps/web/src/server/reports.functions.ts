@@ -26,8 +26,8 @@ export const getReport = createServerFn({
   });
 
 /**
- * Server function that deletes a PRD review run (reports, stored upload and
- * extracted data). The run id is validated server-side before any path is built.
+ * Server function that deletes a PRD review run (reports, stored upload,
+ * extracted data and images, AI transcripts). The run id is validated server-side before any path is built.
  */
 export const deletePrdReport = createServerFn({ method: "POST" })
   .validator((data: { runId: string }) => data)

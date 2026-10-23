@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -296,6 +296,35 @@ describe("runPrdReview", () => {
     // A per-run delete removes everything the run wrote.
     await deletePrdRun(result.runId, { tempPath });
     expect(await readdir(path.join(tempPath, "reports"))).toEqual([]);
+    expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
+  });
+
+  it("sends every AI call's transcripts into the run directory, so a per-run delete removes them", async () => {
+    // Simulates the providers: each call writes a transcript into the requested directory.
+    const ai = createFakeAIClient(async (prompt, opts) => {
+      expect(opts?.transcriptDir).toBe(path.resolve(tempPath, "prd", "run-1", "transcripts"));
+      if (opts?.transcriptDir) {
+        await mkdir(opts.transcriptDir, { recursive: true });
+        await writeFile(
+          path.join(
+            opts.transcriptDir,
+            `transcript-${String(opts.promptType)}-${Math.random()}.txt`
+          ),
+          prompt
+        );
+      }
+      return defaultHandler(prompt, opts);
+    });
+
+    const result = await runPrdReview(options(), { aiClient: ai });
+
+    expect(result.paths.transcriptsDir).toBe(path.join(tempPath, "prd", "run-1", "transcripts"));
+    expect((await readdir(result.paths.transcriptsDir)).length).toBe(
+      ai.executePrompt.mock.calls.length
+    );
+    expect(await readdir(tempPath)).not.toContain("transcripts");
+
+    await deletePrdRun(result.runId, { tempPath });
     expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
   });
 

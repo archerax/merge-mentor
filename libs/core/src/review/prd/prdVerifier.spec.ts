@@ -328,6 +328,7 @@ describe("PrdVerifier", () => {
     const verifier = new PrdVerifier(ai, {
       documentType: "prd",
       onTokenUsage: (u) => usage.push(u),
+      transcriptDir: "/runs/run-1/transcripts",
     });
 
     const result = await verifier.verify(document, [
@@ -346,8 +347,12 @@ describe("PrdVerifier", () => {
       verifierFailed: false,
     });
     expect(usage).toHaveLength(1);
-    const [prompt, options] = ai.executePrompt.mock.calls[0] as [string, { promptType: string }];
+    const [prompt, options] = ai.executePrompt.mock.calls[0] as [
+      string,
+      { promptType: string; transcriptDir?: string },
+    ];
     expect(options.promptType).toBe("prd-verify");
+    expect(options.transcriptDir).toBe("/runs/run-1/transcripts");
     expect(prompt).toContain("## F2");
     expect(prompt).toContain("Section: Goals > Metrics [s1.1]");
   });

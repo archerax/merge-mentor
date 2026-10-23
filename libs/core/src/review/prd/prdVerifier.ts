@@ -53,6 +53,8 @@ export interface PrdVerifierOptions {
   readonly onTokenUsage?: (usage: TokenUsage | undefined) => void;
   /** Called with raw AI output chunks; enables streaming when set. */
   readonly onStreamData?: (chunk: string) => void;
+  /** Directory for the AI transcripts of the verifier calls (see `ExecutePromptOptions`). */
+  readonly transcriptDir?: string;
 }
 
 /** Outcome of {@link PrdVerifier.verify}. */
@@ -481,10 +483,11 @@ export class PrdVerifier {
       candidates,
     });
     try {
-      const onStreamData = this.options.onStreamData;
+      const { onStreamData, transcriptDir } = this.options;
       const response = await this.provider.executePrompt(prompt, {
         promptType: "prd-verify",
         ...(onStreamData ? { onStreamData } : {}),
+        ...(transcriptDir ? { transcriptDir } : {}),
       });
       this.options.onTokenUsage?.(response.tokenUsage);
       const parsed = PrdVerifierResultSchema.safeParse(parseAIJson(response));

@@ -54,7 +54,8 @@ export async function loadReport(name: string): Promise<ReportDocument | undefin
 
 /**
  * Deletes a PRD review run: its reports, the stored copy of the uploaded
- * document and the extracted data, plus the web UI's stream log of the run
+ * document, the extracted data and images and the run's AI transcripts
+ * (everything under the run directory), plus the web UI's stream log of the run
  * (its stored summary holds the report, and so quotes from the document).
  *
  * @throws {ValidationError} when `runId` is not a safe run id (so it can never

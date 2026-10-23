@@ -172,9 +172,9 @@ export function PrdReviewRunner({ runId, onRunCreated }: PrdReviewRunnerProps) {
             icon={<IconLock size={18} />}
             title="Your document stays local"
           >
-            The file is reviewed on this computer with your configured AI provider. A copy and the
-            report are kept in <Code>.mergementor</Code> so you can reopen them, and you can delete
-            them at any time from the Reports page.
+            The file is reviewed on this computer with your configured AI provider. A copy, the
+            report and the AI request transcripts are kept in <Code>.mergementor</Code> so you can
+            reopen them, and Delete on the Reports page removes all of them.
           </Alert>
 
           <Group>

@@ -419,6 +419,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             prompt,
             rawResponse: JSON.stringify(result, null, 2),
             attachments: options?.diffFiles,
+            transcriptDir: options?.transcriptDir,
             success: false,
             error: err.message,
             attempt,
@@ -445,6 +446,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: raw,
             tokenUsage,
             attachments: options?.diffFiles,
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -469,6 +471,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
                 jsonOutput: JSON.stringify(parsed, null, 2),
                 tokenUsage,
                 attachments: options?.diffFiles,
+                transcriptDir: options?.transcriptDir,
                 success: true,
                 attempt,
               });
@@ -515,6 +518,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage,
             attachments: options?.diffFiles,
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -532,6 +536,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage,
           attachments: options?.diffFiles,
+          transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
         });
@@ -544,6 +549,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       await this.saveTranscript({
         prompt,
         attachments: options?.diffFiles,
+        transcriptDir: options?.transcriptDir,
         success: false,
         error: (error as Error).message,
         attempt,
@@ -566,24 +572,28 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
+    transcriptDir?: string;
     success: boolean;
     error?: string;
     attempt: number;
   }): Promise<void> {
+    const { transcriptDir, ...transcript } = data;
     return saveTranscript(
       {
         fileSystem: this.fileSystem,
         clock: this.clock,
         logger: this.logger,
         tempPath: this.tempPath,
+        ...(transcriptDir ? { transcriptDir } : {}),
         providerLabel: "OPENCODE SDK PROVIDER TRANSCRIPT",
         filePrefix: "transcript-opencode",
         displayName: "OpenCode SDK",
         model: this.model,
       },
       {
-        ...data,
-        attachments: data.attachments ?? [],
+        ...transcript,
+        attachments: transcript.attachments ?? [],
       }
     );
   }

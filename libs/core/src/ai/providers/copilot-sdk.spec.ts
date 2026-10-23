@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
@@ -279,6 +281,25 @@ describe("CopilotSdkProvider", () => {
       expect(transcript).toContain("Diff attachments: 2 file(s)");
       expect(transcript).toContain("  - /tmp/diff1.patch");
       expect(transcript).toContain("  - /tmp/diff2.patch");
+    });
+
+    it("writes the transcript to the per-request transcript directory when given", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        transcriptDir: "/runs/run-1/transcripts",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(nodeFs.mkdir).toHaveBeenCalledWith("/runs/run-1/transcripts", { recursive: true });
+      const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
+      expect(paths.some((file) => file.startsWith("/runs/run-1/transcripts/transcript-sdk-"))).toBe(
+        true
+      );
+      const sharedDir = path.join(process.cwd(), ".mergementor", "transcripts");
+      expect(paths.some((file) => file.startsWith(sharedDir))).toBe(false);
     });
 
     it("records that no diffs were attached in the transcript header", async () => {

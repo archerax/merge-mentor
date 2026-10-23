@@ -138,16 +138,17 @@ Each review is a separate run with its own run id (for example `20261023-142530-
 | `.mergementor/prd/<run-id>/source.docx`                | A copy of the document that was reviewed                  |
 | `.mergementor/prd/<run-id>/document.json`              | The text extracted from the document, split into sections |
 | `.mergementor/prd/<run-id>/images/`                    | Images sent for review (only with `--include-images`)     |
+| `.mergementor/prd/<run-id>/transcripts/`               | A transcript of each AI request, for troubleshooting      |
 
-The command prints the exact paths when it finishes. If a review fails, its copy of the document and extracted text are removed automatically.
+The command prints the exact paths when it finishes. If a review fails, its run folder (the copy of the document, the extracted text, images and transcripts) is removed automatically.
 
-The AI providers also keep a transcript of each AI request, including the document text that was sent, under `.mergementor/transcripts/` (shared by all Merge Mentor commands, for troubleshooting).
+The transcripts include the document text that was sent to the AI provider. For `prd` runs they are kept in the run's own folder, not in the `.mergementor/transcripts/` folder other commands use, so they are deleted with the run.
 
 ### Deleting a Run
 
 To delete a run, either:
 
-- Open the dashboard (`merge-mentor ui`), go to the **Reports** page and use **Delete** on the run. This removes the report, the copy of the document and the extracted text together.
+- Open the dashboard (`merge-mentor ui`), go to the **Reports** page and use **Delete** on the run. This removes the report, the copy of the document, the extracted text and images, and the AI transcripts together.
 - Or delete the files yourself: the two report files and the run folder listed above, for example:
 
   ```bash
@@ -156,4 +157,4 @@ To delete a run, either:
   rm -r .mergementor/prd/<run-id>
   ```
 
-Neither option removes the AI transcripts. To remove those too, delete the matching files in `.mergementor/transcripts/` (or the whole folder). Each review is independent, so deleting one run never affects another.
+Each review is independent, so deleting one run never affects another.

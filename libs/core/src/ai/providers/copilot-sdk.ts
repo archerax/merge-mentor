@@ -653,6 +653,7 @@ export class CopilotSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage: collectedUsage,
             attachments: options?.diffFiles,
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -671,6 +672,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
         });
@@ -696,6 +698,7 @@ export class CopilotSdkProvider implements AIProviderClient {
               jsonOutput: JSON.stringify(recovered.parsed, null, 2),
               tokenUsage: collectedUsage,
               attachments: options?.diffFiles,
+              transcriptDir: options?.transcriptDir,
               success: true,
               attempt,
             });
@@ -710,6 +713,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           rawResponse: streamedContent || undefined,
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          transcriptDir: options?.transcriptDir,
           success: false,
           error: (error as Error).message,
           attempt,
@@ -958,25 +962,29 @@ export class CopilotSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
+    transcriptDir?: string;
     success: boolean;
     error?: string;
     attempt: number;
   }): Promise<void> {
+    const { transcriptDir, ...transcript } = data;
     return saveTranscript(
       {
         fileSystem: this.fileSystem,
         clock: this.clock,
         logger: this.logger,
         tempPath: this.tempPath,
+        ...(transcriptDir ? { transcriptDir } : {}),
         providerLabel: "COPILOT SDK PROVIDER TRANSCRIPT",
         filePrefix: "transcript-sdk",
         displayName: "Copilot SDK",
         model: this.model,
       },
       {
-        ...data,
-        attachments: data.attachments ?? [],
-        timeline: this.formatSessionTimeline(data.events),
+        ...transcript,
+        attachments: transcript.attachments ?? [],
+        timeline: this.formatSessionTimeline(transcript.events),
       }
     );
   }
