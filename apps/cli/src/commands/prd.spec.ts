@@ -55,6 +55,7 @@ function createResult(overrides: { complete?: boolean } = {}): PrdReviewResult {
       runDir: `${TEMP_PATH}/prd/${runId}`,
       sourceDocx: `${TEMP_PATH}/prd/${runId}/source.docx`,
       documentJson: `${TEMP_PATH}/prd/${runId}/document.json`,
+      imagesDir: `${TEMP_PATH}/prd/${runId}/images`,
       reportMarkdown: `${TEMP_PATH}/reports/prd-${runId}-review-report.md`,
       reportJson: `${TEMP_PATH}/reports/prd-${runId}-review-report.json`,
     },
@@ -174,7 +175,7 @@ describe("executePrdReview", () => {
     );
   });
 
-  it("passes --include-images through and notes that image review is not available yet", async () => {
+  it("passes --include-images through without a not-available note", async () => {
     const output = createCapturingOutputWriter();
 
     await executePrdReview(
@@ -187,7 +188,33 @@ describe("executePrdReview", () => {
       expect.objectContaining({ includeImages: true }),
       expect.any(Object)
     );
-    expect(output.output[0]?.data).toContain("Image review is not available yet");
+    expect(output.output.map((entry) => entry.data).join("\n")).not.toContain("not available");
+  });
+
+  it("warns when --include-images was set but the model cannot read images", async () => {
+    const result = createResult();
+    vi.mocked(runPrdReview).mockResolvedValueOnce({
+      ...result,
+      report: {
+        ...result.report,
+        imageReview: {
+          supported: false,
+          reason: 'the model "x" does not accept images',
+          reviewed: 0,
+        },
+      },
+    });
+    const output = createCapturingOutputWriter();
+
+    await executePrdReview(
+      "a.docx",
+      { includeImages: true },
+      { output, fileSystem: fakeFs({ size: 10 }) }
+    );
+
+    expect(output.output.map((entry) => entry.data).join("\n")).toContain(
+      '--include-images was set, but images were not reviewed: the model "x" does not accept images.'
+    );
   });
 
   it("rejects an invalid --type before doing any work", async () => {

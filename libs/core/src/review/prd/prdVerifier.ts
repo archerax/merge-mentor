@@ -8,7 +8,10 @@
  *    text of the cited section and its subsections, then in the other sections
  *    of the reviewed chunk; consistency findings may quote any section. A
  *    finding whose quote cannot be found is dropped. Exact duplicates (same
- *    quote and dimension) are collapsed.
+ *    quote and dimension) are collapsed. Image findings are grounded by their
+ *    image id instead: the image must exist, the finding is attributed to the
+ *    image's section, and a quote that is neither found near the image nor
+ *    the image's alt text is cleared rather than causing a drop.
  * 2. **AI verifier pass.** The remaining findings, each with the document text
  *    around its quote, go to the model in batches; findings it rejects as
  *    unsupported, misread or duplicate are dropped. If a verifier call fails,
@@ -28,6 +31,7 @@ import { parseAIJson } from "./aiJson.js";
 import type {
   DocxBlock,
   DocxDocument,
+  DocxImage,
   DocxSection,
   PrdCandidateFinding,
   PrdFinding,
@@ -123,10 +127,12 @@ interface QuoteLocation {
 /** Searchable text of every section of a document, for locating quotes. */
 export class DocumentTextIndex {
   private readonly sections = new Map<string, IndexedSection>();
+  private readonly images: ReadonlyMap<string, DocxImage>;
   private readonly order: readonly string[];
 
   constructor(document: DocxDocument) {
     this.order = document.sections.map((section) => section.id);
+    this.images = new Map(document.images.map((image) => [image.id, image]));
     for (const section of document.sections) {
       const paragraphs: IndexedParagraph[] = [];
       if (section.headingParagraphId) {
@@ -143,6 +149,11 @@ export class DocumentTextIndex {
       }
       this.sections.set(section.id, { section, paragraphs, joined, offsets });
     }
+  }
+
+  /** The image with this id, if the document has one. */
+  image(imageId: string): DocxImage | undefined {
+    return this.images.get(imageId);
   }
 
   /** True when the document has a section with this id. */
@@ -265,6 +276,20 @@ export function checkQuotes(
   let droppedDuplicate = 0;
 
   for (const candidate of candidates) {
+    if (candidate.imageId !== undefined) {
+      const finding = groundImageFinding(index, candidate, documentType);
+      if (!finding) {
+        droppedUnsupportedQuote += 1;
+        continue;
+      }
+      const key = `image\u0000${candidate.imageId}\u0000${candidate.dimension}\u0000${normaliseForQuoteMatch(candidate.problem)}`;
+      if (kept.has(key)) {
+        droppedDuplicate += 1;
+        continue;
+      }
+      kept.set(key, finding);
+      continue;
+    }
     const location = locateCandidate(index, candidate);
     if (!location) {
       droppedUnsupportedQuote += 1;
@@ -296,6 +321,44 @@ export function checkQuotes(
   }
 
   return { findings: [...kept.values()], droppedUnsupportedQuote, droppedDuplicate };
+}
+
+/**
+ * Grounds an image finding by its image id: drops it when the document has no
+ * such image, attributes it to the image's section, and keeps the quote only
+ * when it is found near the image or is the image's alt text.
+ */
+function groundImageFinding(
+  index: DocumentTextIndex,
+  candidate: PrdCandidateFinding,
+  documentType: PrdDocumentType
+): VerifiedPrdFinding | undefined {
+  const image = candidate.imageId ? index.image(candidate.imageId) : undefined;
+  if (!image) return undefined;
+  const quote = candidate.quote.trim();
+  const location =
+    quote.length > 0 ? index.locate(quote, index.subtree(image.sectionId)) : undefined;
+  const isAltText =
+    quote.length > 0 &&
+    image.altText !== undefined &&
+    normaliseForQuoteMatch(quote).replace(/^["']+|["']+$/g, "") ===
+      normaliseForQuoteMatch(image.altText);
+  const sectionId = location?.sectionId ?? image.sectionId;
+  return {
+    severity: candidate.severity,
+    dimension: candidate.dimension,
+    dimensionName: dimensionName(documentType, candidate.dimension),
+    sectionId,
+    headingPath: index.headingPath(sectionId),
+    paragraphId: location?.paragraphId ?? image.paragraphId,
+    quote: location ? quote : isAltText ? (image.altText?.trim() ?? "") : "",
+    problem: candidate.problem.trim(),
+    suggestion: candidate.suggestion.trim(),
+    ...(candidate.authorQuestion ? { authorQuestion: candidate.authorQuestion.trim() } : {}),
+    origin: candidate.origin,
+    imageId: image.id,
+    ...(image.altText ? { imageAltText: image.altText } : {}),
+  };
 }
 
 function locateCandidate(
@@ -386,6 +449,14 @@ export class PrdVerifier {
         problem: finding.problem,
         suggestion: finding.suggestion,
         context: index.context(finding.sectionId, finding.paragraphId),
+        ...(finding.imageId
+          ? {
+              image: {
+                id: finding.imageId,
+                ...(finding.imageAltText ? { altText: finding.imageAltText } : {}),
+              },
+            }
+          : {}),
       }));
       const rejected = await this.rejectedIds(candidates);
       if (rejected === undefined) {

@@ -101,6 +101,25 @@ describe("PrdReviewResult", () => {
 
     expect(html).toContain("Not ready");
     expect(html).toContain("partly reviewed");
+    expect(html).not.toContain("Images were not reviewed");
+  });
+
+  it("notes when image review was turned on but the model cannot read images", () => {
+    const html = renderHtml(
+      <PrdReviewResult
+        summary={buildSummary({
+          includeImages: true,
+          imageReview: {
+            supported: false,
+            reason: 'the model "gpt-x" does not accept images',
+            reviewed: 0,
+          },
+        })}
+      />
+    );
+
+    expect(html).toContain("Images were not reviewed");
+    expect(html).toContain("does not accept images");
   });
 });
 
@@ -112,6 +131,7 @@ describe("PrdReviewRunner", () => {
     expect(html).toContain("Product requirements (PRD)");
     expect(html).toContain("Functional requirements (FRD)");
     expect(html).toContain("Include images");
+    expect(html).toContain("needs a model that accepts images");
     expect(html).toContain("may take longer and cost more");
     expect(html).toContain("Your document stays local");
     expect(html).toContain(".mergementor");

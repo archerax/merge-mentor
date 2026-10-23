@@ -532,6 +532,39 @@ async function buildImages(
   return { images, warnings };
 }
 
+/**
+ * Reads the bytes of the given images from a `.docx` by their zip part path,
+ * for image review. An image is returned only when its part exists and its
+ * bytes still match the SHA-256 recorded at parse time; images without a part
+ * path (linked or unreadable) are left out. Validate the buffer first (as
+ * {@link parseDocx} does).
+ *
+ * @returns Image bytes keyed by image id
+ * @throws {DocumentParseError} if the file is not a readable zip
+ */
+export async function readDocxImageData(
+  buffer: Buffer,
+  images: readonly DocxImage[]
+): Promise<Map<string, Buffer>> {
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(buffer);
+  } catch (error) {
+    throw new DocumentParseError("docx", "the file is not a readable Word document", {
+      cause: error,
+    });
+  }
+  const data = new Map<string, Buffer>();
+  for (const image of images) {
+    if (!image.partPath || !image.sha256) continue;
+    const file = zip.file(image.partPath);
+    if (!file) continue;
+    const bytes = await file.async("nodebuffer");
+    if (sha256(bytes) === image.sha256) data.set(image.id, bytes);
+  }
+  return data;
+}
+
 function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -540,8 +573,12 @@ function sha256(bytes: Buffer): string {
 // Warnings
 // ---------------------------------------------------------------------------
 
-/** Style-mapping warnings concern mammoth's HTML output, which is not used. */
-const IGNORED_WARNING = /^Unrecognised (paragraph|run|table) style/;
+/**
+ * Style-mapping and browser-display warnings concern mammoth's HTML output,
+ * which is not used (image formats are handled by image review).
+ */
+const IGNORED_WARNING =
+  /^Unrecognised (paragraph|run|table) style|^Image of type .* is unlikely to display in web browsers/;
 
 function collectWarnings(messages: readonly MammothMessage[]): string[] {
   return [

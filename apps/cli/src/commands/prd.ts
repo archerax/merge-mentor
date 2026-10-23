@@ -96,12 +96,6 @@ export async function executePrdReview(
     enableShellTools: false,
   });
 
-  if (options.includeImages) {
-    output.log(
-      "ℹ️ Image review is not available yet; images will be listed under “Not reviewed” in the report."
-    );
-  }
-
   const result = await runPrdReview(
     {
       source: { path: filePath },
@@ -149,6 +143,11 @@ function formatMb(bytes: number): string {
 /** Prints where the run's files are and how to remove them. */
 function displayRunSummary(result: PrdReviewResult, output: OutputWriter): void {
   const { report, paths } = result;
+  if (report.imageReview && !report.imageReview.supported) {
+    output.log(
+      `⚠️ --include-images was set, but images were not reviewed: ${report.imageReview.reason}.\n`
+    );
+  }
   if (!report.complete) {
     output.log(
       "⚠️ Parts of the document were not reviewed. See “Not reviewed” in the report for details.\n"

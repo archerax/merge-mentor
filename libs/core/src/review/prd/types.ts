@@ -143,7 +143,7 @@ export interface DocumentChunk {
 export type PrdSeverity = "Blocker" | "Major" | "Minor";
 
 /** Which pass produced a finding. */
-type PrdFindingOrigin = "section" | "consistency";
+type PrdFindingOrigin = "section" | "consistency" | "image";
 
 /** A finding proposed by a section or consistency pass, before verification. */
 export interface PrdCandidateFinding {
@@ -151,7 +151,7 @@ export interface PrdCandidateFinding {
   /** Rubric dimension id, or `"general"` when the model gave an unknown one. */
   readonly dimension: string;
   readonly sectionId: string;
-  /** Text the model says it copied from the document. */
+  /** Text the model says it copied from the document (may be empty for image findings). */
   readonly quote: string;
   readonly problem: string;
   readonly suggestion: string;
@@ -162,6 +162,12 @@ export interface PrdCandidateFinding {
    * to search the whole document (consistency findings).
    */
   readonly scopeSectionIds: readonly string[] | null;
+  /**
+   * Set for image-pass findings: the image the finding is about. These are
+   * grounded by the image id and its section rather than by the quote, which
+   * may be empty or the image's alt text.
+   */
+  readonly imageId?: string;
 }
 
 /** A verified finding as it appears in the report. */
@@ -182,6 +188,10 @@ export interface PrdFinding {
   readonly suggestion: string;
   readonly authorQuestion?: string;
   readonly origin: PrdFindingOrigin;
+  /** Image the finding is about (image-pass findings only). */
+  readonly imageId?: string;
+  /** Alt text of that image, when it has one. */
+  readonly imageAltText?: string;
 }
 
 /** Why part of the document was not reviewed. */

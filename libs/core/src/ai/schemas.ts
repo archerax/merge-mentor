@@ -186,6 +186,13 @@ export const PrdConsistencyResultSchema = z.object({
   findings: z.array(PrdFindingSchema).default([]),
 });
 
+/** Result of the image pass: findings about the attached images. */
+export const PrdImageResultSchema = z.object({
+  findings: z
+    .array(PrdFindingSchema.extend({ imageId: z.coerce.string().default("") }))
+    .default([]),
+});
+
 /** Result of the verifier pass: one verdict per candidate finding id. */
 export const PrdVerifierResultSchema = z.object({
   verdicts: z

@@ -29,6 +29,7 @@ describe("prdRuns", () => {
         runDir: path.join("/tmp/mm", "prd", "run-1"),
         sourceDocx: path.join("/tmp/mm", "prd", "run-1", "source.docx"),
         documentJson: path.join("/tmp/mm", "prd", "run-1", "document.json"),
+        imagesDir: path.join("/tmp/mm", "prd", "run-1", "images"),
         reportMarkdown: path.join("/tmp/mm", "reports", "prd-run-1-review-report.md"),
         reportJson: path.join("/tmp/mm", "reports", "prd-run-1-review-report.json"),
       });

@@ -12,6 +12,7 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     createSession: vi.fn().mockResolvedValue(session),
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
+    listModels: vi.fn().mockResolvedValue([]),
   };
   const ClientCtor = vi.fn().mockImplementation(function () {
     return client;
@@ -232,6 +233,29 @@ describe("CopilotSdkProvider", () => {
           attachments: [
             { type: "file", path: "/tmp/diff1.patch" },
             { type: "file", path: "/tmp/diff2.patch" },
+          ],
+        }),
+        expect.any(Number)
+      );
+    });
+
+    it("attaches image files after the diff files", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+
+      const resultPromise = provider.executePrompt("Review these images", {
+        promptType: "prd-image",
+        diffFiles: ["/tmp/diff1.patch"],
+        imageFiles: [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [
+            { type: "file", path: "/tmp/diff1.patch" },
+            { type: "file", path: "/tmp/run/images/img1.png" },
           ],
         }),
         expect.any(Number)
@@ -2038,6 +2062,87 @@ describe("createReviewPermissionHandler", () => {
       // Tool finding
       expect(parsed.findings[1].line).toBe(15);
       expect(parsed.findings[1].message).toBe("Tool finding body");
+    });
+  });
+});
+
+function vision(supports: boolean, limits: Record<string, unknown> = {}) {
+  return {
+    id: "Claude-Sonnet-4.6",
+    name: "Claude Sonnet 4.6",
+    capabilities: {
+      supports: { vision: supports, reasoningEffort: false },
+      limits: { max_context_window_tokens: 200_000, ...limits },
+    },
+  };
+}
+
+describe("CopilotSdkProvider.checkImageSupport", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.start.mockResolvedValue(undefined);
+    mockClient.listModels.mockResolvedValue([]);
+  });
+
+  it("cannot check automatic model selection or a BYOK endpoint", async () => {
+    await expect(new CopilotSdkProvider().checkImageSupport()).resolves.toMatchObject({
+      supported: false,
+      reason: expect.stringContaining("chosen automatically"),
+    });
+    await expect(
+      new CopilotSdkProvider({
+        model: "gpt-5",
+        aiBaseUrl: "https://ai.example.test/v1",
+      }).checkImageSupport()
+    ).resolves.toMatchObject({ supported: false, reason: expect.stringContaining("BYOK") });
+    expect(mockClient.listModels).not.toHaveBeenCalled();
+  });
+
+  it("reports the model's vision capability and limits from the model list", async () => {
+    mockClient.listModels.mockResolvedValue([
+      vision(true, {
+        vision: {
+          supported_media_types: ["image/png", "image/jpeg"],
+          max_prompt_images: 5,
+          max_prompt_image_size: 3_000_000,
+        },
+      }),
+    ]);
+
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: true,
+      maxImagesPerRequest: 5,
+      maxImageBytes: 3_000_000,
+      mediaTypes: ["image/png", "image/jpeg"],
+    });
+
+    mockClient.listModels.mockResolvedValue([vision(true)]);
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({ supported: true });
+  });
+
+  it("reports text-only, unknown and unlisted models as unsupported", async () => {
+    mockClient.listModels.mockResolvedValue([vision(false)]);
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: false,
+      reason: 'the model "claude-sonnet-4.6" does not accept images',
+    });
+
+    await expect(
+      new CopilotSdkProvider({ model: "other-model" }).checkImageSupport()
+    ).resolves.toMatchObject({ supported: false, reason: expect.stringContaining("not in the") });
+
+    mockClient.listModels.mockRejectedValue(new Error("not authenticated"));
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: false,
+      reason: "the Copilot model list could not be read (not authenticated)",
     });
   });
 });

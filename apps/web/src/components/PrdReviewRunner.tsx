@@ -160,7 +160,7 @@ export function PrdReviewRunner({ runId, onRunCreated }: PrdReviewRunnerProps) {
 
           <Checkbox
             label="Include images"
-            description="Off by default. Turning this on may take longer and cost more with your AI provider. Images that are not reviewed are listed in the report."
+            description="Off by default. Sends the document's images to your AI provider, which needs a model that accepts images (set one with MM_AI_MODEL). This may take longer and cost more. Images that are not reviewed are listed in the report with the reason."
             checked={includeImages}
             onChange={(event) => setIncludeImages(event.currentTarget.checked)}
             disabled={running}
@@ -284,6 +284,13 @@ export function PrdReviewResult({ summary }: { readonly summary: PrdReviewSummar
             </Badge>
           )}
         </Group>
+
+        {report.imageReview && !report.imageReview.supported && (
+          <Alert variant="light" color="yellow" title="Images were not reviewed">
+            Image review was turned on, but {report.imageReview.reason}. The images are listed under
+            “Not reviewed” in the report.
+          </Alert>
+        )}
 
         <Divider />
         <MarkdownReport content={summary.reportMarkdown} />

@@ -14,6 +14,11 @@ import type { PrdFinding, PrdNotReviewedItem, PrdSeverity, PrdVerificationStats 
 /** Overall readiness of the document for development. */
 export type PrdReadinessVerdict = "ready" | "needs-work" | "not-ready";
 
+/** Outcome of image review, recorded when it was turned on and the document has images. */
+export type PrdImageReviewSummary =
+  | { readonly supported: true; readonly reviewed: number }
+  | { readonly supported: false; readonly reason: string; readonly reviewed: 0 };
+
 /** Structured PRD / FRD review report (written as JSON next to the Markdown). */
 export interface PrdReviewReport {
   readonly schemaVersion: 1;
@@ -52,6 +57,8 @@ export interface PrdReviewReport {
   readonly notReviewed: readonly PrdNotReviewedItem[];
   readonly verification: PrdVerificationStats;
   readonly includeImages: boolean;
+  /** Set when image review was turned on and the document has images. */
+  readonly imageReview?: PrdImageReviewSummary;
   readonly aiProvider?: string;
   readonly aiModel?: string;
   readonly tokenUsage?: TokenUsage;
@@ -109,10 +116,13 @@ function renderFinding(finding: PrdFinding, index: number): string {
     "",
     `**Where:** ${sectionLabel(finding)} · **Topic:** ${finding.dimensionName}`,
     "",
-    blockquote(finding.quote),
-    "",
-    `**What's the issue:** ${finding.problem}`,
   ];
+  if (finding.imageId) {
+    const alt = finding.imageAltText ? ` (“${finding.imageAltText}”)` : "";
+    lines.push(`**Image:** ${finding.imageId}${alt}`, "");
+  }
+  if (finding.quote) lines.push(blockquote(finding.quote), "");
+  lines.push(`**What's the issue:** ${finding.problem}`);
   if (finding.suggestion) lines.push("", `**Suggestion:** ${finding.suggestion}`);
   if (finding.authorQuestion)
     lines.push("", `**Question for the author:** ${finding.authorQuestion}`);
@@ -181,6 +191,11 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
     `- Sections: ${report.document.sectionCount}, reviewed in ${report.document.reviewedChunkCount} of ${report.document.chunkCount} parts`,
     `- Checked and removed ${dropped} possible issue${dropped === 1 ? "" : "s"} that could not be confirmed against the document text (${v.droppedUnsupportedQuote} quote not found, ${v.droppedDuplicate} duplicate, ${v.droppedByVerifier} rejected on review)`
   );
+  if (report.imageReview?.supported) {
+    out.push(`- Images: ${report.imageReview.reviewed} of ${report.document.imageCount} reviewed`);
+  } else if (report.imageReview) {
+    out.push(`- Images were not reviewed: ${report.imageReview.reason}`);
+  }
   if (v.verifierFailed) {
     out.push("- The final double-check could not run for some issues; they are shown unchecked.");
   }

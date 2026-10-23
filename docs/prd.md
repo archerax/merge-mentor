@@ -85,7 +85,7 @@ Each report contains:
 
   Every finding quotes the exact text it is about, explains the problem in plain language, suggests an improvement and, where useful, asks you a question.
 
-- **A "Not reviewed" list**: anything the review did not cover, so you know where to look yourself. This includes images (unless image review is on), sections the AI could not review, parts beyond the review limit for very long documents, and content the reader could not extract.
+- **A "Not reviewed" list**: anything the review did not cover, so you know where to look yourself. This includes images that were not reviewed (with the reason), sections the AI could not review, parts beyond the review limit for very long documents, and content the reader could not extract.
 
 Before the report is written, every finding is double-checked: findings whose quote cannot be found in the document, duplicates, and findings that do not hold up on a second look are removed.
 
@@ -102,7 +102,18 @@ The review is an automated first pass. Use it alongside, not instead of, review 
 
 By default, images are not sent to the AI provider. They are listed under "Not reviewed" in the report, with their alt text and section, so the review cost and behaviour are predictable.
 
-`--include-images` opts in to image review. Image review is not available yet: for now the option is accepted, and images are still listed as not reviewed. When it becomes available, whether images can be read will depend on the model your provider uses.
+`--include-images` (or **Include images** on the dashboard) opts in to image review. Each image is reviewed together with the text of the part of the document it appears in, looking for diagrams, flows or mock-ups that contradict the text, show things the text never describes, or cannot be understood on their own. Findings about an image name the image (for example `img3`, with its alt text) and quote the text next to it, and are double-checked like every other finding.
+
+Image review needs a model that accepts images. Before sending anything, Merge Mentor asks the provider whether the configured model does:
+
+- **`copilot-sdk`**: the model must be set explicitly (`--ai-model` / `MM_AI_MODEL`) and listed as accepting images ("vision") in your Copilot model list. With automatic model selection or a custom `--ai-base-url` endpoint, support cannot be checked, so images are not sent.
+- **`opencode-sdk`**: the model must be set as `provider/model` and listed by OpenCode as accepting image input.
+
+If the model does not accept images, the review still runs on the text: the command prints a warning, the dashboard shows a note, and every image is listed under "Not reviewed" with the reason.
+
+To keep cost and time predictable, at most **20 images** per document are reviewed, each up to **5 MB** (or the model's own limit, if lower), in PNG, JPEG, GIF or WebP format (or the formats the model reports). Repeated copies of the same picture are reviewed once. Images beyond these limits, in other formats (such as EMF/WMF drawings) or linked rather than embedded are listed under "Not reviewed" with the reason.
+
+The images that are sent are first saved in the run's folder (`.mergementor/prd/<run-id>/images/`) and are removed when you delete the run.
 
 ---
 
@@ -126,6 +137,7 @@ Each review is a separate run with its own run id (for example `20261023-142530-
 | `.mergementor/reports/prd-<run-id>-review-report.json` | The same report as structured data                        |
 | `.mergementor/prd/<run-id>/source.docx`                | A copy of the document that was reviewed                  |
 | `.mergementor/prd/<run-id>/document.json`              | The text extracted from the document, split into sections |
+| `.mergementor/prd/<run-id>/images/`                    | Images sent for review (only with `--include-images`)     |
 
 The command prints the exact paths when it finishes. If a review fails, its copy of the document and extracted text are removed automatically.
 

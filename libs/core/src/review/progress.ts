@@ -32,6 +32,7 @@ export type ReviewPhaseId =
   | "cross-file"
   | "ai-review"
   | "consistency"
+  | "images"
   | "verify"
   | "post"
   | "report";

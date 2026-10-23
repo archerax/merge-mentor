@@ -55,6 +55,7 @@ import type {
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
+  ImageInputSupport,
   FastReviewResult,
   ReasoningEffort,
   TokenUsage,
@@ -328,6 +329,62 @@ export class CopilotSdkProvider implements AIProviderClient {
     );
   }
 
+  /**
+   * Looks up the configured model in the Copilot model list and reports
+   * whether it accepts images (`capabilities.supports.vision`) and its image
+   * limits. "Auto" model selection and BYOK endpoints cannot be checked, so
+   * they are reported as unsupported.
+   */
+  async checkImageSupport(): Promise<ImageInputSupport> {
+    if (this.byokBaseUrl) {
+      return {
+        supported: false,
+        reason: "image support cannot be checked for a custom (BYOK) AI endpoint",
+      };
+    }
+    const model = this.model?.trim() ?? "";
+    if (model.length === 0 || model.toLowerCase() === "auto") {
+      return {
+        supported: false,
+        reason:
+          "the AI model is chosen automatically, so image support cannot be checked; set a specific model that accepts images with --ai-model (MM_AI_MODEL)",
+      };
+    }
+
+    let models: Awaited<ReturnType<CopilotClient["listModels"]>>;
+    try {
+      const client = this.getClient();
+      await this.withTimeout(client.start(), this.timeoutMs);
+      models = await this.withTimeout(client.listModels(), this.timeoutMs);
+    } catch (error) {
+      this.logger.warn({ error: (error as Error).message }, "Copilot model list unavailable");
+      return {
+        supported: false,
+        reason: `the Copilot model list could not be read (${(error as Error).message})`,
+      };
+    }
+
+    const info = models.find((candidate) => candidate.id.toLowerCase() === model.toLowerCase());
+    if (!info) {
+      return {
+        supported: false,
+        reason: `the model "${model}" is not in the Copilot model list, so image support cannot be checked`,
+      };
+    }
+    if (!info.capabilities?.supports?.vision) {
+      return { supported: false, reason: `the model "${model}" does not accept images` };
+    }
+    const vision = info.capabilities.limits?.vision;
+    return {
+      supported: true,
+      ...(vision?.max_prompt_images ? { maxImagesPerRequest: vision.max_prompt_images } : {}),
+      ...(vision?.max_prompt_image_size ? { maxImageBytes: vision.max_prompt_image_size } : {}),
+      ...(vision?.supported_media_types?.length
+        ? { mediaTypes: vision.supported_media_types }
+        : {}),
+    };
+  }
+
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
@@ -521,6 +578,10 @@ export class CopilotSdkProvider implements AIProviderClient {
         for (const diffFile of options.diffFiles) {
           attachments.push({ type: "file", path: diffFile });
         }
+      }
+      // The Copilot runtime sends attached image files to the model as images.
+      for (const image of options?.imageFiles ?? []) {
+        attachments.push({ type: "file", path: image.path });
       }
 
       try {

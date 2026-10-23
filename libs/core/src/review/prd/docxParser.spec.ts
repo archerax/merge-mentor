@@ -23,7 +23,7 @@ import {
   table,
   TINY_PNG,
 } from "./docxFixture.test-helper.js";
-import { parseDocx, parseDocxFile } from "./docxParser.js";
+import { parseDocx, parseDocxFile, readDocxImageData } from "./docxParser.js";
 import type { DocxBlock, DocxDocument, DocxParagraph, DocxSection, DocxTable } from "./types.js";
 
 function section(doc: DocxDocument, id: string): DocxSection {
@@ -418,6 +418,44 @@ describe("parseDocx", () => {
       expect(doc.images[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(doc.images[1]).toMatchObject({ partPath: "word/media/image2.png" });
       expect(doc.images[1]?.altText).toBeUndefined();
+      expect(doc.warnings).toEqual([]);
+    });
+
+    it("reads image bytes by part path for image review, checking the hash", async () => {
+      const other = Buffer.concat([TINY_PNG, Buffer.from([1])]);
+      const buffer = await buildDocx({
+        body: paraXml(imageRun("rIdImg1", "A")) + paraXml(imageRun("rIdImg2", "B")),
+        images: [
+          { relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG },
+          { relId: "rIdImg2", fileName: "image2.png", data: other },
+        ],
+      });
+      const doc = await parseDocx(buffer);
+      const [first, second] = doc.images;
+      if (!first || !second) throw new Error("expected two images");
+
+      const data = await readDocxImageData(buffer, [
+        first,
+        { ...second, sha256: "0".repeat(64) },
+        { ...second, id: "img3", partPath: "word/media/missing.png" },
+        { ...second, id: "img4", partPath: undefined },
+      ]);
+
+      expect([...data.keys()]).toEqual(["img1"]);
+      expect(data.get("img1")).toEqual(TINY_PNG);
+      await expect(readDocxImageData(Buffer.from("not a zip"), [first])).rejects.toThrow(
+        DocumentParseError
+      );
+    });
+
+    it("does not warn about image formats browsers cannot show", async () => {
+      const doc = await parseDocx(
+        await buildDocx({
+          body: paraXml(imageRun("rIdImg1", "Drawing")),
+          images: [{ relId: "rIdImg1", fileName: "image1.emf", data: Buffer.from("emf") }],
+        })
+      );
+      expect(doc.images[0]?.contentType).toBe("image/x-emf");
       expect(doc.warnings).toEqual([]);
     });
 

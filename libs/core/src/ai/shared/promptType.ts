@@ -11,6 +11,7 @@ export type PromptType =
   | "project"
   | "prd-section"
   | "prd-consistency"
+  | "prd-image"
   | "prd-verify"
   | "unknown";
 

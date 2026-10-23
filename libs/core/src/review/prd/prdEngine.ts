@@ -3,8 +3,10 @@
  *
  * Pipeline: read and validate the `.docx` → parse into the document model →
  * split into model-sized chunks → one section pass per chunk → one
- * whole-document consistency pass over the section summaries → verifier
- * (quote check + AI double-check) → Markdown + JSON report.
+ * whole-document consistency pass over the section summaries → with
+ * `includeImages`, an image pass per document part that has images (when the
+ * model accepts images) → verifier (quote check + AI double-check) → Markdown
+ * + JSON report.
  *
  * Every artefact of a run (report, source copy, extracted data) is written
  * under the temp path using the layout in `@merge-mentor/shared/reports`
@@ -33,19 +35,31 @@ import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 import packageJson from "../../../package.json" with { type: "json" };
 import {
   buildPrdConsistencyPrompt,
+  buildPrdImagePrompt,
   buildPrdSectionPrompt,
   PRD_RUBRICS,
   type PrdDocumentType,
 } from "../../ai/prompts/prd.js";
-import { PrdConsistencyResultSchema, PrdSectionResultSchema } from "../../ai/schemas.js";
-import type { AIProviderClient, AIProviderType, TokenUsage } from "../../ai/types.js";
+import {
+  PrdConsistencyResultSchema,
+  PrdImageResultSchema,
+  PrdSectionResultSchema,
+} from "../../ai/schemas.js";
+import type {
+  AIProviderClient,
+  AIProviderType,
+  ImageInputSupport,
+  PromptImageFile,
+  TokenUsage,
+} from "../../ai/types.js";
 import { runWithConcurrency } from "../batching.js";
 import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { parseAIJson } from "./aiJson.js";
-import { parseDocx, readDocxFile } from "./docxParser.js";
+import { parseDocx, readDocxFile, readDocxImageData } from "./docxParser.js";
 import type { DocxValidationOptions } from "./docxValidator.js";
 import {
   fallbackReadinessSummary,
+  type PrdImageReviewSummary,
   type PrdReadinessVerdict,
   type PrdReviewReport,
   readinessFromCounts,
@@ -56,6 +70,7 @@ import { type ChunkOptions, chunkDocument } from "./sectionChunker.js";
 import type {
   DocumentChunk,
   DocxDocument,
+  DocxImage,
   PrdCandidateFinding,
   PrdFinding,
   PrdNotReviewedItem,
@@ -75,10 +90,14 @@ export interface PrdReviewOptions {
   /** Which rubric to apply. */
   readonly documentType: PrdDocumentType;
   /**
-   * Review embedded images (`--include-images`). Image review is not
-   * implemented yet; images are always listed as not reviewed.
+   * Review embedded images (`--include-images`, default false). Images are
+   * sent only when the AI client reports that its model accepts images
+   * (`checkImageSupport`); otherwise, and for images over the limits, they
+   * are listed as not reviewed.
    */
   readonly includeImages?: boolean;
+  /** Overrides for the image review limits. */
+  readonly imageLimits?: PrdImageReviewLimits;
   /** Base directory for reports and run data (default `./.mergementor`). */
   readonly tempPath?: string;
   /** AI provider name, recorded in the report and shown in progress output. */
@@ -101,6 +120,16 @@ export interface PrdReviewOptions {
   readonly onStreamChunk?: (chunk: string) => void;
   /** Structured progress events (phases, per-section steps, AI stream deltas). */
   readonly onProgress?: ReviewProgressCallback;
+}
+
+/** Limits for image review; the provider's own limits apply when lower. */
+interface PrdImageReviewLimits {
+  /** Most images reviewed per run; the rest are listed as not reviewed (default 20). */
+  readonly maxImages?: number;
+  /** Largest image reviewed, in bytes (default 5 MB). */
+  readonly maxImageBytes?: number;
+  /** Most images attached to one AI request (default 4). */
+  readonly imagesPerRequest?: number;
 }
 
 /** Filesystem capabilities the engine uses (satisfied by `nodeFs`). */
@@ -131,6 +160,26 @@ export interface PrdReviewResult {
 
 const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_MAX_CHUNKS = 80;
+const DEFAULT_MAX_IMAGES = 20;
+const DEFAULT_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const DEFAULT_IMAGES_PER_REQUEST = 4;
+/** Image formats sent when the provider does not list the ones its model accepts. */
+const DEFAULT_IMAGE_MEDIA_TYPES: readonly string[] = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+];
+const IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/bmp": ".bmp",
+  "image/tiff": ".tiff",
+  "image/svg+xml": ".svg",
+};
 const SEVERITY_RANK: Record<PrdSeverity, number> = { Blocker: 0, Major: 1, Minor: 2 };
 
 interface SectionPassSuccess {
@@ -255,7 +304,7 @@ class PrdReviewRun {
       async () => this.consistencyPass(document, succeeded, sectionCandidates)
     );
 
-    const imageReview = this.reviewImages(document);
+    const imageReview = await this.reviewImages({ document, chunks, buffer, paths });
     const candidates = [
       ...sectionCandidates,
       ...(consistency?.candidates ?? []),
@@ -331,6 +380,7 @@ class PrdReviewRun {
       notReviewed,
       verification: verification.stats,
       includeImages: options.includeImages ?? false,
+      ...(imageReview.summary ? { imageReview: imageReview.summary } : {}),
       ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
       ...(options.aiModel ? { aiModel: options.aiModel } : {}),
       ...(this.tokenUsage ? { tokenUsage: this.tokenUsage } : {}),
@@ -475,29 +525,242 @@ class PrdReviewRun {
   }
 
   /**
-   * Extension point for image review (`--include-images`, Phase 5). Until it
-   * is implemented every image is listed as not reviewed and no findings are
-   * produced; an implementation returns its candidates here so they go
-   * through the same verifier and report.
+   * Image review (`includeImages`). When the AI model accepts images, the
+   * reviewable images are extracted into the run's `images/` directory and
+   * reviewed in the context of the document part they appear in (one call
+   * per part, in batches of the per-request limit). Every image that is not
+   * reviewed is listed with the reason. Image findings go through the same
+   * verifier, grounded by image id and section.
    */
-  private reviewImages(document: DocxDocument): {
+  private async reviewImages(run: {
+    readonly document: DocxDocument;
+    readonly chunks: readonly DocumentChunk[];
+    readonly buffer: Buffer;
+    readonly paths: PrdRunPaths;
+  }): Promise<{
     candidates: PrdCandidateFinding[];
     notReviewed: PrdNotReviewedItem[];
-  } {
-    const reason = this.options.includeImages
-      ? "image review is not available yet"
-      : "images are not reviewed unless image review is turned on";
-    const headings = new Map(document.sections.map((s) => [s.id, s.headingPath.join(" › ")]));
-    const notReviewed = document.images.map((image) => {
-      const where = headings.get(image.sectionId);
-      const alt = image.altText ? ` (“${image.altText}”)` : "";
+    summary?: PrdImageReviewSummary;
+  }> {
+    const { document } = run;
+    const describe = imageDescriber(document);
+    if (document.images.length === 0) return { candidates: [], notReviewed: [] };
+    if (!this.options.includeImages) {
       return {
-        kind: "image" as const,
-        description: `Image ${image.id}${alt}${where ? ` in “${where}”` : ""}: ${reason}.`,
-        sectionIds: [image.sectionId],
+        candidates: [],
+        notReviewed: document.images.map((image) =>
+          describe(image, "images are not reviewed unless image review is turned on")
+        ),
       };
+    }
+
+    return this.runPhase("images", "Reviewing images", async () => {
+      const support = await this.checkImageSupport();
+      if (!support.supported) {
+        this.output.log(
+          `⚠️ Images will not be reviewed: ${support.reason}. They are listed under “Not reviewed” in the report.\n`
+        );
+        return {
+          candidates: [],
+          notReviewed: document.images.map((image) =>
+            describe(image, `image review is not available (${support.reason})`)
+          ),
+          summary: { supported: false, reason: support.reason, reviewed: 0 },
+        };
+      }
+
+      const { selected, notReviewed } = this.selectImages(document, support, describe);
+      const files = await this.extractImages(run.buffer, selected, run.paths);
+      for (const image of selected) {
+        if (!files.has(image.id)) {
+          notReviewed.push(describe(image, "the image could not be extracted from the document"));
+        }
+      }
+
+      const batches = imageBatches(
+        selected.filter((image) => files.has(image.id)),
+        run.chunks,
+        imagesPerRequest(this.options.imageLimits, support)
+      );
+      const concurrency = this.streaming
+        ? 1
+        : Math.max(1, this.options.concurrency ?? DEFAULT_CONCURRENCY);
+      const results = await runWithConcurrency(batches, concurrency, (batch) =>
+        this.reviewImageBatch(document, batch, files)
+      );
+
+      const candidates: PrdCandidateFinding[] = [];
+      let reviewed = 0;
+      results.forEach((result, index) => {
+        const batch = batches[index];
+        if (!batch) return;
+        if (result) {
+          reviewed += batch.images.length;
+          candidates.push(...result);
+          return;
+        }
+        notReviewed.push(
+          ...batch.images.map((image) =>
+            describe(image, "could not be reviewed because the AI request failed")
+          )
+        );
+      });
+      this.output.log(`🖼️ Reviewed ${reviewed} of ${document.images.length} image(s).\n`);
+      return { candidates, notReviewed, summary: { supported: true, reviewed } };
     });
-    return { candidates: [], notReviewed };
+  }
+
+  private async checkImageSupport(): Promise<ImageInputSupport> {
+    if (!this.ai.checkImageSupport) {
+      return {
+        supported: false,
+        reason: "the AI provider cannot report whether its model accepts images",
+      };
+    }
+    try {
+      return await this.ai.checkImageSupport();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { supported: false, reason: `the image support check failed (${message})` };
+    }
+  }
+
+  /** Picks the images to review within the limits; lists the rest with a reason. */
+  private selectImages(
+    document: DocxDocument,
+    support: Extract<ImageInputSupport, { supported: true }>,
+    describe: ImageDescriber
+  ): { selected: DocxImage[]; notReviewed: PrdNotReviewedItem[] } {
+    const limits = this.options.imageLimits;
+    const mediaTypes = new Set(
+      (support.mediaTypes ?? DEFAULT_IMAGE_MEDIA_TYPES).map((type) => type.toLowerCase())
+    );
+    const maxBytes = Math.min(
+      limits?.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES,
+      support.maxImageBytes ?? Number.POSITIVE_INFINITY
+    );
+    const maxImages = Math.max(0, limits?.maxImages ?? DEFAULT_MAX_IMAGES);
+    const selected: DocxImage[] = [];
+    const bySha = new Map<string, string>();
+    const notReviewed: PrdNotReviewedItem[] = [];
+
+    for (const image of document.images) {
+      const same = image.sha256 ? bySha.get(image.sha256) : undefined;
+      let reason: string | undefined;
+      if (!image.partPath || !image.sha256 || image.sizeBytes === undefined) {
+        reason = "the image data could not be read from the document";
+      } else if (!mediaTypes.has(image.contentType.toLowerCase())) {
+        reason = `its format (${image.contentType}) cannot be read by the AI model`;
+      } else if (image.sizeBytes > maxBytes) {
+        reason = `it is larger than the ${formatMegabytes(maxBytes)} image size limit`;
+      } else if (same) {
+        reason = `it is the same picture as image ${same}, which is reviewed instead`;
+      } else if (selected.length >= maxImages) {
+        reason = `the review limit of ${maxImages} images per document was reached`;
+      }
+      if (reason) {
+        notReviewed.push(describe(image, reason));
+        continue;
+      }
+      selected.push(image);
+      if (image.sha256) bySha.set(image.sha256, image.id);
+    }
+    return { selected, notReviewed };
+  }
+
+  /** Writes the selected images into the run's `images/` directory. */
+  private async extractImages(
+    buffer: Buffer,
+    images: readonly DocxImage[],
+    paths: PrdRunPaths
+  ): Promise<Map<string, PromptImageFile>> {
+    const files = new Map<string, PromptImageFile>();
+    if (images.length === 0) return files;
+    const data = await readDocxImageData(buffer, images);
+    if (data.size === 0) return files;
+    await this.fs.mkdir(paths.imagesDir, { recursive: true });
+    for (const image of images) {
+      const bytes = data.get(image.id);
+      if (!bytes) continue;
+      const mimeType = image.contentType.toLowerCase();
+      const filePath = path.resolve(
+        paths.imagesDir,
+        `${image.id}${IMAGE_EXTENSIONS[mimeType] ?? ".bin"}`
+      );
+      await this.fs.writeFileBuffer(filePath, bytes);
+      files.set(image.id, { path: filePath, mimeType });
+    }
+    return files;
+  }
+
+  /** Reviews one batch of images; returns undefined when the AI call failed. */
+  private async reviewImageBatch(
+    document: DocxDocument,
+    batch: ImageBatch,
+    files: ReadonlyMap<string, PromptImageFile>
+  ): Promise<PrdCandidateFinding[] | undefined> {
+    const label = `Images ${batch.images.map((image) => image.id).join(", ")}`;
+    this.step(label, "start");
+    try {
+      const prompt = buildPrdImagePrompt({
+        documentType: this.options.documentType,
+        documentTitle: document.title,
+        contextText: batch.chunk.text,
+        images: batch.images.map((image) => ({
+          id: image.id,
+          sectionId: image.sectionId,
+          ...(image.altText ? { altText: image.altText } : {}),
+        })),
+      });
+      const imageFiles = batch.images.flatMap((image) => {
+        const file = files.get(image.id);
+        return file ? [file] : [];
+      });
+      const response = await this.ai.executePrompt(prompt, {
+        promptType: "prd-image",
+        imageFiles,
+        ...(this.streaming ? { onStreamData: this.stream("images") } : {}),
+      });
+      this.addUsage(response.tokenUsage);
+      const parsed = PrdImageResultSchema.safeParse(parseAIJson(response));
+      if (!parsed.success) {
+        throw new MergeMentorError("the AI response for these images could not be read");
+      }
+      const ids = new Set(batch.images.map((image) => image.id));
+      const known = new Set(
+        PRD_RUBRICS[this.options.documentType].dimensions.map((dimension) => dimension.id)
+      );
+      const candidates = parsed.data.findings.flatMap((finding): PrdCandidateFinding[] => {
+        const imageId = finding.imageId
+          .trim()
+          .replace(/^\[|\]$/g, "")
+          .replace(/^image\s+/i, "");
+        if (!ids.has(imageId) || finding.problem.trim().length === 0) return [];
+        const dimension = finding.dimension.trim();
+        return [
+          {
+            severity: finding.severity,
+            dimension: known.has(dimension) ? dimension : "general",
+            sectionId: finding.sectionId.trim().replace(/^\[|\]$/g, ""),
+            quote: finding.quote,
+            problem: finding.problem,
+            suggestion: finding.suggestion,
+            ...(finding.authorQuestion ? { authorQuestion: finding.authorQuestion } : {}),
+            origin: "image",
+            scopeSectionIds: batch.chunk.sectionIds,
+            imageId,
+          },
+        ];
+      });
+      this.step(label, "done", `${candidates.length} possible issue(s)`);
+      return candidates;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn({ chunk: batch.chunk.id, error: err.message }, "PRD image pass failed");
+      this.output.log(`⚠️ ${label}: review failed (${err.message})`);
+      this.step(label, "error", err.message);
+      return undefined;
+    }
   }
 
   private toCandidates(
@@ -587,6 +850,72 @@ class PrdReviewRun {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Builds the "not reviewed" entry for an image with a reason. */
+type ImageDescriber = (image: DocxImage, reason: string) => PrdNotReviewedItem;
+
+function imageDescriber(document: DocxDocument): ImageDescriber {
+  const headings = new Map(document.sections.map((s) => [s.id, s.headingPath.join(" › ")]));
+  return (image, reason) => {
+    const where = headings.get(image.sectionId);
+    const alt = image.altText ? ` (“${image.altText}”)` : "";
+    return {
+      kind: "image",
+      description: `Image ${image.id}${alt}${where ? ` in “${where}”` : ""}: ${reason}.`,
+      sectionIds: [image.sectionId],
+    };
+  };
+}
+
+/** Images reviewed together in one AI call, with the document part they appear in. */
+interface ImageBatch {
+  readonly chunk: DocumentChunk;
+  readonly images: readonly DocxImage[];
+}
+
+function imagesPerRequest(
+  limits: PrdImageReviewLimits | undefined,
+  support: Extract<ImageInputSupport, { supported: true }>
+): number {
+  return Math.max(
+    1,
+    Math.min(
+      limits?.imagesPerRequest ?? DEFAULT_IMAGES_PER_REQUEST,
+      support.maxImagesPerRequest ?? Number.POSITIVE_INFINITY
+    )
+  );
+}
+
+/**
+ * Groups images by the chunk their paragraph was rendered in (falling back to
+ * the first chunk of their section), then splits each group into batches.
+ */
+function imageBatches(
+  images: readonly DocxImage[],
+  chunks: readonly DocumentChunk[],
+  perRequest: number
+): ImageBatch[] {
+  const groups = new Map<DocumentChunk, DocxImage[]>();
+  for (const image of images) {
+    const chunk =
+      chunks.find((candidate) => candidate.paragraphIds.includes(image.paragraphId)) ??
+      chunks.find((candidate) => candidate.sectionIds.includes(image.sectionId)) ??
+      chunks[0];
+    if (!chunk) continue;
+    groups.set(chunk, [...(groups.get(chunk) ?? []), image]);
+  }
+  const batches: ImageBatch[] = [];
+  for (const [chunk, group] of groups) {
+    for (let start = 0; start < group.length; start += perRequest) {
+      batches.push({ chunk, images: group.slice(start, start + perRequest) });
+    }
+  }
+  return batches;
+}
+
+function formatMegabytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 function sourceFileName(source: PrdReviewSource): string {
   const name = path.basename("path" in source ? source.path : source.fileName);

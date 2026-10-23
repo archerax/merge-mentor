@@ -367,6 +367,33 @@ export const PRD_CONSISTENCY_SCHEMA = {
   required: ["readiness", "findings"],
 } as const;
 
+/** JSON schema for the PRD / FRD image pass structured output. */
+export const PRD_IMAGE_SCHEMA = {
+  type: "object",
+  properties: {
+    findings: {
+      type: "array",
+      items: {
+        ...PRD_FINDING_SCHEMA,
+        properties: {
+          imageId: {
+            type: "string",
+            description: "Id of the image the finding is about, e.g. img2",
+          },
+          ...PRD_FINDING_SCHEMA.properties,
+          quote: {
+            type: "string",
+            description:
+              "Exact text copied from the document near the image (or its alt text); empty when there is none",
+          },
+        },
+        required: ["imageId", ...PRD_FINDING_SCHEMA.required],
+      },
+    },
+  },
+  required: ["findings"],
+} as const;
+
 /** JSON schema for the PRD / FRD verifier pass structured output. */
 export const PRD_VERIFY_SCHEMA = {
   type: "object",
@@ -410,6 +437,8 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return PRD_SECTION_SCHEMA as unknown as Record<string, unknown>;
     case "prd-consistency":
       return PRD_CONSISTENCY_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-image":
+      return PRD_IMAGE_SCHEMA as unknown as Record<string, unknown>;
     case "prd-verify":
       return PRD_VERIFY_SCHEMA as unknown as Record<string, unknown>;
     default:

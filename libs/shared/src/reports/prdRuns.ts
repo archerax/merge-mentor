@@ -14,6 +14,7 @@ import { type FileSystem, nodeFs } from "../ports/index.js";
  * <tempPath>/reports/prd-<runId>-review-report.json  (structured report)
  * <tempPath>/prd/<runId>/source.docx                 (copy of the reviewed document)
  * <tempPath>/prd/<runId>/document.json               (extracted document model and chunks)
+ * <tempPath>/prd/<runId>/images/                     (images extracted for --include-images)
  * ```
  */
 export interface PrdRunPaths {
@@ -23,6 +24,8 @@ export interface PrdRunPaths {
   readonly sourceDocx: string;
   /** Extracted document model and chunks, as JSON. */
   readonly documentJson: string;
+  /** Images extracted for image review (`--include-images`). */
+  readonly imagesDir: string;
   /** Markdown report (picked up by the reports reader). */
   readonly reportMarkdown: string;
   /** Structured JSON report. */
@@ -54,6 +57,7 @@ export function prdRunPaths(tempPath: string, runId: string): PrdRunPaths {
     runDir,
     sourceDocx: path.join(runDir, "source.docx"),
     documentJson: path.join(runDir, "document.json"),
+    imagesDir: path.join(runDir, "images"),
     reportMarkdown: `${reportBase}.md`,
     reportJson: `${reportBase}.json`,
   };
@@ -73,7 +77,7 @@ export function prdRunIdFromReportName(name: string): string | undefined {
 
 /**
  * Deletes everything a PRD review run produced: the Markdown and JSON reports,
- * the copy of the source `.docx` and the extracted data. Missing files are
+ * the copy of the source `.docx`, the extracted data and images. Missing files are
  * ignored, so deleting a partially written run is safe.
  *
  * @throws {ValidationError} when `runId` is not a safe path segment

@@ -725,7 +725,7 @@ program
   .option("--type <type>", "Document type: prd or frd", "prd")
   .option(
     "--include-images",
-    "Also review images in the document; without it, images are listed as not reviewed",
+    "Also review images in the document (needs an AI model that accepts images); without it, images are listed as not reviewed",
     false
   )
   .option(

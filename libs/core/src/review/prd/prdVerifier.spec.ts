@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { buildDocx, heading, para, table } from "./docxFixture.test-helper.js";
+import {
+  buildDocx,
+  heading,
+  imageRun,
+  para,
+  paraXml,
+  table,
+  TINY_PNG,
+} from "./docxFixture.test-helper.js";
 import { parseDocx } from "./docxParser.js";
 import { createFakeAIClient, jsonResponse } from "./prdAi.test-helper.js";
 import {
@@ -234,6 +242,70 @@ describe("checkQuotes", () => {
     ]);
   });
 });
+
+function imageCandidate(overrides: Partial<PrdCandidateFinding>): PrdCandidateFinding {
+  return candidate({
+    origin: "image",
+    imageId: "img1",
+    sectionId: "s1",
+    scopeSectionIds: ["s1", "s2"],
+    quote: "",
+    ...overrides,
+  });
+}
+
+describe("checkQuotes for image findings", () => {
+  it("grounds image findings by image id and section, clearing quotes it cannot find", async () => {
+    const withImage = await parseDocx(
+      await buildDocx({
+        body: [
+          heading(1, "Intro"),
+          para("Nothing here."),
+          heading(1, "Flow"),
+          para("The shopper pays."),
+          paraXml(imageRun("rIdImg1", "Payment flow")),
+        ].join(""),
+        images: [{ relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG }],
+      })
+    );
+    const index = new DocumentTextIndex(withImage);
+    const image = withImage.images[0];
+
+    const result = checkQuotes(
+      index,
+      [
+        imageCandidate({ quote: "The shopper pays.", problem: "Shows a refund step." }),
+        imageCandidate({ quote: "“Payment flow”", problem: "No legend." }),
+        imageCandidate({ quote: "Nothing here.", problem: "Wrong section quote." }),
+        imageCandidate({ problem: "No legend." }),
+        imageCandidate({ imageId: "img7", problem: "Unknown image." }),
+      ],
+      "prd"
+    );
+
+    expect(result.droppedUnsupportedQuote).toBe(1);
+    expect(result.droppedDuplicate).toBe(1);
+    expect(result.findings.map((f) => [f.sectionId, f.quote, f.imageId, f.paragraphId])).toEqual([
+      ["s2", "The shopper pays.", "img1", paragraphIdIn(withImage, "The shopper pays.")],
+      ["s2", "Payment flow", "img1", image?.paragraphId],
+      ["s2", "", "img1", image?.paragraphId],
+    ]);
+    expect(result.findings[0]).toMatchObject({
+      headingPath: ["Flow"],
+      imageAltText: "Payment flow",
+      origin: "image",
+    });
+  });
+});
+
+function paragraphIdIn(doc: DocxDocument, text: string): string | undefined {
+  for (const section of doc.sections) {
+    for (const block of section.blocks) {
+      if (block.kind === "paragraph" && block.paragraph.text === text) return block.paragraph.id;
+    }
+  }
+  return undefined;
+}
 
 describe("dimensionName", () => {
   it("looks up rubric names and falls back to General", () => {
