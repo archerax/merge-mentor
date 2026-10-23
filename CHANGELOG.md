@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`merge-mentor prd <file.docx>`**: a first-pass review of a Word requirements
+  document before development starts, written in plain language for product
+  owners and business analysts. `--type prd` (the default) checks the problem,
+  users and goals, scope, ambiguity and non-functional needs; `--type frd` checks
+  that requirements are testable, have acceptance criteria and cover edge cases.
+  The report gives a readiness verdict, Blocker / Major / Minor findings that each
+  quote the document, and a list of anything that was not reviewed. Files up to
+  20 MB are accepted. See [docs/prd.md](./docs/prd.md).
+- **`prd --include-images`** (opt-in): also reviews the document's images, such as
+  diagrams and mock-ups, when the configured model accepts images. Otherwise the
+  images are listed as not reviewed, with the reason.
+- **PRD Review page in the web dashboard** (`merge-mentor ui`): upload a `.docx`,
+  pick PRD or FRD, follow the review live and open the report on the Reports page.
+- **Local-only storage with per-run delete**: the report, a copy of the document,
+  the extracted text and images and the AI transcripts of each review stay in
+  `.mergementor` on your computer, and Delete on the Reports page removes them all
+  at once.
+
 ## [4.0.0] - 2026-10-23
 
 Security-focused major release. It tightens what the web dashboard, the `fix`

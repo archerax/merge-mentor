@@ -1,7 +1,9 @@
 # Plan: PRD / FRD Review (`merge-mentor prd`)
 
-Status: draft for review. Supersedes the MVP scope in `prd-review-feature.md`
-(that document remains the original idea and roadmap).
+Status: phases 1-5 implemented (spike, core, CLI, web UI, images); phase 6
+(pilot on real team documents, prompt tuning, release notes) remains.
+Supersedes the MVP scope in `prd-review-feature.md` (that document remains the
+original idea and roadmap).
 
 ## 1. Goal
 
@@ -82,7 +84,8 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
   `libs/core/src/review/prd/prdEngine.ts`, with `prdVerifier.ts` (quote check, then
   an AI double-check) and `prdReport.ts` (JSON shape and Markdown). Prompts are in
   `libs/core/src/ai/prompts/prd.ts`. Run files follow `prdRunPaths` in
-  `libs/shared/src/reports/prdRuns.ts`, and `deletePrdRun` removes a whole run.
+  `libs/shared/src/reports/prdRuns.ts`, and `deletePrdRun` removes a whole run
+  (reports, source copy, extracted data, images and AI transcripts).
 
 ## 5. Open technical risks
 
@@ -111,9 +114,19 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
    Implementation: `libs/core/src/review/prd/` (`docxParser.ts`, `openXml.ts`,
    `docxValidator.ts`, `sectionChunker.ts`, `types.ts`).
 
-2. **Vision.** The providers attach files by path, but whether the configured
-   model reads images varies. `--include-images` needs a per-provider check, and
-   the default stays text-only so cost and compatibility are predictable.
+2. **Vision — resolved in Phase 5.** The providers attach files by path, but
+   whether the configured model reads images varies, so `--include-images` is
+   behind a per-provider check (`AIProviderClient.checkImageSupport`):
+   `copilot-sdk` looks the configured model up in the Copilot model list
+   (`capabilities.supports.vision` and its vision limits); `opencode-sdk` looks
+   the `provider/model` up in OpenCode's provider list
+   (`capabilities.input.image`). "Auto" model selection, BYOK endpoints and an
+   unset model cannot be checked and count as unsupported. The default stays
+   text-only. When supported, reviewable images (default caps: 20 per document,
+   5 MB each, 4 per request, PNG/JPEG/GIF/WebP unless the model lists others)
+   are extracted to `prd/<runId>/images/` and reviewed per document part with
+   the `prd-image` prompt; image findings are grounded by image id and section
+   in the verifier. Everything else is listed as not reviewed with the reason.
 3. **Large documents.** Section splitting relies on a usable heading structure.
    Documents with no headings need a fallback (fixed-size chunks with overlap).
    Parameters are settled in section 9.
@@ -133,7 +146,14 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
 3. **CLI:** `prd` command, options, config/env wiring, `docs/prd.md`, README entry.
 4. **Web UI:** upload route, run streaming, report view, Reports page integration.
 5. **Images:** `--include-images` behind the per-provider check.
-6. **Pilot:** run on real team documents, tune prompts, then release notes.
+
+   Phases 1-5 are done. AI transcripts for a run are written to
+   `prd/<runId>/transcripts/` (provider `transcriptDir` option), so the per-run
+   delete removes everything a run produced.
+
+6. **Pilot (remaining):** run on real team documents (confirming the spike's
+   mammoth findings and image handling on real files), tune prompts, then
+   release notes.
 
 ## 7. Out of scope (later)
 
