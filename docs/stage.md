@@ -66,6 +66,7 @@ merge-mentor stage --format json --output ./stage-review.json
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--passes <passNames>`  | Comma-separated additive review passes (`scan`, `security`, `logic`, `performance`, `monorepo`, `testing`, `database`); requires `--strategy multi-agent` | -       |
 | `--strategy <strategy>` | Execution strategy (`deep`, `fast`, or `multi-agent`)                                                                                                     | `fast`  |
+| `--runs <number>`       | Sequential review runs; findings are aggregated and deduplicated (env: `MM_REVIEW_RUNS`)                                                                  | `1`     |
 
 ### File Filtering
 

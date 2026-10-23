@@ -23,9 +23,10 @@ merge-mentor ui --host 0.0.0.0 --no-open
 The command keeps running until the server exits or you press `Ctrl+C`.
 
 By default the dashboard binds to `127.0.0.1` (loopback) and is reachable only
-from the local machine. The dashboard has **no authentication**, so avoid
-binding it to a public interface unless you have another layer of access
-control in front of it.
+from the local machine. Requests are protected by a per-launch access token (see
+[Access protection](#access-protection)), but the dashboard holds your
+credentials, so avoid binding it to a public interface unless you have another
+layer of access control in front of it.
 
 ---
 

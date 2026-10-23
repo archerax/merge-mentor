@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-23
+
+Security-focused major release. Upgrading from 3.x: the web dashboard now requires
+the access-token URL printed by `merge-mentor ui`, and `fix` skips threads from
+non-collaborators unless `--allow-untrusted-comments` is passed.
+
 ### Added
 
 - **`review --runs <n>` / `stage --runs <n>` / `MM_REVIEW_RUNS` restored**: runs the
