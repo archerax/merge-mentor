@@ -9,9 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.0.0] - 2026-10-23
 
-Security-focused major release. Upgrading from 3.x: the web dashboard now requires
-the access-token URL printed by `merge-mentor ui`, and `fix` skips threads from
-non-collaborators unless `--allow-untrusted-comments` is passed.
+Security-focused major release. It tightens what the web dashboard, the `fix`
+command and the AI providers are allowed to do, restores multi-run reviews, and
+makes large pull requests more reliable.
+
+### Upgrading from 3.x
+
+- **Web dashboard**: open the URL printed by `merge-mentor ui`. It now contains a
+  per-launch access token, and requests without it are refused.
+- **Web dashboard**: it now listens on `127.0.0.1` only. If you reached it from
+  another machine or a container, pass `--host 0.0.0.0` (the browser is then not
+  opened automatically).
+- **`fix`**: it now only acts on review threads written by repository owners,
+  members or collaborators. Pass `--allow-untrusted-comments` to keep the old
+  behavior.
+- **Review cache**: results cached by earlier versions are reviewed once more
+  after upgrading.
 
 ### Added
 
@@ -19,93 +32,64 @@ non-collaborators unless `--allow-untrusted-comments` is passed.
   review several times in sequence and aggregates the findings, deduplicating by
   fingerprint. Several runs of a smaller model can cost less than one run of a
   larger model. This reverses the 2.0.0 removal of multi-run mode.
+- **`ui --no-open`**: skips opening the browser. The dashboard opens by default on
+  an interactive terminal, but not in CI, when output is piped, or when bound to a
+  non-loopback `--host`.
+- **`eval` with real providers**: `eval` accepts `--ai-model`, `--ai-base-url` and
+  `--ai-api-key` (or `MM_AI_MODEL`, `MM_AI_BASE_URL`, `MM_AI_API_KEY`), so real
+  providers and BYOK endpoints such as DeepSeek can be evaluated. `eval --runs <n>`
+  averages several samples per scenario to smooth out model noise.
 
 ### Security
 
-- **Prompts**: untrusted content (PR description, diffs, comments, work items) can
-  no longer close its own wrapper tag to smuggle text outside the untrusted block.
-- **Git**: the clone/fetch credentials are passed through `GIT_CONFIG_*` environment
-  variables instead of a `-c` argument, so the token no longer shows in `ps`.
-- **GitHub**: a comment is only treated as one of the bot's own when its author is
-  the bot account (the authenticated user or a `[bot]` app) as well as carrying the
-  marker, so a PR author can no longer plant fake findings. Comments are only
-  written once per request: writes are retried on rate limits (429, 403 rate limit)
-  but no longer on 5xx or dropped connections, which could post duplicates.
-- **Copilot SDK provider**: the permission handler is now deny-by-default. Only
-  `read` (and `write`/`shell` when enabled) are approved; unknown or future
-  permission kinds and sandbox-bypass requests are rejected. Reads and writes
-  must resolve (symlinks included) inside the working directory.
-- **Fix**: refuses writes to `.git/`, `.husky/`, `.github/`, `.vscode/`,
-  `package.json` and package-manager config, and by default only acts on threads
-  whose comments come from repository owners, members or collaborators. Use
-  `--allow-untrusted-comments` to restore the previous behavior.
-- **Web dashboard**: the dashboard now refuses requests with a foreign `Host`
-  (DNS rebinding), cross-origin writes, non-JSON `/api/*` bodies, and requests
-  without a per-launch access token. Open the URL printed by `merge-mentor ui`,
-  which contains the token. Previously any website could drive the dashboard
-  with your configured tokens.
+- **Web dashboard**: any website you visit could previously drive a running
+  dashboard, including your configured tokens. It now refuses requests with a
+  foreign `Host` (DNS rebinding), cross-origin writes, non-JSON `/api/*` bodies and
+  requests without the access token, and it binds to `127.0.0.1` by default.
+- **Prompt injection**: text from a PR (description, diffs, comments, work items)
+  can no longer break out of the block that marks it as untrusted.
+- **Fake findings**: a comment only counts as one of the bot's own when it was
+  written by the bot account, so a PR author can no longer plant fake findings.
+- **Duplicate comments**: comment writes are retried on rate limits but no longer
+  on server errors or dropped connections, which could post the same comment twice.
+- **Git credentials**: the token used to clone and fetch no longer appears in the
+  process list.
+- **Copilot SDK provider**: unknown or future permission requests are denied by
+  default. Only reads (and writes or shell commands when enabled) are approved, and
+  only inside the working directory, symlinks included.
+- **`fix`**: refuses to write to `.git/`, `.husky/`, `.github/`, `.vscode/`,
+  `package.json` and package-manager config.
 
 ### Fixed
 
-- **Eval**: the `eval` command now accepts `--ai-model`, `--ai-base-url` and
-  `--ai-api-key` (or `MM_AI_MODEL`, `MM_AI_BASE_URL`, `MM_AI_API_KEY`), so real
-  providers and BYOK endpoints such as DeepSeek can be evaluated. Real providers run
-  in a temporary diff-only sandbox, so the model can no longer read `ground-truth.json`
-  or `mock-response.json`. A provider error now fails that scenario instead of
-  aborting the whole run, and the report is still written. The `08`-`10` corpus
-  manifests used `patchFile` instead of `diffPath`, so those scenarios silently ran
-  without any diff; a manifest entry without `diffPath` is now an error. Ground truth
-  gained `acceptableFindings` for genuine extra issues, which are no longer counted
-  as false positives. `eval --runs <n>` averages several samples per scenario to
-  smooth model noise, and every scenario below 100% now lists what it expected but
-  missed and each finding the model reported. The quality gate now requires each
-  scenario to meet the recall threshold and the mean precision to meet the precision
-  threshold, and the production ignore filter is applied before review.
-- **Review**: PRs from forks are reviewed against the fork's code. The workspace is
-  fetched from the base repository's PR ref (`refs/pull/<n>/head` on GitHub, the
-  merge ref on Azure DevOps) instead of a branch that does not exist there, or
-  worse, shares a name with an unrelated upstream branch.
-- **Review**: inline comments attach to the head commit captured when the review
-  started, so a push mid-review can no longer pair old-diff line numbers with a
-  newer commit; this also removes one API call per comment.
-- **Review**: cached results are only reused when the strategy, passes and model
-  match, so a `deep` run no longer inherits `fast` results for unchanged files.
-  Caches written by earlier versions are re-reviewed once.
-- **Review**: the `fast`, `deep` and `multi-agent` strategies now split large PRs into
-  batches of related files so the model no longer skims or skips files. `fast` and
-  `deep` re-review any file the model fails to report; batch results are merged in
-  code, with a final cross-file pass for `fast` and `multi-agent`.
-- **Review**: the `fast` strategy now asks for an entry per changed file in
-  `file_results` (as `deep` does) instead of a separate `reviewed_files` list, so a
-  file missing from the response is detected and re-reviewed. A response that reports
-  no files is treated as nothing reviewed. The eval mock provider now scopes results
-  to the files in each call.
-- **Review**: `fast`, `deep` and `multi-agent` (subagents and synthesizer) now share one
-  response format: a `summary`, a `file_results` entry for every changed file, and
-  `cross_file_findings`. They use the same prompt format, provider JSON schema, response
-  parser and schema-repair rules, and multi-agent cross-file findings now keep their
-  affected files. Subagents that skip files are logged. The legacy flat `findings` list is
-  still accepted when parsing.
-- **Review**: the `fast` strategy's provider JSON schema now allows `file_results` and
-  `cross_file_findings`. It previously allowed only a flat findings list, so the model
-  could not report which files it reviewed, and cross-file findings keep their
-  `architecture`, `design` and `testing` categories.
-- **Review**: each strategy now logs how many files go to the model and how many were
-  reused from the review cache or had no diff, so silently skipped files are visible.
-- **Review**: the coverage check no longer treats one reported file as covering every
-  other file that shares its basename (for example `index.ts`).
-- **Web dashboard**: a disk error while finalizing a review run no longer leaves the PR
-  stuck as "running" until the server restarts, and live subscribers still receive the
-  final frames.
-- **Web dashboard**: the run store, posted-comment store and `.env` writer use a unique
-  temp file per write, so concurrent writes can no longer clobber each other's temp file.
-- **Workspace**: all workspace packages now carry the same version as the root package.
+- **Large PRs**: the `fast`, `deep` and `multi-agent` strategies split large PRs
+  into batches of related files, so the model no longer skims or skips files. Any
+  file the model fails to report is reviewed again, and the log shows how many files
+  went to the model and how many came from the cache or had no diff.
+- **Forks**: PRs from forks are reviewed against the fork's code instead of a branch
+  that does not exist in the base repository or that shares a name with an
+  unrelated one.
+- **Inline comments**: they attach to the commit the review started on, so a push
+  during a review can no longer put comments on the wrong lines.
+- **Review cache**: cached results are reused only when the strategy, passes and
+  model match, so a `deep` run no longer inherits `fast` results.
+- **Coverage check**: one reported file no longer counts as covering every other
+  file with the same name, such as `index.ts`.
+- **Web dashboard**: a disk error while finishing a review no longer leaves the PR
+  stuck as "running" until the server restarts.
+- **`eval`**: a provider error fails that scenario instead of aborting the run, and
+  the report is still written. Real providers run in a diff-only sandbox, so the
+  model can no longer read the expected answers.
+- **`eval` corpus**: scenarios `08` to `10` ran without any diff because their
+  manifests used the wrong key; a manifest entry without `diffPath` is now an error.
+  Genuine extra findings are no longer counted as false positives, and the quality
+  gate checks recall per scenario and mean precision.
 
 ### Changed
 
-- **CI**: the golden-PR evaluation workflow pins actions to commit SHAs, runs with
-  read-only permissions and passes dispatch inputs through `env:`; the self-review
-  workflow also re-reviews pull requests on later pushes.
+- **Internal**: `fast`, `deep` and `multi-agent` share one response format and
+  schema, the CI evaluation workflow is hardened (pinned actions, read-only
+  permissions), and all workspace packages carry the same version.
 
 ## [4.0.0-rc3] - 2026-10-21
 

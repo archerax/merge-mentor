@@ -26,13 +26,14 @@ Merge Mentor is a **self-hosted CLI tool** that runs directly on your local work
 - **Zero Telemetry**: No usage tracking, analytics, or telemetry of any kind are collected.
 - **Local Data & Logs**: Audit logs, execution caches, and reports stay strictly on your local disk under `./.mergementor`.
 - **Dry-Run by Default**: Reviews run in preview mode by default. Comments are only published to your pull requests when you explicitly pass `--write`.
+- **Local-Only Dashboard**: The optional web dashboard (`merge-mentor ui`) listens on `127.0.0.1` only and requires a per-launch access token, so other machines and websites cannot reach it.
 
 ---
 
 ## Why Merge Mentor?
 
 - **⚡ Faster feedback cycle** — Developers get actionable feedback the moment they open a PR.
-- **💰 Free up your senior engineers** — AI handles the routine first pass so human reviewers can focus on architectural decisions.
+- **🧑‍💻 Free up your senior engineers** — AI handles the routine first pass so human reviewers can focus on architectural decisions.
 - **🎯 Goes beyond linting** — Surfaces logic errors, insecure trust boundaries, missing edge cases, and cross-file issues.
 - **🔒 Control where your code goes** — Supports OpenAI-compatible endpoints (Ollama, vLLM, Azure OpenAI) for private hosting.
 - **🔁 Safe to try** — Dry-run is the default; preview every review before posting a single comment.
