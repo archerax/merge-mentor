@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 
 import { buildDocx, para } from "./docxFixture.test-helper.js";
-import { assertDocxSize, MAX_DOCX_BYTES, validateDocxBuffer } from "./docxValidator.js";
+import { assertDocxSize, formatMb, MAX_DOCX_BYTES, validateDocxBuffer } from "./docxValidator.js";
 
 async function zipOf(files: Record<string, string>): Promise<Buffer> {
   const zip = new JSZip();
@@ -29,7 +29,7 @@ describe("validateDocxBuffer", () => {
     const buffer = await buildDocx({ body: para("Hello") });
     expect(() => validateDocxBuffer(buffer, { maxBytes: 100 })).toThrow(ValidationError);
     expect(() => validateDocxBuffer(buffer, { maxBytes: 100 })).toThrow(
-      /exceeds the 0\.0 MB limit/
+      /which is over the 0\.00 MB limit/
     );
   });
 
@@ -102,7 +102,19 @@ describe("assertDocxSize", () => {
 
   it("throws a ValidationError above the cap", () => {
     expect(() => assertDocxSize(MAX_DOCX_BYTES + 1)).toThrow(
-      "Validation failed for docx: file is 20.0 MB, which exceeds the 20.0 MB limit"
+      "Validation failed for docx: file is 20.00 MB, which is over the 20 MB limit"
     );
+    expect(() => assertDocxSize(21 * 1024 * 1024)).toThrow(
+      "file is 21 MB, which is over the 20 MB limit"
+    );
+    expect(() => assertDocxSize(MAX_DOCX_BYTES + 30_000)).toThrow(
+      "file is 20.03 MB, which is over the 20 MB limit"
+    );
+  });
+
+  it("formats sizes with two decimals unless whole", () => {
+    expect(formatMb(20 * 1024 * 1024)).toBe("20 MB");
+    expect(formatMb(1.5 * 1024 * 1024)).toBe("1.50 MB");
+    expect(formatMb(1024)).toBe("0.00 MB");
   });
 });

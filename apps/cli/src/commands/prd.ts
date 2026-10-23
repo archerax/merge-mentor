@@ -4,7 +4,7 @@ import { loadConfig } from "@merge-mentor/config/config.js";
 import type { PrdDocumentType } from "@merge-mentor/core/ai/prompts/prd.js";
 import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
-import { MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
+import { formatMb, MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
 import { type PrdReviewResult, runPrdReview } from "@merge-mentor/core/review/prd/prdEngine.js";
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import {
@@ -133,11 +133,6 @@ async function assertReadableFile(
       `${displayPath} is ${formatMb(stats.size)}, which is over the ${formatMb(MAX_DOCX_BYTES)} limit`
     );
   }
-}
-
-function formatMb(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  return `${Number.isInteger(mb) ? mb : mb.toFixed(2)} MB`;
 }
 
 /** Prints where the run's files are and how to remove them. */

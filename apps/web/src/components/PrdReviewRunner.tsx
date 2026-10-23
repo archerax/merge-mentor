@@ -13,7 +13,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
+import { formatMb, MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
 import type { PrdReadinessVerdict } from "@merge-mentor/core/review/prd/prdReport.js";
 import { IconFileTypeDocx, IconLock } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
@@ -36,7 +36,7 @@ import { useReviewStream } from "./review/useReviewStream.js";
 /** Formats a byte count as KB/MB for plain-language messages. */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return formatMb(bytes);
 }
 
 /**

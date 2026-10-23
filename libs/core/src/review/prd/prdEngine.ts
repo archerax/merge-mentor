@@ -57,7 +57,7 @@ import { runWithConcurrency } from "../batching.js";
 import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { parseAIJson } from "./aiJson.js";
 import { parseDocx, readDocxFile, readDocxImageData } from "./docxParser.js";
-import type { DocxValidationOptions } from "./docxValidator.js";
+import { type DocxValidationOptions, formatMb } from "./docxValidator.js";
 import {
   fallbackReadinessSummary,
   type PrdImageReviewSummary,
@@ -662,7 +662,7 @@ class PrdReviewRun {
       } else if (!mediaTypes.has(image.contentType.toLowerCase())) {
         reason = `its format (${image.contentType}) cannot be read by the AI model`;
       } else if (image.sizeBytes > maxBytes) {
-        reason = `it is larger than the ${formatMegabytes(maxBytes)} image size limit`;
+        reason = `it is larger than the ${formatMb(maxBytes)} image size limit`;
       } else if (same) {
         reason = `it is the same picture as image ${same}, which is reviewed instead`;
       } else if (selected.length >= maxImages) {
@@ -924,10 +924,6 @@ function imageBatches(
     }
   }
   return batches;
-}
-
-function formatMegabytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function sourceFileName(source: PrdReviewSource): string {

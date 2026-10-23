@@ -45,7 +45,7 @@ export function assertDocxSize(sizeBytes: number, maxBytes: number = MAX_DOCX_BY
   if (sizeBytes > maxBytes) {
     throw new ValidationError(
       FIELD,
-      `file is ${formatMb(sizeBytes)}, which exceeds the ${formatMb(maxBytes)} limit`
+      `file is ${formatMb(sizeBytes)}, which is over the ${formatMb(maxBytes)} limit`
     );
   }
 }
@@ -87,7 +87,7 @@ export function validateDocxBuffer(buffer: Uint8Array, options: DocxValidationOp
   if (totalUncompressed > maxUncompressedBytes) {
     throw new ValidationError(
       FIELD,
-      `file expands to ${formatMb(totalUncompressed)}, which exceeds the ${formatMb(maxUncompressedBytes)} limit`
+      `file expands to ${formatMb(totalUncompressed)}, which is over the ${formatMb(maxUncompressedBytes)} limit`
     );
   }
 
@@ -173,6 +173,12 @@ function startsWith(buffer: Uint8Array, magic: readonly number[]): boolean {
   return buffer.length >= magic.length && magic.every((byte, i) => buffer[i] === byte);
 }
 
-function formatMb(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+/**
+ * Formats a byte count in megabytes for size messages: whole numbers as is
+ * ("20 MB"), others with two decimals ("20.01 MB"), so a file just over a
+ * limit does not read as the same size as the limit.
+ */
+export function formatMb(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return `${Number.isInteger(mb) ? mb : mb.toFixed(2)} MB`;
 }

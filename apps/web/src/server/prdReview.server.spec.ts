@@ -157,7 +157,9 @@ describe("prdReview.server", () => {
         uploadRequest(stream, { "content-length": String(MAX_DOCX_BYTES + 1) }, { duplex: "half" })
       );
       expect(response.status).toBe(413);
-      expect(((await response.json()) as { error: string }).error).toMatch(/exceeds the 20/);
+      expect(((await response.json()) as { error: string }).error).toMatch(
+        /which is over the 20 MB limit/
+      );
       // The stream itself pre-fills one chunk (its high-water mark); nothing more is read.
       expect(pulled()).toBeLessThanOrEqual(1);
       expect(runPrdReview).not.toHaveBeenCalled();
@@ -217,7 +219,7 @@ describe("prdReview.server", () => {
       const { stream, pulled } = countingStream(1024, 100);
       await expect(
         readUploadBody(uploadRequest(stream, {}, { duplex: "half" }), 4096)
-      ).rejects.toThrow(/exceeds/);
+      ).rejects.toThrow(/which is over the/);
       expect(pulled()).toBeLessThan(10);
     });
 

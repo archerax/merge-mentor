@@ -145,7 +145,8 @@ describe("checkPickedFile", () => {
     [{ name: "spec.doc", size: 10 }, /older Word file/],
     [{ name: "spec.pdf", size: 10 }, /saved as .docx/],
     [{ name: "spec.docx", size: 0 }, /empty/],
-    [{ name: "spec.docx", size: 21 * 1024 * 1024 }, /21\.0 MB; the limit is 20\.0 MB/],
+    [{ name: "spec.docx", size: 21 * 1024 * 1024 }, /21 MB; the limit is 20 MB/],
+    [{ name: "spec.docx", size: 20 * 1024 * 1024 + 1 }, /20\.00 MB; the limit is 20 MB/],
   ])("rejects %j", (file, message) => {
     expect(checkPickedFile(file)).toMatch(message);
   });
@@ -159,6 +160,7 @@ describe("formatFileSize", () => {
   it("formats kilobytes and megabytes", () => {
     expect(formatFileSize(100)).toBe("1 KB");
     expect(formatFileSize(10 * 1024)).toBe("10 KB");
-    expect(formatFileSize(5.5 * 1024 * 1024)).toBe("5.5 MB");
+    expect(formatFileSize(5.5 * 1024 * 1024)).toBe("5.50 MB");
+    expect(formatFileSize(20 * 1024 * 1024)).toBe("20 MB");
   });
 });
