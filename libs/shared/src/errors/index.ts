@@ -210,9 +210,10 @@ export class ValidationError extends MergeMentorError {
      * Helps users identify which input needs to be corrected.
      */
     public readonly field: string,
-    message: string
+    message: string,
+    options?: ErrorOptions
   ) {
-    super(`Validation failed for ${field}: ${message}`);
+    super(`Validation failed for ${field}: ${message}`, options);
     this.name = "ValidationError";
   }
 }

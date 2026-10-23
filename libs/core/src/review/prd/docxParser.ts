@@ -18,6 +18,7 @@ import mammoth from "mammoth";
 
 import { assertDocxSize, type DocxValidationOptions, validateDocxBuffer } from "./docxValidator.js";
 import { extractCommentAnchors, findMainDocumentPath } from "./openXml.js";
+import { assertZipEntriesWithinDeclaredSizes } from "./zipInflateGuard.js";
 import type {
   DocxBlock,
   DocxComment,
@@ -85,6 +86,9 @@ export async function parseDocx(
   options: ParseDocxOptions = {}
 ): Promise<DocxDocument> {
   validateDocxBuffer(buffer, options.validation);
+  // The declared sizes checked above are untrusted; make sure no entry
+  // inflates past them before any zip reader decompresses it into memory.
+  assertZipEntriesWithinDeclaredSizes(buffer, options.validation?.maxEntries);
 
   let root: unknown;
   let messages: readonly MammothMessage[];

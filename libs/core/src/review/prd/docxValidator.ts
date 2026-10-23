@@ -106,12 +106,28 @@ export function validateDocxBuffer(buffer: Uint8Array, options: DocxValidationOp
   }
 }
 
-interface ZipEntry {
+/** One entry of a zip central directory, as declared by the archive. */
+export interface ZipEntry {
   readonly name: string;
+  /** Declared uncompressed size; untrusted until the data is inflated. */
   readonly uncompressedSize: number;
+  readonly compressedSize: number;
+  /** Compression method (0 stored, 8 deflate). */
+  readonly method: number;
+  /** Offset of the entry's local file header. */
+  readonly localHeaderOffset: number;
 }
 
-function readCentralDirectory(buffer: Uint8Array, maxEntries: number): ZipEntry[] {
+/**
+ * Reads the central directory of a zip archive without decompressing anything.
+ *
+ * @throws {ValidationError} when the archive is corrupt, zip64, or has more
+ *   than `maxEntries` entries
+ */
+export function readCentralDirectory(
+  buffer: Uint8Array,
+  maxEntries: number = DEFAULT_MAX_ENTRIES
+): ZipEntry[] {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   const eocd = findEndOfCentralDirectory(view);
   if (eocd < 0) {
@@ -139,7 +155,10 @@ function readCentralDirectory(buffer: Uint8Array, maxEntries: number): ZipEntry[
         "file is not a valid zip archive (corrupt central directory)"
       );
     }
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
     const uncompressedSize = view.getUint32(offset + 24, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
     const nameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
@@ -150,11 +169,15 @@ function readCentralDirectory(buffer: Uint8Array, maxEntries: number): ZipEntry[
         "file is not a valid zip archive (corrupt central directory)"
       );
     }
-    if (uncompressedSize === 0xffffffff) {
+    if (
+      uncompressedSize === 0xffffffff ||
+      compressedSize === 0xffffffff ||
+      localHeaderOffset === 0xffffffff
+    ) {
       throw new ValidationError(FIELD, "zip64 archives are not supported");
     }
     const name = Buffer.from(buffer.subarray(nameStart, nameStart + nameLength)).toString("utf8");
-    entries.push({ name, uncompressedSize });
+    entries.push({ name, uncompressedSize, compressedSize, method, localHeaderOffset });
     offset = nameStart + nameLength + extraLength + commentLength;
   }
   return entries;
