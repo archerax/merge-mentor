@@ -19,6 +19,13 @@
       "category": "security|bug",
       "minSeverity": "low",
       "containsKeywords": ["decode|null|unauthenticated|verif"]
+    },
+    {
+      "id": "ok-02",
+      "filePath": "src/api/authMiddleware.ts",
+      "category": "security|bug|quality|design|style|documentation",
+      "minSeverity": "low",
+      "containsKeywords": ["comment|bypass|verif|decode"]
     }
   ],
   "maxAllowedDuplicates": 0

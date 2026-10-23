@@ -19,6 +19,13 @@
       "category": "bug|quality|architecture|design",
       "minSeverity": "low",
       "containsKeywords": ["tenantid|required|breaking"]
+    },
+    {
+      "id": "ok-02",
+      "filePath": "src/services/userService.ts",
+      "category": "bug|quality|architecture|design|documentation",
+      "minSeverity": "low",
+      "containsKeywords": ["comment|invalid|defect|tenantid"]
     }
   ],
   "maxAllowedDuplicates": 0

@@ -48,7 +48,8 @@ The evaluation harness compares detected findings against expected findings in t
 
 - **Recall**: Percentage of expected issues in the corpus correctly identified by the review process.
 - **Precision**: Percentage of detected findings that correspond to genuine expected issues (minimizing false positives).
-- **Quality Gate**: The command returns exit code `0` if overall recall and precision meet or exceed the specified thresholds (`--min-recall` and `--min-precision`), or exit code `1` if thresholds are violated.
+- **Quality Gate**: The command returns exit code `0` when every scenario's recall meets `--min-recall` (so no expected issue is missed) and the mean precision across scenarios meets `--min-precision`. Otherwise it returns exit code `1`. Precision is judged on the mean so a single extra finding does not fail an otherwise correct scenario.
+- **Ignore filter**: files the product's ignore filter would skip (lockfiles, `dist/`, minified and generated files) are removed before the review. If nothing is left, the provider is not called.
 
 Model output varies from run to run, so use `--runs 3` or more with a real provider. Each scenario's recall and precision are averaged over its runs, and misses and false positives are listed with how many runs they appeared in. Scenarios below 100% print what was expected but missed and every finding the model reported.
 

@@ -700,6 +700,31 @@ describe("Evaluation Harness Engine", () => {
     });
   });
 
+  describe("gate and ignore filter", () => {
+    const corpusDir = path.join(process.cwd(), "test/eval/corpus");
+
+    it("does not send generated files to the provider", async () => {
+      const result = await evaluateScenario(path.join(corpusDir, "06-generated-file-exclusion"), {
+        provider: "mock",
+      });
+      expect(result.passed).toBe(true);
+      expect(result.reportedFindings).toEqual([]);
+      expect(result.falsePositives).toEqual([]);
+    });
+
+    it("passes a scenario that caught everything despite low precision", async () => {
+      const report = await evaluateCorpus({ corpusDir, provider: "mock", minPrecision: 0 });
+      expect(report.scenarioResults.every((r) => r.passed)).toBe(true);
+      expect(report.overallPassed).toBe(true);
+    });
+
+    it("fails overall when mean precision is below the threshold", async () => {
+      const report = await evaluateCorpus({ corpusDir, provider: "mock", minPrecision: 1.01 });
+      expect(report.scenarioResults.every((r) => r.passed)).toBe(true);
+      expect(report.overallPassed).toBe(false);
+    });
+  });
+
   describe("multiple runs and miss details", () => {
     const corpusDir = path.join(process.cwd(), "test/eval/corpus");
 

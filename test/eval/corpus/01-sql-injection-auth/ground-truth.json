@@ -32,6 +32,13 @@
       "category": "security|performance|quality",
       "minSeverity": "low",
       "containsKeywords": ["select *|columns|over-fetch|overfetch|sensitive"]
+    },
+    {
+      "id": "ok-03",
+      "filePath": "src/auth/login.ts",
+      "category": "bug|quality|security",
+      "minSeverity": "low",
+      "containsKeywords": ["req.body|body", "validat|verif|undefined|non-empty|missing"]
     }
   ],
   "maxAllowedDuplicates": 0

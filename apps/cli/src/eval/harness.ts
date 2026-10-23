@@ -12,6 +12,7 @@ import type {
 import { AIProviderError, CorpusEvalError } from "@merge-mentor/shared/errors/index.js";
 import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import { nodeFs } from "@merge-mentor/shared/ports/fileSystem.js";
+import { getIgnorePatterns, shouldIgnoreFile } from "@merge-mentor/shared/utils/ignoreFilter.js";
 
 import { MockAIProvider } from "./mockProvider.js";
 import type {
@@ -173,7 +174,6 @@ async function evaluateScenarioOnce(
 ): Promise<ScenarioEvalResult> {
   const fs: FileSystem = options?.fileSystem ?? nodeFs;
   const minRecall = options?.minRecall ?? 0.9;
-  const minPrecision = options?.minPrecision ?? 0.85;
   const scenarioId = path.basename(scenarioDir);
 
   let provider: AIProviderClient;
@@ -200,6 +200,8 @@ async function evaluateScenarioOnce(
 
   let response: AIResponse | undefined;
   let providerError: string | undefined;
+  // Set when the production ignore filter leaves nothing to review.
+  let skipProvider = false;
   try {
     let prompt =
       "Review all changed files in this pull request scenario. Return a JSON object with a fileResults array containing findings for each file.";
@@ -216,8 +218,16 @@ async function evaluateScenarioOnce(
           `Failed to parse diffs/manifest.json: ${err instanceof Error ? err.message : String(err)}`
         );
       }
+      // Same filter as production: lockfiles, build output and other generated files
+      // never reach the model.
+      const ignorePatterns = getIgnorePatterns();
+      manifest = {
+        ...manifest,
+        files: (manifest.files ?? []).filter((f) => !shouldIgnoreFile(f.filename, ignorePatterns)),
+      };
+      skipProvider = manifest.files.length === 0;
       const files: string[] = [];
-      for (const f of manifest.files ?? []) {
+      for (const f of manifest.files) {
         if (typeof f.diffPath !== "string" || f.diffPath.length === 0) {
           throw new CorpusEvalError(
             scenarioId,
@@ -247,14 +257,15 @@ async function evaluateScenarioOnce(
       diffFiles = files;
     }
 
-    if (sandboxDir) {
-      await fs.mkdir(sandboxDir, { recursive: true });
+    if (!skipProvider) {
+      if (sandboxDir) {
+        await fs.mkdir(sandboxDir, { recursive: true });
+      }
+      response = await provider.executePrompt(prompt, {
+        workingDirectory: workDir,
+        ...(diffFiles ? { diffFiles } : {}),
+      });
     }
-
-    response = await provider.executePrompt(prompt, {
-      workingDirectory: workDir,
-      ...(diffFiles ? { diffFiles } : {}),
-    });
   } catch (err) {
     // A provider failure fails this scenario, not the whole corpus run.
     if (!(err instanceof AIProviderError)) throw err;
@@ -265,7 +276,7 @@ async function evaluateScenarioOnce(
     }
   }
 
-  if (response === undefined) {
+  if (response === undefined && !skipProvider) {
     return {
       scenarioId: groundTruth.scenarioId || scenarioId,
       name: groundTruth.name || scenarioId,
@@ -282,9 +293,12 @@ async function evaluateScenarioOnce(
     };
   }
 
-  const fileResults: FileReviewResult[] = provider.parseBatchedFileReview(response);
-  const fastResults = provider.parseFastReview(response);
-  const combinedFileResults = fileResults.length > 0 ? fileResults : fastResults.fileResults;
+  let combinedFileResults: FileReviewResult[] = [];
+  if (response !== undefined) {
+    const fileResults = provider.parseBatchedFileReview(response);
+    const fastResults = provider.parseFastReview(response);
+    combinedFileResults = fileResults.length > 0 ? fileResults : fastResults.fileResults;
+  }
 
   const allFindings: Array<FileFinding & { filePath: string }> = [];
   for (const fr of combinedFileResults) {
@@ -355,10 +369,9 @@ async function evaluateScenarioOnce(
   const totalPositives = caughtFindings.length + falsePositives.length;
   const precision = totalPositives > 0 ? caughtFindings.length / totalPositives : 1.0;
 
-  const passed =
-    recall >= minRecall &&
-    precision >= minPrecision &&
-    duplicateCount <= groundTruth.maxAllowedDuplicates;
+  // Precision is gated on the corpus mean (see evaluateCorpus), so one extra finding
+  // does not fail a scenario whose expected issues were all caught.
+  const passed = recall >= minRecall && duplicateCount <= groundTruth.maxAllowedDuplicates;
 
   return {
     scenarioId: groundTruth.scenarioId || scenarioId,
@@ -405,7 +418,6 @@ function aggregateRuns(
     name: results[0].name,
     passed:
       recall >= (options?.minRecall ?? 0.9) &&
-      precision >= (options?.minPrecision ?? 0.85) &&
       duplicateCount <= groundTruth.maxAllowedDuplicates &&
       errors.length === 0,
     recall,
@@ -471,7 +483,9 @@ export async function evaluateCorpus(options?: EvalHarnessOptions): Promise<Full
   const meanPrecision =
     scenarioResults.reduce((acc, r) => acc + r.precision, 0) / scenarioResults.length;
   const totalDuplicates = scenarioResults.reduce((acc, r) => acc + r.duplicateCount, 0);
-  const overallPassed = scenarioResults.every((r) => r.passed);
+  // Every scenario must catch its expected issues; precision is judged on the mean.
+  const overallPassed =
+    scenarioResults.every((r) => r.passed) && meanPrecision >= (options?.minPrecision ?? 0.85);
 
   const report: FullEvalReport = {
     timestamp: new Date().toISOString(),

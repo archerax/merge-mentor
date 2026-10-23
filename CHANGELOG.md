@@ -45,7 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gained `acceptableFindings` for genuine extra issues, which are no longer counted
   as false positives. `eval --runs <n>` averages several samples per scenario to
   smooth model noise, and every scenario below 100% now lists what it expected but
-  missed and each finding the model reported.
+  missed and each finding the model reported. The quality gate now requires each
+  scenario to meet the recall threshold and the mean precision to meet the precision
+  threshold, and the production ignore filter is applied before review.
 - **Review**: PRs from forks are reviewed against the fork's code. The workspace is
   fetched from the base repository's PR ref (`refs/pull/<n>/head` on GitHub, the
   merge ref on Azure DevOps) instead of a branch that does not exist there, or
