@@ -234,3 +234,30 @@ export class CorpusEvalError extends MergeMentorError {
     this.name = "CorpusEvalError";
   }
 }
+
+/**
+ * Error thrown when an input document (e.g. a `.docx` requirements document)
+ * passes basic validation but cannot be parsed.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await mammoth.convertToHtml({ buffer });
+ * } catch (error) {
+ *   throw new DocumentParseError("docx", "the file is not a readable Word document", { cause: error });
+ * }
+ * ```
+ */
+export class DocumentParseError extends MergeMentorError {
+  constructor(
+    /**
+     * The document format being parsed (e.g. "docx").
+     */
+    public readonly format: string,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(`Failed to parse ${format} document: ${message}`, options);
+    this.name = "DocumentParseError";
+  }
+}

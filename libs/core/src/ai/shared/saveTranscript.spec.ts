@@ -22,6 +22,7 @@ const createMockDeps = (overrides?: Partial<SaveTranscriptDeps>) => {
     access: vi.fn(),
     stat: vi.fn(),
     unlink: vi.fn(),
+    readFileBuffer: vi.fn(),
   };
 
   const clock: Clock = {

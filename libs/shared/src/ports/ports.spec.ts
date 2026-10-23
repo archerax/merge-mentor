@@ -190,6 +190,16 @@ describe("nodeFs", () => {
     expect(fs.readFile).toHaveBeenCalledWith("/tmp/test.txt", "utf-8");
   });
 
+  test("readFileBuffer delegates to fs.readFile without an encoding", async () => {
+    const bytes = Buffer.from([0x50, 0x4b]);
+    vi.mocked(fs.readFile).mockResolvedValue(bytes);
+
+    const content = await nodeFs.readFileBuffer("/tmp/test.docx");
+
+    expect(content).toBe(bytes);
+    expect(fs.readFile).toHaveBeenCalledWith("/tmp/test.docx");
+  });
+
   test("writeFile delegates to fs.writeFile", async () => {
     vi.mocked(fs.writeFile).mockResolvedValue();
 

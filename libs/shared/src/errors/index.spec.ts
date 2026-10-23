@@ -4,6 +4,7 @@ import {
   AIProviderError,
   ConfigurationError,
   CorpusEvalError,
+  DocumentParseError,
   JsonParseError,
   MergeMentorError,
   PlatformApiError,
@@ -78,6 +79,19 @@ describe("Error Classes", () => {
       expect(error.message).toBe("Validation failed for email: Invalid email format");
       expect(error.name).toBe("ValidationError");
       expect(error.field).toBe("email");
+    });
+  });
+
+  describe("DocumentParseError", () => {
+    it("creates error with format and preserves the cause", () => {
+      const cause = new Error("bad zip");
+      const error = new DocumentParseError("docx", "not a Word document", { cause });
+
+      expect(error.message).toBe("Failed to parse docx document: not a Word document");
+      expect(error.name).toBe("DocumentParseError");
+      expect(error.format).toBe("docx");
+      expect(error.cause).toBe(cause);
+      expect(error).toBeInstanceOf(MergeMentorError);
     });
   });
 

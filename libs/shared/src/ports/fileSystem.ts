@@ -34,6 +34,15 @@ export interface FileSystem {
   readFile(path: string, encoding: BufferEncoding): Promise<string>;
 
   /**
+   * Reads a file's raw bytes (for binary formats such as `.docx`).
+   *
+   * @param path - File path
+   * @returns File content as a Buffer
+   * @throws If file does not exist or cannot be read
+   */
+  readFileBuffer(path: string): Promise<Buffer>;
+
+  /**
    * Writes content to a file.
    *
    * @param path - File path
@@ -106,6 +115,7 @@ export interface FileSystem {
  */
 export const nodeFs: FileSystem = {
   readFile: (path, encoding) => fs.readFile(path, encoding),
+  readFileBuffer: (path) => fs.readFile(path),
   writeFile: (path, data, encoding) => fs.writeFile(path, data, encoding),
   mkdir: (path, options) => fs.mkdir(path, options),
   rm: (path, options) => fs.rm(path, options),
