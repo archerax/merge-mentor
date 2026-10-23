@@ -1033,6 +1033,12 @@ program
     (val: string) => Number.parseFloat(val),
     0.85
   )
+  .option(
+    "--runs <number>",
+    "Samples per scenario; recall and precision are averaged (default: 1)",
+    (val: string) => Number.parseInt(val, 10),
+    1
+  )
   .optionsGroup("Console Output Options")
   .option("--json", "Output raw JSON report to stdout", false)
   .option("--output-file <path>", "Path to write JSON evaluation report")

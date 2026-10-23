@@ -77,8 +77,14 @@ export interface ScenarioEvalResult {
   readonly caughtFindings: readonly string[];
   /** IDs of expected findings that were missed. */
   readonly missedFindings: readonly string[];
+  /** Descriptions (file, category, severity, keywords) of the missed expected findings. */
+  readonly missedDetails?: readonly string[];
   /** IDs of findings that were reported but not expected. */
   readonly falsePositives: readonly string[];
+  /** Every finding the provider reported, as `file:line [severity/category] message`. */
+  readonly reportedFindings?: readonly string[];
+  /** Number of samples averaged into this result (omitted for a single run). */
+  readonly runs?: number;
   /** AI provider error that prevented this scenario from being reviewed, if any. */
   readonly error?: string;
 }
@@ -115,6 +121,8 @@ export interface EvalHarnessOptions {
   readonly minRecall?: number;
   /** Minimum required precision threshold (0.0 - 1.0). Defaults to 0.85. */
   readonly minPrecision?: number;
+  /** Samples per scenario, averaged. Defaults to 1. */
+  readonly runs?: number;
   /** Output raw JSON report. */
   readonly json?: boolean;
   /** Write report JSON to specified output path. */

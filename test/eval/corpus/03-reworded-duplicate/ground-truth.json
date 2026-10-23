@@ -1,16 +1,8 @@
 {
   "scenarioId": "03-reworded-duplicate",
   "name": "Reworded Duplicate Comment Suppression",
-  "description": "Tests if re-review appropriately suppresses duplicate comments on shifted lines.",
-  "expectedFindings": [
-    {
-      "id": "exp-01",
-      "filePath": "src/api/client.ts",
-      "category": "performance|reliability|bug",
-      "minSeverity": "medium",
-      "containsKeywords": ["retry|retries|fetch", "backoff|delay|wait|error|abort"]
-    }
-  ],
+  "description": "A pure reformat of an existing retry loop. The ideal review reports nothing new; the pre-existing retry-without-backoff issue is acceptable but not required.",
+  "expectedFindings": [],
   "forbiddenFindings": [],
   "maxAllowedDuplicates": 0,
   "passes": [
@@ -22,6 +14,15 @@
       "passIndex": 2,
       "diffDir": "diffs",
       "expectedSuppressedCount": 1
+    }
+  ],
+  "acceptableFindings": [
+    {
+      "id": "ok-01",
+      "filePath": "src/api/client.ts",
+      "category": "performance|reliability|bug",
+      "minSeverity": "medium",
+      "containsKeywords": ["retry|retries|fetch", "backoff|delay|wait|error|abort"]
     }
   ]
 }

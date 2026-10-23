@@ -43,7 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manifests used `patchFile` instead of `diffPath`, so those scenarios silently ran
   without any diff; a manifest entry without `diffPath` is now an error. Ground truth
   gained `acceptableFindings` for genuine extra issues, which are no longer counted
-  as false positives.
+  as false positives. `eval --runs <n>` averages several samples per scenario to
+  smooth model noise, and every scenario below 100% now lists what it expected but
+  missed and each finding the model reported.
 - **Review**: PRs from forks are reviewed against the fork's code. The workspace is
   fetched from the base repository's PR ref (`refs/pull/<n>/head` on GitHub, the
   merge ref on Azure DevOps) instead of a branch that does not exist there, or

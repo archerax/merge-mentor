@@ -11,6 +11,10 @@ on:
         description: "Model name (e.g. deepseek-flash). Overrides the MM_AI_MODEL variable"
         required: false
         default: ""
+      runs:
+        description: "Samples per scenario; recall and precision are averaged to smooth model noise"
+        required: false
+        default: "3"
       min_recall:
         description: "Minimum required recall threshold (0.0 - 1.0)"
         required: false
@@ -54,6 +58,7 @@ jobs:
           EVAL_PROVIDER: ${{ github.event.inputs.provider || 'copilot-sdk' }}
           EVAL_MIN_RECALL: ${{ github.event.inputs.min_recall || '0.90' }}
           EVAL_MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.85' }}
+          EVAL_RUNS: ${{ github.event.inputs.runs || '3' }}
         run: |
           if [ "$EVAL_PROVIDER" = "mock" ]; then
             unset MM_AI_BASE_URL MM_AI_MODEL MM_AI_API_KEY
@@ -63,6 +68,7 @@ jobs:
             --provider "$EVAL_PROVIDER" \
             --min-recall "$EVAL_MIN_RECALL" \
             --min-precision "$EVAL_MIN_PRECISION" \
+            --runs "$EVAL_RUNS" \
             --output-file "eval-report.json"
 
       - name: Upload Evaluation Artifacts

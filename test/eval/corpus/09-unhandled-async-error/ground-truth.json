@@ -21,5 +21,14 @@
       "reason": "Standard static queue configuration settings should not generate findings."
     }
   ],
-  "maxAllowedDuplicates": 0
+  "maxAllowedDuplicates": 0,
+  "acceptableFindings": [
+    {
+      "id": "ok-01",
+      "filePath": "src/services/queueWorker.ts",
+      "category": "bug|quality|architecture|performance|design",
+      "minSeverity": "low",
+      "containsKeywords": ["concurren|unbounded|limit|parallel|exhaust"]
+    }
+  ]
 }

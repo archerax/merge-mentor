@@ -286,6 +286,8 @@ export interface EvalCommandOptions {
   minRecall?: number;
   /** Minimum required precision threshold (0.0 - 1.0). Default: 0.85. */
   minPrecision?: number;
+  /** Samples per scenario, averaged. Default: 1. */
+  runs?: number;
   /** Output raw JSON report to stdout. Default: `false`. */
   json?: boolean;
   /** Path to write the JSON evaluation report. */

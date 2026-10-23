@@ -36,6 +36,7 @@ merge-mentor eval --json --output-file ./eval-report.json
 | `--ai-api-key <key>`       | BYOK API key (`MM_AI_API_KEY`)                             | -                    |
 | `--min-recall <number>`    | Minimum required recall threshold (0.0 - 1.0)              | `0.9` (90%)          |
 | `--min-precision <number>` | Minimum required precision threshold (0.0 - 1.0)           | `0.85` (85%)         |
+| `--runs <number>`          | Samples per scenario; recall and precision are averaged    | `1`                  |
 | `--json`                   | Output raw JSON report to stdout                           | `false`              |
 | `--output-file <path>`     | Path to write JSON evaluation report                       | -                    |
 
@@ -48,6 +49,8 @@ The evaluation harness compares detected findings against expected findings in t
 - **Recall**: Percentage of expected issues in the corpus correctly identified by the review process.
 - **Precision**: Percentage of detected findings that correspond to genuine expected issues (minimizing false positives).
 - **Quality Gate**: The command returns exit code `0` if overall recall and precision meet or exceed the specified thresholds (`--min-recall` and `--min-precision`), or exit code `1` if thresholds are violated.
+
+Model output varies from run to run, so use `--runs 3` or more with a real provider. Each scenario's recall and precision are averaged over its runs, and misses and false positives are listed with how many runs they appeared in. Scenarios below 100% print what was expected but missed and every finding the model reported.
 
 If the AI provider fails on a scenario (for example, it returns no content), that scenario is recorded as failed with 0% recall and the error message, and the remaining scenarios still run. The report is always written, so the quality gate fails but you can see every scenario's result.
 

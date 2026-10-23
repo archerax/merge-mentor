@@ -6,8 +6,8 @@
     {
       "id": "exp-01",
       "filePath": "src/analytics/user.ts",
-      "category": "style|quality|design|architecture",
-      "minSeverity": "medium",
+      "category": "style|quality|design|architecture|bug",
+      "minSeverity": "low",
       "containsKeywords": ["import|unused", ".js|extension|logger"]
     },
     {

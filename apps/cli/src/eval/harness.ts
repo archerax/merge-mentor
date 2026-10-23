@@ -126,31 +126,55 @@ read any path outside the working directory and do not call bash. Review from th
 diffs alone and return the JSON result.
 `;
 
-/** Evaluates a single evaluation scenario directory. */
-export async function evaluateScenario(
+/** Loads and parses a scenario's ground truth. */
+async function loadGroundTruth(
+  fs: FileSystem,
   scenarioDir: string,
-  options?: EvalHarnessOptions
-): Promise<ScenarioEvalResult> {
-  const fs: FileSystem = options?.fileSystem ?? nodeFs;
-  const minRecall = options?.minRecall ?? 0.9;
-  const minPrecision = options?.minPrecision ?? 0.85;
-  const scenarioId = path.basename(scenarioDir);
-
+  scenarioId: string
+): Promise<GroundTruth> {
   const gtPath = path.join(scenarioDir, "ground-truth.json");
   if (!(await pathExists(fs, gtPath))) {
     throw new CorpusEvalError(scenarioId, `Missing ground-truth.json file in "${scenarioDir}"`);
   }
 
-  let groundTruth: GroundTruth;
   try {
     const gtContent = await fs.readFile(gtPath, "utf-8");
-    groundTruth = JSON.parse(gtContent) as GroundTruth;
+    return JSON.parse(gtContent) as GroundTruth;
   } catch (err) {
     throw new CorpusEvalError(
       scenarioId,
       `Failed to parse ground-truth.json: ${err instanceof Error ? err.message : String(err)}`
     );
   }
+}
+
+/** Describes an expected finding for the report. */
+function describeExpected(expected: ExpectedFinding): string {
+  const parts = [expected.filePath, expected.category];
+  if (expected.minSeverity) parts.push(`>=${expected.minSeverity}`);
+  if (expected.containsKeywords?.length) {
+    parts.push(`keywords: ${expected.containsKeywords.join(" & ")}`);
+  }
+  return `${expected.id} (${parts.join(", ")})`;
+}
+
+/** Describes a reported finding for the report. */
+function describeReported(finding: FileFinding & { filePath: string }): string {
+  const message =
+    finding.message.length > 160 ? `${finding.message.slice(0, 157)}...` : finding.message;
+  return `${finding.filePath}:${finding.line} [${finding.severity}/${finding.category}] ${message}`;
+}
+
+/** Evaluates a scenario once. */
+async function evaluateScenarioOnce(
+  scenarioDir: string,
+  groundTruth: GroundTruth,
+  options?: EvalHarnessOptions
+): Promise<ScenarioEvalResult> {
+  const fs: FileSystem = options?.fileSystem ?? nodeFs;
+  const minRecall = options?.minRecall ?? 0.9;
+  const minPrecision = options?.minPrecision ?? 0.85;
+  const scenarioId = path.basename(scenarioDir);
 
   let provider: AIProviderClient;
   const providerType = options?.provider ?? "mock";
@@ -251,7 +275,9 @@ export async function evaluateScenario(
       duplicateCount: 0,
       caughtFindings: [],
       missedFindings: groundTruth.expectedFindings.map((ef) => ef.id),
+      missedDetails: groundTruth.expectedFindings.map(describeExpected),
       falsePositives: [],
+      reportedFindings: [],
       error: providerError ?? "AI provider returned no response",
     };
   }
@@ -343,8 +369,76 @@ export async function evaluateScenario(
     duplicateCount,
     caughtFindings,
     missedFindings,
+    missedDetails: groundTruth.expectedFindings
+      .filter((ef) => missedFindings.includes(ef.id))
+      .map(describeExpected),
     falsePositives,
+    reportedFindings: allFindings.map(describeReported),
   };
+}
+
+/** Averages several runs of one scenario into a single result. */
+function aggregateRuns(
+  results: readonly ScenarioEvalResult[],
+  groundTruth: GroundTruth,
+  options?: EvalHarnessOptions
+): ScenarioEvalResult {
+  const n = results.length;
+  const mean = (pick: (r: ScenarioEvalResult) => number): number =>
+    results.reduce((acc, r) => acc + pick(r), 0) / n;
+  const recall = mean((r) => r.recall);
+  const precision = mean((r) => r.precision);
+  const duplicateCount = Math.max(...results.map((r) => r.duplicateCount));
+  const countIn = (pick: (r: ScenarioEvalResult) => readonly string[]): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const r of results) {
+      for (const item of new Set(pick(r))) counts.set(item, (counts.get(item) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const withCounts = (counts: Map<string, number>): string[] =>
+    [...counts].map(([item, c]) => (c === n ? item : `${item} [${c}/${n} runs]`));
+  const errors = results.map((r) => r.error).filter((e): e is string => e !== undefined);
+
+  return {
+    scenarioId: results[0].scenarioId,
+    name: results[0].name,
+    passed:
+      recall >= (options?.minRecall ?? 0.9) &&
+      precision >= (options?.minPrecision ?? 0.85) &&
+      duplicateCount <= groundTruth.maxAllowedDuplicates &&
+      errors.length === 0,
+    recall,
+    precision,
+    duplicateCount,
+    runs: n,
+    caughtFindings: [...countIn((r) => r.caughtFindings).keys()],
+    missedFindings: withCounts(countIn((r) => r.missedFindings)),
+    missedDetails: withCounts(countIn((r) => r.missedDetails ?? [])),
+    falsePositives: withCounts(countIn((r) => r.falsePositives)),
+    reportedFindings: results.flatMap((r, i) =>
+      (r.reportedFindings ?? []).map((f) => `run ${i + 1}: ${f}`)
+    ),
+    ...(errors.length > 0 ? { error: errors.join("; ") } : {}),
+  };
+}
+
+/** Evaluates a single evaluation scenario directory, averaging `options.runs` samples. */
+export async function evaluateScenario(
+  scenarioDir: string,
+  options?: EvalHarnessOptions
+): Promise<ScenarioEvalResult> {
+  const fs: FileSystem = options?.fileSystem ?? nodeFs;
+  const groundTruth = await loadGroundTruth(fs, scenarioDir, path.basename(scenarioDir));
+  const runs = Math.max(1, Math.floor(options?.runs ?? 1));
+  if (runs === 1) {
+    return evaluateScenarioOnce(scenarioDir, groundTruth, options);
+  }
+  const results: ScenarioEvalResult[] = [];
+  for (let i = 0; i < runs; i++) {
+    results.push(await evaluateScenarioOnce(scenarioDir, groundTruth, options));
+  }
+  return aggregateRuns(results, groundTruth, options);
 }
 
 /** Evaluates all scenarios in the Golden-PR evaluation corpus. */
@@ -414,14 +508,25 @@ export function formatTerminalSummary(report: FullEvalReport): string {
     const status = res.passed ? "PASS" : "FAIL";
     const recallPct = `${(res.recall * 100).toFixed(0)}%`;
     const precPct = `${(res.precision * 100).toFixed(0)}%`;
+    const runsNote = res.runs && res.runs > 1 ? ` | Runs: ${res.runs}` : "";
     lines.push(
-      `[${status.padEnd(4)}] ${res.scenarioId.padEnd(28)} | Recall: ${recallPct.padStart(4)} | Prec: ${precPct.padStart(4)} | Dups: ${res.duplicateCount}`
+      `[${status.padEnd(4)}] ${res.scenarioId.padEnd(28)} | Recall: ${recallPct.padStart(4)} | Prec: ${precPct.padStart(4)} | Dups: ${res.duplicateCount}${runsNote}`
     );
     if (res.error) {
       lines.push(`       Error: ${res.error}`);
     }
     if (res.missedFindings.length > 0) {
       lines.push(`       Missed Findings: ${res.missedFindings.join(", ")}`);
+      for (const detail of res.missedDetails ?? []) {
+        lines.push(`         expected ${detail}`);
+      }
+      // Show what the model did report, to tell a wrong severity from no finding at all.
+      for (const reported of res.reportedFindings ?? []) {
+        lines.push(`         reported ${reported}`);
+      }
+      if ((res.reportedFindings ?? []).length === 0) {
+        lines.push("         reported (no findings)");
+      }
     }
     if (res.falsePositives.length > 0) {
       lines.push(`       False Positives: ${res.falsePositives.join(", ")}`);

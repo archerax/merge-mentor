@@ -700,6 +700,50 @@ describe("Evaluation Harness Engine", () => {
     });
   });
 
+  describe("multiple runs and miss details", () => {
+    const corpusDir = path.join(process.cwd(), "test/eval/corpus");
+
+    it("averages several runs and reports the run count", async () => {
+      const result = await evaluateScenario(path.join(corpusDir, "01-sql-injection-auth"), {
+        provider: "mock",
+        runs: 3,
+      });
+      expect(result.runs).toBe(3);
+      expect(result.recall).toBe(1);
+      expect(result.reportedFindings?.length).toBeGreaterThan(0);
+      expect(result.reportedFindings?.[0]).toMatch(/^run 1: /);
+    });
+
+    it("describes missed expectations and what was reported", () => {
+      const summary = formatTerminalSummary({
+        timestamp: "2026-01-01T00:00:00.000Z",
+        overallPassed: false,
+        meanRecall: 0,
+        meanPrecision: 1,
+        totalDuplicates: 0,
+        scenarioResults: [
+          {
+            scenarioId: "missy",
+            name: "Missy",
+            passed: false,
+            recall: 0,
+            precision: 1,
+            duplicateCount: 0,
+            runs: 3,
+            caughtFindings: [],
+            missedFindings: ["exp-01"],
+            missedDetails: ["exp-01 (src/a.ts, security, >=critical, keywords: jwt)"],
+            falsePositives: [],
+            reportedFindings: ["src/a.ts:1 [high/security] weak check"],
+          },
+        ],
+      });
+      expect(summary).toContain("Runs: 3");
+      expect(summary).toContain("expected exp-01 (src/a.ts, security, >=critical");
+      expect(summary).toContain("reported src/a.ts:1 [high/security] weak check");
+    });
+  });
+
   describe("formatTerminalSummary failure details", () => {
     it("lists missed findings and false positives for failed scenarios", () => {
       const report: FullEvalReport = {

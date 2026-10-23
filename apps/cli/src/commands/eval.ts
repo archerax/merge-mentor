@@ -22,6 +22,7 @@ export async function executeEval(
     aiApiKey: options.aiApiKey ?? process.env.MM_AI_API_KEY,
     minRecall: options.minRecall,
     minPrecision: options.minPrecision,
+    runs: options.runs,
     json: options.json,
     outputFile: options.outputFile,
     output,
