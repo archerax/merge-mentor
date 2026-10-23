@@ -728,6 +728,31 @@ describe("Evaluation Harness Engine", () => {
       expect(summary).toContain("False Positives: src/a.ts:1 - noise");
       expect(summary).toContain("Overall Status: ❌ FAIL");
     });
+
+    it("lists details for passing scenarios that are below 100%", () => {
+      const report: FullEvalReport = {
+        timestamp: "2026-01-01T00:00:00.000Z",
+        overallPassed: true,
+        meanRecall: 1,
+        meanPrecision: 0.5,
+        totalDuplicates: 0,
+        scenarioResults: [
+          {
+            scenarioId: "passing-but-noisy",
+            name: "Noisy",
+            passed: true,
+            recall: 1,
+            precision: 0.5,
+            duplicateCount: 0,
+            caughtFindings: ["exp-1"],
+            missedFindings: [],
+            falsePositives: ["src/a.ts:1 - extra"],
+          },
+        ],
+      };
+
+      expect(formatTerminalSummary(report)).toContain("False Positives: src/a.ts:1 - extra");
+    });
   });
 });
 

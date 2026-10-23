@@ -420,13 +420,11 @@ export function formatTerminalSummary(report: FullEvalReport): string {
     if (res.error) {
       lines.push(`       Error: ${res.error}`);
     }
-    if (!res.passed) {
-      if (res.missedFindings.length > 0) {
-        lines.push(`       Missed Findings: ${res.missedFindings.join(", ")}`);
-      }
-      if (res.falsePositives.length > 0) {
-        lines.push(`       False Positives: ${res.falsePositives.join(", ")}`);
-      }
+    if (res.missedFindings.length > 0) {
+      lines.push(`       Missed Findings: ${res.missedFindings.join(", ")}`);
+    }
+    if (res.falsePositives.length > 0) {
+      lines.push(`       False Positives: ${res.falsePositives.join(", ")}`);
     }
   }
 
