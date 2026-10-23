@@ -373,7 +373,7 @@ describe("Evaluation Harness Engine", () => {
       expect(options.diffFiles[0].startsWith(options.workingDirectory)).toBe(true);
       expect(writes).toEqual([
         ...options.diffFiles,
-        options.diffFiles[0].replace(".mergementor/diffs", "diffs"),
+        options.diffFiles[0].replace(path.join(".mergementor", "diffs"), "diffs"),
       ]);
       expect(removed).toEqual([options.workingDirectory]);
     });
