@@ -7,6 +7,7 @@ import {
   Code,
   Divider,
   Group,
+  NumberInput,
   Select,
   SimpleGrid,
   Stack,
@@ -54,9 +55,11 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     input: prInput,
     write,
     strategy,
+    runs,
     setInput: setPrInput,
     setWrite,
     setStrategy,
+    setRuns,
   } = useReviewForm("pr");
   const [formError, setFormError] = useState<string | null>(null);
   const [reReview, setReReview] = useState(false);
@@ -86,6 +89,7 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     const base = {
       write,
       ...(strategy ? { strategy } : {}),
+      ...(runs ? { runs } : {}),
       ...(cacheStatus?.cached && reReview ? { reReview: true } : {}),
     };
 
@@ -156,6 +160,17 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
             value={strategy}
             onChange={(next) => setStrategy(next as ReviewStrategyInput | null)}
             clearable
+            disabled={running}
+          />
+          <NumberInput
+            label="Review runs"
+            description="Runs the review several times and merges the findings. Overrides the configured default."
+            placeholder="Use configured default"
+            min={1}
+            allowDecimal={false}
+            allowNegative={false}
+            value={runs ?? ""}
+            onChange={(next) => setRuns(typeof next === "number" ? next : null)}
             disabled={running}
           />
           {cacheStatus?.cached && (

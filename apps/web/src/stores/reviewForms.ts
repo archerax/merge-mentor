@@ -10,6 +10,7 @@ interface ReviewFormState {
   readonly input: string;
   readonly write: boolean;
   readonly strategy: ReviewStrategyInput | null;
+  readonly runs: number | null;
 }
 
 interface ReviewFormsStore {
@@ -17,9 +18,10 @@ interface ReviewFormsStore {
   setInput(key: ReviewRunnerKey, input: string): void;
   setWrite(key: ReviewRunnerKey, write: boolean): void;
   setStrategy(key: ReviewRunnerKey, strategy: ReviewStrategyInput | null): void;
+  setRuns(key: ReviewRunnerKey, runs: number | null): void;
 }
 
-const EMPTY_FORM: ReviewFormState = { input: "", write: false, strategy: null };
+const EMPTY_FORM: ReviewFormState = { input: "", write: false, strategy: null, runs: null };
 
 /**
  * Form state for the review runners, kept outside the route components.
@@ -40,6 +42,8 @@ const useReviewFormsStore = create<ReviewFormsStore>((set) => ({
     set((state) => ({ forms: { ...state.forms, [key]: { ...state.forms[key], write } } })),
   setStrategy: (key, strategy) =>
     set((state) => ({ forms: { ...state.forms, [key]: { ...state.forms[key], strategy } } })),
+  setRuns: (key, runs) =>
+    set((state) => ({ forms: { ...state.forms, [key]: { ...state.forms[key], runs } } })),
 }));
 
 /** Subscribes a runner to its persisted form state, returning bound setters. */
@@ -48,13 +52,16 @@ export function useReviewForm(key: ReviewRunnerKey) {
   const setInput = useReviewFormsStore((state) => state.setInput);
   const setWrite = useReviewFormsStore((state) => state.setWrite);
   const setStrategy = useReviewFormsStore((state) => state.setStrategy);
+  const setRuns = useReviewFormsStore((state) => state.setRuns);
 
   return {
     input: form.input,
     write: form.write,
     strategy: form.strategy,
+    runs: form.runs,
     setInput: (value: string) => setInput(key, value),
     setWrite: (value: boolean) => setWrite(key, value),
     setStrategy: (value: ReviewStrategyInput | null) => setStrategy(key, value),
+    setRuns: (value: number | null) => setRuns(key, value),
   };
 }

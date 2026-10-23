@@ -61,6 +61,8 @@ export interface ReviewStreamInput {
   readonly write?: boolean;
   /** Overrides the configured review strategy for this run. */
   readonly strategy?: ReviewStrategyInput;
+  /** Overrides the configured number of aggregated review runs for this run. */
+  readonly runs?: number;
   /** Ignore cached per-file results and review every file again. Default: `false`. */
   readonly reReview?: boolean;
 }

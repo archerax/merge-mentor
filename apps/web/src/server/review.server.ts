@@ -73,6 +73,7 @@ function resolveTarget(input: ReviewStreamInput): ReviewTarget {
     azureRepo?: string;
     tempPath?: string;
     reviewStrategy?: string;
+    reviewRuns?: number;
     passes?: string;
   } = { tempPath: resolveTempPath() };
   let pr: number;
@@ -81,6 +82,13 @@ function resolveTarget(input: ReviewStreamInput): ReviewTarget {
   if (input.strategy) {
     overrides.reviewStrategy = input.strategy;
     if (input.strategy !== "multi-agent") overrides.passes = "";
+  }
+
+  if (input.runs !== undefined) {
+    if (!Number.isInteger(input.runs) || input.runs <= 0) {
+      throw new Error("Review runs must be a positive integer.");
+    }
+    overrides.reviewRuns = input.runs;
   }
 
   if (input.prUrl) {
@@ -254,7 +262,7 @@ function createEngine(
  * Builds the run-dedupe key for a PR target.
  *
  * This is distinct from the posted-comments key: it includes the execution mode
- * (`write` and `strategy`) so a submit that changes either setting starts a new
+ * (`write`, `strategy` and `runs`) so a submit that changes any setting starts a new
  * run instead of silently attaching to an unrelated in-flight run.
  */
 function runTargetKey(target: ReviewTarget): string {
@@ -264,7 +272,7 @@ function runTargetKey(target: ReviewTarget): string {
     reviewScope(target.platform, target.config),
     target.pr
   );
-  return `${base}:write=${target.write}:strategy=${target.config.reviewStrategy}:reReview=${target.reReview}`;
+  return `${base}:write=${target.write}:strategy=${target.config.reviewStrategy}:runs=${target.config.reviewRuns}:reReview=${target.reReview}`;
 }
 
 /**

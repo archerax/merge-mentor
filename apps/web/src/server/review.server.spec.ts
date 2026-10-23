@@ -287,6 +287,23 @@ describe("review.server", () => {
       ]);
     });
 
+    it("starts a distinct run when the review runs differ", async () => {
+      const single = startPRReview({ pr: 7 });
+      const triple = startPRReview({ pr: 7, runs: 3 });
+      expect(triple.attached).toBe(false);
+      expect(triple.runId).not.toBe(single.runId);
+
+      await Promise.all([
+        collectFrames(streamRun(single.runId, 0) as ReadableStream<Uint8Array>),
+        collectFrames(streamRun(triple.runId, 0) as ReadableStream<Uint8Array>),
+      ]);
+    });
+
+    it("rejects a non-positive or fractional runs override", () => {
+      expect(() => startPRReview({ pr: 7, runs: 0 })).toThrow(/positive integer/);
+      expect(() => startPRReview({ pr: 7, runs: 1.5 })).toThrow(/positive integer/);
+    });
+
     it("starts a distinct run when the write mode differs", async () => {
       const dry = startPRReview({ pr: 7, write: false });
       const write = startPRReview({ pr: 7, write: true });
