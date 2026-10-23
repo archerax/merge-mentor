@@ -5,7 +5,7 @@
       "findings": []
     },
     {
-      "filename": "dist/bundle.js",
+      "filename": "dist/bundle.min.js",
       "findings": []
     }
   ]

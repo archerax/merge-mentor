@@ -9,9 +9,9 @@
       "deletions": 12
     },
     {
-      "filename": "dist/bundle.js",
+      "filename": "dist/bundle.min.js",
       "status": "modified",
-      "diffPath": "dist__bundle.js.diff",
+      "diffPath": "dist__bundle.min.js.diff",
       "additions": 150,
       "deletions": 120
     }

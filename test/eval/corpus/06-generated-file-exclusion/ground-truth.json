@@ -11,7 +11,7 @@
     },
     {
       "id": "forbid-02",
-      "filePath": "dist/bundle.js",
+      "filePath": "dist/bundle.min.js",
       "reason": "Compiled output in dist/ must not trigger linter or review comments."
     }
   ],

@@ -1,31 +1,28 @@
 {
   "scenarioId": "05-cross-file-breaking-change",
   "name": "Cross-File Breaking Change in User API Interface",
-  "description": "Tests if breaking type changes in shared interfaces are flagged when updating consumer services.",
+  "description": "Tests that a breaking change to a shared interface (tenantId becomes required) is flagged, including its effect on consumers such as createGuestProfile.",
   "expectedFindings": [
     {
       "id": "exp-01",
-      "filePath": "src/services/userService.ts",
-      "category": "bug|quality|architecture|design|style",
+      "filePath": "src/types/user.ts",
+      "category": "bug|quality|architecture|design",
       "minSeverity": "high",
-      "containsKeywords": ["type|contract|mismatch|required", "breaking|tenantid|userprofile"]
+      "containsKeywords": [
+        "required|breaking|contract",
+        "tenantid|userprofile",
+        "guest|userservice|existing|consumer|caller|constructor|omit"
+      ]
     }
   ],
   "forbiddenFindings": [],
   "acceptableFindings": [
     {
       "id": "ok-01",
-      "filePath": "src/types/user.ts",
-      "category": "bug|quality|architecture|design",
-      "minSeverity": "low",
-      "containsKeywords": ["tenantid|required|breaking"]
-    },
-    {
-      "id": "ok-02",
       "filePath": "src/services/userService.ts",
-      "category": "bug|quality|architecture|design|documentation",
+      "category": "bug|quality|architecture|design|security",
       "minSeverity": "low",
-      "containsKeywords": ["comment|invalid|defect|tenantid"]
+      "containsKeywords": ["createadminprofile|createguestprofile|admin|tenantid"]
     }
   ],
   "maxAllowedDuplicates": 0

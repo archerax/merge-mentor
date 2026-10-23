@@ -1,21 +1,21 @@
 {
   "fileResults": [
     {
-      "filename": "src/services/userService.ts",
+      "filename": "src/types/user.ts",
       "findings": [
         {
-          "line": 15,
+          "line": 12,
           "severity": "high",
           "confidence": "high",
           "category": "bug",
-          "message": "Potential type mismatch breaking change when constructing UserProfile",
+          "message": "Making tenantId required is a breaking change for existing UserProfile consumers such as createGuestProfile",
           "suggestion": "Update call site to include required 'tenantId' property introduced in UserProfile interface",
           "reasoning": "UserProfile interface made tenantId non-optional, but service instantiation omitted it"
         }
       ]
     },
     {
-      "filename": "src/types/user.ts",
+      "filename": "src/services/userService.ts",
       "findings": []
     }
   ]
