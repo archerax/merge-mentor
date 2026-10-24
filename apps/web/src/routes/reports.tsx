@@ -56,7 +56,21 @@ function formatBytes(bytes: number): string {
 }
 
 function ReportsPage() {
-  const { reports: loadedReports, report: initialReport } = Route.useLoaderData();
+  const { reports, report } = Route.useLoaderData();
+  // The view keeps the list and selection in local state, so a new loader result
+  // (e.g. a changed `report` search parameter) must start it afresh.
+  return (
+    <ReportsView key={report?.name ?? "none"} loadedReports={reports} initialReport={report} />
+  );
+}
+
+function ReportsView({
+  loadedReports,
+  initialReport,
+}: {
+  readonly loadedReports: readonly ReportListItem[];
+  readonly initialReport: ReportDocument | null;
+}) {
   const [reports, setReports] = useState<readonly ReportListItem[]>(loadedReports);
   const [selected, setSelected] = useState<ReportDocument | null>(initialReport);
   const [loadingName, setLoadingName] = useState<string | null>(null);

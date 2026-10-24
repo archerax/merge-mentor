@@ -133,7 +133,7 @@ describe("PrdReviewRunner", () => {
     expect(html).toContain("Include images");
     expect(html).toContain("needs a model that accepts images");
     expect(html).toContain("may take longer and cost more");
-    expect(html).toContain("Your document stays local");
+    expect(html).toContain("Stored locally; sent to your AI provider");
     expect(html).toContain(".mergementor");
     expect(html).toContain("Review document");
   });
