@@ -16,6 +16,7 @@ const { buildDocx, heading, para } =
 const { MAX_DOCX_BYTES } = await import("@merge-mentor/core/review/prd/docxValidator.js");
 const { handlePrdUpload, parseUploadOptions, readUploadBody, sanitizeUploadFileName } =
   await import("./prdReview.server.js");
+const { createAIProvider } = await import("@merge-mentor/core/ai/providerFactory.js");
 const { streamRun } = await import("./reviewRuns.server.js");
 const { PRD_UPLOAD_HEADERS } = await import("./prd.types.js");
 
@@ -132,6 +133,19 @@ describe("prdReview.server", () => {
         source: { fileName: "Checkout PRD.docx" },
       });
       expect(Buffer.compare((options.source as { buffer: Buffer }).buffer, docx)).toBe(0);
+    });
+
+    it("passes the configured AI timeout to the provider", async () => {
+      fs.appendFileSync(process.env.MM_ENV_FILE ?? "", "MM_AI_TIMEOUT=45000\n", "utf8");
+
+      const response = await handlePrdUpload(uploadRequest(new Uint8Array(docx)));
+      const { runId } = (await response.json()) as { runId: string };
+      await collectFrames(streamRun(runId, 0) as ReadableStream<Uint8Array>);
+
+      expect(createAIProvider).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ timeoutMs: 45_000 })
+      );
     });
 
     it("persists the options but never the file in the run manifest", async () => {

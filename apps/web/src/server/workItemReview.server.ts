@@ -124,6 +124,7 @@ export function createAiClient(config: Config): {
   const client = createAIProvider(aiProvider, {
     model: config.aiModel,
     token: config.copilotToken,
+    timeoutMs: config.aiTimeoutMs,
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     tempPath: config.tempPath,
