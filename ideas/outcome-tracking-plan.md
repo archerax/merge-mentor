@@ -7,11 +7,17 @@ finding was fixed, dismissed, or ignored — so it cannot measure its own value,
 detect its own false positives, or tune its thresholds. Its feedback loop is
 open.
 
-This feature closes the loop. A new `merge-mentor outcomes` command revisits
-reviewed pull requests after they are merged (or aged past a window), inspects
-what happened to each bot-initiated comment, and produces a **resolution
-report** plus a **signal file** the review engine can consume to get sharper
-over time:
+This feature closes the loop. A new top-level `merge-mentor outcomes` command
+revisits reviewed pull requests after they are **merged**, inspects what happened
+to each bot-initiated comment, and produces a **resolution report**.
+
+**MVP scope (decided):** measurement only. The goal is to let humans see the
+mentor's value. The report contains the **overall resolution rate**
+(fixed / dismissed / ignored totals). Everything below marked _Post-MVP_ is
+retained as direction but is not built in the first release. GitHub and Azure
+are both supported from day one.
+
+Longer-term the same data enables:
 
 - **Resolution rate** — how many findings were fixed, dismissed, or ignored.
 - **False-positive candidates** — finding categories/patterns repeatedly
@@ -31,16 +37,18 @@ all produce the findings this command scores.
 
 - `CommentManager` embeds a stable per-finding fingerprint in every inline
   comment — `<!-- finding-id: base64(filename:line:category) -->`
-  (`src/review/commentManager.ts`). This is the key that lets a later scan map a
+  (`libs/core/src/review/commentManager.ts`). This is the key that lets a later scan map a
   resolved/dismissed thread back to the exact finding that produced it.
 - The `PlatformAdapter` already exposes `getExistingBotComments`,
   `getUnresolvedCommentThreads`, `resolveCommentThread`, and `postCommentReply`
-  (`src/platforms/types.ts`) — enough to read thread state on a _known_ PR.
+  (`libs/domain/src/platform.ts`) — enough to read thread state on a _known_ PR.
 - There is **no API to list merged PRs** or to **fetch threads for arbitrary
   PRs** — both must be added. The repo-intelligence plan
   (`ideas/repo-intelligence-and-team-coaching-plan.md`) already specifies these
-  exact methods (`listMergedPRs`, `getReviewThreads`) and a JSON history cache;
-  outcome tracking should **share** that pipeline, not duplicate it.
+  exact methods (`listMergedPRs`, `getReviewThreads`) and a JSON history cache.
+  **Decision:** outcome tracking builds these adapter methods itself (GitHub +
+  Azure) and the intelligence plan reuses them later. Keep the method shapes
+  identical to the intelligence plan's spec so no rework is needed.
 - `ReviewStateCache` stores per-file findings per PR under
   `{tempPath}/cache/{prIdentifier}.json`; the bot identifier that distinguishes
   bot comments is configured (`botCommentIdentifier`).
@@ -65,9 +73,6 @@ merge-mentor outcomes --pr 42
 # Only PRs reviewed by this bot
 merge-mentor outcomes --since 6m --bot-identifier "[Merge Mentor]"
 
-# Emit only the self-tuning signal file (no report)
-merge-mentor outcomes --since 6m --signal-only
-
 # Output a report
 merge-mentor outcomes --since 6m --format markdown --output ./docs/mentor-outcomes.md
 ```
@@ -81,7 +86,6 @@ merge-mentor outcomes --since 6m --format markdown --output ./docs/mentor-outcom
 | `--limit <n>`                         | Maximum PR sample size                                                  |
 | `--bot-identifier`                    | Override the bot marker used to recognize bot comments                  |
 | `--min-age <days>`                    | Skip PRs merged more recently than this (default: findings need ~1 day) |
-| `--signal-only`                       | Write only `signal.json`, no report                                     |
 | `--format`                            | `markdown` or `json` report output                                      |
 | `--output <path>`                     | Report output file                                                      |
 | `--refresh`                           | Re-fetch all PRs, ignoring the shared history cache                     |
@@ -99,15 +103,24 @@ exactly one outcome:
 | `fixed`      | Thread resolved and the flagged code changed after the comment        |
 | `dismissed`  | Thread resolved without a code change (e.g. "won't fix", intentional) |
 | `ignored`    | Thread left open through merge / closed by merge with no resolution   |
-| `unresolved` | PR not yet merged; no outcome yet                                     |
 
-`fixed` vs `dismissed` is decided by diffing the flagged file between the
-reviewed SHA and the current/merged head: a diff at/around the flagged line
-means `fixed`; no diff means `dismissed`. Thread state from
+Scoping rules (decided):
+
+- **Only merged PRs are scored.** Closed-unmerged PRs are excluded entirely;
+  open PRs have no outcome yet and are skipped (no `unresolved` outcome is
+  persisted).
+
+`fixed` vs `dismissed` uses a **lines-touched check** (decided): after the
+comment, did the merged head change the flagged file within ±N lines of the
+flagged line (N configurable, small default, e.g. 5)? Yes means `fixed`; no
+means `dismissed`. This is approximate by design (no line remapping across
+commits); the report states the heuristic so rates are read accordingly. Thread state from
 `getReviewThreads` supplies resolved/active + author, and `isBot` + the
 `finding-id` marker supply the finding link.
 
 ### Metrics
+
+**MVP:** overall resolution rate only. _Post-MVP:_ the breakdowns below.
 
 - **Resolution rate** = `fixed / (fixed + dismissed + ignored)` per category,
   severity, and pass.
@@ -118,7 +131,10 @@ means `fixed`; no diff means `dismissed`. Thread state from
 
 ---
 
-## Self-Tuning Signal
+## Self-Tuning Signal (Post-MVP — deferred)
+
+_Decided: not part of the MVP. The design below is kept as a sketch only; the
+engine does not read it and `--signal-only` is not implemented._
 
 `outcomes` writes `{tempPath}/outcomes/signal.json`, a per-category/pattern
 table of accumulated evidence:
@@ -177,14 +193,13 @@ weights** at finding-aggregation time:
   (`getPRFiles` on the current head, or a `getFileAtRef`/commit-history helper).
   Whichever shape the intelligence plan lands on should be shared.
 
-### 2. `src/outcomes/` module
+### 2. `libs/core/src/outcomes/` module
 
 | File                        | Responsibility                                           |
 | --------------------------- | -------------------------------------------------------- |
 | `classifier.ts`             | Map threads → findings via `finding-id` → outcome model  |
 | `fixDetector.ts`            | `fixed` vs `dismissed` via post-review diff analysis     |
 | `metrics.ts`                | Aggregate metrics (resolution rate, recurrence, latency) |
-| `signal.ts`                 | Build/version/merge `signal.json`                        |
 | `reports/outcomesReport.ts` | Markdown/JSON report                                     |
 
 ### 3. Durable per-PR state
@@ -200,8 +215,6 @@ PRs not yet scored and the pipeline is resumable and idempotent.
 - `finding-id` decoding and thread-to-finding matching.
 - `fixed` vs `dismissed` classification given a diff and a resolved thread.
 - Metrics math (resolution rate, recurrence, median latency) on fixtures.
-- `signal.json` versioning, additive merging, and confidence-weight application
-  in the aggregator (with and without the opt-in flag).
 - Idempotency: re-running over scored PRs performs no duplicate work.
 - Privacy: no per-author data in any report output.
 - Both GitHub and Azure adapters against recorded fixtures.
@@ -217,9 +230,6 @@ PRs not yet scored and the pipeline is resumable and idempotent.
    `merge-mentor outcomes --pr <n>` and confirm the three outcomes classify
    correctly.
 4. Run `--since 6m` twice and confirm the second run is a pure cache hit.
-5. Generate `signal.json`, re-run a review with the engine opt-in flag, and
-   confirm only below-threshold, repeatedly-dismissed findings are
-   down-weighted — nothing is suppressed.
 
 ---
 
@@ -237,13 +247,31 @@ PRs not yet scored and the pipeline is resumable and idempotent.
 
 ---
 
-## Open Decisions & Dependencies
+## Decisions Log
 
-- Depends on `listMergedPRs` + `getReviewThreads` from the repo-intelligence
-  plan; the shared history-cache format must be finalized first.
-- Whether the engine reads `signal.json` automatically or behind a
-  config flag (default recommended: opt-in).
-- Whether `fixed` detection needs a full diff or can rely on a "was this
-  file/lines touched after review" check.
-- Whether `finding-id` markers should be extended with a pattern/context hash to
-  power cross-PR recurrence beyond filename+line+category.
+- Purpose: measure value via report first; self-tuning deferred.
+- Adapter methods (`listMergedPRs`, `getReviewThreads`, changed-lines lookup) are
+  built here, shaped per the intelligence plan.
+- `fixed` detection: lines-touched check within ±N lines.
+- Signal use: deferred entirely.
+- Platforms: GitHub + Azure.
+- Closed-unmerged PRs excluded.
+- CLI: top-level `outcomes` command.
+- Report content (MVP): overall resolution rate.
+
+## Open Questions
+
+- Replied-but-unresolved threads: `ignored`, or a separate `discussed` outcome?
+- GitHub "outdated" threads (flagged line changed, thread unresolved): count as
+  `fixed`?
+- Threads the bot itself resolved (re-review or `reply` command): exclude from
+  human outcomes?
+- Default for N (lines window) and `--min-age`.
+- Where the report goes by default (stdout vs `--output`), and whether `--format
+  json` is MVP.
+- Cache location/format: `{tempPath}/outcomes/` per-PR files vs the shared
+  history cache; staleness rules when a PR gets new comments.
+- Whether `finding-id` (filename:line:category) is stable enough when line
+  numbers shift between re-reviews, and whether to extend it (post-MVP
+  recurrence).
+- Rate limits / pagination cost for `--since 6m` on large repos.
