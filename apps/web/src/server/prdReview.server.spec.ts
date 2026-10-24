@@ -162,7 +162,12 @@ describe("prdReview.server", () => {
         includeImages: false,
         fileName: "Checkout PRD.docx",
         sizeBytes: docx.length,
+        prdRunId: expect.stringMatching(/^web-\d{14}-[0-9a-f]{8}$/),
       });
+      expect(runPrdReview).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: manifest.input.prdRunId }),
+        expect.anything()
+      );
     });
 
     it("rejects an oversized body from Content-Length with 413 before reading it", async () => {

@@ -31,6 +31,12 @@ export interface PrdReviewRunInput {
   readonly fileName: string;
   /** Size of the uploaded file in bytes. */
   readonly sizeBytes: number;
+  /**
+   * Id of the PRD run the review will write under `prd/` and `reports/`,
+   * assigned before execution starts so deleting the report can find this
+   * run's stream log even if the server crashed before the summary was saved.
+   */
+  readonly prdRunId?: string;
 }
 
 /** Final summary of a completed PRD / FRD review. */

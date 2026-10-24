@@ -102,6 +102,28 @@ describe("reports.server", () => {
       }
     });
 
+    it("finds the stream log through the manifest when no summary was saved", async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mm-prd-delete-"));
+      process.env.MM_TEMP_PATH = tempDir;
+      try {
+        writeManifest(tempDir, {
+          kind: "prd",
+          targetKey: "t",
+          input: { prdRunId: "web-20261023120000-aabbccdd" },
+          label: "l",
+          status: "running",
+          runId: "web-run-crashed",
+          createdAt: 1,
+        });
+
+        await removePrdRun("web-20261023120000-aabbccdd");
+
+        expect(fs.existsSync(path.join(tempDir, "runs", "web-run-crashed"))).toBe(false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     it.each([
       "../reports",
       "..",

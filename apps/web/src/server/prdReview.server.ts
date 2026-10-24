@@ -12,7 +12,7 @@
  *   which only lets this path accept a raw `application/octet-stream` body.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 
 import { type Config, loadConfig } from "@merge-mentor/config/config.js";
@@ -180,6 +180,7 @@ function startPrdReview(upload: PrdUpload): { runId: string; attached: boolean }
     includeImages: upload.includeImages,
     fileName,
     sizeBytes: upload.buffer.length,
+    prdRunId: `web-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`,
   };
 
   return startOrAttach({
@@ -187,7 +188,8 @@ function startPrdReview(upload: PrdUpload): { runId: string; attached: boolean }
     targetKey: `prd:${upload.documentType}:${digest}:images=${upload.includeImages}`,
     label: `${DOCUMENT_TYPE_LABELS[upload.documentType]} · ${fileName}`,
     input,
-    execute: (emitter) => executePrdReview({ ...upload, fileName }, config, emitter),
+    execute: (emitter) =>
+      executePrdReview({ ...upload, fileName }, config, emitter, input.prdRunId),
   });
 }
 
@@ -195,7 +197,8 @@ function startPrdReview(upload: PrdUpload): { runId: string; attached: boolean }
 async function executePrdReview(
   upload: PrdUpload,
   config: Config,
-  emit: SseEmitter
+  emit: SseEmitter,
+  prdRunId?: string
 ): Promise<void> {
   initLogger(config.tempPath);
   emit.send({
@@ -209,6 +212,7 @@ async function executePrdReview(
       source: { buffer: upload.buffer, fileName: upload.fileName },
       documentType: upload.documentType,
       includeImages: upload.includeImages,
+      runId: prdRunId,
       tempPath: config.tempPath,
       aiProvider,
       aiModel: config.aiModel,

@@ -71,8 +71,13 @@ export async function removePrdRun(runId: unknown): Promise<void> {
     tempPath,
     (manifest, summary) =>
       manifest.kind === "prd" &&
-      typeof summary === "object" &&
-      summary !== null &&
-      (summary as { prdRunId?: unknown }).prdRunId === runId
+      (recordedPrdRunId(manifest.input) === runId || recordedPrdRunId(summary) === runId)
   );
+}
+
+/** Reads the `prdRunId` a run recorded in its manifest input or final summary. */
+function recordedPrdRunId(value: unknown): unknown {
+  return typeof value === "object" && value !== null
+    ? (value as { prdRunId?: unknown }).prdRunId
+    : undefined;
 }
