@@ -153,6 +153,40 @@ describe("DocumentTextIndex", () => {
     expect(context.length).toBe(1_503);
     expect(context.endsWith("...")).toBe(true);
   });
+
+  it("windows a long context around the quote with truncation marks at both ends", () => {
+    const text = `${"alpha ".repeat(500)}The checkout must load within 2 seconds. ${"omega ".repeat(500)}`;
+    const long: DocxDocument = {
+      sections: [
+        {
+          id: "s0",
+          title: "",
+          level: 0,
+          headingPath: [],
+          parentId: null,
+          childIds: [],
+          headingParagraphId: null,
+          blocks: [
+            { kind: "paragraph", paragraph: { id: "p1", text, commentIds: [], imageIds: [] } },
+          ],
+        },
+      ],
+      comments: [],
+      images: [],
+      hasHeadings: false,
+      warnings: [],
+    };
+    const index = new DocumentTextIndex(long);
+    const context = index.context("s0", "p1", "the CHECKOUT must load within 2 seconds");
+    expect(context.startsWith("[s0]\n...")).toBe(true);
+    expect(context.endsWith("...")).toBe(true);
+    expect(context).toContain("The checkout must load within 2 seconds.");
+    expect(context.length).toBeLessThanOrEqual(1_510);
+    // Without a locatable quote the start of the text is kept, as before.
+    expect(
+      index.context("s0", "p1", "not in the document at all").startsWith("[s0]\n[p1] alpha")
+    ).toBe(true);
+  });
 });
 
 describe("checkQuotes", () => {

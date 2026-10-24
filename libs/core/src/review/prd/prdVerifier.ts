@@ -234,24 +234,82 @@ export class DocumentTextIndex {
 
   /**
    * Document text around a paragraph (the paragraph and its neighbours in the
-   * same section), rendered with paragraph ids and capped in length.
+   * same section), rendered with paragraph ids and capped in length. When the
+   * text is too long and the `quote` can be found in it, the cap keeps a window
+   * around the quote (marking truncation at either end) instead of the start.
    */
-  context(sectionId: string, paragraphId: string | undefined): string {
+  context(sectionId: string, paragraphId: string | undefined, quote?: string): string {
     const entry = this.sections.get(sectionId);
     if (!entry) return "";
     const index = Math.max(
       0,
       entry.paragraphs.findIndex((paragraph) => paragraph.id === paragraphId)
     );
-    const lines = entry.paragraphs
-      .slice(Math.max(0, index - 1), index + 2)
-      .map((paragraph) => `[${paragraph.id}] ${paragraph.text}`);
     const heading = entry.section.headingPath.join(" > ");
-    const text = [heading ? `Section: ${heading} [${sectionId}]` : `[${sectionId}]`, ...lines].join(
-      "\n"
+    const header = heading ? `Section: ${heading} [${sectionId}]` : `[${sectionId}]`;
+    const paragraphs = entry.paragraphs.slice(Math.max(0, index - 1), index + 2);
+    const text = [
+      header,
+      ...paragraphs.map((paragraph) => `[${paragraph.id}] ${paragraph.text}`),
+    ].join("\n");
+    if (text.length <= MAX_CONTEXT_CHARS) return text;
+    const span = quote === undefined ? undefined : locateQuoteSpan(header, paragraphs, quote);
+    if (span === undefined) return `${text.slice(0, MAX_CONTEXT_CHARS)}...`;
+    // Keep the header, then a window of the body around the quote.
+    const body = text.slice(header.length);
+    const budget = MAX_CONTEXT_CHARS - header.length - 6;
+    const quoteStart = span.start - header.length;
+    const quoteLength = Math.min(span.end - span.start, budget);
+    const from = Math.max(
+      0,
+      Math.min(quoteStart - Math.floor((budget - quoteLength) / 2), body.length - budget)
     );
-    return text.length > MAX_CONTEXT_CHARS ? `${text.slice(0, MAX_CONTEXT_CHARS)}...` : text;
+    const to = Math.min(body.length, from + budget);
+    return `${header}${from > 0 ? "\n..." : ""}${body.slice(from, to)}${to < body.length ? "..." : ""}`;
   }
+}
+
+/**
+ * Offsets of a quote within the rendered context text (header line followed by
+ * one `[id] text` line per paragraph), or undefined when it is not found.
+ */
+function locateQuoteSpan(
+  header: string,
+  paragraphs: readonly IndexedParagraph[],
+  quote: string
+): { start: number; end: number } | undefined {
+  const segments = quoteSegments(quote);
+  if (segments.length === 0) return undefined;
+  let lineStart = header.length + 1;
+  for (const paragraph of paragraphs) {
+    const prefix = `[${paragraph.id}] `;
+    const normalised = normaliseForQuoteMatch(paragraph.text);
+    const first = findSegments(normalised, segments);
+    if (first !== undefined) {
+      const last = segments[segments.length - 1] ?? "";
+      const lastAt = normalised.lastIndexOf(last);
+      const start = lineStart + prefix.length + rawOffset(paragraph.text, first);
+      const end =
+        lineStart +
+        prefix.length +
+        rawOffset(paragraph.text, Math.max(first, lastAt) + last.length);
+      return { start: start - 1, end };
+    }
+    lineStart += prefix.length + paragraph.text.length + 1;
+  }
+  return undefined;
+}
+
+/** Offset in `raw` whose normalised prefix is `normalisedOffset` characters long. */
+function rawOffset(raw: string, normalisedOffset: number): number {
+  let low = 0;
+  let high = raw.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (normaliseForQuoteMatch(raw.slice(0, mid)).length < normalisedOffset) low = mid + 1;
+    else high = mid;
+  }
+  return low;
 }
 
 function collectParagraphs(blocks: readonly DocxBlock[], into: IndexedParagraph[]): void {
@@ -500,7 +558,7 @@ export class PrdVerifier {
         quote: finding.quote,
         problem: finding.problem,
         suggestion: finding.suggestion,
-        context: index.context(finding.sectionId, finding.paragraphId),
+        context: index.context(finding.sectionId, finding.paragraphId, finding.quote),
         ...(finding.imageId
           ? {
               image: {
