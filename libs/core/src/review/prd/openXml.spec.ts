@@ -47,6 +47,24 @@ describe("extractCommentAnchors", () => {
     expect(extractCommentAnchors(xml).get("1")).toBe(`a & b <c> "d" 'e' AB &#xFFFFFFF;`);
   });
 
+  it("does not read markup inside XML comments, processing instructions or CDATA", () => {
+    const xml =
+      `<w:p><!-- <w:commentRangeStart w:id="9"/><w:r><w:t>forged</w:t></w:r><w:commentRangeEnd w:id="9"/> -->` +
+      `<?x <w:commentRangeStart w:id="8"/> ?>` +
+      `<w:commentRangeStart w:id="1"/><w:r><w:t>real ` +
+      `<!-- <w:commentRangeEnd w:id="1"/> hidden -->` +
+      `<![CDATA[<w:commentRangeEnd w:id="1"/> & kept]]>` +
+      ` text</w:t></w:r><w:commentRangeEnd w:id="1"/></w:p>`;
+    const anchors = extractCommentAnchors(xml);
+    expect([...anchors.keys()]).toEqual(["1"]);
+    expect(anchors.get("1")).toBe('real <w:commentRangeEnd w:id="1"/> & kept text');
+  });
+
+  it("swallows an unterminated comment instead of reading its contents as markup", () => {
+    const xml = `<w:p><w:commentRangeStart w:id="1"/>${t("a")}<!-- <w:commentRangeEnd w:id="1"/>${t("b")}`;
+    expect(extractCommentAnchors(xml).get("1")).toBe("a");
+  });
+
   it("omits empty ranges and ignores markers without ids", () => {
     const xml = `<w:p><w:commentRangeStart w:id="1"/><w:commentRangeEnd w:id="1"/><w:commentRangeStart/>${t("x")}</w:p>`;
     expect(extractCommentAnchors(xml).size).toBe(0);

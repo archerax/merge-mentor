@@ -18,7 +18,13 @@ const DEFAULT_MAIN_DOCUMENT_PATH = "word/document.xml";
 /** Elements whose text is not part of the accepted view of the document. */
 const SKIPPED_ELEMENTS = new Set(["w:del", "w:moveFrom", "mc:Fallback"]);
 
-const TOKEN_PATTERN = /<(\/?)([A-Za-z_][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
+/**
+ * Tokens, in order: comments and processing instructions (skipped whole, an
+ * unterminated one swallows the rest as an XML parser would reject it), CDATA
+ * (literal text, never markup), tags, and plain text.
+ */
+const TOKEN_PATTERN =
+  /<!--[\s\S]*?(?:-->|$)|<\?[\s\S]*?(?:\?>|$)|<!\[CDATA\[([\s\S]*?)(?:\]\]>|$)|<(\/?)([A-Za-z_][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
 const ID_ATTRIBUTE = /\bw:id\s*=\s*["']([^"']*)["']/;
 
 const OFFICE_DOCUMENT_REL = /<Relationship\b[^>]*\bType\s*=\s*["'][^"']*\/officeDocument["'][^>]*>/;
@@ -63,13 +69,18 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
   };
 
   for (const match of documentXml.matchAll(TOKEN_PATTERN)) {
-    const [, closing, name, attributes = "", selfClosing, text] = match;
+    const [whole, cdata, closing, name, attributes = "", selfClosing, text] = match;
+    if (cdata !== undefined) {
+      if (inText && skipDepth === 0 && open.size > 0) append(cdata);
+      continue;
+    }
     if (text !== undefined) {
       if (inText && skipDepth === 0 && open.size > 0) {
         append(decodeXmlEntities(text));
       }
       continue;
     }
+    if (whole.startsWith("<!--") || whole.startsWith("<?")) continue;
     if (name === undefined) continue;
 
     if (name === "w:commentRangeStart" || name === "w:commentRangeEnd") {
