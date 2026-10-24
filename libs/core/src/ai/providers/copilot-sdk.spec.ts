@@ -99,6 +99,13 @@ function createProviderWithInvalidByok(): CopilotSdkProvider {
   } satisfies AIProviderOptions);
 }
 
+/** Contents of every Copilot SDK transcript written so far. */
+const writtenTranscripts = () =>
+  vi
+    .mocked(nodeFs.writeFile)
+    .mock.calls.map(([, content]) => content as string)
+    .filter((content) => content.includes("COPILOT SDK PROVIDER TRANSCRIPT"));
+
 describe("CopilotSdkProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -288,27 +295,22 @@ describe("CopilotSdkProvider", () => {
 
     it("records attached image files in the transcript for success and failure saves", async () => {
       const imageFiles = [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }];
-      const transcripts = () =>
-        vi
-          .mocked(nodeFs.writeFile)
-          .mock.calls.map(([, content]) => content as string)
-          .filter((content) => content.includes("COPILOT SDK PROVIDER TRANSCRIPT"));
 
       const provider = createProvider();
       mockSuccessfulPrompt({ findings: [] });
       const ok = provider.executePrompt("Review these images", { imageFiles });
       await vi.runAllTimersAsync();
       await ok;
-      expect(transcripts().at(-1)).toContain("Image attachments: 1 file(s)");
-      expect(transcripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
+      expect(writtenTranscripts().at(-1)).toContain("Image attachments: 1 file(s)");
+      expect(writtenTranscripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
 
       const failing = createProvider(1, 5000);
       mockSession.sendAndWait.mockRejectedValue(new Error("SDK error"));
       const failed = failing.executePrompt("Review these images", { imageFiles }).catch(() => {});
       await vi.runAllTimersAsync();
       await failed;
-      expect(transcripts().at(-1)).toContain("Status: failure");
-      expect(transcripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
+      expect(writtenTranscripts().at(-1)).toContain("Status: failure");
+      expect(writtenTranscripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
     });
 
     it("writes the transcript to the per-request transcript directory when given", async () => {
