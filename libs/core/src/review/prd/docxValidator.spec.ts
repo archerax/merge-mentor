@@ -49,7 +49,8 @@ describe("validateDocxBuffer", () => {
 
   it("rejects a corrupt central directory", async () => {
     const buffer = Buffer.from(await buildDocx({ body: para("Hello") }));
-    buffer.writeUInt32LE(4, eocdOffset(buffer) + 16);
+    // Directory declared to end after the end record (JSZip also refuses this).
+    buffer.writeUInt32LE(buffer.length, eocdOffset(buffer) + 16);
     expect(() => validateDocxBuffer(buffer)).toThrow(/corrupt central directory/);
   });
 
