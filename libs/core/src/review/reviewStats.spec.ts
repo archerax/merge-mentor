@@ -58,6 +58,17 @@ describe("collectLiveReviewStats", () => {
     expect(stats.reviewedPullRequests.map((p) => p.number)).toEqual([1, 2]);
   });
 
+  it("throws when comments cannot be read on any PR", async () => {
+    const adapter = createAdapter([pull(1), pull(2)], {
+      1: new Error("Bad credentials"),
+      2: new Error("Bad credentials"),
+    });
+
+    await expect(collectLiveReviewStats(adapter, { limit: 10 })).rejects.toThrow(
+      /any of the 2 PRs: Bad credentials/
+    );
+  });
+
   it("excludes PRs whose comments cannot be fetched and reports them", async () => {
     const adapter = createAdapter([pull(1), pull(2)], {
       1: new Error("boom"),
@@ -70,14 +81,20 @@ describe("collectLiveReviewStats", () => {
     expect(stats.prsReviewed).toBe(1);
   });
 
-  it("flags truncation when the limit is reached and forwards the window", async () => {
-    const adapter = createAdapter([pull(1), pull(2)], {});
+  it("flags truncation only when more PRs exist than the limit", async () => {
     const since = new Date("2026-01-01T00:00:00Z");
+    const adapter = createAdapter([pull(3), pull(2), pull(1)], {});
 
-    const stats = await collectLiveReviewStats(adapter, { limit: 2, since, concurrency: 1 });
+    const truncated = await collectLiveReviewStats(adapter, { limit: 2, since, concurrency: 1 });
+    expect(truncated.truncated).toBe(true);
+    expect(truncated.prsScanned).toBe(2);
+    expect(adapter.listPullRequests).toHaveBeenCalledWith({ since, limit: 3 });
 
-    expect(stats.truncated).toBe(true);
-    expect(adapter.listPullRequests).toHaveBeenCalledWith({ since, limit: 2 });
+    const exact = await collectLiveReviewStats(createAdapter([pull(2), pull(1)], {}), {
+      limit: 2,
+    });
+    expect(exact.truncated).toBe(false);
+    expect(exact.prsScanned).toBe(2);
   });
 
   it("handles a repository with no PRs", async () => {

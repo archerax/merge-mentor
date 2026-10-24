@@ -56,6 +56,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 - **[prd](./prd.md)**: Reviews a PRD or FRD Word document (`.docx`) for gaps, ambiguity and testability before development starts.
 - **[plan](./plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.
+- **[stats](./stats.md)**: Reports how many PRs Merge Mentor has reviewed and how many comments it has posted, queried live from your repository.
 - **[ui](./ui.md)**: Launches the local web dashboard for interactive reviews.
 
 ---

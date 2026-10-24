@@ -1,5 +1,3 @@
-import type { PlatformAdapter, PullRequestLister } from "@merge-mentor/domain/platform.js";
-
 /**
  * Live review statistics gathered from a platform's real pull requests.
  *
@@ -8,6 +6,8 @@ import type { PlatformAdapter, PullRequestLister } from "@merge-mentor/domain/pl
  * bot account). Azure DevOps counts the comment threads Merge Mentor started;
  * replies inside a thread are not counted.
  */
+
+import type { PlatformAdapter, PullRequestLister } from "@merge-mentor/domain/platform.js";
 
 /** Per-PR review activity. */
 interface PullRequestReviewStats {
@@ -66,13 +66,17 @@ export async function collectLiveReviewStats(
   adapter: PlatformAdapter & PullRequestLister,
   options: CollectLiveReviewStatsOptions
 ): Promise<LiveReviewStats> {
-  const pulls = await adapter.listPullRequests({ since: options.since, limit: options.limit });
+  // Ask for one extra PR so hitting the limit exactly is not mistaken for truncation.
+  const listed = await adapter.listPullRequests({ since: options.since, limit: options.limit + 1 });
+  const truncated = listed.length > options.limit;
+  const pulls = listed.slice(0, options.limit);
   const concurrency = Math.max(1, options.concurrency ?? DEFAULT_CONCURRENCY);
 
   const results: (PullRequestReviewStats | "failed" | undefined)[] = Array.from({
     length: pulls.length,
   });
   let next = 0;
+  let firstError: unknown;
 
   const worker = async (): Promise<void> => {
     while (next < pulls.length) {
@@ -92,12 +96,21 @@ export async function collectLiveReviewStats(
                 inlineComments,
                 generalComments: comments.length - inlineComments,
               };
-      } catch {
+      } catch (error) {
+        firstError ??= error;
         results[index] = "failed";
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, pulls.length) }, worker));
+
+  const prsFailed = results.filter((result) => result === "failed").length;
+  if (pulls.length > 0 && prsFailed === pulls.length) {
+    // Every fetch failed (expired token, outage, rate limit): not a repository without reviews.
+    throw new Error(
+      `Could not read comments on any of the ${pulls.length} PRs: ${(firstError as Error)?.message ?? "unknown error"}`
+    );
+  }
 
   const reviewed = results.filter(
     (result): result is PullRequestReviewStats => result !== undefined && result !== "failed"
@@ -113,8 +126,8 @@ export async function collectLiveReviewStats(
     totalComments: inlineComments + generalComments,
     inlineComments,
     generalComments,
-    prsFailed: results.filter((result) => result === "failed").length,
-    truncated: pulls.length >= options.limit,
+    prsFailed,
+    truncated,
     reviewedPullRequests: reviewed,
   };
 }

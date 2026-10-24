@@ -290,18 +290,22 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
   async listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]> {
     const sinceMs = options.since?.getTime();
     const pulls: PullRequestSummary[] = [];
+    if (options.limit <= 0) return pulls;
 
-    const iterator = this.octokit.paginate.iterator(this.octokit.pulls.list, {
-      owner: this.owner,
-      repo: this.repo,
-      state: "all",
-      sort: "updated",
-      direction: "desc",
-      per_page: DEFAULT_PAGE_SIZE,
-    });
+    for (let page = 1; ; page += 1) {
+      const { data } = await withRateLimitHandling(() =>
+        this.octokit.pulls.list({
+          owner: this.owner,
+          repo: this.repo,
+          state: "all",
+          sort: "updated",
+          direction: "desc",
+          per_page: DEFAULT_PAGE_SIZE,
+          page,
+        })
+      );
 
-    for await (const page of iterator) {
-      for (const pr of page.data) {
+      for (const pr of data) {
         if (sinceMs !== undefined && Date.parse(pr.updated_at) < sinceMs) return pulls;
         pulls.push({
           number: pr.number,
@@ -311,8 +315,8 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
         });
         if (pulls.length >= options.limit) return pulls;
       }
+      if (data.length < DEFAULT_PAGE_SIZE) return pulls;
     }
-    return pulls;
   }
 
   /**

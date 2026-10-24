@@ -5,7 +5,7 @@ title: Stats Command
 
 # `stats` Command
 
-The `stats` command reports how many pull requests Merge Mentor has reviewed and how many comments it has posted. By default it queries the **real PRs** in your GitHub or Azure DevOps repository, so it reflects what is actually on the platform (including reviews run by CI or by teammates). The same live numbers appear on the **Stats** page of the [web dashboard](./ui.md), with a 7/30/90-day window selector.
+The `stats` command reports how many pull requests Merge Mentor has reviewed and how many comments it has posted. By default it queries the **real PRs** in your GitHub or Azure DevOps repository, so it reflects what is actually on the platform (including reviews run by CI; on GitHub a comment must come from a `[bot]` account or the token's own account to count). The same live numbers appear on the **Stats** page of the [web dashboard](./ui.md), with a 7/30/90-day window selector.
 
 ## Usage
 
@@ -29,19 +29,20 @@ The token needs the same read access as `review` (comments and pull requests).
 
 ## Options
 
-| Option                        | Description                                                           | Env Variable           | Default  |
-| ----------------------------- | --------------------------------------------------------------------- | ---------------------- | -------- |
-| `--since <date\|Nd>`          | Only count PRs/activity since a date (`2026-01-31`) or window (`30d`) | -                      | `30d`    |
-| `--limit <number>`            | Maximum number of PRs to inspect                                      | -                      | `100`    |
-| `--json`                      | Output statistics as JSON                                             | -                      | `false`  |
-| `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `github` |
-| `--github-token <token>`      | GitHub personal access token                                          | `MM_GITHUB_TOKEN`      | -        |
-| `--github-repo-owner <owner>` | GitHub repository owner                                               | `MM_GITHUB_REPO_OWNER` | -        |
-| `--github-repo-name <name>`   | GitHub repository name                                                | `MM_GITHUB_REPO_NAME`  | -        |
-| `--azure-token <token>`       | Azure DevOps personal access token                                    | `MM_AZURE_TOKEN`       | -        |
-| `--azure-org <org>`           | Azure DevOps organization                                             | `MM_AZURE_ORG`         | -        |
-| `--azure-project <project>`   | Azure DevOps project                                                  | `MM_AZURE_PROJECT`     | -        |
-| `--azure-repo <repo>`         | Azure DevOps repository                                               | `MM_AZURE_REPO`        | -        |
+| Option                        | Description                                                           | Env Variable           | Default          |
+| ----------------------------- | --------------------------------------------------------------------- | ---------------------- | ---------------- |
+| `--since <date\|Nd>`          | Only count PRs/activity since a date (`2026-01-31`) or window (`30d`) | -                      | `30d`            |
+| `--limit <number>`            | Maximum number of PRs to inspect                                      | -                      | `100`            |
+| `--temp-path <path>`          | Base path for temporary files, including audit `logs`                 | `MM_TEMP_PATH`         | `./.mergementor` |
+| `--json`                      | Output statistics as JSON                                             | -                      | `false`          |
+| `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `github`         |
+| `--github-token <token>`      | GitHub personal access token                                          | `MM_GITHUB_TOKEN`      | -                |
+| `--github-repo-owner <owner>` | GitHub repository owner                                               | `MM_GITHUB_REPO_OWNER` | -                |
+| `--github-repo-name <name>`   | GitHub repository name                                                | `MM_GITHUB_REPO_NAME`  | -                |
+| `--azure-token <token>`       | Azure DevOps personal access token                                    | `MM_AZURE_TOKEN`       | -                |
+| `--azure-org <org>`           | Azure DevOps organization                                             | `MM_AZURE_ORG`         | -                |
+| `--azure-project <project>`   | Azure DevOps project                                                  | `MM_AZURE_PROJECT`     | -                |
+| `--azure-repo <repo>`         | Azure DevOps repository                                               | `MM_AZURE_REPO`        | -                |
 
 ## What is counted
 

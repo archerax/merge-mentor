@@ -139,7 +139,6 @@ export interface CrossFileReviewResult {
   readonly recommendations: readonly string[];
 }
 
-/** An existing bot comment on a PR. */
 /** Lightweight PR listing entry used for repository-wide statistics. */
 export interface PullRequestSummary {
   readonly number: number;
@@ -152,7 +151,11 @@ export interface PullRequestSummary {
 
 /** Options for {@link PullRequestLister.listPullRequests}. */
 export interface ListPullRequestsOptions {
-  /** Only return PRs with activity at or after this instant. */
+  /**
+   * Only return PRs from this instant on. GitHub filters by last update; Azure DevOps can
+   * only filter by creation date, so a PR created before `since` is not listed there even
+   * if it was reviewed afterwards.
+   */
   readonly since?: Date;
   /** Maximum number of PRs to return. */
   readonly limit: number;
@@ -170,6 +173,7 @@ export interface PullRequestLister {
   listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]>;
 }
 
+/** An existing bot comment on a PR. */
 export interface ExistingComment {
   /** Platform comment identifier. */
   readonly id: number | string;

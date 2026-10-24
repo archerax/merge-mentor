@@ -601,7 +601,7 @@ program
   .option(
     "--since <date|Nd>",
     "Only inspect PRs active since a date (2026-01-31) or window (30d). Default: 30d",
-    parseSince
+    (value: string) => parseSince(value)
   )
   .option(
     "--limit <number>",
@@ -610,6 +610,10 @@ program
   )
   .option("--json", "Output statistics as JSON", false)
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
   .optionsGroup("GitHub Configuration")
   .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
   .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")

@@ -1,6 +1,5 @@
 import {
   Alert,
-  Anchor,
   Code,
   Paper,
   SegmentedControl,
@@ -9,7 +8,7 @@ import {
   Table,
   Text,
 } from "@mantine/core";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { PageHeader } from "../components/PageHeader.js";
 import { getLiveStats } from "../server/stats.functions.js";
@@ -22,6 +21,8 @@ export const Route = createFileRoute("/stats")({
     days: WINDOWS.find((days) => days === Number(search.days)) ?? DEFAULT_DAYS,
   }),
   loaderDeps: ({ search }) => ({ days: search.days }),
+  staleTime: 60_000,
+  preloadStaleTime: 60_000,
   loader: ({ deps }) => getLiveStats({ data: { days: deps.days } }),
   component: StatsPage,
 });
@@ -70,8 +71,8 @@ function StatsPage() {
 
       {!result.ok ? (
         <Alert title="Could not load live stats" color="red">
-          {result.error} Check the <Anchor href="/config">configuration</Anchor> for the platform
-          token and repository.
+          {result.error} Check the <Link to="/config">configuration</Link> for the platform token
+          and repository.
         </Alert>
       ) : (
         <LiveStats stats={result.stats} days={days} />

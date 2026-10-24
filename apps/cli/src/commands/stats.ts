@@ -6,6 +6,7 @@ import {
 import type { Platform } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
+import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { InvalidArgumentError } from "commander";
 
@@ -17,6 +18,7 @@ export interface StatsOptions {
   /** Maximum number of PRs to inspect. */
   readonly limit?: number;
   readonly json?: boolean;
+  readonly tempPath?: string;
   readonly platform?: string;
   readonly githubToken?: string;
   readonly githubRepoOwner?: string;
@@ -57,7 +59,10 @@ export function parseLimit(value: string): number {
  */
 export function parseSince(value: string, now: Date = new Date()): Date {
   const relative = /^(\d+)d$/.exec(value.trim());
-  if (relative) return new Date(now.getTime() - Number(relative[1]) * MS_PER_DAY);
+  if (relative) {
+    const windowStart = new Date(now.getTime() - Number(relative[1]) * MS_PER_DAY);
+    if (!Number.isNaN(windowStart.getTime())) return windowStart;
+  }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -82,12 +87,14 @@ export async function executeStatsCommand(options: StatsOptions): Promise<void> 
     azureOrg: options.azureOrg,
     azureProject: options.azureProject,
     azureRepo: options.azureRepo,
+    tempPath: options.tempPath,
   });
   const platform = (options.platform ?? config.defaultPlatform) as Platform;
   if (platform !== "github" && platform !== "azure") {
     throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
   }
   validateConfig(config, platform);
+  initLogger(config.tempPath);
 
   const adapter =
     platform === "github" ? new GitHubAdapter(config) : new AzureDevOpsAdapter(config);
