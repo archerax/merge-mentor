@@ -692,17 +692,26 @@ describe("AzureDevOpsAdapter", () => {
           number: 4,
           title: "Done",
           state: "closed",
-          updatedAt: new Date("2026-03-04").toISOString(),
+          updatedAt: new Date("2026-03-01").toISOString(),
         },
       ]);
       expect(mockGitApiInstance.getPullRequests).toHaveBeenCalledWith(
-        expect.any(String),
+        "test-repo",
         { status: 4, minTime: new Date("2026-02-01"), queryTimeRangeType: 1 },
-        expect.any(String),
+        "test-project",
         undefined,
         0,
         50
       );
+    });
+
+    it("returns nothing for a non-positive limit without calling the API", async () => {
+      const result = await new AzureDevOpsAdapter(createTestConfig()).listPullRequests({
+        limit: 0,
+      });
+
+      expect(result).toEqual([]);
+      expect(mockGitApiInstance.getPullRequests).not.toHaveBeenCalled();
     });
 
     it("returns an empty list when the API returns nothing", async () => {

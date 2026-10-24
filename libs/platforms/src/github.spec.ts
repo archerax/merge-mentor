@@ -1,5 +1,6 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
+import { DEFAULT_PAGE_SIZE } from "@merge-mentor/shared/constants.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GitHubAdapter } from "./github.js";
@@ -84,7 +85,9 @@ const pr = (number: number, state: "open" | "closed", updatedAt: string) => ({
 });
 
 const fullPage = (firstNumber: number) =>
-  Array.from({ length: 100 }, (_, i) => pr(firstNumber - i, "open", "2026-03-01T00:00:00Z"));
+  Array.from({ length: DEFAULT_PAGE_SIZE }, (_, i) =>
+    pr(firstNumber - i, "open", "2026-03-01T00:00:00Z")
+  );
 
 describe("GitHubAdapter", () => {
   beforeEach(() => {
@@ -322,6 +325,18 @@ describe("GitHubAdapter", () => {
       const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 102 });
 
       expect(result).toHaveLength(102);
+    });
+
+    it("skips a PR repeated across pages when it was updated between requests", async () => {
+      const first = fullPage(150);
+      list.mockResolvedValueOnce({ data: first }).mockResolvedValueOnce({
+        data: [first.at(-1), pr(50, "closed", "2026-02-01T00:00:00Z")],
+      });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 500 });
+
+      expect(result).toHaveLength(DEFAULT_PAGE_SIZE + 1);
+      expect(new Set(result.map((p) => p.number)).size).toBe(result.length);
     });
 
     it("returns nothing for a non-positive limit", async () => {

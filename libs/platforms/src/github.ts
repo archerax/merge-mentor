@@ -291,6 +291,8 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
     const sinceMs = options.since?.getTime();
     const pulls: PullRequestSummary[] = [];
     if (options.limit <= 0) return pulls;
+    // Offset paging over a mutable sort key can repeat a PR that was updated between requests.
+    const seen = new Set<number>();
 
     for (let page = 1; ; page += 1) {
       const { data } = await withRateLimitHandling(() =>
@@ -307,6 +309,8 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
 
       for (const pr of data) {
         if (sinceMs !== undefined && Date.parse(pr.updated_at) < sinceMs) return pulls;
+        if (seen.has(pr.number)) continue;
+        seen.add(pr.number);
         pulls.push({
           number: pr.number,
           title: pr.title,

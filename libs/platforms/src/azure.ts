@@ -725,6 +725,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
    * @returns PR summaries
    */
   async listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]> {
+    if (options.limit <= 0) return [];
+
     const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
     const pulls = await withRateLimitHandling(() =>
       gitApi.getPullRequests(
@@ -753,7 +755,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
                 pr.status === AzurePullRequestStatus.ACTIVE
                   ? ("open" as const)
                   : ("closed" as const),
-              updatedAt: (pr.closedDate ?? pr.creationDate ?? new Date(0)).toISOString(),
+              // Azure has no update time, so this is the creation date (see PullRequestSummary).
+              updatedAt: (pr.creationDate ?? new Date(0)).toISOString(),
             },
           ]
     );
