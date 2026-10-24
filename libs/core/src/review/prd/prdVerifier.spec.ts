@@ -255,6 +255,29 @@ function imageCandidate(overrides: Partial<PrdCandidateFinding>): PrdCandidateFi
 }
 
 describe("checkQuotes for image findings", () => {
+  it("keeps the most severe of duplicate image findings, whichever comes first", async () => {
+    const withImage = await parseDocx(
+      await buildDocx({
+        body: [heading(1, "Flow"), paraXml(imageRun("rIdImg1", "Payment flow"))].join(""),
+        images: [{ relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG }],
+      })
+    );
+    const index = new DocumentTextIndex(withImage);
+
+    const result = checkQuotes(
+      index,
+      [
+        imageCandidate({ severity: "Minor", problem: "No legend." }),
+        imageCandidate({ severity: "Blocker", problem: "No legend." }),
+        imageCandidate({ severity: "Major", problem: "No legend." }),
+      ],
+      "prd"
+    );
+
+    expect(result.droppedDuplicate).toBe(2);
+    expect(result.findings.map((f) => f.severity)).toEqual(["Blocker"]);
+  });
+
   it("grounds image findings by image id and section, clearing quotes it cannot find", async () => {
     const withImage = await parseDocx(
       await buildDocx({
@@ -375,6 +398,20 @@ describe("PrdVerifier", () => {
     expect(result.findings.map((f) => f.quote)).toEqual(['Checkout must be "fast"']);
     expect(result.stats.verifierFailed).toBe(true);
     expect(result.stats.droppedByVerifier).toBe(1);
+  });
+
+  it("falls back to the default batch size when batchSize is not a usable number", async () => {
+    for (const batchSize of [Number.NaN, 0, -3, Number.POSITIVE_INFINITY]) {
+      const ai = createFakeAIClient(() =>
+        jsonResponse({ verdicts: [{ id: "F1", keep: true, reason: "ok" }] })
+      );
+      const result = await new PrdVerifier(ai, { documentType: "prd", batchSize }).verify(
+        document,
+        [candidate()]
+      );
+      expect(ai.executePrompt).toHaveBeenCalledTimes(1);
+      expect(result.findings).toHaveLength(1);
+    }
   });
 
   it("keeps findings unchecked when the verifier response is unusable", async () => {

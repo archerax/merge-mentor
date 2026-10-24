@@ -476,7 +476,7 @@ describe("runPrdReview", () => {
     expect(report.complete).toBe(false);
     expect(report.readiness).toEqual({
       verdict: "needs-work",
-      summary: "The review found 1 major, 1 minor issues.",
+      summary: "The review found 1 major issue, 1 minor issue.",
     });
     expect(report.notReviewed.map((item) => item.kind)).toContain("consistency-check");
   });

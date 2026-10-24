@@ -169,7 +169,7 @@ describe("chunkDocument", () => {
   });
 
   it("gives each slice of an oversized table only the paragraphs in its own text", () => {
-    const rows = Array.from({ length: 10 }, (_, i) => `row${i} ${words(10)}`);
+    const rows = Array.from({ length: 16 }, (_, i) => `row${i} ${words(10)}`);
     const matrix = {
       kind: "table" as const,
       table: {
@@ -202,8 +202,8 @@ describe("chunkDocument", () => {
       for (const id of chunk.paragraphIds.slice(1)) expect(chunk.text).toContain(`[${id}]`);
     }
     // The last row is only in the last slice, not in the first.
-    expect(chunks[0]?.paragraphIds).not.toContain("tp9");
-    expect(chunks.at(-1)?.paragraphIds).toContain("tp9");
+    expect(chunks[0]?.paragraphIds).not.toContain("tp15");
+    expect(chunks.at(-1)?.paragraphIds).toContain("tp15");
     const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
     expect(rows.filter((_, i) => !covered.has(`tp${i}`))).toEqual([]);
   });
@@ -386,7 +386,13 @@ describe("chunkDocument", () => {
     expect(() => chunkDocument(document, { fallbackChunkChars: Number.NaN })).toThrow(
       /positive numbers/
     );
-    expect(() => chunkDocument(document, { overlapChars: -1 })).toThrow(/must not be negative/);
+    expect(() => chunkDocument(document, { overlapChars: -1 })).toThrow(/finite and not negative/);
+    expect(() => chunkDocument(document, { overlapChars: Number.NaN })).toThrow(
+      /finite and not negative/
+    );
+    expect(() => chunkDocument(document, { minChars: Number.POSITIVE_INFINITY })).toThrow(
+      /finite and not negative/
+    );
     expect(() => chunkDocument(document, { maxChars: 1_000, overlapChars: 600 })).toThrow(
       /at most half/
     );

@@ -324,8 +324,12 @@ export function checkQuotes(
         continue;
       }
       const key = `image\u0000${candidate.imageId}\u0000${candidate.dimension}\u0000${normaliseForQuoteMatch(candidate.problem)}`;
-      if (kept.has(key)) {
+      const existingImage = kept.get(key);
+      if (existingImage) {
         droppedDuplicate += 1;
+        if (SEVERITY_RANK[finding.severity] < SEVERITY_RANK[existingImage.severity]) {
+          kept.set(key, finding);
+        }
         continue;
       }
       kept.set(key, finding);
@@ -478,7 +482,11 @@ export class PrdVerifier {
     index: DocumentTextIndex,
     findings: readonly VerifiedPrdFinding[]
   ): Promise<{ findings: VerifiedPrdFinding[]; failed: boolean }> {
-    const batchSize = Math.max(1, this.options.batchSize ?? DEFAULT_BATCH_SIZE);
+    const requested = this.options.batchSize;
+    const batchSize =
+      requested !== undefined && Number.isFinite(requested) && requested >= 1
+        ? Math.floor(requested)
+        : DEFAULT_BATCH_SIZE;
     const kept: VerifiedPrdFinding[] = [];
     let failed = false;
 

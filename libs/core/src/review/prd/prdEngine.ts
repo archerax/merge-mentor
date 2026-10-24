@@ -370,7 +370,11 @@ class PrdReviewRun {
         description: `Some content could not be read: ${warning}`,
       })),
     ];
-    const complete = failed.length === 0 && skippedChunks.length === 0 && consistency !== undefined;
+    const complete =
+      failed.length === 0 &&
+      skippedChunks.length === 0 &&
+      consistency !== undefined &&
+      document.warnings.length === 0;
 
     const report: PrdReviewReport = {
       schemaVersion: 1,

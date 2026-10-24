@@ -104,9 +104,10 @@ export function fallbackReadinessSummary(counts: Readonly<Record<PrdSeverity, nu
   const total = counts.Blocker + counts.Major + counts.Minor;
   if (total === 0) return "The review found no issues in the text it could check.";
   const parts = SEVERITY_ORDER.filter((severity) => counts[severity] > 0).map(
-    (severity) => `${counts[severity]} ${severity.toLowerCase()}`
+    (severity) =>
+      `${counts[severity]} ${severity.toLowerCase()} issue${counts[severity] === 1 ? "" : "s"}`
   );
-  return `The review found ${parts.join(", ")} issue${total === 1 ? "" : "s"}.`;
+  return `The review found ${parts.join(", ")}.`;
 }
 
 function blockquote(text: string): string {

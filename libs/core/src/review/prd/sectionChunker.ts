@@ -94,8 +94,11 @@ function resolveOptions(options: ChunkOptions): Required<ChunkOptions> {
   if (sizes.some((size) => !Number.isFinite(size) || size <= 0)) {
     throw new ValidationError("chunkOptions", "chunk sizes must be positive numbers");
   }
-  if (minChars < 0 || overlapChars < 0) {
-    throw new ValidationError("chunkOptions", "minChars and overlapChars must not be negative");
+  if (![minChars, overlapChars].every((size) => Number.isFinite(size) && size >= 0)) {
+    throw new ValidationError(
+      "chunkOptions",
+      "minChars and overlapChars must be finite and not negative"
+    );
   }
   if (overlapChars * 2 > Math.min(maxChars, fallbackChunkChars)) {
     throw new ValidationError("chunkOptions", "overlapChars must be at most half the chunk size");
@@ -174,9 +177,14 @@ function splitSection(
       ? [{ sectionIds: [section.id], headingPath: section.headingPath, ...joinPieces([heading]) }]
       : [];
   }
-  const header = renderer.header(section, undefined);
-  // Always leave a positive body budget, even when the header is long.
-  const budget = Math.max(Math.ceil(options.maxChars / 2), options.maxChars - header.length - 40);
+  // Budget for the longest header any part can carry (part numbers are not
+  // known until the body is packed) plus the blank line before the body, and
+  // always leave a positive body budget even when the header is long.
+  const longestHeader = renderer.header(section, { index: 99_999, total: 99_999 });
+  const budget = Math.max(
+    Math.ceil(options.maxChars / 2),
+    options.maxChars - longestHeader.length - "\n\n".length
+  );
   const pieces = section.blocks.map((block) => renderer.block(block));
   const groups = packWithOverlap(pieces, budget, options.overlapChars);
   return groups.map((group, index) => {

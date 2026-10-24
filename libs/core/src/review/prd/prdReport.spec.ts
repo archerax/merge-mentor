@@ -82,7 +82,7 @@ describe("fallbackReadinessSummary", () => {
       "The review found no issues in the text it could check."
     );
     expect(fallbackReadinessSummary({ Blocker: 2, Major: 0, Minor: 1 })).toBe(
-      "The review found 2 blocker, 1 minor issues."
+      "The review found 2 blocker issues, 1 minor issue."
     );
   });
 });
