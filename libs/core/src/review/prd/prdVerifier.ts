@@ -284,16 +284,13 @@ function locateQuoteSpan(
   for (const paragraph of paragraphs) {
     const prefix = `[${paragraph.id}] `;
     const normalised = normaliseForQuoteMatch(paragraph.text);
-    const first = findSegments(normalised, segments);
-    if (first !== undefined) {
-      const last = segments[segments.length - 1] ?? "";
-      const lastAt = normalised.lastIndexOf(last);
-      const start = lineStart + prefix.length + rawOffset(paragraph.text, first);
-      const end =
-        lineStart +
-        prefix.length +
-        rawOffset(paragraph.text, Math.max(first, lastAt) + last.length);
-      return { start: start - 1, end };
+    const match = findSegmentSpan(normalised, segments);
+    if (match !== undefined) {
+      const base = lineStart + prefix.length;
+      return {
+        start: base + rawOffset(paragraph.text, match.start) - 1,
+        end: base + rawOffset(paragraph.text, match.end),
+      };
     }
     lineStart += prefix.length + paragraph.text.length + 1;
   }
@@ -324,17 +321,25 @@ function collectParagraphs(blocks: readonly DocxBlock[], into: IndexedParagraph[
   }
 }
 
-/** Returns the offset where the first segment matched, when all segments match in order. */
-function findSegments(haystack: string, segments: readonly string[]): number | undefined {
+/** Offsets of the match of all segments in order (start of the first, end of the last), if any. */
+function findSegmentSpan(
+  haystack: string,
+  segments: readonly string[]
+): { start: number; end: number } | undefined {
   let cursor = 0;
-  let first: number | undefined;
+  let start: number | undefined;
   for (const segment of segments) {
     const index = haystack.indexOf(segment, cursor);
     if (index === -1) return undefined;
-    first ??= index;
+    start ??= index;
     cursor = index + segment.length;
   }
-  return first;
+  return start === undefined ? undefined : { start, end: cursor };
+}
+
+/** Returns the offset where the first segment matched, when all segments match in order. */
+function findSegments(haystack: string, segments: readonly string[]): number | undefined {
+  return findSegmentSpan(haystack, segments)?.start;
 }
 
 function paragraphAt(entry: IndexedSection, offset: number): string | undefined {

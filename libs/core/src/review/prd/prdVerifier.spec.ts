@@ -189,6 +189,44 @@ describe("DocumentTextIndex", () => {
   });
 });
 
+describe("DocumentTextIndex.context with a repeated final segment", () => {
+  it("centres the window on the occurrence that matched, not on a later repeat of its last segment", () => {
+    const text =
+      `${"alpha ".repeat(400)}Payments are retried ... after a timeout. ${"mid ".repeat(100)}` +
+      `${"omega ".repeat(400)}Later we also say after a timeout. ${"tail ".repeat(100)}`;
+    const long: DocxDocument = {
+      sections: [
+        {
+          id: "s0",
+          title: "",
+          level: 0,
+          headingPath: [],
+          parentId: null,
+          childIds: [],
+          headingParagraphId: null,
+          blocks: [
+            { kind: "paragraph", paragraph: { id: "p1", text, commentIds: [], imageIds: [] } },
+          ],
+        },
+      ],
+      comments: [],
+      images: [],
+      hasHeadings: false,
+      warnings: [],
+    };
+
+    const context = new DocumentTextIndex(long).context(
+      "s0",
+      "p1",
+      "Payments are retried ... after a timeout."
+    );
+
+    // Centred on the real match: text before the quote is kept (a window stretched to the
+    // later repeat would start at the quote and drop it).
+    expect(context).toContain("alpha Payments are retried ... after a timeout.");
+  });
+});
+
 describe("checkQuotes", () => {
   it("keeps supported findings and drops ones whose quote is not in the document", () => {
     const index = new DocumentTextIndex(document);
