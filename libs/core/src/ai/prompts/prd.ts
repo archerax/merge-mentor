@@ -96,7 +96,7 @@ const FRD_DIMENSIONS = [
   },
 ] as const satisfies readonly PrdDimension[];
 
-/** Built-in rubrics per document type (see ideas/prd-review-plan.md, section 3). */
+/** Built-in rubrics per document type. */
 export const PRD_RUBRICS: Readonly<
   Record<PrdDocumentType, { readonly label: string; readonly dimensions: readonly PrdDimension[] }>
 > = {

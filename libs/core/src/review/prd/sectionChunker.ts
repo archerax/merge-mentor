@@ -39,7 +39,7 @@ export interface ChunkOptions {
   readonly overlapChars?: number;
 }
 
-/** Defaults settled in the spike (see ideas/prd-review-plan.md, section 9). */
+/** Default chunk sizes for PRD section splitting. */
 export const DEFAULT_CHUNK_OPTIONS: Required<ChunkOptions> = {
   maxChars: 24_000,
   minChars: 4_000,
