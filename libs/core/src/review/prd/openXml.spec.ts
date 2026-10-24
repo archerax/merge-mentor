@@ -43,6 +43,20 @@ describe("extractCommentAnchors", () => {
     expect(extractCommentAnchors(xml).get("1")).toBe("kept added fallback");
   });
 
+  it("honours range markers inside skipped content, so ranges close and keep accepted text", () => {
+    const del = (inner: string): string =>
+      `<w:del w:id="9"><w:r><w:delText>x</w:delText></w:r>${inner}</w:del>`;
+    // Start inside a deletion: the accepted text that follows is genuinely covered.
+    const startInDel = `<w:p>${del('<w:commentRangeStart w:id="1"/>')}${t("accepted")}<w:commentRangeEnd w:id="1"/>${t(" after")}</w:p>`;
+    expect(extractCommentAnchors(startInDel).get("1")).toBe("accepted");
+    // End inside a deletion: the range still closes, text after it is excluded.
+    const endInDel = `<w:p><w:commentRangeStart w:id="2"/>${t("kept")}${del('<w:commentRangeEnd w:id="2"/>')}${t(" after")}</w:p>`;
+    expect(extractCommentAnchors(endInDel).get("2")).toBe("kept");
+    // Entirely inside a deletion: no accepted text, so no anchor.
+    const inside = `<w:p>${del('<w:commentRangeStart w:id="3"/><w:commentRangeEnd w:id="3"/>')}${t("after")}</w:p>`;
+    expect(extractCommentAnchors(inside).has("3")).toBe(false);
+  });
+
   it("decodes XML entities", () => {
     const xml = `<w:p><w:commentRangeStart w:id="1"/>${t("a &amp; b &lt;c&gt; &quot;d&quot; &apos;e&apos; &#65;&#x42; &#xFFFFFFF;")}<w:commentRangeEnd w:id="1"/></w:p>`;
     expect(extractCommentAnchors(xml).get("1")).toBe(`a & b <c> "d" 'e' AB &#xFFFFFFF;`);
