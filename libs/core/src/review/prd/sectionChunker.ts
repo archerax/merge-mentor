@@ -290,7 +290,8 @@ function splitPiece(piece: Piece, size: number, overlap: number): Piece[] {
       const boundary = piece.text.lastIndexOf(" ", end);
       if (boundary > start + size / 2) end = boundary;
     }
-    slices.push({ text: piece.text.slice(start, end).trim(), paragraphIds: piece.paragraphIds });
+    const text = piece.text.slice(start, end).trim();
+    slices.push({ text, paragraphIds: idsInSlice(piece, text, slices.at(-1)) });
     if (end >= piece.text.length) break;
     let next = end - overlap;
     const boundary = piece.text.indexOf(" ", next);
@@ -298,6 +299,26 @@ function splitPiece(piece: Piece, size: number, overlap: number): Piece[] {
     start = Math.max(next, start + 1);
   }
   return slices;
+}
+
+/**
+ * The paragraph ids of `piece` that appear (as `[id]` markers) in one slice of
+ * its text, so a slice of a large table does not claim the whole table's
+ * paragraphs. A slice that starts inside a paragraph continues the previous
+ * slice's last paragraph.
+ */
+function idsInSlice(piece: Piece, text: string, previous: Piece | undefined): string[] {
+  if (piece.paragraphIds.length <= 1) return [...piece.paragraphIds];
+  const found = piece.paragraphIds
+    .map((id) => ({ id, at: text.indexOf(`[${id}]`) }))
+    .filter((entry) => entry.at !== -1)
+    .toSorted((a, b) => a.at - b.at);
+  const ids = found.map((entry) => entry.id);
+  const continued = previous?.paragraphIds.at(-1);
+  if (continued !== undefined && !ids.includes(continued) && (found[0]?.at ?? 1) > 0) {
+    ids.unshift(continued);
+  }
+  return ids;
 }
 
 function joinPieces(pieces: readonly Piece[]): { text: string; paragraphIds: string[] } {

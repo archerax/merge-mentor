@@ -168,6 +168,46 @@ describe("chunkDocument", () => {
     expect(chunks.every((c) => c.part !== undefined)).toBe(true);
   });
 
+  it("gives each slice of an oversized table only the paragraphs in its own text", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => `row${i} ${words(10)}`);
+    const matrix = {
+      kind: "table" as const,
+      table: {
+        id: "t1",
+        rows: rows.map((text, i) => ({
+          isHeader: false,
+          cells: [
+            {
+              colSpan: 1,
+              rowSpan: 1,
+              blocks: [
+                {
+                  kind: "paragraph" as const,
+                  paragraph: { id: `tp${i}`, text, commentIds: [], imageIds: [] },
+                },
+              ],
+            },
+          ],
+        })),
+      },
+    };
+    const document = doc([s("s1", "Matrix", [matrix])]);
+
+    const chunks = chunkDocument(document, { maxChars: 400, minChars: 0, overlapChars: 40 });
+
+    expect(chunks.length).toBeGreaterThan(2);
+    for (const chunk of chunks) {
+      expect(chunk.paragraphIds.length).toBeGreaterThan(0);
+      // Only the first id may be a paragraph continued from the previous slice.
+      for (const id of chunk.paragraphIds.slice(1)) expect(chunk.text).toContain(`[${id}]`);
+    }
+    // The last row is only in the last slice, not in the first.
+    expect(chunks[0]?.paragraphIds).not.toContain("tp9");
+    expect(chunks.at(-1)?.paragraphIds).toContain("tp9");
+    const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
+    expect(rows.filter((_, i) => !covered.has(`tp${i}`))).toEqual([]);
+  });
+
   it("keeps a positive body budget when the heading path is longer than maxChars", () => {
     const longPath = Array.from({ length: 6 }, (_, i) => `${i}${"h".repeat(150)}`);
     const body = Array.from({ length: 12 }, (_, i) => p(`Sentence ${i} ${words(15)}.`));
