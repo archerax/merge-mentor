@@ -457,6 +457,24 @@ describe("PrdVerifier", () => {
     expect(result.stats).toMatchObject({ verifierFailed: true, droppedByVerifier: 0, kept: 2 });
   });
 
+  it("treats a malformed keep value as an unusable batch, not a positive verdict", async () => {
+    const ai = createFakeAIClient(() =>
+      jsonResponse({
+        verdicts: [
+          { id: "F1", keep: "false", reason: "no" },
+          { id: "F2", keep: true, reason: "ok" },
+        ],
+      })
+    );
+    const result = await new PrdVerifier(ai, { documentType: "prd" }).verify(document, [
+      candidate(),
+      candidate({ quote: "within two months", sectionId: "s1.1" }),
+    ]);
+
+    expect(result.findings).toHaveLength(2);
+    expect(result.stats).toMatchObject({ verifierFailed: true, droppedByVerifier: 0, kept: 2 });
+  });
+
   it("reads JSON from the raw text when the provider did not parse it, and streams", async () => {
     const ai = createFakeAIClient(() => ({
       raw: '```json\n{"verdicts":[{"id":"F1","keep":false,"reason":"misread"}]}\n```',

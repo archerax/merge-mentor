@@ -199,7 +199,8 @@ export const PrdVerifierResultSchema = z.object({
     .array(
       z.object({
         id: z.coerce.string(),
-        keep: z.boolean().catch(true),
+        // A literal boolean only: a malformed verdict must not silently become "keep".
+        keep: z.boolean(),
         reason: z.coerce.string().default(""),
       })
     )

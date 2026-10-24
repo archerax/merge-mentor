@@ -132,9 +132,12 @@ describe("AI response schemas", () => {
       ).toBe("needs-work");
     });
 
-    it("keeps findings when the verifier gives a non-boolean decision", () => {
-      expect(PrdVerifierResultSchema.parse({ verdicts: [{ id: 1, keep: "no" }] })).toEqual({
-        verdicts: [{ id: "1", keep: true, reason: "" }],
+    it("rejects a verifier decision that is not a literal boolean", () => {
+      expect(
+        PrdVerifierResultSchema.safeParse({ verdicts: [{ id: 1, keep: "false" }] }).success
+      ).toBe(false);
+      expect(PrdVerifierResultSchema.parse({ verdicts: [{ id: 1, keep: false }] })).toEqual({
+        verdicts: [{ id: "1", keep: false, reason: "" }],
       });
     });
   });
