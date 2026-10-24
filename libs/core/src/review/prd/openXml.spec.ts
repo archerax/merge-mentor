@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { extractCommentAnchors, findMainDocumentPath } from "./openXml.js";
+import {
+  extractCommentAnchors,
+  findMainDocumentPath,
+  MAX_ACCUMULATING_RANGES,
+  MAX_ANCHOR_CHARS,
+} from "./openXml.js";
 
 const t = (text: string) => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`;
 
@@ -50,6 +55,34 @@ describe("extractCommentAnchors", () => {
   it("ignores attribute values containing '>'", () => {
     const xml = `<w:p><w:commentRangeStart w:id="1"/><w:r w:x="a>b"><w:t>text</w:t></w:r><w:commentRangeEnd w:id="1"/></w:p>`;
     expect(extractCommentAnchors(xml).get("1")).toBe("text");
+  });
+});
+
+describe("extractCommentAnchors bounds", () => {
+  it("truncates long anchors with an ellipsis marker", () => {
+    const xml = `<w:p><w:commentRangeStart w:id="1"/>${t("x".repeat(MAX_ANCHOR_CHARS * 5))}<w:commentRangeEnd w:id="1"/></w:p>`;
+    const anchor = extractCommentAnchors(xml).get("1") ?? "";
+    expect(anchor.startsWith("x".repeat(MAX_ANCHOR_CHARS))).toBe(true);
+    expect(anchor.endsWith("…")).toBe(true);
+    expect(anchor.length).toBeLessThanOrEqual(MAX_ANCHOR_CHARS + 2);
+  });
+
+  it("bounds total retained text for many overlapping ranges over large text", () => {
+    const ranges = 5_000;
+    const starts = Array.from(
+      { length: ranges },
+      (_, i) => `<w:commentRangeStart w:id="${i}"/>`
+    ).join("");
+    const body = Array.from({ length: 200 }, () => `<w:p>${t("y".repeat(5_000))}</w:p>`).join("");
+    const xml = `<w:body>${starts}${body}</w:body>`;
+    const anchors = extractCommentAnchors(xml);
+    expect(anchors.size).toBeLessThanOrEqual(MAX_ACCUMULATING_RANGES);
+    let total = 0;
+    for (const anchor of anchors.values()) {
+      expect(anchor.length).toBeLessThanOrEqual(MAX_ANCHOR_CHARS + 2);
+      total += anchor.length;
+    }
+    expect(total).toBeLessThanOrEqual(MAX_ACCUMULATING_RANGES * (MAX_ANCHOR_CHARS + 2));
   });
 });
 

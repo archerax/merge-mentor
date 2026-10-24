@@ -7,6 +7,12 @@
  * machine-written by Word, so a full DOM is not needed.
  */
 
+/** Characters kept per comment anchor; anchors are only context for the model. */
+export const MAX_ANCHOR_CHARS = 2_000;
+/** Overlapping comment ranges that accumulate text at once (the rest stay empty). */
+export const MAX_ACCUMULATING_RANGES = 32;
+const TRUNCATION_MARKER = "…";
+
 const DEFAULT_MAIN_DOCUMENT_PATH = "word/document.xml";
 
 /** Elements whose text is not part of the accepted view of the document. */
@@ -40,12 +46,27 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
   let skipDepth = 0;
   let inText = false;
 
+  const append = (value: string): void => {
+    let accumulating = 0;
+    for (const id of open) {
+      if (accumulating++ >= MAX_ACCUMULATING_RANGES) break;
+      const current = buffers.get(id) ?? "";
+      if (current.length > MAX_ANCHOR_CHARS) continue;
+      const next = current + value;
+      buffers.set(
+        id,
+        next.length > MAX_ANCHOR_CHARS
+          ? `${next.slice(0, MAX_ANCHOR_CHARS)}\n${TRUNCATION_MARKER}`
+          : next
+      );
+    }
+  };
+
   for (const match of documentXml.matchAll(TOKEN_PATTERN)) {
     const [, closing, name, attributes = "", selfClosing, text] = match;
     if (text !== undefined) {
       if (inText && skipDepth === 0 && open.size > 0) {
-        const decoded = decodeXmlEntities(text);
-        for (const id of open) buffers.set(id, (buffers.get(id) ?? "") + decoded);
+        append(decodeXmlEntities(text));
       }
       continue;
     }
@@ -64,9 +85,7 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
     }
     if (!closing && skipDepth === 0 && open.size > 0) {
       const whitespace = name === "w:tab" ? "\t" : name === "w:br" || name === "w:cr" ? "\n" : "";
-      if (whitespace) {
-        for (const id of open) buffers.set(id, (buffers.get(id) ?? "") + whitespace);
-      }
+      if (whitespace) append(whitespace);
     }
     if (selfClosing) continue;
 
@@ -75,7 +94,7 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
     } else if (name === "w:t") {
       inText = !closing;
     } else if (name === "w:p" && closing && skipDepth === 0) {
-      for (const id of open) buffers.set(id, `${buffers.get(id) ?? ""}\n`);
+      append("\n");
     }
   }
 
