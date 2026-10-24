@@ -19,6 +19,13 @@ describe("extractCommentAnchors", () => {
     expect(anchors.get("2")).toBe("two three");
   });
 
+  it("keeps tabs and line breaks inside the range, but not outside it", () => {
+    const xml =
+      `<w:p><w:r><w:tab/></w:r><w:commentRangeStart w:id="1"/>${t("Name")}<w:r><w:tab/></w:r>${t("Value")}` +
+      `<w:r><w:br/></w:r>${t("next")}<w:r><w:cr/></w:r>${t("last")}<w:commentRangeEnd w:id="1"/><w:r><w:br/></w:r>${t("after")}</w:p>`;
+    expect(extractCommentAnchors(xml).get("1")).toBe("Name\tValue\nnext\nlast");
+  });
+
   it("excludes deleted, moved-from and fallback content (accepted view)", () => {
     const xml =
       `<w:p><w:commentRangeStart w:id="1"/>${t("kept ")}` +

@@ -62,6 +62,12 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
       }
       continue;
     }
+    if (!closing && skipDepth === 0 && open.size > 0) {
+      const whitespace = name === "w:tab" ? "\t" : name === "w:br" || name === "w:cr" ? "\n" : "";
+      if (whitespace) {
+        for (const id of open) buffers.set(id, (buffers.get(id) ?? "") + whitespace);
+      }
+    }
     if (selfClosing) continue;
 
     if (SKIPPED_ELEMENTS.has(name)) {

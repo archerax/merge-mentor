@@ -428,9 +428,13 @@ function normalizeText(text: string): string {
 // Comments
 // ---------------------------------------------------------------------------
 
+/** The main document part named by the package relationships (normally `word/document.xml`). */
+async function mainDocumentPath(zip: JSZip): Promise<string> {
+  return findMainDocumentPath(await zip.file("_rels/.rels")?.async("string"));
+}
+
 async function readCommentAnchors(zip: JSZip): Promise<Map<string, string>> {
-  const rels = await zip.file("_rels/.rels")?.async("string");
-  const mainPath = findMainDocumentPath(rels);
+  const mainPath = await mainDocumentPath(zip);
   const xml = await zip.file(mainPath)?.async("string");
   return xml ? extractCommentAnchors(xml) : new Map();
 }
@@ -495,12 +499,16 @@ function locateByText(
 
 /**
  * Names of the zip parts that the main document references as images, taken
- * from the image relationships in `word/_rels/document.xml.rels`. Only these
+ * from the image relationships of the main document part (normally
+ * `word/_rels/document.xml.rels`). Only these
  * are inflated and hashed, so unrelated binaries (embedded OLE objects,
  * fonts, ...) are never read.
  */
 async function imagePartNames(zip: JSZip): Promise<string[]> {
-  const rels = zip.file("word/_rels/document.xml.rels");
+  const mainPath = await mainDocumentPath(zip);
+  const slash = mainPath.lastIndexOf("/");
+  const baseDir = slash < 0 ? "" : mainPath.slice(0, slash);
+  const rels = zip.file(`${baseDir ? `${baseDir}/` : ""}_rels/${mainPath.slice(slash + 1)}.rels`);
   if (!rels) return [];
   const xml = await rels.async("string");
   const names = new Set<string>();
@@ -511,18 +519,18 @@ async function imagePartNames(zip: JSZip): Promise<string[]> {
     const target = attr("Target");
     if (!type || !target || !/\/image$/i.test(type)) continue;
     if (/^external$/i.test(attr("TargetMode") ?? "")) continue;
-    const resolved = resolveRelationshipTarget(target);
+    const resolved = resolveRelationshipTarget(target, baseDir);
     if (resolved && !/\.(xml|rels)$/i.test(resolved)) names.add(resolved);
   }
   return [...names];
 }
 
-/** Resolves a relationship target against `word/` (or the package root when absolute). */
-function resolveRelationshipTarget(target: string): string | undefined {
+/** Resolves a relationship target against the main part's folder (or the package root when absolute). */
+function resolveRelationshipTarget(target: string, baseDir: string): string | undefined {
   const segments: string[] = [];
   const parts = target.startsWith("/")
     ? target.slice(1).split("/")
-    : ["word", ...target.split("/")];
+    : [...baseDir.split("/"), ...target.split("/")];
   for (const part of parts) {
     if (part === "" || part === ".") continue;
     if (part === "..") {

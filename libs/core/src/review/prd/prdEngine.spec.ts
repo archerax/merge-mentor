@@ -405,6 +405,27 @@ describe("runPrdReview", () => {
     expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
   });
 
+  it("warns, and still throws the original error, when a failed run cannot be cleaned up", async () => {
+    const ai = createFakeAIClient(() => {
+      throw new Error("provider down");
+    });
+    const output = createCapturingOutputWriter();
+    const failingFs = {
+      ...nodeFs,
+      rm: async () => {
+        throw new Error("permission denied");
+      },
+    };
+
+    await expect(
+      runPrdReview(options({ output }), { aiClient: ai, fileSystem: failingFs as typeof nodeFs })
+    ).rejects.toThrow("None of the 5 part(s) of the document could be reviewed: provider down");
+
+    const warning = output.output.map((entry) => entry.data).join("\n");
+    expect(warning).toContain("could not be fully removed (permission denied)");
+    expect(warning).toContain(path.join(tempPath, "prd", "run-1"));
+  });
+
   it("removes the Markdown report too when writing the JSON report fails", async () => {
     const ai = createFakeAIClient(defaultHandler);
     const failingFs = {

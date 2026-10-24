@@ -282,7 +282,11 @@ class PrdReviewRun {
       await deletePrdRun(runId, {
         tempPath: options.tempPath ?? "./.mergementor",
         fs: this.fs,
-      }).catch(() => undefined);
+      }).catch((cleanupError: unknown) => {
+        this.output.error(
+          `⚠️ The review failed and its files could not be fully removed (${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}). Delete ${paths.runDir} and the run's reports by hand if the document is confidential.`
+        );
+      });
       throw error;
     }
   }
