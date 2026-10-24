@@ -392,6 +392,34 @@ describe("PrdVerifier", () => {
     expect(second.stats.verifierFailed).toBe(true);
   });
 
+  it.each([
+    ["a verdict is missing", [{ id: "F1", keep: false, reason: "no" }]],
+    [
+      "an unknown id is present",
+      [
+        { id: "F1", keep: true, reason: "ok" },
+        { id: "F9", keep: false, reason: "who?" },
+      ],
+    ],
+    [
+      "a candidate is judged twice",
+      [
+        { id: "F1", keep: true, reason: "ok" },
+        { id: "F1", keep: false, reason: "again" },
+      ],
+    ],
+    ["there are no verdicts", []],
+  ])("treats the response as unusable when %s", async (_name, verdicts) => {
+    const ai = createFakeAIClient(() => jsonResponse({ verdicts }));
+    const result = await new PrdVerifier(ai, { documentType: "prd" }).verify(document, [
+      candidate(),
+      candidate({ quote: "within two months", sectionId: "s1.1" }),
+    ]);
+
+    expect(result.findings).toHaveLength(2);
+    expect(result.stats).toMatchObject({ verifierFailed: true, droppedByVerifier: 0, kept: 2 });
+  });
+
   it("reads JSON from the raw text when the provider did not parse it, and streams", async () => {
     const ai = createFakeAIClient(() => ({
       raw: '```json\n{"verdicts":[{"id":"F1","keep":false,"reason":"misread"}]}\n```',

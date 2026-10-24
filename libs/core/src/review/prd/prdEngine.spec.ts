@@ -52,6 +52,12 @@ async function fixtureDocx(): Promise<Buffer> {
   });
 }
 
+/** A verifier response that keeps every candidate in the prompt. */
+function keepAllVerdicts(prompt: string): AIResponse {
+  const ids = [...prompt.matchAll(/^## (F\d+)/gm)].map((match) => match[1]);
+  return jsonResponse({ verdicts: ids.map((id) => ({ id, keep: true, reason: "Supported." })) });
+}
+
 type Handler = (prompt: string, options: ExecutePromptOptions | undefined) => AIResponse;
 
 /** Default AI behaviour: one real and one made-up finding per pass, verifier keeps all. */
@@ -115,7 +121,7 @@ const defaultHandler: Handler = (prompt, options) => {
         ],
       });
     case "prd-verify":
-      return jsonResponse({ verdicts: [] });
+      return keepAllVerdicts(prompt);
     default:
       throw new Error(`unexpected prompt type ${String(options?.promptType)}`);
   }
@@ -136,7 +142,7 @@ function imageHandler(
       case "prd-image":
         return onImage(prompt, opts);
       case "prd-verify":
-        return jsonResponse({ verdicts: [] });
+        return keepAllVerdicts(prompt);
       default:
         throw new Error(`unexpected prompt type ${String(opts?.promptType)}`);
     }
@@ -599,7 +605,7 @@ describe("runPrdReview", () => {
           })
         : opts?.promptType === "prd-consistency"
           ? jsonResponse({ readiness: { verdict: "needs-work", summary: "" }, findings: [] })
-          : jsonResponse({ verdicts: [] })
+          : keepAllVerdicts(prompt)
     );
     const { report } = await runPrdReview(options({ documentType: "frd" }), { aiClient: ok });
     expect(report.findings[0]).toMatchObject({

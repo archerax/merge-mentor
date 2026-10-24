@@ -499,6 +499,21 @@ export class PrdVerifier {
         this.logger.warn({ error: parsed.error.message }, "PRD verifier response was not usable");
         return undefined;
       }
+      // Require exactly one verdict per candidate: a partial or padded answer
+      // cannot be trusted to have judged the findings it does not mention.
+      const wanted = new Set(candidates.map((candidate) => candidate.id));
+      const answered = new Set(parsed.data.verdicts.map((verdict) => verdict.id.trim()));
+      if (
+        parsed.data.verdicts.length !== wanted.size ||
+        answered.size !== wanted.size ||
+        [...answered].some((id) => !wanted.has(id))
+      ) {
+        this.logger.warn(
+          { expected: wanted.size, received: parsed.data.verdicts.length },
+          "PRD verifier response did not give exactly one verdict per candidate"
+        );
+        return undefined;
+      }
       return new Set(parsed.data.verdicts.filter((v) => !v.keep).map((v) => v.id.trim()));
     } catch (error) {
       this.logger.warn({ error: (error as Error).message }, "PRD verifier call failed");
