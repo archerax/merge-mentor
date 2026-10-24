@@ -313,6 +313,55 @@ describe("checkQuotes", () => {
       ["Major", "scope"],
     ]);
   });
+
+  it("keeps distinct problems about the same quote and dimension", () => {
+    const index = new DocumentTextIndex(document);
+    const result = checkQuotes(
+      index,
+      [
+        candidate({ severity: "Blocker", problem: "Fast is not measurable." }),
+        candidate({ severity: "Minor", problem: "Which users are meant by “all users”?" }),
+        candidate({ severity: "Major", problem: "  fast IS not measurable. " }),
+      ],
+      "prd"
+    );
+    expect(result.droppedDuplicate).toBe(1);
+    expect(result.findings.map((f) => [f.severity, f.problem])).toEqual([
+      ["Blocker", "Fast is not measurable."],
+      ["Minor", "Which users are meant by “all users”?"],
+    ]);
+  });
+
+  it("keeps the same problem about the same quote in different sections", async () => {
+    const twice = await parseDocx(
+      await buildDocx({
+        body: [
+          heading(1, "Web"),
+          para("The page must load quickly."),
+          heading(1, "Mobile"),
+          para("The page must load quickly."),
+        ].join(""),
+      })
+    );
+    const result = checkQuotes(
+      new DocumentTextIndex(twice),
+      [
+        candidate({
+          sectionId: "s1",
+          quote: "The page must load quickly.",
+          scopeSectionIds: ["s1"],
+        }),
+        candidate({
+          sectionId: "s2",
+          quote: "The page must load quickly.",
+          scopeSectionIds: ["s2"],
+        }),
+      ],
+      "prd"
+    );
+    expect(result.droppedDuplicate).toBe(0);
+    expect(result.findings.map((f) => f.sectionId)).toEqual(["s1", "s2"]);
+  });
 });
 
 function imageCandidate(overrides: Partial<PrdCandidateFinding>): PrdCandidateFinding {

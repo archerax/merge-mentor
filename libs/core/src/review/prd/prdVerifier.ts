@@ -416,7 +416,10 @@ export function checkQuotes(
       ...(candidate.authorQuestion ? { authorQuestion: candidate.authorQuestion.trim() } : {}),
       origin: candidate.origin,
     };
-    const key = `${candidate.dimension}\u0000${quoteSegments(candidate.quote).join("...")}`;
+    // Only genuinely identical findings collapse: same dimension, quote,
+    // problem wording and located section. Differently worded problems about
+    // one quote are kept (the AI verifier pass handles near-duplicates).
+    const key = `${candidate.dimension}\u0000${quoteSegments(candidate.quote).join("...")}\u0000${location.sectionId}\u0000${normaliseForQuoteMatch(candidate.problem)}`;
     const existing = kept.get(key);
     if (existing) {
       droppedDuplicate += 1;
