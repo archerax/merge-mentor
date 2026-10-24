@@ -1,3 +1,4 @@
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
 const { mockClient, mockServer, mockCreateOpencode } = vi.hoisted(() => {
   const client = {
+    config: {
+      providers: vi.fn(),
+    },
     event: {
       subscribe: vi.fn(),
     },
@@ -51,6 +55,7 @@ vi.mock("@merge-mentor/shared/ports/index.js", async (importOriginal) => {
 });
 
 import { AIProviderError, ValidationError } from "@merge-mentor/shared/errors/index.js";
+import { nodeFs } from "@merge-mentor/shared/ports/index.js";
 
 import type { AIResponse } from "../types.js";
 import { OpenCodeSdkProvider } from "./opencode-sdk.js";
@@ -187,6 +192,71 @@ describe("OpenCodeSdkProvider", () => {
           }),
         })
       );
+    });
+
+    it("should send image files as OpenCode file parts with their MIME type", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+      const image = "/tmp/run/images/img1.png";
+
+      const resultPromise = provider.executePrompt("Review these images", {
+        promptType: "prd-image",
+        imageFiles: [{ path: image, mimeType: "image/png" }],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.session.prompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            parts: [
+              { type: "text", text: "Review these images" },
+              {
+                type: "file",
+                mime: "image/png",
+                filename: "img1.png",
+                url: pathToFileURL(image).href,
+              },
+            ],
+          }),
+        })
+      );
+    });
+
+    it("records attached image files in the transcript", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+
+      const resultPromise = provider.executePrompt("Review these images", {
+        promptType: "prd-image",
+        imageFiles: [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const transcript = vi
+        .mocked(nodeFs.writeFile)
+        .mock.calls.map(([, content]) => content as string)
+        .find((content) => content.includes("OPENCODE SDK PROVIDER TRANSCRIPT"));
+      expect(transcript).toContain("Image attachments: 1 file(s)");
+      expect(transcript).toContain("  - /tmp/run/images/img1.png");
+    });
+
+    it("should write transcripts to the per-request transcript directory when given", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the changes", {
+        transcriptDir: "/runs/run-1/transcripts",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const runTranscripts = "/runs/run-1/transcripts";
+      expect(nodeFs.mkdir).toHaveBeenCalledWith(runTranscripts, { recursive: true });
+      const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.startsWith(path.join(runTranscripts, "transcript-opencode-"))).toBe(true);
     });
 
     it("should forward streamed text deltas to onStreamData", async () => {
@@ -1302,5 +1372,69 @@ describe("OpenCodeSdkProvider", () => {
         message: "Unhandled exception",
       });
     });
+  });
+});
+
+function providers(models: Record<string, unknown>) {
+  return { data: { providers: [{ id: "anthropic", models }], default: {} } };
+}
+
+function check(model: string) {
+  return new OpenCodeSdkProvider({ model }).checkImageSupport();
+}
+
+describe("OpenCodeSdkProvider.checkImageSupport", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateOpencode.mockResolvedValue({ client: mockClient, server: mockServer });
+  });
+
+  it("needs an explicit provider/model", async () => {
+    for (const model of [undefined, "claude-sonnet", "anthropic/"]) {
+      await expect(new OpenCodeSdkProvider({ model }).checkImageSupport()).resolves.toMatchObject({
+        supported: false,
+        reason: expect.stringContaining('"provider/model"'),
+      });
+    }
+    expect(mockClient.config.providers).not.toHaveBeenCalled();
+  });
+
+  it("reads the model's image input capability from the provider list", async () => {
+    mockClient.config.providers.mockResolvedValue(
+      providers({
+        vision: { capabilities: { input: { image: true } } },
+        text: { capabilities: { input: { image: false } } },
+        legacy: { modalities: { input: ["text", "image"] } },
+        bare: {},
+      })
+    );
+
+    await expect(check("anthropic/vision")).resolves.toEqual({ supported: true });
+    await expect(check("anthropic/legacy")).resolves.toEqual({ supported: true });
+    await expect(check("anthropic/text")).resolves.toEqual({
+      supported: false,
+      reason: 'the model "anthropic/text" does not accept images',
+    });
+    await expect(check("anthropic/bare")).resolves.toMatchObject({ supported: false });
+    await expect(check("anthropic/missing")).resolves.toMatchObject({
+      supported: false,
+      reason: expect.stringContaining("not in the OpenCode provider list"),
+    });
+    await expect(check("openai/vision")).resolves.toMatchObject({ supported: false });
+  });
+
+  it("reports a failing provider lookup as unsupported", async () => {
+    mockClient.config.providers.mockRejectedValue(new Error("server gone"));
+    await expect(
+      new OpenCodeSdkProvider({ model: "anthropic/vision" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: false,
+      reason: "the OpenCode provider list could not be read (server gone)",
+    });
+
+    mockClient.config.providers.mockResolvedValue({ providers: "not-a-list" });
+    await expect(
+      new OpenCodeSdkProvider({ model: "anthropic/vision" }).checkImageSupport()
+    ).resolves.toMatchObject({ supported: false });
   });
 });

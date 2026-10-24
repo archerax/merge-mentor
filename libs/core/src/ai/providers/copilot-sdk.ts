@@ -55,6 +55,7 @@ import type {
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
+  ImageInputSupport,
   FastReviewResult,
   ReasoningEffort,
   TokenUsage,
@@ -328,6 +329,68 @@ export class CopilotSdkProvider implements AIProviderClient {
     );
   }
 
+  /**
+   * Looks up the configured model in the Copilot model list and reports
+   * whether it accepts images (`capabilities.supports.vision`) and its image
+   * limits. "Auto" model selection and BYOK endpoints cannot be checked, so
+   * they are reported as unsupported.
+   */
+  async checkImageSupport(): Promise<ImageInputSupport> {
+    if (this.byokBaseUrl) {
+      return {
+        supported: false,
+        reason: "image support cannot be checked for a custom (BYOK) AI endpoint",
+      };
+    }
+    const model = this.model?.trim() ?? "";
+    if (model.length === 0 || model.toLowerCase() === "auto") {
+      return {
+        supported: false,
+        reason:
+          "the AI model is chosen automatically, so image support cannot be checked; set a specific model that accepts images with --ai-model (MM_AI_MODEL)",
+      };
+    }
+
+    let models: Awaited<ReturnType<CopilotClient["listModels"]>>;
+    try {
+      const client = this.getClient();
+      await this.withTimeout(client.start(), this.timeoutMs);
+      models = await this.withTimeout(client.listModels(), this.timeoutMs);
+    } catch (error) {
+      this.logger.warn({ error: (error as Error).message }, "Copilot model list unavailable");
+      return {
+        supported: false,
+        reason: `the Copilot model list could not be read (${(error as Error).message})`,
+      };
+    }
+
+    const info = models.find((candidate) => candidate.id.toLowerCase() === model.toLowerCase());
+    if (!info) {
+      return {
+        supported: false,
+        reason: `the model "${model}" is not in the Copilot model list, so image support cannot be checked`,
+      };
+    }
+    if (!info.capabilities?.supports?.vision) {
+      return { supported: false, reason: `the model "${model}" does not accept images` };
+    }
+    const vision = info.capabilities.limits?.vision;
+    return {
+      supported: true,
+      // Check presence, not truthiness: an explicit 0 means "no images allowed"
+      // and must reach the engine rather than fall back to its defaults.
+      ...(typeof vision?.max_prompt_images === "number"
+        ? { maxImagesPerRequest: vision.max_prompt_images }
+        : {}),
+      ...(typeof vision?.max_prompt_image_size === "number"
+        ? { maxImageBytes: vision.max_prompt_image_size }
+        : {}),
+      ...(vision?.supported_media_types?.length
+        ? { mediaTypes: vision.supported_media_types }
+        : {}),
+    };
+  }
+
   private getClient(): CopilotClient {
     if (this.client) return this.client;
 
@@ -522,6 +585,10 @@ export class CopilotSdkProvider implements AIProviderClient {
           attachments.push({ type: "file", path: diffFile });
         }
       }
+      // The Copilot runtime sends attached image files to the model as images.
+      for (const image of options?.imageFiles ?? []) {
+        attachments.push({ type: "file", path: image.path });
+      }
 
       try {
         const promptOptions: {
@@ -592,6 +659,8 @@ export class CopilotSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage: collectedUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -610,6 +679,8 @@ export class CopilotSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
+          transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
         });
@@ -635,6 +706,8 @@ export class CopilotSdkProvider implements AIProviderClient {
               jsonOutput: JSON.stringify(recovered.parsed, null, 2),
               tokenUsage: collectedUsage,
               attachments: options?.diffFiles,
+              imageAttachments: options?.imageFiles?.map((image) => image.path),
+              transcriptDir: options?.transcriptDir,
               success: true,
               attempt,
             });
@@ -649,6 +722,8 @@ export class CopilotSdkProvider implements AIProviderClient {
           rawResponse: streamedContent || undefined,
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
+          transcriptDir: options?.transcriptDir,
           success: false,
           error: (error as Error).message,
           attempt,
@@ -669,6 +744,20 @@ export class CopilotSdkProvider implements AIProviderClient {
         await this.withTimeout(session.disconnect(), this.timeoutMs);
       } catch {
         // Best-effort session cleanup
+      }
+      if (options?.discardSession) {
+        // disconnect() keeps the conversation on disk for resumption; the
+        // caller asked for nothing to outlive the request.
+        try {
+          await this.withTimeout(client.deleteSession(session.sessionId), this.timeoutMs);
+        } catch (error) {
+          const reason = (error as Error).message;
+          this.logger.warn(
+            { error: reason },
+            "Could not delete Copilot session data after the request"
+          );
+          options.onSessionDiscardFailed?.(reason);
+        }
       }
     }
   }
@@ -897,25 +986,30 @@ export class CopilotSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    imageAttachments?: readonly string[];
+    /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
+    transcriptDir?: string;
     success: boolean;
     error?: string;
     attempt: number;
   }): Promise<void> {
+    const { transcriptDir, ...transcript } = data;
     return saveTranscript(
       {
         fileSystem: this.fileSystem,
         clock: this.clock,
         logger: this.logger,
         tempPath: this.tempPath,
+        ...(transcriptDir ? { transcriptDir } : {}),
         providerLabel: "COPILOT SDK PROVIDER TRANSCRIPT",
         filePrefix: "transcript-sdk",
         displayName: "Copilot SDK",
         model: this.model,
       },
       {
-        ...data,
-        attachments: data.attachments ?? [],
-        timeline: this.formatSessionTimeline(data.events),
+        ...transcript,
+        attachments: transcript.attachments ?? [],
+        timeline: this.formatSessionTimeline(transcript.events),
       }
     );
   }

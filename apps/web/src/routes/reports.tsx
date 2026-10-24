@@ -1,11 +1,13 @@
 import {
   Alert,
   Badge,
+  Button,
   Card,
   Code,
   Grid,
   Group,
   Loader,
+  Modal,
   NavLink,
   ScrollArea,
   Skeleton,
@@ -13,23 +15,26 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import type {
-  ReportDocument,
-  ReportKind,
-  ReportSummary,
-} from "@merge-mentor/shared/reports/index.js";
+import type { ReportDocument, ReportKind } from "@merge-mentor/shared/reports/index.js";
+import { IconTrash } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
-import { getReport, getReports } from "../server/reports.functions.js";
+import { deletePrdReport, getReport, getReports } from "../server/reports.functions.js";
+import type { ReportListItem } from "../server/reports.server.js";
 
 export const Route = createFileRoute("/reports")({
-  loader: async () => {
-    const reports = await getReports();
-    const first = reports[0];
-    const report = first ? await getReport({ data: { name: first.name } }) : null;
+  validateSearch: (search: Record<string, unknown>): { report?: string } => ({
+    report:
+      typeof search.report === "string" && search.report.length > 0 ? search.report : undefined,
+  }),
+  loaderDeps: ({ search }) => ({ report: search.report }),
+  loader: async ({ deps }) => {
+    const reports: ReportListItem[] = await getReports();
+    const initial = reports.find((item) => item.name === deps.report) ?? reports[0];
+    const report = initial ? await getReport({ data: { name: initial.name } }) : null;
     return { reports, report };
   },
   component: ReportsPage,
@@ -39,6 +44,7 @@ const KIND_COLORS: Record<ReportKind, string> = {
   review: "blue",
   pbi: "grape",
   project: "teal",
+  prd: "cyan",
   plan: "indigo",
   stage: "orange",
   report: "gray",
@@ -50,10 +56,30 @@ function formatBytes(bytes: number): string {
 }
 
 function ReportsPage() {
-  const { reports, report: initialReport } = Route.useLoaderData();
+  const { reports, report } = Route.useLoaderData();
+  // The view keeps the list and selection in local state, so a new loader result
+  // (e.g. a changed `report` search parameter) must start it afresh.
+  return (
+    <ReportsView key={report?.name ?? "none"} loadedReports={reports} initialReport={report} />
+  );
+}
+
+function ReportsView({
+  loadedReports,
+  initialReport,
+}: {
+  readonly loadedReports: readonly ReportListItem[];
+  readonly initialReport: ReportDocument | null;
+}) {
+  const [reports, setReports] = useState<readonly ReportListItem[]>(loadedReports);
   const [selected, setSelected] = useState<ReportDocument | null>(initialReport);
   const [loadingName, setLoadingName] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<ReportListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const selectedItem = reports.find((report) => report.name === selected?.name);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -77,6 +103,23 @@ function ReportsPage() {
     }
   }
 
+  async function confirmDelete() {
+    const target = pendingDelete;
+    if (!target?.prdRunId) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deletePrdReport({ data: { runId: target.prdRunId } });
+      setReports((previous) => previous.filter((report) => report.prdRunId !== target.prdRunId));
+      if (selected?.name === target.name) setSelected(null);
+      setPendingDelete(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <Stack gap="lg">
       <PageHeader
@@ -90,8 +133,8 @@ function ReportsPage() {
 
       {reports.length === 0 ? (
         <Alert title="No reports found" color="gray">
-          Run a review from the PR Review page or the Merge Mentor CLI (review, PBI, project, or
-          plan) to generate a markdown report, then reload this page.
+          Run a review from the PR, PBI, project or PRD review pages, or the Merge Mentor CLI, to
+          generate a markdown report, then reload this page.
         </Alert>
       ) : (
         <Grid gap="lg">
@@ -138,7 +181,29 @@ function ReportsPage() {
                   <Skeleton height={14} width="60%" />
                 </Stack>
               ) : selected ? (
-                <MarkdownReport content={selected.content} />
+                <Stack gap="md">
+                  {selectedItem?.prdRunId && (
+                    <Group justify="space-between" align="center">
+                      <Text size="sm" c="dimmed">
+                        This review keeps a copy of the uploaded document in{" "}
+                        <Code>.mergementor</Code>.
+                      </Text>
+                      <Button
+                        color="red"
+                        variant="light"
+                        size="xs"
+                        leftSection={<IconTrash size={14} />}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setPendingDelete(selectedItem);
+                        }}
+                      >
+                        Delete run
+                      </Button>
+                    </Group>
+                  )}
+                  <MarkdownReport content={selected.content} />
+                </Stack>
               ) : (
                 <Text c="dimmed">Select a report to view its contents.</Text>
               )}
@@ -146,12 +211,42 @@ function ReportsPage() {
           </Grid.Col>
         </Grid>
       )}
+
+      <Modal
+        opened={pendingDelete !== null}
+        onClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+        title="Delete this review?"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            This permanently deletes the report for <b>{pendingDelete?.title}</b>, the stored copy
+            of the uploaded document, the data and images extracted from it, and the AI transcripts
+            of the review. This cannot be undone.
+          </Text>
+          {deleteError && (
+            <Alert color="red" title="Could not delete">
+              {deleteError}
+            </Alert>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={confirmDelete} loading={deleting}>
+              Delete
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }
 
 interface ReportNavItemProps {
-  readonly report: ReportSummary;
+  readonly report: ReportListItem;
   readonly active: boolean;
   readonly loading: boolean;
   readonly onSelect: () => void;

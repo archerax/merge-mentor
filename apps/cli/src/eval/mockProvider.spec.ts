@@ -57,6 +57,8 @@ describe("MockAIProvider", () => {
       stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 100 }) as Stats,
       readdir: async () => [],
       unlink: async () => {},
+      readFileBuffer: async () => Buffer.alloc(0),
+      writeFileBuffer: async () => undefined,
       rm: async () => {},
     };
 
@@ -135,6 +137,8 @@ describe("MockAIProvider", () => {
       stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 0 }) as Stats,
       readdir: async () => [],
       unlink: async () => {},
+      readFileBuffer: async () => Buffer.alloc(0),
+      writeFileBuffer: async () => undefined,
       rm: async () => {},
     };
     const provider = new MockAIProvider({ scenarioDir: "/test/corpus/broken", fileSystem: mockFs });
@@ -153,6 +157,8 @@ describe("MockAIProvider", () => {
       stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 0 }) as Stats,
       readdir: async () => [],
       unlink: async () => {},
+      readFileBuffer: async () => Buffer.alloc(0),
+      writeFileBuffer: async () => undefined,
       rm: async () => {},
     };
     const provider = new MockAIProvider({ scenarioDir: "/test/corpus/x", fileSystem: mockFs });

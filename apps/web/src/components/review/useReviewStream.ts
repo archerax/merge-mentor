@@ -67,10 +67,23 @@ interface ReviewStreamState<TResult> {
   readonly runInput: unknown | null;
 }
 
+/**
+ * A custom request body for {@link UseReviewStreamResult.run}, used for raw
+ * uploads instead of the default JSON-encoded input.
+ */
+interface ReviewRunRequest {
+  readonly body: BodyInit;
+  readonly headers: Readonly<Record<string, string>>;
+}
+
 /** Hook result: stream state plus controls. */
 interface UseReviewStreamResult<TResult> extends ReviewStreamState<TResult> {
   readonly running: boolean;
-  run(input: unknown): Promise<void>;
+  /**
+   * Creates a run and attaches to it. `input` is kept as the run input; the
+   * request body is `input` as JSON unless `request` supplies its own.
+   */
+  run(input: unknown, request?: ReviewRunRequest): Promise<void>;
   stop(): void;
 }
 
@@ -439,7 +452,7 @@ export function useReviewStream<TResult = ReviewSummary>(
   }, [runId, recoverInput, attach]);
 
   const run = useCallback(
-    async (input: unknown) => {
+    async (input: unknown, request?: ReviewRunRequest) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -451,8 +464,8 @@ export function useReviewStream<TResult = ReviewSummary>(
       try {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
+          headers: request?.headers ?? { "Content-Type": "application/json" },
+          body: request?.body ?? JSON.stringify(input),
           signal: controller.signal,
         });
 

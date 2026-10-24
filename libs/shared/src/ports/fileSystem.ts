@@ -34,6 +34,15 @@ export interface FileSystem {
   readFile(path: string, encoding: BufferEncoding): Promise<string>;
 
   /**
+   * Reads a file's raw bytes (for binary formats such as `.docx`).
+   *
+   * @param path - File path
+   * @returns File content as a Buffer
+   * @throws If file does not exist or cannot be read
+   */
+  readFileBuffer(path: string): Promise<Buffer>;
+
+  /**
    * Writes content to a file.
    *
    * @param path - File path
@@ -42,6 +51,15 @@ export interface FileSystem {
    * @throws If directory does not exist or write fails
    */
   writeFile(path: string, data: string, encoding: BufferEncoding): Promise<void>;
+
+  /**
+   * Writes raw bytes to a file (for binary formats such as `.docx`).
+   *
+   * @param path - File path
+   * @param data - Bytes to write
+   * @throws If directory does not exist or write fails
+   */
+  writeFileBuffer(path: string, data: Uint8Array): Promise<void>;
 
   /**
    * Creates a directory.
@@ -106,7 +124,9 @@ export interface FileSystem {
  */
 export const nodeFs: FileSystem = {
   readFile: (path, encoding) => fs.readFile(path, encoding),
+  readFileBuffer: (path) => fs.readFile(path),
   writeFile: (path, data, encoding) => fs.writeFile(path, data, encoding),
+  writeFileBuffer: (path, data) => fs.writeFile(path, data),
   mkdir: (path, options) => fs.mkdir(path, options),
   rm: (path, options) => fs.rm(path, options),
   access: (path) => fs.access(path),

@@ -83,6 +83,8 @@ function scenarioFs(files: Record<string, string>, accessFails: string[] = []): 
     stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 0 }) as Stats,
     readdir: async () => [],
     unlink: async () => {},
+    readFileBuffer: async () => Buffer.alloc(0),
+    writeFileBuffer: async () => undefined,
     rm: async () => {},
   };
 }
@@ -241,6 +243,8 @@ describe("Evaluation Harness Engine", () => {
             ? [{ name: "01-sql-auth", isDirectory: () => true, isFile: () => false } as Dirent]
             : [],
         unlink: async () => {},
+        readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 
@@ -633,6 +637,8 @@ describe("Evaluation Harness Engine", () => {
         stat: async () => ({ isDirectory: () => false, isFile: () => true, size: 0 }) as Stats,
         readdir: async () => [],
         unlink: async () => {},
+        readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       } satisfies FileSystem;
 
@@ -654,6 +660,8 @@ describe("Evaluation Harness Engine", () => {
           { name: "empty", isDirectory: () => true, isFile: () => false } as Dirent,
         ],
         unlink: async () => {},
+        readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 
@@ -687,6 +695,8 @@ describe("Evaluation Harness Engine", () => {
           { name: "s", isDirectory: () => true, isFile: () => false } as Dirent,
         ],
         unlink: async () => {},
+        readFileBuffer: async () => Buffer.alloc(0),
+        writeFileBuffer: async () => undefined,
         rm: async () => {},
       };
 

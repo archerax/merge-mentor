@@ -20,6 +20,7 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconBrandGithub,
+  IconFileDescription,
   IconFileText,
   IconGitPullRequest,
   IconHistory,
@@ -50,6 +51,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "/review", label: "PR Review", icon: IconGitPullRequest },
   { to: "/pbi", label: "PBI Review", icon: IconListDetails },
   { to: "/project", label: "Project Review", icon: IconSitemap },
+  { to: "/prd", label: "PRD Review", icon: IconFileDescription },
   { to: "/reports", label: "Reports", icon: IconFileText },
   { to: "/audit", label: "Audit Log", icon: IconHistory },
   { to: "/config", label: "Configuration", icon: IconSettings },

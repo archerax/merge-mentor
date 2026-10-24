@@ -8,7 +8,9 @@
  *   entries) are served, which defeats DNS rebinding.
  * - **Origin / Fetch Metadata** - state-changing requests must be same-origin
  *   and API bodies must be `application/json` (a cross-site form or
- *   `text/plain` POST needs no CORS preflight).
+ *   `text/plain` POST needs no CORS preflight). Upload endpoints listed in
+ *   {@link UPLOAD_PATHS} also accept `application/octet-stream`, which, like
+ *   JSON, is not a CORS-safelisted type; `multipart/form-data` never is.
  * - **Per-launch token** - when `MM_UI_TOKEN` is set (the `ui` command always
  *   sets it) the request must carry it as a cookie. The token is handed to the
  *   browser once through the printed `?token=` URL and stored in a
@@ -25,6 +27,13 @@ const TOKEN_PARAM = "token";
 
 const LOOPBACK_HOSTS: readonly string[] = ["localhost", "127.0.0.1", "[::1]"];
 const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * API paths that accept a raw `application/octet-stream` body (file uploads).
+ * A cross-site page cannot send that content type without a CORS preflight,
+ * which the dashboard never grants.
+ */
+const UPLOAD_PATHS: ReadonlySet<string> = new Set(["/api/prd/stream"]);
 
 /** Environment inputs for the guard. */
 export interface RequestGuardConfig {
@@ -123,7 +132,10 @@ export function checkRequest(request: Request, config: RequestGuardConfig): Guar
     }
     const isApi = url.pathname.startsWith("/api/");
     const contentType = request.headers.get("content-type") ?? "";
-    if (isApi && !/^application\/json\b/i.test(contentType)) {
+    const isJson = /^application\/json\b/i.test(contentType);
+    const isUpload =
+      UPLOAD_PATHS.has(url.pathname) && /^application\/octet-stream\b/i.test(contentType);
+    if (isApi && !isJson && !isUpload) {
       return { action: "deny", status: 415, reason: "Content-Type must be application/json" };
     }
   }

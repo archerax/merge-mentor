@@ -112,25 +112,29 @@ function createAdapter(target: WorkItemTarget): PlatformAdapter {
     : new AzureDevOpsAdapter(target.config);
 }
 
-/** Creates the AI provider client for the resolved target's configuration. */
-function createAiClient(target: WorkItemTarget): {
+/**
+ * Creates the AI provider client for a resolved configuration. Shared with the
+ * PRD review, which has no platform target.
+ */
+export function createAiClient(config: Config): {
   readonly aiProvider: AIProviderType;
   readonly client: ReturnType<typeof createAIProvider>;
 } {
-  const aiProvider = target.config.aiProvider as AIProviderType;
+  const aiProvider = config.aiProvider as AIProviderType;
   const client = createAIProvider(aiProvider, {
-    model: target.config.aiModel,
-    token: target.config.copilotToken,
-    aiBaseUrl: target.config.aiBaseUrl,
-    aiApiKey: target.config.aiApiKey,
-    tempPath: target.config.tempPath,
+    model: config.aiModel,
+    token: config.copilotToken,
+    timeoutMs: config.aiTimeoutMs,
+    aiBaseUrl: config.aiBaseUrl,
+    aiApiKey: config.aiApiKey,
+    tempPath: config.tempPath,
   });
 
   return { aiProvider, client };
 }
 
 /** Builds an OutputWriter that forwards engine progress to the SSE emitter. */
-function createStreamOutput(emit: SseEmitter): OutputWriter {
+export function createStreamOutput(emit: SseEmitter): OutputWriter {
   return {
     log: (message) => emit.send({ type: "log", message }),
     error: (message) => emit.send({ type: "log", message: `⚠️ ${message}` }),
@@ -145,7 +149,7 @@ function createStreamOutput(emit: SseEmitter): OutputWriter {
  * Routes structured engine progress: AI stream deltas go to the batched
  * formatted `stream` channel, everything else becomes a `progress` frame.
  */
-function createProgressHandler(emit: SseEmitter): (event: ReviewProgressEvent) => void {
+export function createProgressHandler(emit: SseEmitter): (event: ReviewProgressEvent) => void {
   return (event) => {
     if (event.kind === "stream") {
       emit.pushStream(event.phase, event.delta);
@@ -273,7 +277,7 @@ async function executePBIReview(target: WorkItemTarget, emit: SseEmitter): Promi
   emit.send({ type: "status", message: "Resolving review configuration..." });
   announceStart(emit, target, "PBI");
 
-  const { aiProvider, client } = createAiClient(target);
+  const { aiProvider, client } = createAiClient(target.config);
   const engine = new PBIReviewEngine(createAdapter(target), client, {
     dryRun: !target.write,
     tempPath: target.config.tempPath,
@@ -315,7 +319,7 @@ async function executeProjectReview(target: WorkItemTarget, emit: SseEmitter): P
   emit.send({ type: "status", message: "Resolving review configuration..." });
   announceStart(emit, target, "project");
 
-  const { aiProvider, client } = createAiClient(target);
+  const { aiProvider, client } = createAiClient(target.config);
   const engine = new ProjectReviewEngine(createAdapter(target), client, {
     dryRun: !target.write,
     tempPath: target.config.tempPath,

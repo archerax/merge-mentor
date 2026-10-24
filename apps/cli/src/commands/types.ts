@@ -174,6 +174,28 @@ export interface PBIOptions {
   gitBackend?: string;
 }
 
+/** Options for the `prd` command. */
+export interface PrdOptions {
+  /** Document type, which selects the review rubric ('prd' or 'frd'). Default: 'prd'. */
+  type?: string;
+  /** Review embedded images. Default: `false` (images are listed as not reviewed). */
+  includeImages?: boolean;
+  /** AI provider ('copilot-sdk' or 'opencode-sdk'). Env: `MM_AI_PROVIDER`. */
+  provider?: string;
+  /** Copilot GitHub token. Env: `MM_COPILOT_TOKEN`. */
+  copilotToken?: string;
+  /** Timeout in milliseconds for all AI providers. Env: `MM_AI_TIMEOUT`. */
+  aiTimeout?: number;
+  /** Model name for the active AI provider. Env: `MM_AI_MODEL`. */
+  aiModel?: string;
+  /** OpenAI-compatible API base URL for AI providers that support BYOK. Env: `MM_AI_BASE_URL`. */
+  aiBaseUrl?: string;
+  /** API key for AI providers that support BYOK. Env: `MM_AI_API_KEY`. */
+  aiApiKey?: string;
+  /** Base path for reports and run data. Env: `MM_TEMP_PATH`. Default: `./.mergementor`. */
+  tempPath?: string;
+}
+
 /** Options for the `project` command. */
 export interface ProjectOptions {
   /** Root planning item or Epic ID. */

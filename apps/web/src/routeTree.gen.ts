@@ -13,10 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as ConfigRouteImport } from './routes/config'
 import { Route as PbiRouteImport } from './routes/pbi'
+import { Route as PrdRouteImport } from './routes/prd'
 import { Route as ProjectRouteImport } from './routes/project'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ApiPbiStreamRouteImport } from './routes/api/pbi/stream'
+import { Route as ApiPrdStreamRouteImport } from './routes/api/prd/stream'
 import { Route as ApiProjectStreamRouteImport } from './routes/api/project/stream'
 import { Route as ApiReviewPostRouteImport } from './routes/api/review/post'
 import { Route as ApiReviewStreamRouteImport } from './routes/api/review/stream'
@@ -42,6 +44,11 @@ const PbiRoute = PbiRouteImport.update({
   path: '/pbi',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrdRoute = PrdRouteImport.update({
+  id: '/prd',
+  path: '/prd',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectRoute = ProjectRouteImport.update({
   id: '/project',
   path: '/project',
@@ -60,6 +67,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const ApiPbiStreamRoute = ApiPbiStreamRouteImport.update({
   id: '/api/pbi/stream',
   path: '/api/pbi/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPrdStreamRoute = ApiPrdStreamRouteImport.update({
+  id: '/api/prd/stream',
+  path: '/api/prd/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProjectStreamRoute = ApiProjectStreamRouteImport.update({
@@ -88,10 +100,12 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
   '/pbi': typeof PbiRoute
+  '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
   '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
@@ -102,10 +116,12 @@ export interface FileRoutesByTo {
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
   '/pbi': typeof PbiRoute
+  '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
   '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
@@ -117,10 +133,12 @@ export interface FileRoutesById {
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
   '/pbi': typeof PbiRoute
+  '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
   '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
   '/api/review/stream': typeof ApiReviewStreamRoute
@@ -133,10 +151,12 @@ export interface FileRouteTypes {
     | '/audit'
     | '/config'
     | '/pbi'
+    | '/prd'
     | '/project'
     | '/reports'
     | '/review'
     | '/api/pbi/stream'
+    | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
@@ -147,10 +167,12 @@ export interface FileRouteTypes {
     | '/audit'
     | '/config'
     | '/pbi'
+    | '/prd'
     | '/project'
     | '/reports'
     | '/review'
     | '/api/pbi/stream'
+    | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
@@ -161,10 +183,12 @@ export interface FileRouteTypes {
     | '/audit'
     | '/config'
     | '/pbi'
+    | '/prd'
     | '/project'
     | '/reports'
     | '/review'
     | '/api/pbi/stream'
+    | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
     | '/api/review/stream'
@@ -176,10 +200,12 @@ export interface RootRouteChildren {
   AuditRoute: typeof AuditRoute
   ConfigRoute: typeof ConfigRoute
   PbiRoute: typeof PbiRoute
+  PrdRoute: typeof PrdRoute
   ProjectRoute: typeof ProjectRoute
   ReportsRoute: typeof ReportsRoute
   ReviewRoute: typeof ReviewRoute
   ApiPbiStreamRoute: typeof ApiPbiStreamRoute
+  ApiPrdStreamRoute: typeof ApiPrdStreamRoute
   ApiProjectStreamRoute: typeof ApiProjectStreamRoute
   ApiReviewPostRoute: typeof ApiReviewPostRoute
   ApiReviewStreamRoute: typeof ApiReviewStreamRoute
@@ -216,6 +242,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PbiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prd': {
+      id: '/prd'
+      path: '/prd'
+      fullPath: '/prd'
+      preLoaderRoute: typeof PrdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/project': {
       id: '/project'
       path: '/project'
@@ -242,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/api/pbi/stream'
       fullPath: '/api/pbi/stream'
       preLoaderRoute: typeof ApiPbiStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/prd/stream': {
+      id: '/api/prd/stream'
+      path: '/api/prd/stream'
+      fullPath: '/api/prd/stream'
+      preLoaderRoute: typeof ApiPrdStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/project/stream': {
@@ -280,10 +320,12 @@ const rootRouteChildren: RootRouteChildren = {
   AuditRoute: AuditRoute,
   ConfigRoute: ConfigRoute,
   PbiRoute: PbiRoute,
+  PrdRoute: PrdRoute,
   ProjectRoute: ProjectRoute,
   ReportsRoute: ReportsRoute,
   ReviewRoute: ReviewRoute,
   ApiPbiStreamRoute: ApiPbiStreamRoute,
+  ApiPrdStreamRoute: ApiPrdStreamRoute,
   ApiProjectStreamRoute: ApiProjectStreamRoute,
   ApiReviewPostRoute: ApiReviewPostRoute,
   ApiReviewStreamRoute: ApiReviewStreamRoute,

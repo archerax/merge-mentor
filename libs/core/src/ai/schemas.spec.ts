@@ -4,6 +4,10 @@ import {
   CrossFileReviewResponseSchema,
   FileReviewResponseSchema,
   PBIAlignmentResponseSchema,
+  PrdConsistencyResultSchema,
+  PrdFindingSchema,
+  PrdSectionResultSchema,
+  PrdVerifierResultSchema,
   ReviewResponseSchema,
 } from "./schemas.js";
 
@@ -93,5 +97,48 @@ describe("AI response schemas", () => {
 
     expect(parsed.file_results["a.ts"].findings[0].category).toBe("testing");
     expect(parsed.cross_file_findings[0].category).toBe("architecture");
+  });
+
+  describe("PRD schemas", () => {
+    it("normalises severity case and falls back to Major", () => {
+      expect(PrdFindingSchema.parse({ severity: "blocker" }).severity).toBe("Blocker");
+      expect(PrdFindingSchema.parse({ severity: "MINOR" }).severity).toBe("Minor");
+      expect(PrdFindingSchema.parse({ severity: "critical" }).severity).toBe("Major");
+      expect(PrdFindingSchema.parse({}).severity).toBe("Major");
+    });
+
+    it("treats a blank or null author question as absent", () => {
+      expect(PrdFindingSchema.parse({ authorQuestion: "" }).authorQuestion).toBeUndefined();
+      expect(PrdFindingSchema.parse({ authorQuestion: null }).authorQuestion).toBeUndefined();
+      expect(PrdFindingSchema.parse({ authorQuestion: "Who?" }).authorQuestion).toBe("Who?");
+    });
+
+    it("defaults missing section-pass fields", () => {
+      expect(PrdSectionResultSchema.parse({})).toEqual({
+        summary: "",
+        keyStatements: [],
+        findings: [],
+      });
+    });
+
+    it("defaults the consistency readiness and catches unknown verdicts", () => {
+      expect(PrdConsistencyResultSchema.parse({}).readiness).toEqual({
+        verdict: "needs-work",
+        summary: "",
+      });
+      expect(
+        PrdConsistencyResultSchema.parse({ readiness: { verdict: "maybe", summary: "x" } })
+          .readiness.verdict
+      ).toBe("needs-work");
+    });
+
+    it("rejects a verifier decision that is not a literal boolean", () => {
+      expect(
+        PrdVerifierResultSchema.safeParse({ verdicts: [{ id: 1, keep: "false" }] }).success
+      ).toBe(false);
+      expect(PrdVerifierResultSchema.parse({ verdicts: [{ id: 1, keep: false }] })).toEqual({
+        verdicts: [{ id: "1", keep: false, reason: "" }],
+      });
+    });
   });
 });

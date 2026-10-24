@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted ensures these are available when vi.mock() factory runs (which is hoisted)
@@ -6,12 +8,15 @@ const { mockSession, mockClient, MockCopilotClient } = vi.hoisted(() => {
     on: vi.fn(),
     sendAndWait: vi.fn(),
     disconnect: vi.fn(),
+    sessionId: "session-1",
   };
   const client = {
     start: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(session),
     stop: vi.fn().mockResolvedValue([]),
     getAuthStatus: vi.fn().mockResolvedValue({ isAuthenticated: true, authType: "token" }),
+    listModels: vi.fn().mockResolvedValue([]),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
   };
   const ClientCtor = vi.fn().mockImplementation(function () {
     return client;
@@ -94,6 +99,13 @@ function createProviderWithInvalidByok(): CopilotSdkProvider {
   } satisfies AIProviderOptions);
 }
 
+/** Contents of every Copilot SDK transcript written so far. */
+const writtenTranscripts = () =>
+  vi
+    .mocked(nodeFs.writeFile)
+    .mock.calls.map(([, content]) => content as string)
+    .filter((content) => content.includes("COPILOT SDK PROVIDER TRANSCRIPT"));
+
 describe("CopilotSdkProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,6 +115,7 @@ describe("CopilotSdkProvider", () => {
     mockClient.start.mockResolvedValue(undefined);
     mockClient.createSession.mockResolvedValue(mockSession);
     mockClient.stop.mockResolvedValue([]);
+    mockClient.deleteSession.mockResolvedValue(undefined);
     mockClient.getAuthStatus.mockResolvedValue({ isAuthenticated: true, authType: "token" });
   });
 
@@ -238,6 +251,29 @@ describe("CopilotSdkProvider", () => {
       );
     });
 
+    it("attaches image files after the diff files", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+
+      const resultPromise = provider.executePrompt("Review these images", {
+        promptType: "prd-image",
+        diffFiles: ["/tmp/diff1.patch"],
+        imageFiles: [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockSession.sendAndWait).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [
+            { type: "file", path: "/tmp/diff1.patch" },
+            { type: "file", path: "/tmp/run/images/img1.png" },
+          ],
+        }),
+        expect.any(Number)
+      );
+    });
+
     it("records attached diff files in the transcript header", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();
@@ -255,6 +291,46 @@ describe("CopilotSdkProvider", () => {
       expect(transcript).toContain("Diff attachments: 2 file(s)");
       expect(transcript).toContain("  - /tmp/diff1.patch");
       expect(transcript).toContain("  - /tmp/diff2.patch");
+    });
+
+    it("records attached image files in the transcript for success and failure saves", async () => {
+      const imageFiles = [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }];
+
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+      const ok = provider.executePrompt("Review these images", { imageFiles });
+      await vi.runAllTimersAsync();
+      await ok;
+      expect(writtenTranscripts().at(-1)).toContain("Image attachments: 1 file(s)");
+      expect(writtenTranscripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
+
+      const failing = createProvider(1, 5000);
+      mockSession.sendAndWait.mockRejectedValue(new Error("SDK error"));
+      const failed = failing.executePrompt("Review these images", { imageFiles }).catch(() => {});
+      await vi.runAllTimersAsync();
+      await failed;
+      expect(writtenTranscripts().at(-1)).toContain("Status: failure");
+      expect(writtenTranscripts().at(-1)).toContain("  - /tmp/run/images/img1.png");
+    });
+
+    it("writes the transcript to the per-request transcript directory when given", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        transcriptDir: "/runs/run-1/transcripts",
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const runTranscripts = "/runs/run-1/transcripts";
+      expect(nodeFs.mkdir).toHaveBeenCalledWith(runTranscripts, { recursive: true });
+      const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
+      expect(
+        paths.some((file) => file.startsWith(path.join(runTranscripts, "transcript-sdk-")))
+      ).toBe(true);
+      const sharedDir = path.join(process.cwd(), ".mergementor", "transcripts");
+      expect(paths.some((file) => file.startsWith(sharedDir))).toBe(false);
     });
 
     it("records that no diffs were attached in the transcript header", async () => {
@@ -722,6 +798,90 @@ describe("CopilotSdkProvider", () => {
       await rejection;
 
       expect(mockSession.disconnect).toHaveBeenCalled();
+    });
+
+    it("keeps session data by default", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockClient.deleteSession).not.toHaveBeenCalled();
+    });
+
+    it("deletes session data after the request when discardSession is set", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(mockSession.disconnect).toHaveBeenCalled();
+      expect(mockClient.deleteSession).toHaveBeenCalledWith("session-1");
+    });
+
+    it("deletes session data even when the prompt fails", async () => {
+      const provider = createProvider();
+      mockSession.sendAndWait.mockRejectedValue(new Error("SDK error"));
+
+      const promise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      const rejection = promise.catch((e) => e);
+      await vi.runAllTimersAsync();
+      await rejection;
+
+      expect(mockClient.deleteSession).toHaveBeenCalledWith("session-1");
+    });
+
+    it("does not fail if deleting session data throws", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      mockClient.deleteSession.mockRejectedValue(new Error("delete failed"));
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+      });
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.parsed).toEqual({ findings: [] });
+    });
+
+    it("tells the caller when session data could not be deleted", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      mockClient.deleteSession.mockRejectedValue(new Error("delete failed"));
+      const onSessionDiscardFailed = vi.fn();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+        onSessionDiscardFailed,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(onSessionDiscardFailed).toHaveBeenCalledWith("delete failed");
+    });
+
+    it("does not report a discard failure when deletion succeeds", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      const onSessionDiscardFailed = vi.fn();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+        onSessionDiscardFailed,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(onSessionDiscardFailed).not.toHaveBeenCalled();
     });
 
     it("does not fail if session.disconnect throws", async () => {
@@ -2038,6 +2198,97 @@ describe("createReviewPermissionHandler", () => {
       // Tool finding
       expect(parsed.findings[1].line).toBe(15);
       expect(parsed.findings[1].message).toBe("Tool finding body");
+    });
+  });
+});
+
+function vision(supports: boolean, limits: Record<string, unknown> = {}) {
+  return {
+    id: "Claude-Sonnet-4.6",
+    name: "Claude Sonnet 4.6",
+    capabilities: {
+      supports: { vision: supports, reasoningEffort: false },
+      limits: { max_context_window_tokens: 200_000, ...limits },
+    },
+  };
+}
+
+describe("CopilotSdkProvider.checkImageSupport", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.start.mockResolvedValue(undefined);
+    mockClient.listModels.mockResolvedValue([]);
+  });
+
+  it("cannot check automatic model selection or a BYOK endpoint", async () => {
+    await expect(new CopilotSdkProvider().checkImageSupport()).resolves.toMatchObject({
+      supported: false,
+      reason: expect.stringContaining("chosen automatically"),
+    });
+    await expect(
+      new CopilotSdkProvider({
+        model: "gpt-5",
+        aiBaseUrl: "https://ai.example.test/v1",
+      }).checkImageSupport()
+    ).resolves.toMatchObject({ supported: false, reason: expect.stringContaining("BYOK") });
+    expect(mockClient.listModels).not.toHaveBeenCalled();
+  });
+
+  it("reports the model's vision capability and limits from the model list", async () => {
+    mockClient.listModels.mockResolvedValue([
+      vision(true, {
+        vision: {
+          supported_media_types: ["image/png", "image/jpeg"],
+          max_prompt_images: 5,
+          max_prompt_image_size: 3_000_000,
+        },
+      }),
+    ]);
+
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: true,
+      maxImagesPerRequest: 5,
+      maxImageBytes: 3_000_000,
+      mediaTypes: ["image/png", "image/jpeg"],
+    });
+
+    mockClient.listModels.mockResolvedValue([vision(true)]);
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({ supported: true });
+  });
+
+  it("keeps an explicit zero image limit instead of dropping it", async () => {
+    mockClient.listModels.mockResolvedValue([
+      vision(true, { vision: { max_prompt_images: 0, max_prompt_image_size: 0 } }),
+    ]);
+
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({ supported: true, maxImagesPerRequest: 0, maxImageBytes: 0 });
+  });
+
+  it("reports text-only, unknown and unlisted models as unsupported", async () => {
+    mockClient.listModels.mockResolvedValue([vision(false)]);
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: false,
+      reason: 'the model "claude-sonnet-4.6" does not accept images',
+    });
+
+    await expect(
+      new CopilotSdkProvider({ model: "other-model" }).checkImageSupport()
+    ).resolves.toMatchObject({ supported: false, reason: expect.stringContaining("not in the") });
+
+    mockClient.listModels.mockRejectedValue(new Error("not authenticated"));
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({
+      supported: false,
+      reason: "the Copilot model list could not be read (not authenticated)",
     });
   });
 });

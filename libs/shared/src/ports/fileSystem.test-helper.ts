@@ -8,7 +8,9 @@ import type { FileSystem } from "./fileSystem.js";
 export function createStubFileSystem(overrides?: Partial<FileSystem>): FileSystem {
   return {
     readFile: vi.fn().mockResolvedValue(""),
+    readFileBuffer: vi.fn().mockResolvedValue(Buffer.alloc(0)),
     writeFile: vi.fn().mockResolvedValue(undefined),
+    writeFileBuffer: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
     rm: vi.fn().mockResolvedValue(undefined),
     access: vi.fn().mockResolvedValue(undefined),

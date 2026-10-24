@@ -5,14 +5,14 @@ import { nodeFs } from "../ports/index.js";
 /**
  * Review report reader.
  *
- * The CLI persists markdown reports (PR reviews, PBI/project assessments,
+ * The CLI persists markdown reports (PR reviews, PBI/project assessments, PRD/FRD reviews,
  * implementation plans, staged reviews) under `.mergementor/reports/`. This
  * module lists and reads those files back as typed summaries so tools such as
  * the web UI can render review history without re-implementing file handling.
  */
 
 /** Category of a persisted report, derived from its file name. */
-export type ReportKind = "review" | "pbi" | "project" | "plan" | "stage" | "report";
+export type ReportKind = "review" | "pbi" | "project" | "prd" | "plan" | "stage" | "report";
 
 /** Metadata describing a persisted markdown report. */
 export interface ReportSummary {
@@ -79,6 +79,7 @@ export function classifyReport(name: string): ReportKind {
   if (name.startsWith("merge-mentor-plan-")) return "plan";
   if (name.startsWith("pbi-")) return "pbi";
   if (name.startsWith("project-")) return "project";
+  if (name.startsWith("prd-")) return "prd";
   if (name.startsWith("stage-")) return "stage";
   if (name.endsWith("-review-profile-report.md")) return "review";
   return "report";

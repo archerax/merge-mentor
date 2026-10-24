@@ -85,6 +85,30 @@ export interface ExecutePromptOptions {
   readonly diffFiles?: string[];
   /** Optional callback invoked with streaming output data chunks. */
   readonly onStreamData?: (chunk: string) => void;
+  /**
+   * Image files to attach to the prompt. Only send these after
+   * {@link AIProviderClient.checkImageSupport} reported support for the
+   * configured model; providers attach them by path.
+   */
+  readonly imageFiles?: readonly PromptImageFile[];
+  /**
+   * Directory for this request's transcripts instead of the shared
+   * `<tempPath>/transcripts`. Flows that must be able to delete everything a
+   * run produced (e.g. `prd`) point this into their own run directory.
+   */
+  readonly transcriptDir?: string;
+  /**
+   * Permanently delete any session state the provider keeps for this request
+   * (e.g. the Copilot runtime's on-disk conversation history) once it ends.
+   * Set by flows whose prompts hold confidential content that must not
+   * outlive the run (e.g. `prd`).
+   */
+  readonly discardSession?: boolean;
+  /**
+   * Called when `discardSession` was requested but the provider could not
+   * delete the session data, so the caller can tell the user it may remain.
+   */
+  readonly onSessionDiscardFailed?: (reason: string) => void;
   /** Hint for the type of review prompt being sent (avoids substring inference). */
   readonly promptType?:
     | "file-review"
@@ -95,8 +119,37 @@ export interface ExecutePromptOptions {
     | "multi-agent-subagent"
     | "multi-agent-synthesizer"
     | "plan"
-    | "project";
+    | "project"
+    | "prd-section"
+    | "prd-consistency"
+    | "prd-image"
+    | "prd-verify";
 }
+
+/** An image file attached to a prompt. */
+export interface PromptImageFile {
+  /** Absolute path of the image file. */
+  readonly path: string;
+  /** MIME type, e.g. `image/png`. */
+  readonly mimeType: string;
+}
+
+/** Whether the configured provider and model accept image input. */
+export type ImageInputSupport =
+  | {
+      readonly supported: true;
+      /** Most images the model accepts in one request, when the provider reports it. */
+      readonly maxImagesPerRequest?: number;
+      /** Largest image in bytes the model accepts, when the provider reports it. */
+      readonly maxImageBytes?: number;
+      /** MIME types the model accepts, when the provider reports them. */
+      readonly mediaTypes?: readonly string[];
+    }
+  | {
+      readonly supported: false;
+      /** Plain-language reason, e.g. 'the model "x" does not accept images'. */
+      readonly reason: string;
+    };
 
 /**
  * Interface for AI provider implementations.
@@ -111,6 +164,14 @@ export interface AIProviderClient {
    * @returns Response containing raw output and parsed JSON
    */
   executePrompt(prompt: string, options?: ExecutePromptOptions): Promise<AIResponse>;
+
+  /**
+   * Reports whether the configured model accepts image input (used by
+   * `prd --include-images`). Providers that cannot tell leave this out, which
+   * callers treat as "not supported". Never throws: failures to look up the
+   * model are reported as not supported, with the reason.
+   */
+  checkImageSupport?(): Promise<ImageInputSupport>;
 
   /**
    * Parses an AI response into a file review result.

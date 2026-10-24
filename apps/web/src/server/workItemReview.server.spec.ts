@@ -69,6 +69,7 @@ vi.mock("@merge-mentor/core/review/commentPosting.js", () => ({
   })),
 }));
 
+const { createAIProvider } = await import("@merge-mentor/core/ai/providerFactory.js");
 const { postPlannedComments } = await import("@merge-mentor/core/review/commentPosting.js");
 const { startPBIReview, startProjectReview, postWorkItemComments } =
   await import("./workItemReview.server.js");
@@ -144,6 +145,17 @@ describe("workItemReview.server", () => {
         dryRun: true,
       });
       expect(frames.at(-1)).toMatchObject({ type: "done" });
+    });
+
+    it("passes the configured AI timeout to the provider", async () => {
+      fs.appendFileSync(envFile, "MM_AI_TIMEOUT=45000\n", "utf8");
+
+      await collectRun(() => startPBIReview({ id: "43" }));
+
+      expect(createAIProvider).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ timeoutMs: 45_000 })
+      );
     });
 
     it("attaches a duplicate submit to the in-flight run", async () => {

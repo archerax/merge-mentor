@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   appendEvent,
   closeEventLog,
+  deleteRunsWhere,
   listRuns,
   openEventLog,
   pruneRuns,
@@ -136,5 +137,26 @@ describe("reviewRunStore.server", () => {
     const removed = pruneRuns(tempPath, { maxAgeMs: 1000 });
     expect(removed).toEqual(["old"]);
     expect(listRuns(tempPath).map((entry) => entry.runId)).toEqual(["fresh"]);
+  });
+
+  it("deletes only the runs matching a predicate on manifest and summary", () => {
+    writeManifest(tempPath, manifest({ runId: "prd-a", kind: "prd", status: "done" }));
+    writeSummary(tempPath, "prd-a", { prdRunId: "doc-1" });
+    writeManifest(tempPath, manifest({ runId: "prd-b", kind: "prd", status: "done" }));
+    writeSummary(tempPath, "prd-b", { prdRunId: "doc-2" });
+    writeManifest(tempPath, manifest({ runId: "pr-c", status: "done" }));
+
+    const removed = deleteRunsWhere(
+      tempPath,
+      (entry, summary) =>
+        entry.kind === "prd" && (summary as { prdRunId?: string } | null)?.prdRunId === "doc-1"
+    );
+
+    expect(removed).toEqual(["prd-a"]);
+    expect(
+      listRuns(tempPath)
+        .map((entry) => entry.runId)
+        .toSorted()
+    ).toEqual(["pr-c", "prd-b"]);
   });
 });

@@ -25,7 +25,7 @@ import { isReviewRunId } from "@merge-mentor/shared/utils/reviewRunId.js";
 import { writeFileAtomic } from "./atomicWrite.server.js";
 
 /** Which review kind produced a run. */
-export type ReviewRunKind = "pr" | "pbi" | "project";
+export type ReviewRunKind = "pr" | "pbi" | "project" | "prd";
 
 /** Lifecycle status persisted for a run. */
 export type ReviewRunStatus = "running" | "done" | "error";
@@ -202,6 +202,24 @@ export function listRuns(tempPath: string): ReviewRunManifest[] {
   }
   manifests.sort((a, b) => b.createdAt - a.createdAt);
   return manifests;
+}
+
+/**
+ * Deletes every stored run for which `predicate(manifest, summary)` is true.
+ * Returns the run ids that were removed.
+ */
+export function deleteRunsWhere(
+  tempPath: string,
+  predicate: (manifest: ReviewRunManifest, summary: unknown | null) => boolean
+): string[] {
+  const removed: string[] = [];
+  for (const manifest of listRuns(tempPath)) {
+    const dir = runDir(tempPath, manifest.runId);
+    if (!dir || !predicate(manifest, readSummary(tempPath, manifest.runId))) continue;
+    fs.rmSync(dir, { recursive: true, force: true });
+    removed.push(manifest.runId);
+  }
+  return removed;
 }
 
 /**

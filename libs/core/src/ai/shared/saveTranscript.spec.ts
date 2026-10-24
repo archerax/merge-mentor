@@ -22,6 +22,8 @@ const createMockDeps = (overrides?: Partial<SaveTranscriptDeps>) => {
     access: vi.fn(),
     stat: vi.fn(),
     unlink: vi.fn(),
+    readFileBuffer: vi.fn(),
+    writeFileBuffer: vi.fn(),
   };
 
   const clock: Clock = {
@@ -100,6 +102,22 @@ describe("saveTranscript", () => {
     );
   });
 
+  it("writes to the transcript directory override instead of <tempPath>/transcripts", async () => {
+    const { deps, writtenFiles, createdDirs } = createMockDeps({
+      transcriptDir: "/tmp/test/prd/run-1/transcripts",
+    });
+
+    await saveTranscript(deps, { prompt: "Doc text", success: true, attempt: 2 });
+
+    expect(createdDirs).toEqual(["/tmp/test/prd/run-1/transcripts"]);
+    expect(Object.keys(writtenFiles)).toEqual([
+      path.join(
+        "/tmp/test/prd/run-1/transcripts",
+        "transcript-test-2026-07-24T12-00-00-000Z-attempt-2-success.txt"
+      ),
+    ]);
+  });
+
   it("records attached files when diffs were attached", async () => {
     const { deps, writtenFiles } = createMockDeps();
 
@@ -142,6 +160,23 @@ describe("saveTranscript", () => {
         )
       ];
     expect(content).toContain("Diff attachments: none");
+  });
+
+  it("records attached image files separately from the diff attachments", async () => {
+    const { deps, writtenFiles } = createMockDeps();
+
+    await saveTranscript(deps, {
+      prompt: "Test prompt",
+      attachments: [],
+      imageAttachments: ["/tmp/run/images/img1.png"],
+      success: false,
+      attempt: 1,
+    });
+
+    const content = Object.values(writtenFiles)[0];
+    expect(content).toContain("Diff attachments: none");
+    expect(content).toContain("Image attachments: 1 file(s)");
+    expect(content).toContain("  - /tmp/run/images/img1.png");
   });
 
   it("records an unknown attachment state when attachments are not reported", async () => {

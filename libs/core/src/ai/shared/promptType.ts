@@ -9,6 +9,10 @@ export type PromptType =
   | "multi-agent-synthesizer"
   | "plan"
   | "project"
+  | "prd-section"
+  | "prd-consistency"
+  | "prd-image"
+  | "prd-verify"
   | "unknown";
 
 /**

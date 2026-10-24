@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { loadReport, loadReports } from "./reports.server.js";
+import { loadReport, loadReports, removePrdRun } from "./reports.server.js";
 
 /**
  * Server function that returns metadata for the most recent markdown reports.
@@ -23,4 +23,15 @@ export const getReport = createServerFn({
   .validator((data: { name: string }) => data)
   .handler(async ({ data }) => {
     return (await loadReport(data.name)) ?? null;
+  });
+
+/**
+ * Server function that deletes a PRD review run (reports, stored upload,
+ * extracted data and images, AI transcripts). The run id is validated server-side before any path is built.
+ */
+export const deletePrdReport = createServerFn({ method: "POST" })
+  .validator((data: { runId: string }) => data)
+  .handler(async ({ data }) => {
+    await removePrdRun(data.runId);
+    return { deleted: true };
   });

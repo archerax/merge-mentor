@@ -22,6 +22,11 @@ export interface SaveTranscriptDeps {
   logger: SaveTranscriptLogger;
   /** Base path under which the transcripts directory is created. */
   tempPath: string;
+  /**
+   * Directory to write the transcript to instead of `<tempPath>/transcripts`,
+   * e.g. a run directory that is deleted with the run.
+   */
+  transcriptDir?: string;
   /** Label rendered at the top of the transcript identifying the provider. */
   providerLabel: string;
   /** Prefix used for the generated transcript filename. */
@@ -50,6 +55,8 @@ export interface SaveTranscriptData {
    * array records that no files were attached.
    */
   attachments?: readonly string[];
+  /** Optional list of image files attached to the prompt; omitted from the transcript when empty. */
+  imageAttachments?: readonly string[];
   /** Whether the exchange succeeded. */
   success: boolean;
   /** Optional error message when the exchange failed. */
@@ -80,9 +87,18 @@ function formatAttachmentLines(attachments?: readonly string[]): string[] {
   ];
 }
 
+/** Renders header lines listing the image files attached to the prompt (none when there are none). */
+function formatImageAttachmentLines(imageAttachments?: readonly string[]): string[] {
+  if (!imageAttachments || imageAttachments.length === 0) return [];
+  return [
+    `Image attachments: ${imageAttachments.length} file(s)`,
+    ...imageAttachments.map((file) => `  - ${file}`),
+  ];
+}
+
 /**
  * Writes a debugging transcript of an AI exchange to a timestamped file under
- * `<tempPath>/transcripts`. Failures are logged as warnings rather than
+ * `<tempPath>/transcripts` (or `deps.transcriptDir` when set). Failures are logged as warnings rather than
  * throwing, so transcript writing never breaks the review flow.
  *
  * @param deps - Injected dependencies (filesystem, clock, logger, paths, labels).
@@ -94,7 +110,7 @@ export async function saveTranscript(
   data: SaveTranscriptData
 ): Promise<void> {
   try {
-    const transcriptDir = path.join(deps.tempPath, "transcripts");
+    const transcriptDir = deps.transcriptDir ?? path.join(deps.tempPath, "transcripts");
     await deps.fileSystem.mkdir(transcriptDir, { recursive: true });
 
     const timestamp = deps.clock.timestamp().replace(/[:.]/g, "-");
@@ -111,6 +127,7 @@ export async function saveTranscript(
       `Model: ${deps.model || "default"}`,
       `Attempt: ${data.attempt}`,
       ...formatAttachmentLines(data.attachments),
+      ...formatImageAttachmentLines(data.imageAttachments),
       data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
       "",
       "=".repeat(80),

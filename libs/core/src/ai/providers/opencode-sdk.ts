@@ -43,10 +43,35 @@ import type {
   AIProviderOptions,
   AIResponse,
   ExecutePromptOptions,
+  ImageInputSupport,
   FastReviewResult,
   ReasoningEffort,
   TokenUsage,
 } from "../types.js";
+
+/** The parts of an OpenCode model entry used for the image capability check. */
+interface OpencodeModelInfo {
+  readonly capabilities?: { readonly input?: { readonly image?: boolean } };
+  /** Older servers describe input types as a list instead. */
+  readonly modalities?: { readonly input?: readonly string[] };
+}
+
+/** Finds a model in the `config.providers()` response (shape checked at runtime). */
+function findOpencodeModel(
+  providers: unknown,
+  providerId: string,
+  modelId: string
+): OpencodeModelInfo | undefined {
+  if (!Array.isArray(providers)) return undefined;
+  const provider = providers.find(
+    (candidate): candidate is { models?: Record<string, unknown> } =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      (candidate as { id?: unknown }).id === providerId
+  );
+  const entry = provider?.models?.[modelId];
+  return typeof entry === "object" && entry !== null ? (entry as OpencodeModelInfo) : undefined;
+}
 
 /** Timeout for OpenCode server startup (connection), separate from prompt execution timeout. */
 const SERVER_STARTUP_TIMEOUT_MS = 30_000;
@@ -173,6 +198,56 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     );
   }
 
+  /**
+   * Looks up the configured `provider/model` in the OpenCode server's provider
+   * list and reports whether the model accepts image input
+   * (`capabilities.input.image`). Without an explicit model the default
+   * cannot be checked, so it is reported as unsupported.
+   */
+  async checkImageSupport(): Promise<ImageInputSupport> {
+    const model = this.model?.trim() ?? "";
+    const separator = model.indexOf("/");
+    if (separator <= 0 || separator === model.length - 1) {
+      return {
+        supported: false,
+        reason:
+          'image support cannot be checked without a model; set one that accepts images as "provider/model" with --ai-model (MM_AI_MODEL)',
+      };
+    }
+    const providerId = model.slice(0, separator);
+    const modelId = model.slice(separator + 1);
+
+    let providers: unknown;
+    try {
+      const { client } = await this.getClient();
+      const result = (await this.withTimeout(client.config.providers(), this.timeoutMs)) as {
+        data?: { providers?: unknown };
+        providers?: unknown;
+      };
+      providers = result.data?.providers ?? result.providers;
+    } catch (error) {
+      this.destroy();
+      this.logger.warn({ error: (error as Error).message }, "OpenCode provider list unavailable");
+      return {
+        supported: false,
+        reason: `the OpenCode provider list could not be read (${(error as Error).message})`,
+      };
+    }
+
+    const info = findOpencodeModel(providers, providerId, modelId);
+    if (!info) {
+      return {
+        supported: false,
+        reason: `the model "${model}" is not in the OpenCode provider list, so image support cannot be checked`,
+      };
+    }
+    const acceptsImages =
+      info.capabilities?.input?.image ?? info.modalities?.input?.includes("image") ?? false;
+    return acceptsImages
+      ? { supported: true }
+      : { supported: false, reason: `the model "${model}" does not accept images` };
+  }
+
   private async getClient(): Promise<{
     client: Awaited<ReturnType<typeof createOpencode>>["client"];
     server: Awaited<ReturnType<typeof createOpencode>>["server"];
@@ -284,6 +359,14 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           url: pathToFileURL(diffFile).href,
         });
       }
+      for (const image of options?.imageFiles ?? []) {
+        promptParts.push({
+          type: "file",
+          mime: image.mimeType,
+          filename: path.basename(image.path),
+          url: pathToFileURL(image.path).href,
+        });
+      }
 
       const body: {
         parts: Array<Record<string, unknown>>;
@@ -336,6 +419,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             prompt,
             rawResponse: JSON.stringify(result, null, 2),
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
+            transcriptDir: options?.transcriptDir,
             success: false,
             error: err.message,
             attempt,
@@ -362,6 +447,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: raw,
             tokenUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -386,6 +473,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
                 jsonOutput: JSON.stringify(parsed, null, 2),
                 tokenUsage,
                 attachments: options?.diffFiles,
+                imageAttachments: options?.imageFiles?.map((image) => image.path),
+                transcriptDir: options?.transcriptDir,
                 success: true,
                 attempt,
               });
@@ -432,6 +521,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
+            transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
           });
@@ -449,6 +540,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
+          transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
         });
@@ -461,6 +554,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       await this.saveTranscript({
         prompt,
         attachments: options?.diffFiles,
+        imageAttachments: options?.imageFiles?.map((image) => image.path),
+        transcriptDir: options?.transcriptDir,
         success: false,
         error: (error as Error).message,
         attempt,
@@ -483,24 +578,29 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    imageAttachments?: readonly string[];
+    /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
+    transcriptDir?: string;
     success: boolean;
     error?: string;
     attempt: number;
   }): Promise<void> {
+    const { transcriptDir, ...transcript } = data;
     return saveTranscript(
       {
         fileSystem: this.fileSystem,
         clock: this.clock,
         logger: this.logger,
         tempPath: this.tempPath,
+        ...(transcriptDir ? { transcriptDir } : {}),
         providerLabel: "OPENCODE SDK PROVIDER TRANSCRIPT",
         filePrefix: "transcript-opencode",
         displayName: "OpenCode SDK",
         model: this.model,
       },
       {
-        ...data,
-        attachments: data.attachments ?? [],
+        ...transcript,
+        attachments: transcript.attachments ?? [],
       }
     );
   }
