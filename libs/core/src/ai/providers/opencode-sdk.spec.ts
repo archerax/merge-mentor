@@ -223,6 +223,25 @@ describe("OpenCodeSdkProvider", () => {
       );
     });
 
+    it("records attached image files in the transcript", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt({ findings: [] });
+
+      const resultPromise = provider.executePrompt("Review these images", {
+        promptType: "prd-image",
+        imageFiles: [{ path: "/tmp/run/images/img1.png", mimeType: "image/png" }],
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      const transcript = vi
+        .mocked(nodeFs.writeFile)
+        .mock.calls.map(([, content]) => content as string)
+        .find((content) => content.includes("OPENCODE SDK PROVIDER TRANSCRIPT"));
+      expect(transcript).toContain("Image attachments: 1 file(s)");
+      expect(transcript).toContain("  - /tmp/run/images/img1.png");
+    });
+
     it("should write transcripts to the per-request transcript directory when given", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();

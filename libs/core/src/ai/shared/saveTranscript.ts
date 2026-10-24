@@ -55,6 +55,8 @@ export interface SaveTranscriptData {
    * array records that no files were attached.
    */
   attachments?: readonly string[];
+  /** Optional list of image files attached to the prompt; omitted from the transcript when empty. */
+  imageAttachments?: readonly string[];
   /** Whether the exchange succeeded. */
   success: boolean;
   /** Optional error message when the exchange failed. */
@@ -82,6 +84,15 @@ function formatAttachmentLines(attachments?: readonly string[]): string[] {
   return [
     `Diff attachments: ${attachments.length} file(s)`,
     ...attachments.map((file) => `  - ${file}`),
+  ];
+}
+
+/** Renders header lines listing the image files attached to the prompt (none when there are none). */
+function formatImageAttachmentLines(imageAttachments?: readonly string[]): string[] {
+  if (!imageAttachments || imageAttachments.length === 0) return [];
+  return [
+    `Image attachments: ${imageAttachments.length} file(s)`,
+    ...imageAttachments.map((file) => `  - ${file}`),
   ];
 }
 
@@ -116,6 +127,7 @@ export async function saveTranscript(
       `Model: ${deps.model || "default"}`,
       `Attempt: ${data.attempt}`,
       ...formatAttachmentLines(data.attachments),
+      ...formatImageAttachmentLines(data.imageAttachments),
       data.tokenUsage ? `Token Usage: ${JSON.stringify(data.tokenUsage, null, 2)}` : "",
       "",
       "=".repeat(80),

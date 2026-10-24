@@ -653,6 +653,7 @@ export class CopilotSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage: collectedUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
             transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
@@ -672,6 +673,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
           transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
@@ -698,6 +700,7 @@ export class CopilotSdkProvider implements AIProviderClient {
               jsonOutput: JSON.stringify(recovered.parsed, null, 2),
               tokenUsage: collectedUsage,
               attachments: options?.diffFiles,
+              imageAttachments: options?.imageFiles?.map((image) => image.path),
               transcriptDir: options?.transcriptDir,
               success: true,
               attempt,
@@ -713,6 +716,7 @@ export class CopilotSdkProvider implements AIProviderClient {
           rawResponse: streamedContent || undefined,
           tokenUsage: collectedUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
           transcriptDir: options?.transcriptDir,
           success: false,
           error: (error as Error).message,
@@ -976,6 +980,7 @@ export class CopilotSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    imageAttachments?: readonly string[];
     /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
     transcriptDir?: string;
     success: boolean;

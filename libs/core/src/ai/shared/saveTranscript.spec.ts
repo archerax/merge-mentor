@@ -162,6 +162,23 @@ describe("saveTranscript", () => {
     expect(content).toContain("Diff attachments: none");
   });
 
+  it("records attached image files separately from the diff attachments", async () => {
+    const { deps, writtenFiles } = createMockDeps();
+
+    await saveTranscript(deps, {
+      prompt: "Test prompt",
+      attachments: [],
+      imageAttachments: ["/tmp/run/images/img1.png"],
+      success: false,
+      attempt: 1,
+    });
+
+    const content = Object.values(writtenFiles)[0];
+    expect(content).toContain("Diff attachments: none");
+    expect(content).toContain("Image attachments: 1 file(s)");
+    expect(content).toContain("  - /tmp/run/images/img1.png");
+  });
+
   it("records an unknown attachment state when attachments are not reported", async () => {
     const { deps, writtenFiles } = createMockDeps();
 

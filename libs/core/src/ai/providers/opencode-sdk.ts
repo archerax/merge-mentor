@@ -419,6 +419,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             prompt,
             rawResponse: JSON.stringify(result, null, 2),
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
             transcriptDir: options?.transcriptDir,
             success: false,
             error: err.message,
@@ -446,6 +447,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: raw,
             tokenUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
             transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
@@ -471,6 +473,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
                 jsonOutput: JSON.stringify(parsed, null, 2),
                 tokenUsage,
                 attachments: options?.diffFiles,
+                imageAttachments: options?.imageFiles?.map((image) => image.path),
                 transcriptDir: options?.transcriptDir,
                 success: true,
                 attempt,
@@ -518,6 +521,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
             jsonOutput: JSON.stringify(parsed, null, 2),
             tokenUsage,
             attachments: options?.diffFiles,
+            imageAttachments: options?.imageFiles?.map((image) => image.path),
             transcriptDir: options?.transcriptDir,
             success: true,
             attempt,
@@ -536,6 +540,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
           jsonOutput: JSON.stringify(parsed, null, 2),
           tokenUsage,
           attachments: options?.diffFiles,
+          imageAttachments: options?.imageFiles?.map((image) => image.path),
           transcriptDir: options?.transcriptDir,
           success: true,
           attempt,
@@ -549,6 +554,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
       await this.saveTranscript({
         prompt,
         attachments: options?.diffFiles,
+        imageAttachments: options?.imageFiles?.map((image) => image.path),
         transcriptDir: options?.transcriptDir,
         success: false,
         error: (error as Error).message,
@@ -572,6 +578,7 @@ export class OpenCodeSdkProvider implements AIProviderClient {
     jsonOutput?: string;
     tokenUsage?: TokenUsage;
     attachments?: readonly string[];
+    imageAttachments?: readonly string[];
     /** Per-request transcript directory (`ExecutePromptOptions.transcriptDir`). */
     transcriptDir?: string;
     success: boolean;
