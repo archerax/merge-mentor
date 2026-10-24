@@ -339,10 +339,7 @@ function idsInSlice(piece: Piece, text: string, previous: Piece | undefined): st
 }
 
 function joinPieces(pieces: readonly Piece[]): { text: string; paragraphIds: string[] } {
-  const paragraphIds: string[] = [];
-  for (const piece of pieces) {
-    for (const id of piece.paragraphIds) if (!paragraphIds.includes(id)) paragraphIds.push(id);
-  }
+  const paragraphIds = [...new Set(pieces.flatMap((piece) => piece.paragraphIds))];
   return { text: pieces.map((piece) => piece.text).join("\n\n"), paragraphIds };
 }
 
