@@ -10,7 +10,7 @@
  *    finding whose quote cannot be found is dropped. Exact duplicates (same
  *    quote and dimension) are collapsed. Image findings are grounded by their
  *    image id instead: the image must exist, the finding is attributed to the
- *    image's section, and a quote that is neither found near the image nor
+ *    image's section, and a quote that is neither found in or next to the image's paragraph nor
  *    the image's alt text is cleared rather than causing a drop.
  * 2. **AI verifier pass.** The remaining findings, each with the document text
  *    around its quote, go to the model in batches; findings it rejects as
@@ -68,6 +68,8 @@ export interface PrdVerificationResult {
 const DEFAULT_BATCH_SIZE = 20;
 /** Maximum characters of document context sent with each candidate. */
 const MAX_CONTEXT_CHARS = 1_500;
+/** Paragraphs on each side of an image's own paragraph in which its quote may be found. */
+const IMAGE_QUOTE_RADIUS = 2;
 /** Quotes shorter than this (after normalisation) are too weak to locate anything. */
 const MIN_QUOTE_CHARS = 3;
 
@@ -193,6 +195,41 @@ export class DocumentTextIndex {
       return { sectionId, paragraphId: paragraphAt(entry, start) };
     }
     return undefined;
+  }
+
+  /**
+   * Finds `quote` only in the paragraph `paragraphId` and the `radius`
+   * paragraphs on either side of it within the same section.
+   */
+  locateNear(
+    quote: string,
+    sectionId: string,
+    paragraphId: string,
+    radius: number
+  ): QuoteLocation | undefined {
+    const segments = quoteSegments(quote);
+    const length = segments.reduce((sum, segment) => sum + segment.length, 0);
+    if (length < MIN_QUOTE_CHARS) return undefined;
+    const entry = this.sections.get(sectionId);
+    if (!entry) return undefined;
+    const at = entry.paragraphs.findIndex((paragraph) => paragraph.id === paragraphId);
+    if (at === -1) return undefined;
+    const first = Math.max(0, at - radius);
+    const window = entry.paragraphs.slice(first, at + radius + 1);
+    const offsets: number[] = [];
+    let joined = "";
+    for (const paragraph of window) {
+      if (joined.length > 0) joined += " ";
+      offsets.push(joined.length);
+      joined += normaliseForQuoteMatch(paragraph.text);
+    }
+    const start = findSegments(joined, segments);
+    if (start === undefined) return undefined;
+    let found: string | undefined;
+    offsets.forEach((offset, index) => {
+      if (offset <= start) found = window[index]?.id;
+    });
+    return { sectionId, paragraphId: found };
   }
 
   /**
@@ -330,7 +367,8 @@ export function checkQuotes(
 /**
  * Grounds an image finding by its image id: drops it when the document has no
  * such image, attributes it to the image's section, and keeps the quote only
- * when it is found near the image or is the image's alt text.
+ * when it is found in the image's paragraph or a few neighbouring ones, or is
+ * the image's alt text.
  */
 function groundImageFinding(
   index: DocumentTextIndex,
@@ -341,7 +379,9 @@ function groundImageFinding(
   if (!image) return undefined;
   const quote = candidate.quote.trim();
   const location =
-    quote.length > 0 ? index.locate(quote, index.subtree(image.sectionId)) : undefined;
+    quote.length > 0
+      ? index.locateNear(quote, image.sectionId, image.paragraphId, IMAGE_QUOTE_RADIUS)
+      : undefined;
   const isAltText =
     quote.length > 0 &&
     image.altText !== undefined &&

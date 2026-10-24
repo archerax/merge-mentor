@@ -450,4 +450,48 @@ describe("PrdVerifier", () => {
     expect(empty.findings).toEqual([]);
     expect(ai.executePrompt).not.toHaveBeenCalled();
   });
+  it("only matches an image quote in the image's paragraph and its near neighbours", async () => {
+    const doc = await parseDocx(
+      await buildDocx({
+        body: [
+          heading(1, "Flow"),
+          para("Far before the picture."),
+          para("Filler one."),
+          para("Filler two."),
+          para("Just before the picture."),
+          paraXml(imageRun("rIdImg1", "Payment flow")),
+          para("Right after the picture."),
+          para("Filler three."),
+          para("Filler four."),
+          para("Far after the picture."),
+          heading(2, "Details"),
+          para("Text in a subsection."),
+        ].join(""),
+        images: [{ relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG }],
+      })
+    );
+    const quotes = [
+      "Just before the picture.",
+      "Right after the picture.",
+      "Far before the picture.",
+      "Far after the picture.",
+      "Text in a subsection.",
+    ];
+
+    const result = checkQuotes(
+      new DocumentTextIndex(doc),
+      quotes.map((quote) => imageCandidate({ sectionId: "s1", quote, problem: quote })),
+      "prd"
+    );
+
+    // Distant and subsection quotes are cleared, but the image findings are kept.
+    expect(result.droppedUnsupportedQuote).toBe(0);
+    expect(result.findings.map((f) => [f.quote, f.sectionId])).toEqual([
+      ["Just before the picture.", "s1"],
+      ["Right after the picture.", "s1"],
+      ["", "s1"],
+      ["", "s1"],
+      ["", "s1"],
+    ]);
+  });
 });
