@@ -5,7 +5,8 @@
  * chunk when they fit in `maxChars`; otherwise the section's own content is a
  * chunk and each subsection is considered in turn. A section whose own content
  * is still too large is split at paragraph/table boundaries (oversized single
- * blocks are split at whitespace) with `overlapChars` of overlap, repeating the
+ * blocks are split at whitespace, oversized tables by row with the header
+ * repeated) with `overlapChars` of overlap, repeating the
  * heading on every part. Small neighbouring chunks are then merged so a
  * document with many short sections does not cost one call per heading.
  *
@@ -52,10 +53,25 @@ export const DEFAULT_CHUNK_OPTIONS: Required<ChunkOptions> = {
  */
 const HEADING_FRACTION = 4;
 
+/** Upper bound on a rendered row/column span, so a corrupt file cannot expand a row hugely. */
+const MAX_SPAN = 64;
+
 /** A rendered fragment of a section; the unit that packing works with. */
 interface Piece {
   readonly text: string;
   readonly paragraphIds: readonly string[];
+  /** Set on a rendered table so an oversized one can be split at row boundaries. */
+  readonly table?: TableParts;
+}
+
+/** A rendered table broken into the parts that oversized-table splitting needs. */
+interface TableParts {
+  /** The `[t1] Table:` line alone, the last-resort repeated context. */
+  readonly title: string;
+  /** The title plus the header rows and separator; repeated in every slice. */
+  readonly head: Piece;
+  /** One piece per body row, including the notes (images, comments) of its cells. */
+  readonly rows: readonly Piece[];
 }
 
 interface DraftChunk {
@@ -296,9 +312,50 @@ function packWithOverlap(pieces: readonly Piece[], size: number, overlap: number
   return groups;
 }
 
-/** Splits one oversized piece at whitespace into overlapping slices. */
+/**
+ * Splits an oversized table at row boundaries. Every slice repeats the table
+ * title and header rows, so a value stays next to its identifier and column
+ * labels. A row larger than the budget is split at whitespace as a last resort
+ * (each fragment still carries the header). Rows are not overlapped between
+ * slices: the repeated header is the shared context.
+ */
+function splitTable(parts: TableParts, size: number, overlap: number): Piece[] {
+  // A header taking more than half the budget would crowd out the rows.
+  const head: Piece =
+    parts.head.text.length > size / 2 ? { text: parts.title, paragraphIds: [] } : parts.head;
+  const room = Math.max(1, size - head.text.length - 1);
+  const slices: Piece[] = [];
+  let rows: Piece[] = [];
+  let length = 0;
+  const emit = (body: readonly Piece[]): void => {
+    slices.push({
+      text: [head.text, ...body.map((row) => row.text)].join("\n"),
+      paragraphIds: [...new Set([...head.paragraphIds, ...body.flatMap((r) => r.paragraphIds)])],
+    });
+  };
+  const flush = (): void => {
+    if (rows.length > 0) emit(rows);
+    rows = [];
+    length = 0;
+  };
+  for (const row of parts.rows) {
+    if (row.text.length > room) {
+      flush();
+      for (const fragment of splitPiece(row, room, overlap)) emit([fragment]);
+      continue;
+    }
+    if (rows.length > 0 && length + 1 + row.text.length > room) flush();
+    length += (rows.length > 0 ? 1 : 0) + row.text.length;
+    rows.push(row);
+  }
+  flush();
+  return slices.length > 0 ? slices : [{ text: head.text, paragraphIds: head.paragraphIds }];
+}
+
+/** Splits one oversized piece into slices: tables by row, anything else at whitespace. */
 function splitPiece(piece: Piece, size: number, overlap: number): Piece[] {
   if (piece.text.length <= size) return [piece];
+  if (piece.table) return splitTable(piece.table, size, overlap);
   const slices: Piece[] = [];
   let start = 0;
   while (start < piece.text.length) {
@@ -336,6 +393,13 @@ function idsInSlice(piece: Piece, text: string, previous: Piece | undefined): st
     ids.unshift(continued);
   }
   return ids;
+}
+
+function joinLines(pieces: readonly Piece[]): Piece {
+  return {
+    text: pieces.map((piece) => piece.text).join("\n"),
+    paragraphIds: [...new Set(pieces.flatMap((piece) => piece.paragraphIds))],
+  };
 }
 
 function joinPieces(pieces: readonly Piece[]): { text: string; paragraphIds: string[] } {
@@ -408,8 +472,7 @@ class Renderer {
     if (block.kind === "paragraph") {
       return { text: this.paragraph(block.paragraph), paragraphIds: [block.paragraph.id] };
     }
-    const paragraphIds: string[] = [];
-    return { text: this.table(block.table, paragraphIds), paragraphIds };
+    return this.table(block.table);
   }
 
   private paragraph(paragraph: DocxParagraph): string {
@@ -424,15 +487,72 @@ class Renderer {
     return lines.join("\n");
   }
 
-  private table(table: DocxTable, paragraphIds: string[]): string {
-    const notes: string[] = [];
-    const rows = table.rows.map((row) => {
-      const cells = row.cells.map((cell) =>
-        this.cellText(cell.blocks, paragraphIds, notes).replace(/\|/g, "\\|")
-      );
-      return `| ${cells.join(" | ")} |`;
-    });
-    return [`[${table.id}] Table:`, ...rows, ...notes].join("\n");
+  /**
+   * Renders a table as pipe rows. Leading header rows (`isHeader`) are followed
+   * by a markdown-style `| --- |` separator. Merged cells keep their text, with
+   * paragraph ids, in the first cell they cover and repeat it (without ids)
+   * across the other columns and rows they span, so every row has one entry per
+   * column. Images and comments of a row's cells follow that row.
+   */
+  private table(table: DocxTable): Piece {
+    const title = `[${table.id}] Table:`;
+    const headRows: Piece[] = [];
+    const bodyRows: Piece[] = [];
+    const carried = new Map<number, { text: string; left: number }>();
+    let inHeader = true;
+    let columns = 0;
+    for (const row of table.rows) {
+      const paragraphIds: string[] = [];
+      const notes: string[] = [];
+      const entries: string[] = [];
+      const fillCarried = (): void => {
+        for (let spanned = carried.get(entries.length); spanned;) {
+          const column = entries.length;
+          entries.push(spanned.text);
+          spanned.left -= 1;
+          if (spanned.left === 0) carried.delete(column);
+          spanned = carried.get(entries.length);
+        }
+      };
+      for (const cell of row.cells) {
+        fillCarried();
+        const before = paragraphIds.length;
+        const raw = this.cellText(cell.blocks, paragraphIds, notes);
+        let plain = raw;
+        for (const id of paragraphIds.slice(before)) plain = plain.replaceAll(`[${id}] `, "");
+        const text = raw.replace(/\|/g, "\\|");
+        const repeat = plain.replace(/\|/g, "\\|");
+        const colSpan = Math.min(Math.max(1, cell.colSpan), MAX_SPAN);
+        const rowSpan = Math.min(Math.max(1, cell.rowSpan), MAX_SPAN);
+        const first = entries.length;
+        entries.push(text);
+        for (let k = 1; k < colSpan; k += 1) entries.push(repeat);
+        if (rowSpan > 1) {
+          for (let k = 0; k < colSpan; k += 1) {
+            carried.set(first + k, { text: repeat, left: rowSpan - 1 });
+          }
+        }
+      }
+      fillCarried();
+      columns = Math.max(columns, entries.length);
+      const piece: Piece = {
+        text: [`| ${entries.join(" | ")} |`, ...notes].join("\n"),
+        paragraphIds,
+      };
+      inHeader = inHeader && row.isHeader;
+      (inHeader ? headRows : bodyRows).push(piece);
+    }
+    const separator: Piece[] =
+      headRows.length > 0
+        ? [
+            {
+              text: `| ${Array.from({ length: columns }, () => "---").join(" | ")} |`,
+              paragraphIds: [],
+            },
+          ]
+        : [];
+    const head = joinLines([{ text: title, paragraphIds: [] }, ...headRows, ...separator]);
+    return { ...joinLines([head, ...bodyRows]), table: { title, head, rows: bodyRows } };
   }
 
   private cellText(blocks: readonly DocxBlock[], paragraphIds: string[], notes: string[]): string {

@@ -57,6 +57,29 @@ function doc(sections: DocxSection[], extra: Partial<DocxDocument> = {}): DocxDo
   };
 }
 
+const cell = (text: string, colSpan = 1, rowSpan = 1) => ({
+  blocks: [p(text)],
+  colSpan,
+  rowSpan,
+});
+
+const tp = (id: string, text: string) => ({
+  kind: "paragraph" as const,
+  paragraph: { id, text, commentIds: [], imageIds: [] },
+});
+
+const tableBlock = (
+  rows: { isHeader: boolean; cells: ReturnType<typeof cell>[] }[]
+): DocxBlock => ({ kind: "table", table: { id: "t1", rows } });
+
+const row = (id: string, key: string, value: string, isHeader = false) => ({
+  isHeader,
+  cells: [
+    { colSpan: 1, rowSpan: 1, blocks: [tp(`${id}k`, key)] },
+    { colSpan: 1, rowSpan: 1, blocks: [tp(`${id}v`, value)] },
+  ],
+});
+
 const words = (count: number, word = "word") => Array.from({ length: count }, () => word).join(" ");
 
 describe("chunkDocument", () => {
@@ -206,6 +229,103 @@ describe("chunkDocument", () => {
     expect(chunks.at(-1)?.paragraphIds).toContain("tp15");
     const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
     expect(rows.filter((_, i) => !covered.has(`tp${i}`))).toEqual([]);
+  });
+
+  describe("table rendering", () => {
+    it("marks header rows with a separator and repeats merged cells across spans", () => {
+      const document = doc([
+        s("s1", "Matrix", [
+          tableBlock([
+            { isHeader: true, cells: [cell("ID"), cell("Scope", 2)] },
+            { isHeader: true, cells: [cell("Req"), cell("In"), cell("Out")] },
+            { isHeader: false, cells: [cell("FR-1", 1, 2), cell("Login"), cell("SSO")] },
+            { isHeader: false, cells: [cell("Logout"), cell("Cookies")] },
+          ]),
+        ]),
+      ]);
+
+      const [chunk] = chunkDocument(document);
+      const lines = chunk?.text.split("\n") ?? [];
+
+      const rendered = lines.slice(lines.indexOf("[t1] Table:"));
+      expect(rendered[1]).toMatch(/^\| \[p\d+\] ID \| \[p\d+\] Scope \| Scope \|$/);
+      expect(rendered[2]).toMatch(/^\| \[p\d+\] Req \| \[p\d+\] In \| \[p\d+\] Out \|$/);
+      expect(rendered[3]).toBe("| --- | --- | --- |");
+      expect(rendered[4]).toMatch(/^\| \[p\d+\] FR-1 \| \[p\d+\] Login \| \[p\d+\] SSO \|$/);
+      // The row-spanned cell is repeated in the next row's first column.
+      expect(rendered[5]).toMatch(/^\| FR-1 \| \[p\d+\] Logout \| \[p\d+\] Cookies \|$/);
+      // Repeated copies carry no ids, so each paragraph id appears once.
+      expect(chunk?.paragraphIds).toHaveLength(new Set(chunk?.paragraphIds).size);
+    });
+
+    it("does not add a separator when no row is a header", () => {
+      const document = doc([s("s1", "M", [tableBlock([{ isHeader: false, cells: [cell("a")] }])])]);
+      expect(chunkDocument(document)[0]?.text).not.toContain("---");
+    });
+  });
+
+  describe("oversized tables", () => {
+    it("splits by rows, repeating the header, when rows exceed the budget several times over", () => {
+      const rows = Array.from({ length: 30 }, (_, i) =>
+        row(`r${i}`, `FR-${i}`, words(12, `v${i}`))
+      );
+      const matrix = {
+        kind: "table" as const,
+        table: { id: "t1", rows: [row("h", "ID", "Requirement", true), ...rows] },
+      };
+
+      const chunks = chunkDocument(doc([s("s1", "Matrix", [matrix])]), {
+        maxChars: 400,
+        minChars: 0,
+        overlapChars: 40,
+      });
+
+      expect(chunks.length).toBeGreaterThan(3);
+      for (const chunk of chunks) {
+        expect(chunk.text).toContain("[t1] Table:\n| [hk] ID | [hv] Requirement |\n| --- | --- |");
+        expect(chunk.paragraphIds).toContain("hk");
+        // Every body line is a whole row: an identifier and its value stay together.
+        for (const line of chunk.text.split("\n").filter((l) => /FR-\d+/.test(l))) {
+          expect(line).toMatch(/^\| \[r\d+k\] FR-(\d+) \| \[r\d+v\] (v\d+ ?)+ \|$/);
+        }
+        for (const id of chunk.paragraphIds.filter((i) => i !== "h-s1")) {
+          expect(chunk.text).toContain(`[${id}]`);
+        }
+      }
+      const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
+      expect(rows.flatMap((_, i) => [`r${i}k`, `r${i}v`]).filter((id) => !covered.has(id))).toEqual(
+        []
+      );
+    });
+
+    it("splits a single row bigger than the budget only as a last resort, keeping the header", () => {
+      const matrix = {
+        kind: "table" as const,
+        table: {
+          id: "t1",
+          rows: [
+            row("h", "ID", "Requirement", true),
+            row("a", "FR-1", "short"),
+            row("b", "FR-2", words(200)),
+            row("c", "FR-3", "tail"),
+          ],
+        },
+      };
+
+      const chunks = chunkDocument(doc([s("s1", "Matrix", [matrix])]), {
+        maxChars: 400,
+        minChars: 0,
+        overlapChars: 40,
+      });
+
+      expect(chunks.length).toBeGreaterThan(2);
+      for (const chunk of chunks) expect(chunk.text).toContain("[hk] ID");
+      expect(chunks.every((chunk) => chunk.text.length <= 400)).toBe(true);
+      expect(
+        chunks.some((chunk) => chunk.text.includes("FR-1") && chunk.text.includes("short"))
+      ).toBe(true);
+      expect(chunks.at(-1)?.text).toContain("FR-3");
+    });
   });
 
   it("keeps a positive body budget when the heading path is longer than maxChars", () => {
