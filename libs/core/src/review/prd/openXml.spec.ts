@@ -5,6 +5,7 @@ import {
   findMainDocumentPath,
   MAX_ACCUMULATING_RANGES,
   MAX_ANCHOR_CHARS,
+  MAX_TRACKED_RANGES,
 } from "./openXml.js";
 
 const t = (text: string) => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`;
@@ -63,6 +64,19 @@ describe("extractCommentAnchors", () => {
   it("swallows an unterminated comment instead of reading its contents as markup", () => {
     const xml = `<w:p><w:commentRangeStart w:id="1"/>${t("a")}<!-- <w:commentRangeEnd w:id="1"/>${t("b")}`;
     expect(extractCommentAnchors(xml).get("1")).toBe("a");
+  });
+
+  it("stops tracking new range ids beyond the cap", () => {
+    const starts = Array.from(
+      { length: MAX_TRACKED_RANGES + 10 },
+      (_, index) => `<w:commentRangeStart w:id="${index}"/>`
+    ).join("");
+    const xml = `<w:p>${starts}${t("x")}</w:p>`;
+    const anchors = extractCommentAnchors(xml);
+    expect(anchors.has(String(MAX_TRACKED_RANGES + 5))).toBe(false);
+    expect(anchors.size).toBeLessThanOrEqual(MAX_TRACKED_RANGES);
+    // Ranges tracked before the cap still accumulate (up to the accumulation limit).
+    expect(anchors.get("0")).toBe("x");
   });
 
   it("omits empty ranges and ignores markers without ids", () => {

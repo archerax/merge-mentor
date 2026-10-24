@@ -11,6 +11,8 @@
 export const MAX_ANCHOR_CHARS = 2_000;
 /** Overlapping comment ranges that accumulate text at once (the rest stay empty). */
 export const MAX_ACCUMULATING_RANGES = 32;
+/** Distinct comment range ids tracked per document; further ranges get no anchor. */
+export const MAX_TRACKED_RANGES = 5_000;
 const TRUNCATION_MARKER = "…";
 
 const DEFAULT_MAIN_DOCUMENT_PATH = "word/document.xml";
@@ -87,8 +89,11 @@ export function extractCommentAnchors(documentXml: string): Map<string, string> 
       const id = ID_ATTRIBUTE.exec(attributes)?.[1];
       if (id === undefined) continue;
       if (name === "w:commentRangeStart") {
+        if (!buffers.has(id)) {
+          if (buffers.size >= MAX_TRACKED_RANGES) continue;
+          buffers.set(id, "");
+        }
         open.add(id);
-        if (!buffers.has(id)) buffers.set(id, "");
       } else {
         open.delete(id);
       }
