@@ -112,6 +112,8 @@ interface FixtureImage {
   readonly relId: string;
   /** File name under `word/media/`. */
   readonly fileName: string;
+  /** Relationship `Target` as written in the rels file (default `media/<fileName>`). */
+  readonly target?: string;
   readonly data: Buffer;
 }
 
@@ -218,7 +220,7 @@ export async function buildDocx(options: FixtureOptions): Promise<Buffer> {
       : "",
     ...images.map(
       (img) =>
-        `<Relationship Id="${img.relId}" Type="${R_NS}/image" Target="media/${img.fileName}"/>`
+        `<Relationship Id="${img.relId}" Type="${R_NS}/image" Target="${img.target ?? `media/${img.fileName}`}"/>`
     ),
   ].join("");
   zip.file(

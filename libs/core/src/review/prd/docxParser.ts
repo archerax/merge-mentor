@@ -95,7 +95,7 @@ export async function parseDocx(
   let zip: JSZip;
   try {
     const result = await mammoth.convertToHtml(
-      { buffer },
+      { buffer: await withDecodedImageTargets(buffer) },
       {
         externalFileAccess: false,
         // The HTML output is discarded; avoid base64-encoding every image.
@@ -519,25 +519,113 @@ async function imagePartNames(zip: JSZip): Promise<string[]> {
     const target = attr("Target");
     if (!type || !target || !/\/image$/i.test(type)) continue;
     if (/^external$/i.test(attr("TargetMode") ?? "")) continue;
-    const resolved = resolveRelationshipTarget(target, baseDir);
-    if (resolved && !/\.(xml|rels)$/i.test(resolved)) names.add(resolved);
+    // The decoded name is what Word writes; the literal one covers generators
+    // that store the escaped text as the entry name.
+    for (const decode of [true, false]) {
+      const resolved = resolveRelationshipTarget(target, baseDir, decode);
+      if (resolved && !/\.(xml|rels)$/i.test(resolved)) names.add(resolved);
+    }
   }
   return [...names];
 }
 
-/** Resolves a relationship target against the main part's folder (or the package root when absolute). */
-function resolveRelationshipTarget(target: string, baseDir: string): string | undefined {
+/**
+ * Percent-decodes one path segment of a relationship target (Word writes
+ * `image 1.png` as `image%201.png`). A malformed escape, or a decoded segment
+ * that would act as a path separator or parent step, is left as written, so
+ * decoding can never change which folder a target points into.
+ */
+function decodeTargetSegment(segment: string): string {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+  return /[/\\\0]/.test(decoded) || decoded === ".." || decoded === "." ? segment : decoded;
+}
+
+/**
+ * Resolves a relationship target against the main part's folder (or the
+ * package root when absolute) to a zip entry name, decoding percent-escapes
+ * per segment when `decode` is set.
+ */
+function resolveRelationshipTarget(
+  target: string,
+  baseDir: string,
+  decode = true
+): string | undefined {
   const segments: string[] = [];
   const parts = target.startsWith("/")
     ? target.slice(1).split("/")
     : [...baseDir.split("/"), ...target.split("/")];
-  for (const part of parts) {
+  for (const raw of parts) {
+    const part = decode && raw !== ".." && raw !== "." ? decodeTargetSegment(raw) : raw;
     if (part === "" || part === ".") continue;
     if (part === "..") {
       if (segments.pop() === undefined) return undefined;
     } else segments.push(part);
   }
   return segments.join("/");
+}
+
+/**
+ * Mammoth looks a relationship target up in the zip exactly as written, so an
+ * image whose target is percent-encoded (`image%201.png` for the entry
+ * `image 1.png`) is not found and cannot be read. Rewrites such image targets
+ * in the main part's rels to the decoded entry name, so mammoth and this
+ * parser agree. Returns the input buffer unchanged when nothing needs it.
+ */
+async function withDecodedImageTargets(buffer: Buffer): Promise<Buffer> {
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(buffer);
+  } catch {
+    return buffer; // reported as unreadable by the main parse
+  }
+  const mainPath = await mainDocumentPath(zip);
+  const slash = mainPath.lastIndexOf("/");
+  const baseDir = slash < 0 ? "" : mainPath.slice(0, slash);
+  const relsPath = `${baseDir ? `${baseDir}/` : ""}_rels/${mainPath.slice(slash + 1)}.rels`;
+  const xml = await zip.file(relsPath)?.async("string");
+  if (!xml) return buffer;
+
+  let changed = false;
+  const rewritten = xml.replace(/<Relationship\b[^>]*>/g, (tag) => {
+    const attr = (name: string): string | undefined =>
+      new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`).exec(tag)?.slice(1).find(Boolean);
+    const type = attr("Type");
+    const target = attr("Target");
+    if (
+      !type ||
+      !target ||
+      !/\/image$/i.test(type) ||
+      /^external$/i.test(attr("TargetMode") ?? "")
+    ) {
+      return tag;
+    }
+    const literal = resolveRelationshipTarget(target, baseDir, false);
+    const decoded = resolveRelationshipTarget(target, baseDir);
+    if (!literal || !decoded || literal === decoded) return tag;
+    if (zip.file(literal) || !zip.file(decoded)) return tag;
+    // Mammoth resolves a relative target against `word/`, an absolute one
+    // against the package root; write the entry name in the matching form.
+    const entryTarget = target.startsWith("/") ? `/${decoded}` : decoded.slice(baseDir.length + 1);
+    if (!target.startsWith("/") && !decoded.startsWith(`${baseDir}/`)) return tag;
+    changed = true;
+    const escaped = entryTarget
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&apos;");
+    return tag.replace(
+      /(\sTarget\s*=\s*)(?:"[^"]*"|'[^']*')/,
+      (_match, prefix: string) => `${prefix}"${escaped}"`
+    );
+  });
+  if (!changed) return buffer;
+  zip.file(relsPath, rewritten);
+  return zip.generateAsync({ type: "nodebuffer" });
 }
 
 async function buildImages(

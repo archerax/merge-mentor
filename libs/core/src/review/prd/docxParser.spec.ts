@@ -432,6 +432,59 @@ describe("parseDocx", () => {
       expect(doc.warnings).toEqual([]);
     });
 
+    it("resolves percent-encoded image targets to the zip entry, as Word writes them", async () => {
+      const buffer = await buildDocx({
+        body: heading(1, "Scope") + paraXml(imageRun("rIdImg1", "Diagram")),
+        images: [
+          {
+            relId: "rIdImg1",
+            fileName: "image 1.png",
+            target: "media/image%201.png",
+            data: TINY_PNG,
+          },
+        ],
+      });
+
+      const doc = await parseDocx(buffer);
+
+      expect(doc.warnings).toEqual([]);
+      expect(doc.images[0]).toMatchObject({
+        partPath: "word/media/image 1.png",
+        sizeBytes: TINY_PNG.length,
+      });
+      const data = await readDocxImageData(buffer, doc.images);
+      expect(data.get("img1")).toEqual(TINY_PNG);
+    });
+
+    it("keeps a literal entry name when the target has a malformed or traversing escape", async () => {
+      const buffer = await buildDocx({
+        body:
+          heading(1, "Scope") +
+          paraXml(imageRun("rIdImg1", "Bad escape")) +
+          paraXml(imageRun("rIdImg2", "Encoded dots")),
+        images: [
+          {
+            relId: "rIdImg1",
+            fileName: "bad%zz.png",
+            target: "media/bad%zz.png",
+            data: TINY_PNG,
+          },
+          {
+            relId: "rIdImg2",
+            fileName: "other.png",
+            target: "media/%2e%2e/%2e%2e/%2e%2e/word/media/other.png",
+            data: Buffer.concat([TINY_PNG, Buffer.from("x")]),
+          },
+        ],
+      });
+
+      const doc = await parseDocx(buffer);
+
+      expect(doc.images[0]?.partPath).toBe("word/media/bad%zz.png");
+      // Encoded dots are never turned into a parent-folder step.
+      expect(doc.images[1]?.partPath).toBeUndefined();
+    });
+
     it("only inflates parts referenced as images, never other binaries", async () => {
       const base = await buildDocx({
         body: heading(1, "Scope") + paraXml(imageRun("rIdImg1", "Diagram")),
