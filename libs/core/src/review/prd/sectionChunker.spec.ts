@@ -429,6 +429,35 @@ describe("chunkDocument", () => {
       ].join("\n\n")
     );
   });
+
+  describe("a parent heading whose subtree exceeds maxChars", () => {
+    const options = { maxChars: 1_000, minChars: 0, overlapChars: 100, fallbackChunkChars: 1_000 };
+
+    it("keeps the parent heading and its own paragraph in a chunk", () => {
+      const own = p("Parent own paragraph.");
+      const document = doc([
+        s("s1", "Parent", [own], { childIds: ["s1.1", "s1.2"] }),
+        s("s1.1", "A", [p(words(120))], { parentId: "s1", path: ["Parent", "A"] }),
+        s("s1.2", "B", [p(words(120))], { parentId: "s1", path: ["Parent", "B"] }),
+      ]);
+      const chunks = chunkDocument(document, options);
+      const ownId = own.kind === "paragraph" ? own.paragraph.id : "";
+      const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
+      expect(covered.has("h-s1")).toBe(true);
+      expect(covered.has(ownId)).toBe(true);
+    });
+
+    it("keeps the parent heading paragraph when its own blocks need several parts", () => {
+      const document = doc([
+        s("s1", "Parent", [p(words(150)), p(words(150)), p(words(150))], { childIds: ["s1.1"] }),
+        s("s1.1", "A", [p("Child.")], { parentId: "s1", path: ["Parent", "A"] }),
+      ]);
+      const chunks = chunkDocument(document, options);
+      expect(chunks.filter((chunk) => chunk.sectionIds.includes("s1")).length).toBeGreaterThan(1);
+      const parentChunks = chunks.filter((chunk) => chunk.sectionIds.includes("s1"));
+      expect(parentChunks.some((chunk) => chunk.paragraphIds.includes("h-s1"))).toBe(true);
+    });
+  });
 });
 
 function idOf(document: DocxDocument, index: number): string {

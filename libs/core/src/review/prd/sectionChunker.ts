@@ -195,7 +195,10 @@ function splitSection(
       sectionIds: [section.id],
       headingPath: section.headingPath,
       text: head ? `${head}\n\n${body.text}` : body.text,
-      paragraphIds: body.paragraphIds,
+      // The heading line is shown in every part's header, so each part carries it.
+      paragraphIds: section.headingParagraphId
+        ? [section.headingParagraphId, ...body.paragraphIds]
+        : body.paragraphIds,
       part,
     };
   });
