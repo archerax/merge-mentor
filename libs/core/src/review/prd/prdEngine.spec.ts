@@ -973,6 +973,37 @@ describe("runPrdReview", () => {
       }
     });
 
+    it.each([
+      { imagesPerRequest: Number.NaN },
+      { imagesPerRequest: 0 },
+      { imagesPerRequest: 1.5 },
+      { maxImages: Number.NaN },
+      { maxImages: -1 },
+      { maxImageBytes: Number.POSITIVE_INFINITY },
+      { maxImageBytes: 0 },
+    ])("rejects unusable image limits %o before any AI call", async (imageLimits) => {
+      const ai = withSupport(
+        imageHandler(() => jsonResponse({ findings: [] })),
+        { supported: true }
+      );
+
+      await expect(
+        runPrdReview(options({ includeImages: true, imageLimits }), { aiClient: ai })
+      ).rejects.toThrow(/imageLimits/);
+      expect(ai.executePrompt).not.toHaveBeenCalled();
+    });
+
+    it("ignores non-finite provider image limits instead of dropping images", async () => {
+      const ai = withSupport(
+        imageHandler(() => jsonResponse({ findings: [] })),
+        { supported: true, maxImagesPerRequest: Number.NaN, maxImageBytes: Number.NaN }
+      );
+
+      const { report } = await runPrdReview(options({ includeImages: true }), { aiClient: ai });
+
+      expect(report.imageReview).toEqual({ supported: true, reviewed: 2 });
+    });
+
     it("counts unreviewed images as a gap only when image review was requested", async () => {
       const ai = withSupport(
         imageHandler(() => jsonResponse({ findings: [] })),

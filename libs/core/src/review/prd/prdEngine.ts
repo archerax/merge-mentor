@@ -204,7 +204,7 @@ type SectionPassResult = SectionPassSuccess | SectionPassFailure;
  * Reviews a PRD or FRD `.docx` and writes the Markdown and JSON reports.
  *
  * @throws {ValidationError} for an unsafe run id, a file over the size cap, a
- *   file that is not a `.docx`, or a document with no text
+ *   file that is not a `.docx`, a document with no text, or unusable image limits
  * @throws {DocumentParseError} when the file cannot be read or parsed
  * @throws {MergeMentorError} when every section pass failed
  */
@@ -245,6 +245,7 @@ class PrdReviewRun {
 
   async run(): Promise<PrdReviewResult> {
     const { options } = this;
+    validateImageLimits(options.imageLimits);
     const createdAt = this.clock.now();
     const fileName = sourceFileName(options.source);
     const runId = options.runId ?? createRunId(createdAt, fileName);
@@ -641,6 +642,13 @@ class PrdReviewRun {
         run.chunks,
         imagesPerRequest(this.options.imageLimits, support)
       );
+      // Safety net: a selected image that no batch carries must never vanish.
+      const batched = new Set(batches.flatMap((batch) => batch.images));
+      for (const image of selected) {
+        if (files.has(image.id) && !batched.has(image)) {
+          notReviewed.push(describe(image, "it could not be grouped into an AI request"));
+        }
+      }
       const concurrency = this.streaming
         ? 1
         : Math.max(1, this.options.concurrency ?? DEFAULT_CONCURRENCY);
@@ -713,7 +721,7 @@ class PrdReviewRun {
     );
     const maxBytes = Math.min(
       limits?.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES,
-      support.maxImageBytes ?? Number.POSITIVE_INFINITY
+      finiteLimit(support.maxImageBytes)
     );
     const maxImages = Math.max(0, limits?.maxImages ?? DEFAULT_MAX_IMAGES);
     const selected: DocxImage[] = [];
@@ -960,6 +968,33 @@ interface ImageBatch {
   readonly images: readonly DocxImage[];
 }
 
+/**
+ * Rejects explicit image limits that cannot work (NaN, infinite, fractional or
+ * non-positive), so a bad value fails the run up front instead of silently
+ * dropping images from the report. Omitted limits use the defaults.
+ */
+function validateImageLimits(limits: PrdImageReviewLimits | undefined): void {
+  if (!limits) return;
+  const counts: [string, number | undefined, number][] = [
+    ["maxImages", limits.maxImages, 0],
+    ["imagesPerRequest", limits.imagesPerRequest, 1],
+  ];
+  for (const [name, value, min] of counts) {
+    if (value !== undefined && (!Number.isInteger(value) || value < min)) {
+      throw new ValidationError("imageLimits", `${name} must be a whole number of at least ${min}`);
+    }
+  }
+  const bytes = limits.maxImageBytes;
+  if (bytes !== undefined && (!Number.isFinite(bytes) || bytes <= 0)) {
+    throw new ValidationError("imageLimits", "maxImageBytes must be a positive number");
+  }
+}
+
+/** A provider-reported limit, ignoring values that are not finite numbers. */
+function finiteLimit(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+}
+
 function imagesPerRequest(
   limits: PrdImageReviewLimits | undefined,
   support: Extract<ImageInputSupport, { supported: true }>
@@ -968,7 +1003,7 @@ function imagesPerRequest(
     1,
     Math.min(
       limits?.imagesPerRequest ?? DEFAULT_IMAGES_PER_REQUEST,
-      support.maxImagesPerRequest ?? Number.POSITIVE_INFINITY
+      finiteLimit(support.maxImagesPerRequest)
     )
   );
 }
