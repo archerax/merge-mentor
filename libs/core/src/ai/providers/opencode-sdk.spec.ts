@@ -233,7 +233,7 @@ describe("OpenCodeSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      const runTranscripts = path.join("/runs/run-1/transcripts");
+      const runTranscripts = "/runs/run-1/transcripts";
       expect(nodeFs.mkdir).toHaveBeenCalledWith(runTranscripts, { recursive: true });
       const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
       expect(paths).toHaveLength(1);
