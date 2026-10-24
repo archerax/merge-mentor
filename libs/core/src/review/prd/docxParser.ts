@@ -493,6 +493,45 @@ function locateByText(
 // Images
 // ---------------------------------------------------------------------------
 
+/**
+ * Names of the zip parts that the main document references as images, taken
+ * from the image relationships in `word/_rels/document.xml.rels`. Only these
+ * are inflated and hashed, so unrelated binaries (embedded OLE objects,
+ * fonts, ...) are never read.
+ */
+async function imagePartNames(zip: JSZip): Promise<string[]> {
+  const rels = zip.file("word/_rels/document.xml.rels");
+  if (!rels) return [];
+  const xml = await rels.async("string");
+  const names = new Set<string>();
+  for (const [tag] of xml.matchAll(/<Relationship\b[^>]*>/g)) {
+    const attr = (name: string): string | undefined =>
+      new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`).exec(tag)?.slice(1).find(Boolean);
+    const type = attr("Type");
+    const target = attr("Target");
+    if (!type || !target || !/\/image$/i.test(type)) continue;
+    if (/^external$/i.test(attr("TargetMode") ?? "")) continue;
+    const resolved = resolveRelationshipTarget(target);
+    if (resolved && !/\.(xml|rels)$/i.test(resolved)) names.add(resolved);
+  }
+  return [...names];
+}
+
+/** Resolves a relationship target against `word/` (or the package root when absolute). */
+function resolveRelationshipTarget(target: string): string | undefined {
+  const segments: string[] = [];
+  const parts = target.startsWith("/")
+    ? target.slice(1).split("/")
+    : ["word", ...target.split("/")];
+  for (const part of parts) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (segments.pop() === undefined) return undefined;
+    } else segments.push(part);
+  }
+  return segments.join("/");
+}
+
 async function buildImages(
   builder: DocumentBuilder,
   zip: JSZip
@@ -500,11 +539,12 @@ async function buildImages(
   if (builder.pendingImages.length === 0) return { images: [], warnings: [] };
 
   const partsByHash = new Map<string, string>();
-  for (const file of Object.values(zip.files)) {
-    if (file.dir || !file.name.startsWith("word/") || /\.(xml|rels)$/i.test(file.name)) continue;
+  for (const partName of await imagePartNames(zip)) {
+    const file = zip.file(partName);
+    if (!file) continue;
     const bytes = await file.async("nodebuffer");
     const hash = sha256(bytes);
-    if (!partsByHash.has(hash)) partsByHash.set(hash, file.name);
+    if (!partsByHash.has(hash)) partsByHash.set(hash, partName);
   }
 
   const warnings: string[] = [];

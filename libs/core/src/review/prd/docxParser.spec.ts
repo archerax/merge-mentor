@@ -432,6 +432,40 @@ describe("parseDocx", () => {
       expect(doc.warnings).toEqual([]);
     });
 
+    it("only inflates parts referenced as images, never other binaries", async () => {
+      const base = await buildDocx({
+        body: heading(1, "Scope") + paraXml(imageRun("rIdImg1", "Diagram")),
+        images: [{ relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG }],
+      });
+      const zip = await JSZip.loadAsync(base);
+      zip.file("word/embeddings/oleObject1.bin", Buffer.from("not an image"));
+      zip.file("word/media/unreferenced.png", Buffer.from("orphan"));
+      const buffer = await zip.generateAsync({ type: "nodebuffer" });
+      const proto = Object.getPrototypeOf(zip.file("word/document.xml")) as {
+        async: (...args: unknown[]) => Promise<unknown>;
+      };
+      const original = proto.async;
+      const inflated: string[] = [];
+      const spy = vi.spyOn(proto, "async").mockImplementation(function (
+        this: { name: string },
+        ...args: unknown[]
+      ) {
+        inflated.push(this.name);
+        return original.apply(this, args);
+      });
+
+      try {
+        const doc = await parseDocx(buffer);
+        expect(doc.images[0]?.partPath).toBe("word/media/image1.png");
+      } finally {
+        spy.mockRestore();
+      }
+
+      expect(inflated).toContain("word/media/image1.png");
+      expect(inflated).not.toContain("word/embeddings/oleObject1.bin");
+      expect(inflated).not.toContain("word/media/unreferenced.png");
+    });
+
     it("reads image bytes by part path for image review, checking the hash", async () => {
       const other = Buffer.concat([TINY_PNG, Buffer.from([1])]);
       const buffer = await buildDocx({
