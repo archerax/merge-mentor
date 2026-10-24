@@ -35,17 +35,23 @@ export const DEFAULT_STATS_PR_LIMIT = 100;
 /** Default window, keeping API usage bounded. */
 const DEFAULT_LIVE_WINDOW_DAYS = 30;
 
+/** Largest accepted `--limit`; each PR costs at least two API calls, so this bounds quota use. */
+const MAX_STATS_PR_LIMIT = 1000;
+
 /**
  * Parses the `--limit` option.
  *
  * @param value - Raw option value
- * @returns A positive integer
- * @throws InvalidArgumentError when the value is not a positive integer
+ * @returns An integer between 1 and {@link MAX_STATS_PR_LIMIT}
+ * @throws InvalidArgumentError when the value is not an integer in that range
  */
 export function parseLimit(value: string): number {
   const limit = Number(value);
   if (!Number.isInteger(limit) || limit <= 0) {
     throw new InvalidArgumentError("Expected a positive integer.");
+  }
+  if (limit > MAX_STATS_PR_LIMIT) {
+    throw new InvalidArgumentError(`Expected at most ${MAX_STATS_PR_LIMIT}.`);
   }
   return limit;
 }

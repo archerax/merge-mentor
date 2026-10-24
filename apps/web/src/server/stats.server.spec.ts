@@ -1,5 +1,6 @@
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { collectLiveReviewStats } from "@merge-mentor/core/review/reviewStats.js";
+import { initLogger } from "@merge-mentor/shared/logger.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadLiveStats } from "./stats.server.js";
@@ -7,7 +8,10 @@ import { loadLiveStats } from "./stats.server.js";
 vi.mock("@merge-mentor/config/config.js", () => ({ loadConfig: vi.fn(), validateConfig: vi.fn() }));
 vi.mock("@merge-mentor/core/review/reviewStats.js", () => ({ collectLiveReviewStats: vi.fn() }));
 vi.mock("@merge-mentor/shared/logger.js", () => ({ initLogger: vi.fn() }));
-vi.mock("./env.server.js", () => ({ refreshEnv: vi.fn() }));
+vi.mock("./env.server.js", () => ({
+  refreshEnv: vi.fn(),
+  resolveTempPath: vi.fn(() => "/project/.mergementor"),
+}));
 
 const githubAdapter = vi.hoisted(() =>
   vi.fn(function (this: { getProjectIdentifier: () => string }) {
@@ -36,9 +40,12 @@ const stats = {
 };
 
 function mockPlatform(defaultPlatform: string): void {
-  vi.mocked(loadConfig).mockReturnValue({ defaultPlatform, tempPath: "/tmp/mm" } as ReturnType<
-    typeof loadConfig
-  >);
+  vi.mocked(loadConfig).mockReturnValue({
+    defaultPlatform,
+    tempPath: "/tmp/mm",
+    github: { owner: "owner", repo: "repo" },
+    azure: { org: "org", project: "project", repo: "repo" },
+  } as ReturnType<typeof loadConfig>);
 }
 
 describe("loadLiveStats", () => {
@@ -91,6 +98,26 @@ describe("loadLiveStats", () => {
       throw new Error("MM_GITHUB_TOKEN required");
     });
     await expect(loadLiveStats(30)).rejects.toThrow(/MM_GITHUB_TOKEN/);
+  });
+
+  it("resolves config against the shared temp path and only initialises the logger on a scan", async () => {
+    await loadLiveStats(60);
+    await loadLiveStats(60);
+
+    expect(loadConfig).toHaveBeenCalledWith({ tempPath: "/project/.mergementor" });
+    expect(initLogger).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not share cached scans between repository owners", async () => {
+    await loadLiveStats(45);
+    vi.mocked(loadConfig).mockReturnValue({
+      defaultPlatform: "github",
+      tempPath: "/tmp/mm",
+      github: { owner: "other-owner", repo: "repo" },
+    } as ReturnType<typeof loadConfig>);
+    await loadLiveStats(45);
+
+    expect(collectLiveReviewStats).toHaveBeenCalledTimes(2);
   });
 
   it("reuses a scan within the TTL, then rescans", async () => {

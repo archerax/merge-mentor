@@ -8,7 +8,7 @@ import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 
-import { refreshEnv } from "./env.server.js";
+import { refreshEnv, resolveTempPath } from "./env.server.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -37,27 +37,35 @@ export async function loadLiveStats(days: number): Promise<LiveReviewStats> {
   }
 
   refreshEnv();
-  const config = loadConfig();
+  const config = loadConfig({ tempPath: resolveTempPath() });
   const platform = config.defaultPlatform as Platform;
   if (platform !== "github" && platform !== "azure") {
     throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
   }
   validateConfig(config, platform);
-  initLogger(config.tempPath);
 
-  const adapter =
-    platform === "github" ? new GitHubAdapter(config) : new AzureDevOpsAdapter(config);
-  const key = `${platform}:${adapter.getProjectIdentifier()}:${days}`;
+  const project =
+    platform === "github"
+      ? `${config.github.owner}/${config.github.repo}`
+      : `${config.azure.org}/${config.azure.project}/${config.azure.repo}`;
+  const key = `${platform}:${project}:${days}`;
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.stats;
+
+  // Only on a cache miss: initLogger resets the process-wide logger, which a concurrent review uses.
+  initLogger(config.tempPath);
+  const adapter =
+    platform === "github" ? new GitHubAdapter(config) : new AzureDevOpsAdapter(config);
 
   const stats = collectLiveReviewStats(adapter, {
     since: new Date(Date.now() - days * MS_PER_DAY),
     limit: MAX_PRS,
   });
   cache.set(key, { at: Date.now(), stats });
-  // Failed scans must not be served from the cache.
-  stats.catch(() => cache.delete(key));
+  // Failed scans must not be served from the cache (but never evict a newer scan's entry).
+  stats.catch(() => {
+    if (cache.get(key)?.stats === stats) cache.delete(key);
+  });
   return stats;
 }

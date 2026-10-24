@@ -52,6 +52,11 @@ describe("parseLimit", () => {
   it.each(["0", "-1", "1.5", "abc"])("rejects %s", (value) => {
     expect(() => parseLimit(value)).toThrow(/positive integer/);
   });
+
+  it("accepts the maximum and rejects anything above it", () => {
+    expect(parseLimit("1000")).toBe(1000);
+    expect(() => parseLimit("1001")).toThrow(/at most 1000/);
+  });
 });
 
 describe("formatLiveStats", () => {

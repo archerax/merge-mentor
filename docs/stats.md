@@ -32,7 +32,7 @@ The token needs the same read access as `review` (comments and pull requests).
 | Option                        | Description                                                           | Env Variable           | Default          |
 | ----------------------------- | --------------------------------------------------------------------- | ---------------------- | ---------------- |
 | `--since <date\|Nd>`          | Only count PRs/activity since a date (`2026-01-31`) or window (`30d`) | -                      | `30d`            |
-| `--limit <number>`            | Maximum number of PRs to inspect                                      | -                      | `100`            |
+| `--limit <number>`            | Maximum number of PRs to inspect (1-1000)                             | -                      | `100`            |
 | `--temp-path <path>`          | Base path for temporary files, including audit `logs`                 | `MM_TEMP_PATH`         | `./.mergementor` |
 | `--json`                      | Output statistics as JSON                                             | -                      | `false`          |
 | `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `github`         |
@@ -49,7 +49,7 @@ The token needs the same read access as `review` (comments and pull requests).
 - **PRs scanned**: PRs, open or closed, inside the window, newest first, up to `--limit`. A warning is shown when the limit is reached so you know older PRs were left out.
 - **PRs reviewed**: scanned PRs that carry at least one Merge Mentor comment.
 - **Comments posted**: Merge Mentor comments on those PRs, split into inline and general (PR-level, including the review summary). A comment counts only if it contains the bot identifier (`botCommentIdentifier`); on GitHub it must also come from the token's own account, the same rule `review` uses to recognise its comments.
-- PRs whose comments cannot be fetched are reported as unreadable and excluded from the totals.
+- PRs whose comments cannot be fetched are reported as unreadable and excluded from the totals; the command fails if none of the PRs can be read (for example with an expired token).
 
 Platform differences:
 
