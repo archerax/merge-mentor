@@ -373,6 +373,7 @@ class PrdReviewRun {
       failed.length === 0 &&
       skippedChunks.length === 0 &&
       consistency !== undefined &&
+      !imageReview.incomplete &&
       document.warnings.length === 0;
 
     const verdict = readinessFromCounts(counts, complete);
@@ -582,14 +583,21 @@ class PrdReviewRun {
   }): Promise<{
     candidates: PrdCandidateFinding[];
     notReviewed: PrdNotReviewedItem[];
+    /**
+     * True when image review was requested and an image was left unreviewed
+     * (an identical copy whose twin was reviewed is not a gap), so the report
+     * must not read as a complete review.
+     */
+    incomplete: boolean;
     summary?: PrdImageReviewSummary;
   }> {
     const { document } = run;
     const describe = imageDescriber(document);
-    if (document.images.length === 0) return { candidates: [], notReviewed: [] };
+    if (document.images.length === 0) return { candidates: [], notReviewed: [], incomplete: false };
     if (!this.options.includeImages) {
       return {
         candidates: [],
+        incomplete: false,
         notReviewed: document.images.map((image) =>
           describe(image, "images are not reviewed unless image review is turned on")
         ),
@@ -604,6 +612,7 @@ class PrdReviewRun {
         );
         return {
           candidates: [],
+          incomplete: true,
           notReviewed: document.images.map((image) =>
             describe(image, `image review is not available (${support.reason})`)
           ),
@@ -611,7 +620,7 @@ class PrdReviewRun {
         };
       }
 
-      const { selected, notReviewed } = this.selectImages(document, support, describe);
+      const { selected, notReviewed, duplicates } = this.selectImages(document, support, describe);
       const files = await this.extractImages(run.buffer, selected, run.paths);
       for (const image of selected) {
         if (!files.has(image.id)) {
@@ -648,7 +657,12 @@ class PrdReviewRun {
         );
       });
       this.output.log(`🖼️ Reviewed ${reviewed} of ${document.images.length} image(s).\n`);
-      return { candidates, notReviewed, summary: { supported: true, reviewed } };
+      return {
+        candidates,
+        notReviewed,
+        incomplete: notReviewed.some((item) => !duplicates.has(item)),
+        summary: { supported: true, reviewed },
+      };
     });
   }
 
@@ -672,7 +686,12 @@ class PrdReviewRun {
     document: DocxDocument,
     support: Extract<ImageInputSupport, { supported: true }>,
     describe: ImageDescriber
-  ): { selected: DocxImage[]; notReviewed: PrdNotReviewedItem[] } {
+  ): {
+    selected: DocxImage[];
+    notReviewed: PrdNotReviewedItem[];
+    /** The `notReviewed` items that are identical copies of a selected image. */
+    duplicates: ReadonlySet<PrdNotReviewedItem>;
+  } {
     const limits = this.options.imageLimits;
     const mediaTypes = new Set(
       (support.mediaTypes ?? DEFAULT_IMAGE_MEDIA_TYPES).map((type) => type.toLowerCase())
@@ -685,10 +704,12 @@ class PrdReviewRun {
     const selected: DocxImage[] = [];
     const bySha = new Map<string, string>();
     const notReviewed: PrdNotReviewedItem[] = [];
+    const duplicates = new Set<PrdNotReviewedItem>();
 
     for (const image of document.images) {
       const same = image.sha256 ? bySha.get(image.sha256) : undefined;
       let reason: string | undefined;
+      let isDuplicate = false;
       if (!image.partPath || !image.sha256 || image.sizeBytes === undefined) {
         reason = "the image data could not be read from the document";
       } else if (!mediaTypes.has(image.contentType.toLowerCase())) {
@@ -696,18 +717,21 @@ class PrdReviewRun {
       } else if (image.sizeBytes > maxBytes) {
         reason = `it is larger than the ${formatMb(maxBytes)} image size limit`;
       } else if (same) {
+        isDuplicate = true;
         reason = `it is the same picture as image ${same}, which is reviewed instead`;
       } else if (selected.length >= maxImages) {
         reason = `the review limit of ${maxImages} images per document was reached`;
       }
       if (reason) {
-        notReviewed.push(describe(image, reason));
+        const item = describe(image, reason);
+        notReviewed.push(item);
+        if (isDuplicate) duplicates.add(item);
         continue;
       }
       selected.push(image);
       if (image.sha256) bySha.set(image.sha256, image.id);
     }
-    return { selected, notReviewed };
+    return { selected, notReviewed, duplicates };
   }
 
   /** Writes the selected images into the run's `images/` directory. */

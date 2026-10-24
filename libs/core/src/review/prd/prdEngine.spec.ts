@@ -896,6 +896,62 @@ describe("runPrdReview", () => {
       );
     });
 
+    it("counts unreviewed images as a gap only when image review was requested", async () => {
+      const ai = withSupport(
+        imageHandler(() => jsonResponse({ findings: [] })),
+        { supported: true, mediaTypes: ["image/png"] }
+      );
+
+      // img3 (an unsupported format) was not reviewed: the review is partial.
+      const requested = await runPrdReview(options({ includeImages: true }), { aiClient: ai });
+      expect(requested.report.complete).toBe(false);
+      expect(requested.report.readiness.verdict).not.toBe("ready");
+
+      // Image review is off by default: listed images never make the report partial.
+      const off = await runPrdReview(options({ runId: "run-off" }), { aiClient: ai });
+      expect(off.report.notReviewed.some((item) => item.kind === "image")).toBe(true);
+      expect(off.report.complete).toBe(true);
+    });
+
+    it("does not count an identical copy of a reviewed image as a gap", async () => {
+      await writeFile(
+        docxPath,
+        await buildDocx({
+          body: [
+            heading(1, "Flow"),
+            para("The shopper pays and sees a receipt."),
+            paraXml(imageRun("rIdImg1", "Diagram")),
+            paraXml(imageRun("rIdImg2", "Diagram copy")),
+          ].join(""),
+          images: [
+            { relId: "rIdImg1", fileName: "image1.png", data: TINY_PNG },
+            { relId: "rIdImg2", fileName: "image2.png", data: TINY_PNG },
+          ],
+        })
+      );
+      const ai = withSupport(
+        imageHandler(() => jsonResponse({ findings: [] })),
+        { supported: true, mediaTypes: ["image/png"] }
+      );
+
+      const { report } = await runPrdReview(options({ includeImages: true }), { aiClient: ai });
+
+      expect(report.notReviewed.map((item) => item.kind)).toEqual(["image"]);
+      expect(report.complete).toBe(true);
+
+      // When the reviewed copy's request fails, both are unreviewed: a gap.
+      const failing = withSupport(
+        imageHandler(() => {
+          throw new Error("vision timeout");
+        }),
+        { supported: true, mediaTypes: ["image/png"] }
+      );
+      const failed = await runPrdReview(options({ includeImages: true, runId: "run-2" }), {
+        aiClient: failing,
+      });
+      expect(failed.report.complete).toBe(false);
+    });
+
     it("lists every image with the reason and warns when the model cannot read images", async () => {
       const ai = withSupport(
         imageHandler(() => jsonResponse({ findings: [] })),
