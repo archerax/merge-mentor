@@ -17,8 +17,12 @@ const TRUNCATION_MARKER = "…";
 
 const DEFAULT_MAIN_DOCUMENT_PATH = "word/document.xml";
 
-/** Elements whose text is not part of the accepted view of the document. */
-const SKIPPED_ELEMENTS = new Set(["w:del", "w:moveFrom", "mc:Fallback"]);
+/**
+ * Elements whose text is not part of the accepted view of the document.
+ * Mammoth reads only `mc:Fallback` of an `mc:AlternateContent` (never its
+ * `mc:Choice` branches), so anchors follow the same selection.
+ */
+const SKIPPED_ELEMENTS = new Set(["w:del", "w:moveFrom", "mc:Choice"]);
 
 /**
  * Tokens, in order: comments and processing instructions (skipped whole, an

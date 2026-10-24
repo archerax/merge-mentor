@@ -38,9 +38,9 @@ describe("extractCommentAnchors", () => {
       `<w:del w:id="9" w:author="A"><w:r><w:delText>gone</w:delText></w:r></w:del>` +
       `<w:moveFrom><w:r><w:t>moved</w:t></w:r></w:moveFrom>` +
       `<w:ins w:id="8">${t("added")}</w:ins>` +
-      `<mc:AlternateContent><mc:Choice>${t(" choice")}</mc:Choice><mc:Fallback>${t(" fallback")}</mc:Fallback></mc:AlternateContent>` +
+      `<mc:AlternateContent><mc:Choice>${t(" choice")}</mc:Choice><mc:Choice>${t(" other")}</mc:Choice><mc:Fallback>${t(" fallback")}</mc:Fallback></mc:AlternateContent>` +
       `<w:commentRangeEnd w:id="1"/></w:p>`;
-    expect(extractCommentAnchors(xml).get("1")).toBe("kept added choice");
+    expect(extractCommentAnchors(xml).get("1")).toBe("kept added fallback");
   });
 
   it("decodes XML entities", () => {
