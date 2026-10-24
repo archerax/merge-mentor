@@ -1,5 +1,3 @@
-import { join } from "node:path";
-
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import {
   collectLiveReviewStats,
@@ -8,8 +6,6 @@ import {
 import type { Platform } from "@merge-mentor/domain/platform.js";
 import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
-import { readAuditEvents } from "@merge-mentor/shared/audit/auditReader.js";
-import { computeAuditStats, type AuditStats } from "@merge-mentor/shared/audit/auditStats.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 import { InvalidArgumentError } from "commander";
 
@@ -17,13 +13,10 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Options accepted by the `stats` command. */
 export interface StatsOptions {
-  /** `live` queries the platform's real PRs; `audit` reads local audit logs. Default: `live`. */
-  readonly source?: string;
   readonly since?: Date;
-  /** Maximum number of PRs to inspect in live mode. */
+  /** Maximum number of PRs to inspect. */
   readonly limit?: number;
   readonly json?: boolean;
-  readonly tempPath?: string;
   readonly platform?: string;
   readonly githubToken?: string;
   readonly githubRepoOwner?: string;
@@ -34,10 +27,10 @@ export interface StatsOptions {
   readonly azureRepo?: string;
 }
 
-/** Default number of PRs inspected in live mode. */
+/** Default number of PRs inspected. */
 export const DEFAULT_STATS_PR_LIMIT = 100;
 
-/** Default window for live mode, keeping API usage bounded. */
+/** Default window, keeping API usage bounded. */
 const DEFAULT_LIVE_WINDOW_DAYS = 30;
 
 /**
@@ -74,39 +67,12 @@ export function parseSince(value: string, now: Date = new Date()): Date {
 }
 
 /**
- * Executes the `stats` command: summarizes how many PRs have been reviewed and
- * how many comments have been posted, either from the platform's real PRs (default)
- * or from the persisted audit logs.
+ * Executes the `stats` command: summarizes how many PRs Merge Mentor has reviewed
+ * and how many comments it has posted, by querying the platform's real PRs.
  *
- * @param options - Source, time window, platform settings, and output format
+ * @param options - Time window, platform settings, and output format
  */
 export async function executeStatsCommand(options: StatsOptions): Promise<void> {
-  const source = options.source ?? "live";
-  if (source !== "live" && source !== "audit") {
-    throw new Error(`Invalid source "${source}". Must be "live" or "audit".`);
-  }
-
-  if (source === "audit") {
-    await executeAuditStats(options);
-  } else {
-    await executeLiveStats(options);
-  }
-}
-
-async function executeAuditStats(options: StatsOptions): Promise<void> {
-  const config = loadConfig({ tempPath: options.tempPath });
-  const entries = await readAuditEvents({ logsDir: join(config.tempPath, "logs") });
-  const stats = computeAuditStats(entries, { since: options.since });
-
-  if (options.json) {
-    consoleOutputWriter.log(JSON.stringify(stats, null, 2));
-    return;
-  }
-
-  for (const line of formatStats(stats, options.since)) consoleOutputWriter.log(line);
-}
-
-async function executeLiveStats(options: StatsOptions): Promise<void> {
   const config = loadConfig({
     platform: options.platform,
     githubToken: options.githubToken,
@@ -116,7 +82,6 @@ async function executeLiveStats(options: StatsOptions): Promise<void> {
     azureOrg: options.azureOrg,
     azureProject: options.azureProject,
     azureRepo: options.azureRepo,
-    tempPath: options.tempPath,
   });
   const platform = (options.platform ?? config.defaultPlatform) as Platform;
   if (platform !== "github" && platform !== "azure") {
@@ -174,47 +139,6 @@ export function formatLiveStats(stats: LiveReviewStats, since: Date): string[] {
       "",
       "  ⚠️  PR limit reached; older PRs were not counted. Raise --limit to include them."
     );
-  }
-  lines.push("");
-  return lines;
-}
-
-/**
- * Renders statistics as human-readable lines.
- *
- * @param stats - Aggregated statistics
- * @param since - Start of the window, when one was requested
- * @returns Lines to print
- */
-export function formatStats(stats: AuditStats, since?: Date): string[] {
-  const lines = ["", `📊 Merge Mentor stats${since ? ` (since ${since.toISOString()})` : ""}`, ""];
-
-  if (stats.reviewRuns === 0 && stats.comments.total === 0 && stats.comments.failed === 0) {
-    lines.push("  No review activity found in the audit logs.", "");
-    return lines;
-  }
-
-  const { comments } = stats;
-  lines.push(
-    `  PRs reviewed:     ${stats.prsReviewed}`,
-    `  Review runs:      ${stats.reviewRuns}`,
-    `  Files reviewed:   ${stats.filesReviewed}`,
-    `  Comments posted:  ${comments.total}` +
-      ` (${comments.inline} inline, ${comments.replies} replies, ${comments.general} general)`
-  );
-  if (comments.failed > 0) lines.push(`  Comments failed:  ${comments.failed}`);
-
-  if (stats.byPlatform.length > 1) {
-    lines.push("", "  By platform:");
-    for (const p of stats.byPlatform) {
-      lines.push(
-        `    ${p.platform}: ${p.prsReviewed} PRs, ${p.reviewRuns} runs, ${p.comments.total} comments`
-      );
-    }
-  }
-
-  if (stats.firstEventAt && stats.lastEventAt) {
-    lines.push("", `  Activity from ${stats.firstEventAt} to ${stats.lastEventAt}`);
   }
   lines.push("");
   return lines;
