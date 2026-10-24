@@ -165,6 +165,13 @@ describe("renderPrdReportMarkdown", () => {
     expect(markdown).toContain("FRD review, AI model");
   });
 
+  it("warns when the provider kept session data", () => {
+    const markdown = renderPrdReportMarkdown(report({ retainedSessionData: { count: 1 } }));
+    expect(markdown).toContain(
+      "could not delete its saved conversation for 1 request. Parts of this document may remain"
+    );
+  });
+
   it("falls back to a generic title when the problem text is empty", () => {
     const markdown = renderPrdReportMarkdown(report({ findings: [finding({ problem: "" })] }));
     expect(markdown).toContain("### 1. Issue");

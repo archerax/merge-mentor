@@ -387,6 +387,27 @@ describe("runPrdReview", () => {
     expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
   });
 
+  it("records in the report when the provider could not delete session data", async () => {
+    const ai = createFakeAIClient((prompt, opts) => {
+      opts?.onSessionDiscardFailed?.("delete failed");
+      return defaultHandler(prompt, opts);
+    });
+
+    const { report, reportMarkdown } = await runPrdReview(options(), { aiClient: ai });
+
+    expect(report.retainedSessionData?.count).toBeGreaterThan(0);
+    expect(reportMarkdown).toContain("could not delete its saved conversation");
+  });
+
+  it("leaves the report free of the warning when session data was deleted", async () => {
+    const ai = createFakeAIClient(defaultHandler);
+
+    const { report, reportMarkdown } = await runPrdReview(options(), { aiClient: ai });
+
+    expect(report.retainedSessionData).toBeUndefined();
+    expect(reportMarkdown).not.toContain("saved conversation");
+  });
+
   it("still produces a report when the whole-document check fails", async () => {
     const ai = createFakeAIClient((prompt, opts) => {
       if (opts?.promptType === "prd-consistency") return { raw: "garbage", parsed: null };

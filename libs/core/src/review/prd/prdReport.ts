@@ -59,6 +59,11 @@ export interface PrdReviewReport {
   readonly includeImages: boolean;
   /** Set when image review was turned on and the document has images. */
   readonly imageReview?: PrdImageReviewSummary;
+  /**
+   * Set when the provider could not delete the session data of some AI
+   * requests, so parts of the document may remain in its own storage.
+   */
+  readonly retainedSessionData?: { readonly count: number };
   readonly aiProvider?: string;
   readonly aiModel?: string;
   readonly tokenUsage?: TokenUsage;
@@ -200,6 +205,11 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
     out.push(`- Images: ${report.imageReview.reviewed} of ${report.document.imageCount} reviewed`);
   } else if (report.imageReview) {
     out.push(`- Images were not reviewed: ${report.imageReview.reason}`);
+  }
+  if (report.retainedSessionData) {
+    out.push(
+      `- Warning: the AI provider could not delete its saved conversation for ${report.retainedSessionData.count} request${report.retainedSessionData.count === 1 ? "" : "s"}. Parts of this document may remain in the provider's own storage outside the .mergementor folder; remove it there if the document is confidential.`
+    );
   }
   if (v.verifierFailed) {
     out.push("- The final double-check could not run for some issues; they are shown unchecked.");

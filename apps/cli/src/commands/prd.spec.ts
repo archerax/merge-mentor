@@ -229,9 +229,18 @@ describe("executePrdReview", () => {
   });
 
   it("rejects a missing file", async () => {
+    const missing = Object.assign(new Error("no such file"), { code: "ENOENT" });
     await expect(
-      executePrdReview("missing.docx", {}, { fileSystem: fakeFs(new Error("ENOENT")) })
+      executePrdReview("missing.docx", {}, { fileSystem: fakeFs(missing) })
     ).rejects.toThrow("missing.docx was not found");
+    expect(loadConfig).not.toHaveBeenCalled();
+  });
+
+  it("reports other stat failures instead of calling the file missing", async () => {
+    const denied = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    await expect(
+      executePrdReview("locked.docx", {}, { fileSystem: fakeFs(denied) })
+    ).rejects.toThrow("locked.docx could not be read: permission denied");
     expect(loadConfig).not.toHaveBeenCalled();
   });
 

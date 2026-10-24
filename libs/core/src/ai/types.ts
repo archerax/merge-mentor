@@ -104,6 +104,11 @@ export interface ExecutePromptOptions {
    * outlive the run (e.g. `prd`).
    */
   readonly discardSession?: boolean;
+  /**
+   * Called when `discardSession` was requested but the provider could not
+   * delete the session data, so the caller can tell the user it may remain.
+   */
+  readonly onSessionDiscardFailed?: (reason: string) => void;
   /** Hint for the type of review prompt being sent (avoids substring inference). */
   readonly promptType?:
     | "file-review"

@@ -292,6 +292,14 @@ export function PrdReviewResult({ summary }: { readonly summary: PrdReviewSummar
           </Alert>
         )}
 
+        {report.retainedSessionData && (
+          <Alert variant="light" color="yellow" title="Some provider data may remain">
+            The AI provider could not delete its saved conversation for{" "}
+            {report.retainedSessionData.count} request(s). Parts of the document may remain in the
+            provider’s own storage, outside the .mergementor folder.
+          </Alert>
+        )}
+
         <Divider />
         <MarkdownReport content={summary.reportMarkdown} />
       </Stack>

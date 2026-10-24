@@ -826,6 +826,37 @@ describe("CopilotSdkProvider", () => {
       expect(result.parsed).toEqual({ findings: [] });
     });
 
+    it("tells the caller when session data could not be deleted", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      mockClient.deleteSession.mockRejectedValue(new Error("delete failed"));
+      const onSessionDiscardFailed = vi.fn();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+        onSessionDiscardFailed,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(onSessionDiscardFailed).toHaveBeenCalledWith("delete failed");
+    });
+
+    it("does not report a discard failure when deletion succeeds", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+      const onSessionDiscardFailed = vi.fn();
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts", {
+        discardSession: true,
+        onSessionDiscardFailed,
+      });
+      await vi.runAllTimersAsync();
+      await resultPromise;
+
+      expect(onSessionDiscardFailed).not.toHaveBeenCalled();
+    });
+
     it("does not fail if session.disconnect throws", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();

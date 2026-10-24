@@ -55,6 +55,8 @@ export interface PrdVerifierOptions {
   readonly onStreamData?: (chunk: string) => void;
   /** Directory for the AI transcripts of the verifier calls (see `ExecutePromptOptions`). */
   readonly transcriptDir?: string;
+  /** Called when the provider could not delete a verifier call's session data. */
+  readonly onSessionDiscardFailed?: (reason: string) => void;
 }
 
 /** Outcome of {@link PrdVerifier.verify}. */
@@ -483,10 +485,11 @@ export class PrdVerifier {
       candidates,
     });
     try {
-      const { onStreamData, transcriptDir } = this.options;
+      const { onStreamData, transcriptDir, onSessionDiscardFailed } = this.options;
       const response = await this.provider.executePrompt(prompt, {
         promptType: "prd-verify",
         discardSession: true,
+        ...(onSessionDiscardFailed ? { onSessionDiscardFailed } : {}),
         ...(onStreamData ? { onStreamData } : {}),
         ...(transcriptDir ? { transcriptDir } : {}),
       });

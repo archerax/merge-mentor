@@ -226,6 +226,11 @@ class PrdReviewRun {
   private tokenUsage: TokenUsage | undefined;
   /** Where the provider writes this run's AI transcripts (inside the run directory). */
   private transcriptDir: string | undefined;
+  /** Reasons the provider could not delete session data after a request. */
+  private readonly discardFailures: string[] = [];
+  private readonly onSessionDiscardFailed = (reason: string): void => {
+    this.discardFailures.push(reason);
+  };
 
   constructor(
     private readonly options: PrdReviewOptions,
@@ -323,6 +328,7 @@ class PrdReviewRun {
         documentType: options.documentType,
         onTokenUsage: (usage) => this.addUsage(usage),
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
+        onSessionDiscardFailed: this.onSessionDiscardFailed,
         ...(this.streaming ? { onStreamData: this.stream("verify") } : {}),
       }).verify(document, candidates)
     );
@@ -389,6 +395,9 @@ class PrdReviewRun {
       verification: verification.stats,
       includeImages: options.includeImages ?? false,
       ...(imageReview.summary ? { imageReview: imageReview.summary } : {}),
+      ...(this.discardFailures.length > 0
+        ? { retainedSessionData: { count: this.discardFailures.length } }
+        : {}),
       ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
       ...(options.aiModel ? { aiModel: options.aiModel } : {}),
       ...(this.tokenUsage ? { tokenUsage: this.tokenUsage } : {}),
@@ -459,6 +468,7 @@ class PrdReviewRun {
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-section",
         discardSession: true,
+        onSessionDiscardFailed: this.onSessionDiscardFailed,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("ai-review") } : {}),
       });
@@ -513,6 +523,7 @@ class PrdReviewRun {
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-consistency",
         discardSession: true,
+        onSessionDiscardFailed: this.onSessionDiscardFailed,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         ...(this.streaming ? { onStreamData: this.stream("consistency") } : {}),
       });
@@ -731,6 +742,7 @@ class PrdReviewRun {
       const response = await this.ai.executePrompt(prompt, {
         promptType: "prd-image",
         discardSession: true,
+        onSessionDiscardFailed: this.onSessionDiscardFailed,
         ...(this.transcriptDir ? { transcriptDir: this.transcriptDir } : {}),
         imageFiles,
         ...(this.streaming ? { onStreamData: this.stream("images") } : {}),

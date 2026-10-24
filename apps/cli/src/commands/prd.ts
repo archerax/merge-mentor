@@ -121,8 +121,16 @@ async function assertReadableFile(
   let stats: Awaited<ReturnType<FileSystem["stat"]>>;
   try {
     stats = await fileSystem.stat(filePath);
-  } catch {
-    throw new ValidationError("file", `${displayPath} was not found`);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") {
+      throw new ValidationError("file", `${displayPath} was not found`, { cause: error });
+    }
+    throw new ValidationError(
+      "file",
+      `${displayPath} could not be read: ${(error as Error).message}`,
+      { cause: error }
+    );
   }
   if (!stats.isFile()) {
     throw new ValidationError("file", `${displayPath} is not a file`);
@@ -141,6 +149,11 @@ function displayRunSummary(result: PrdReviewResult, output: OutputWriter): void 
   if (report.imageReview && !report.imageReview.supported) {
     output.log(
       `⚠️ --include-images was set, but images were not reviewed: ${report.imageReview.reason}.\n`
+    );
+  }
+  if (report.retainedSessionData) {
+    output.log(
+      `⚠️ The AI provider could not delete its saved conversation for ${report.retainedSessionData.count} request(s). Parts of the document may remain in the provider's own storage, outside the .mergementor folder.\n`
     );
   }
   if (!report.complete) {

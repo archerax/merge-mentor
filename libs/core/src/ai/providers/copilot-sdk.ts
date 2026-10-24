@@ -741,10 +741,12 @@ export class CopilotSdkProvider implements AIProviderClient {
         try {
           await this.withTimeout(client.deleteSession(session.sessionId), this.timeoutMs);
         } catch (error) {
+          const reason = (error as Error).message;
           this.logger.warn(
-            { error: (error as Error).message },
+            { error: reason },
             "Could not delete Copilot session data after the request"
           );
+          options.onSessionDiscardFailed?.(reason);
         }
       }
     }
