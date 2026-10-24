@@ -296,11 +296,12 @@ describe("CopilotSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      expect(nodeFs.mkdir).toHaveBeenCalledWith("/runs/run-1/transcripts", { recursive: true });
+      const runTranscripts = path.join("/runs/run-1/transcripts");
+      expect(nodeFs.mkdir).toHaveBeenCalledWith(runTranscripts, { recursive: true });
       const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
-      expect(paths.some((file) => file.startsWith("/runs/run-1/transcripts/transcript-sdk-"))).toBe(
-        true
-      );
+      expect(
+        paths.some((file) => file.startsWith(path.join(runTranscripts, "transcript-sdk-")))
+      ).toBe(true);
       const sharedDir = path.join(process.cwd(), ".mergementor", "transcripts");
       expect(paths.some((file) => file.startsWith(sharedDir))).toBe(false);
     });

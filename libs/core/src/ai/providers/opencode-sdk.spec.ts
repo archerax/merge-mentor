@@ -1,3 +1,4 @@
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -232,10 +233,11 @@ describe("OpenCodeSdkProvider", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      expect(nodeFs.mkdir).toHaveBeenCalledWith("/runs/run-1/transcripts", { recursive: true });
+      const runTranscripts = path.join("/runs/run-1/transcripts");
+      expect(nodeFs.mkdir).toHaveBeenCalledWith(runTranscripts, { recursive: true });
       const paths = vi.mocked(nodeFs.writeFile).mock.calls.map(([file]) => String(file));
       expect(paths).toHaveLength(1);
-      expect(paths[0]?.startsWith("/runs/run-1/transcripts/transcript-opencode-")).toBe(true);
+      expect(paths[0]?.startsWith(path.join(runTranscripts, "transcript-opencode-"))).toBe(true);
     });
 
     it("should forward streamed text deltas to onStreamData", async () => {
