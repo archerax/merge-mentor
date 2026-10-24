@@ -2260,6 +2260,16 @@ describe("CopilotSdkProvider.checkImageSupport", () => {
     ).resolves.toEqual({ supported: true });
   });
 
+  it("keeps an explicit zero image limit instead of dropping it", async () => {
+    mockClient.listModels.mockResolvedValue([
+      vision(true, { vision: { max_prompt_images: 0, max_prompt_image_size: 0 } }),
+    ]);
+
+    await expect(
+      new CopilotSdkProvider({ model: "claude-sonnet-4.6" }).checkImageSupport()
+    ).resolves.toEqual({ supported: true, maxImagesPerRequest: 0, maxImageBytes: 0 });
+  });
+
   it("reports text-only, unknown and unlisted models as unsupported", async () => {
     mockClient.listModels.mockResolvedValue([vision(false)]);
     await expect(

@@ -377,8 +377,14 @@ export class CopilotSdkProvider implements AIProviderClient {
     const vision = info.capabilities.limits?.vision;
     return {
       supported: true,
-      ...(vision?.max_prompt_images ? { maxImagesPerRequest: vision.max_prompt_images } : {}),
-      ...(vision?.max_prompt_image_size ? { maxImageBytes: vision.max_prompt_image_size } : {}),
+      // Check presence, not truthiness: an explicit 0 means "no images allowed"
+      // and must reach the engine rather than fall back to its defaults.
+      ...(typeof vision?.max_prompt_images === "number"
+        ? { maxImagesPerRequest: vision.max_prompt_images }
+        : {}),
+      ...(typeof vision?.max_prompt_image_size === "number"
+        ? { maxImageBytes: vision.max_prompt_image_size }
+        : {}),
       ...(vision?.supported_media_types?.length
         ? { mediaTypes: vision.supported_media_types }
         : {}),

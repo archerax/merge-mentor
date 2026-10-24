@@ -951,6 +951,28 @@ describe("runPrdReview", () => {
       );
     });
 
+    it("treats a zero image limit from the provider as images unsupported", async () => {
+      for (const limits of [{ maxImagesPerRequest: 0 }, { maxImageBytes: 0 }]) {
+        const ai = withSupport(
+          imageHandler(() => jsonResponse({ findings: [] })),
+          { supported: true, ...limits }
+        );
+
+        const { report } = await runPrdReview(
+          options({ includeImages: true, runId: `run-${Object.keys(limits)[0]}` }),
+          { aiClient: ai }
+        );
+
+        expect(report.imageReview).toMatchObject({ supported: false, reviewed: 0 });
+        expect(report.notReviewed.filter((item) => item.kind === "image")).toHaveLength(4);
+        expect(report.notReviewed[0]?.description).toContain("accepts no images");
+        expect(report.complete).toBe(false);
+        expect(ai.executePrompt.mock.calls.some((c) => c[1]?.promptType === "prd-image")).toBe(
+          false
+        );
+      }
+    });
+
     it("counts unreviewed images as a gap only when image review was requested", async () => {
       const ai = withSupport(
         imageHandler(() => jsonResponse({ findings: [] })),

@@ -682,7 +682,14 @@ class PrdReviewRun {
       };
     }
     try {
-      return await this.ai.checkImageSupport();
+      const support = await this.ai.checkImageSupport();
+      if (support.supported && (support.maxImagesPerRequest ?? 1) <= 0) {
+        return { supported: false, reason: "the AI model accepts no images per request" };
+      }
+      if (support.supported && (support.maxImageBytes ?? 1) <= 0) {
+        return { supported: false, reason: "the AI model accepts no images of any size" };
+      }
+      return support;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { supported: false, reason: `the image support check failed (${message})` };
