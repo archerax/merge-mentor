@@ -168,6 +168,40 @@ describe("chunkDocument", () => {
     expect(chunks.every((c) => c.part !== undefined)).toBe(true);
   });
 
+  it("keeps a positive body budget when the heading path is longer than maxChars", () => {
+    const longPath = Array.from({ length: 6 }, (_, i) => `${i}${"h".repeat(150)}`);
+    const body = Array.from({ length: 12 }, (_, i) => p(`Sentence ${i} ${words(15)}.`));
+    const document = doc([s("s1", longPath.at(-1) ?? "", body, { path: longPath, level: 6 })]);
+
+    const chunks = chunkDocument(document, { maxChars: 300, minChars: 0, overlapChars: 20 });
+
+    // Not one chunk per character, and every paragraph is still reviewed.
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(40);
+    const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
+    const bodyIds = body.flatMap((block) =>
+      block.kind === "paragraph" ? [block.paragraph.id] : []
+    );
+    expect(bodyIds.filter((id) => !covered.has(id))).toEqual([]);
+    for (const chunk of chunks) {
+      const [header, ...rest] = chunk.text.split("\n\n");
+      expect(header?.length).toBeLessThan(300);
+      expect(rest.join("").trim().length).toBeGreaterThan(0);
+    }
+    expect(chunks[0]?.text).toContain("…");
+  });
+
+  it("keeps a heading-only section with a very long heading path", () => {
+    const longPath = ["a".repeat(500)];
+    const document = doc([s("s1", longPath[0] ?? "", [], { path: longPath, level: 1 })]);
+
+    const chunks = chunkDocument(document, { maxChars: 100, minChars: 0, overlapChars: 10 });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.paragraphIds).toEqual(["h-s1"]);
+    expect(chunks[0]?.text).toContain("[s1]");
+  });
+
   it("splits a single oversized paragraph at whitespace", () => {
     const text = Array.from({ length: 400 }, (_, i) => `w${i}`).join(" ");
     const document = doc([s("s0", "", [p(text)], { level: 0, path: [] })], { hasHeadings: false });

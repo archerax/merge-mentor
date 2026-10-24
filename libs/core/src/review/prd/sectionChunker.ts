@@ -46,6 +46,12 @@ export const DEFAULT_CHUNK_OPTIONS: Required<ChunkOptions> = {
   overlapChars: 1_500,
 };
 
+/**
+ * The heading label shown in a chunk header is capped at this fraction of
+ * `maxChars`, so a very long heading path cannot leave no room for the body.
+ */
+const HEADING_FRACTION = 4;
+
 /** A rendered fragment of a section; the unit that packing works with. */
 interface Piece {
   readonly text: string;
@@ -67,7 +73,7 @@ interface DraftChunk {
  */
 export function chunkDocument(document: DocxDocument, options: ChunkOptions = {}): DocumentChunk[] {
   const resolved = resolveOptions(options);
-  const renderer = new Renderer(document);
+  const renderer = new Renderer(document, Math.floor(resolved.maxChars / HEADING_FRACTION));
   const drafts = document.hasHeadings
     ? chunkByHeadings(document, renderer, resolved)
     : chunkFixedSize(document, renderer, resolved);
@@ -160,8 +166,17 @@ function splitSection(
   renderer: Renderer,
   options: Required<ChunkOptions>
 ): DraftChunk[] {
+  if (section.blocks.length === 0) {
+    // A heading with no content of its own (and no children to carry it): keep
+    // the heading as a chunk instead of letting it vanish.
+    const [heading] = renderer.section(section);
+    return heading
+      ? [{ sectionIds: [section.id], headingPath: section.headingPath, ...joinPieces([heading]) }]
+      : [];
+  }
   const header = renderer.header(section, undefined);
-  const budget = options.maxChars - header.length - 40;
+  // Always leave a positive body budget, even when the header is long.
+  const budget = Math.max(Math.ceil(options.maxChars / 2), options.maxChars - header.length - 40);
   const pieces = section.blocks.map((block) => renderer.block(block));
   const groups = packWithOverlap(pieces, budget, options.overlapChars);
   return groups.map((group, index) => {
@@ -306,7 +321,10 @@ class Renderer {
   private readonly comments: Map<string, DocxComment>;
   private readonly images: Map<string, DocxImage>;
 
-  constructor(document: DocxDocument) {
+  constructor(
+    document: DocxDocument,
+    private readonly maxHeadingChars: number
+  ) {
     this.comments = new Map(document.comments.map((comment) => [comment.id, comment]));
     this.images = new Map(document.images.map((image) => [image.id, image]));
   }
@@ -324,7 +342,14 @@ class Renderer {
     if (section.level === 0) return "";
     const suffix = part ? ` (part ${part.index} of ${part.total})` : "";
     const marks = "#".repeat(Math.min(section.level, 6));
-    return `${marks} ${section.headingPath.join(" > ")} [${section.id}]${suffix}`;
+    return `${marks} ${this.headingLabel(section)} [${section.id}]${suffix}`;
+  }
+
+  /** The heading path, keeping its deepest part when it is longer than the cap. */
+  private headingLabel(section: DocxSection): string {
+    const label = section.headingPath.join(" > ");
+    const cap = Math.max(1, this.maxHeadingChars);
+    return label.length <= cap ? label : `…${label.slice(label.length - (cap - 1))}`;
   }
 
   block(block: DocxBlock): Piece {
