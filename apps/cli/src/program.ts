@@ -27,6 +27,7 @@ import {
   hasBlockingFindings,
   STAGE_BLOCKING_EXIT_CODE,
 } from "./commands/stage.js";
+import { executeStatsCommand, parseSince, type StatsOptions } from "./commands/stats.js";
 import { DEFAULT_UI_PORT, executeUiCommand, parseUiPort } from "./commands/ui.js";
 
 // Re-export types and functions for backward compatibility
@@ -584,6 +585,31 @@ program
   .action(async (options: { provider?: string }) => {
     await executeDoctorCommand(options);
     process.exit(0);
+  });
+
+// Review statistics command
+program
+  .command("stats")
+  .description("Show how many PRs have been reviewed and how many comments have been posted")
+  .optionsGroup("General Options")
+  .option(
+    "--since <date|Nd>",
+    "Only count activity since a date (2026-01-31) or window (30d)",
+    parseSince
+  )
+  .option("--json", "Output statistics as JSON", false)
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .action(async (options: StatsOptions) => {
+    try {
+      await executeStatsCommand(options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
   });
 
 // Web dashboard command

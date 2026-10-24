@@ -69,6 +69,7 @@ Merge Mentor offers a set of subcommands to support reviews, plan checks, and au
 - **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[prd](./docs/prd.md)**: Reviews a PRD or FRD Word document (`.docx`) for gaps, ambiguity and testability before development starts.
 - **[plan](./docs/plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
+- **[stats](./docs/stats.md)**: Reports how many PRs have been reviewed and comments posted, from the local audit logs.
 - **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive reviews.
 
 For full configuration settings and options, refer to the **[Configuration Guide](./docs/configuration.md)**.

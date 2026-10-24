@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { loadAuditEvents } from "./audit.server.js";
+import { loadAuditEvents, loadAuditStats } from "./audit.server.js";
 
 /**
  * Server function that returns the most recent audit log entries.
@@ -14,4 +14,9 @@ export const getAuditEvents = createServerFn({
   strict: { output: false },
 }).handler(async () => {
   return loadAuditEvents(500);
+});
+
+/** Server function that returns PR review and comment totals derived from the audit logs. */
+export const getAuditStats = createServerFn({ method: "GET" }).handler(async () => {
+  return loadAuditStats();
 });

@@ -1,6 +1,11 @@
 import path from "node:path";
 
-import { readAuditEvents, type AuditLogEntry } from "@merge-mentor/shared/audit/index.js";
+import {
+  computeAuditStats,
+  readAuditEvents,
+  type AuditLogEntry,
+  type AuditStats,
+} from "@merge-mentor/shared/audit/index.js";
 
 import { resolveTempPath } from "./env.server.js";
 
@@ -23,4 +28,12 @@ function resolveLogsDir(): string {
  */
 export async function loadAuditEvents(limit = 500): Promise<AuditLogEntry[]> {
   return readAuditEvents({ limit, logsDir: resolveLogsDir() });
+}
+
+/**
+ * Server-only helper that aggregates every persisted audit event into review and
+ * comment statistics for the web UI.
+ */
+export async function loadAuditStats(): Promise<AuditStats> {
+  return computeAuditStats(await readAuditEvents({ logsDir: resolveLogsDir() }));
 }
