@@ -23,6 +23,7 @@ vi.mock("@merge-mentor/shared/reports/index.js", async (importOriginal) => {
 
 const { loadReport, loadReports, removePrdRun } = await import("./reports.server.js");
 const { writeManifest, writeSummary } = await import("./reviewRunStore.server.js");
+const { startOrAttach } = await import("./reviewRuns.server.js");
 
 describe("reports.server", () => {
   beforeEach(() => {
@@ -98,6 +99,36 @@ describe("reports.server", () => {
         expect(fs.existsSync(path.join(tempDir, "runs", "web-run-1"))).toBe(false);
         expect(fs.existsSync(path.join(tempDir, "runs", "web-run-2"))).toBe(true);
       } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("refuses to delete a run whose review is still running", async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mm-prd-delete-"));
+      process.env.MM_TEMP_PATH = tempDir;
+      let finish!: () => void;
+      const finished = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      try {
+        startOrAttach({
+          kind: "prd",
+          targetKey: "prd:active-delete",
+          label: "l",
+          input: { prdRunId: "web-20261023120000-11223344" },
+          execute: () => finished,
+        });
+
+        await expect(removePrdRun("web-20261023120000-11223344")).rejects.toThrow(/still running/);
+        expect(mockDeletePrdRun).not.toHaveBeenCalled();
+
+        finish();
+        await vi.waitFor(async () => {
+          await removePrdRun("web-20261023120000-11223344");
+        });
+        expect(mockDeletePrdRun).toHaveBeenCalled();
+      } finally {
+        finish();
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     });

@@ -286,6 +286,20 @@ export function subscribe(
   return { status: manifest.status, unsubscribe: () => {} };
 }
 
+/**
+ * Returns whether a PRD review recorded under the given `prdRunId` (the id of
+ * its on-disk artifacts, kept in the run input) is still executing in this
+ * process.
+ */
+export function isPrdRunActive(prdRunId: string): boolean {
+  for (const run of active.values()) {
+    if (run.kind !== "prd" || run.status !== "running") continue;
+    const input = run.input as { prdRunId?: unknown } | null;
+    if (input?.prdRunId === prdRunId) return true;
+  }
+  return false;
+}
+
 /** Returns whether a run exists in memory or on disk. */
 export function hasRun(runId: string): boolean {
   return (

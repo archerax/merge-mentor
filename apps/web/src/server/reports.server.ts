@@ -12,6 +12,7 @@ import {
 } from "@merge-mentor/shared/reports/index.js";
 
 import { resolveTempPath } from "./env.server.js";
+import { isPrdRunActive } from "./reviewRuns.server.js";
 import { deleteRunsWhere } from "./reviewRunStore.server.js";
 
 /**
@@ -59,11 +60,19 @@ export async function loadReport(name: string): Promise<ReportDocument | undefin
  * (its stored summary holds the report, and so quotes from the document).
  *
  * @throws {ValidationError} when `runId` is not a safe run id (so it can never
- *   name a path outside the PRD run directory)
+ *   name a path outside the PRD run directory), or its review is still running
  */
 export async function removePrdRun(runId: unknown): Promise<void> {
   if (typeof runId !== "string" || !isSafePrdRunId(runId)) {
     throw new ValidationError("runId", "is not a valid PRD run id");
+  }
+  // A running review keeps writing document-derived files into the run
+  // directory, so deleting now would report success and leave them behind.
+  if (isPrdRunActive(runId)) {
+    throw new ValidationError(
+      "runId",
+      "this review is still running. Wait for it to finish, then delete it."
+    );
   }
   const tempPath = resolveTempPath();
   await deletePrdRun(runId, { tempPath });
