@@ -140,6 +140,36 @@ export interface CrossFileReviewResult {
 }
 
 /** An existing bot comment on a PR. */
+/** Lightweight PR listing entry used for repository-wide statistics. */
+export interface PullRequestSummary {
+  readonly number: number;
+  readonly title: string;
+  /** Whether the PR is still open (`merged` and `abandoned` PRs are `closed`). */
+  readonly state: "open" | "closed";
+  /** ISO timestamp of the PR's last update, or its creation when the platform has no update time. */
+  readonly updatedAt: string;
+}
+
+/** Options for {@link PullRequestLister.listPullRequests}. */
+export interface ListPullRequestsOptions {
+  /** Only return PRs with activity at or after this instant. */
+  readonly since?: Date;
+  /** Maximum number of PRs to return. */
+  readonly limit: number;
+}
+
+/**
+ * Optional capability of remote platform adapters: enumerating the repository's PRs.
+ * Kept separate from {@link PlatformAdapter} because only remote platforms can list PRs.
+ */
+export interface PullRequestLister {
+  /**
+   * Lists pull requests in the configured repository, newest activity first.
+   * @param options - Optional lower bound on PR activity and the maximum number to return
+   */
+  listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]>;
+}
+
 export interface ExistingComment {
   /** Platform comment identifier. */
   readonly id: number | string;

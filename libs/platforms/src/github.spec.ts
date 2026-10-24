@@ -7,6 +7,7 @@ import { GitHubAdapter } from "./github.js";
 const mockOctokitInstance = {
   pulls: {
     get: vi.fn(),
+    list: vi.fn(),
     update: vi.fn(),
     listFiles: vi.fn(),
     listReviewComments: vi.fn(),
@@ -23,7 +24,7 @@ const mockOctokitInstance = {
   users: {
     getAuthenticated: vi.fn(),
   },
-  paginate: vi.fn(),
+  paginate: Object.assign(vi.fn(), { iterator: vi.fn() }),
   graphql: vi.fn(),
 };
 
@@ -73,6 +74,21 @@ function createTestConfig(): Config {
     multiAgentMaxParallel: 4,
     reviewRuns: 1,
   };
+}
+
+const pr = (number: number, state: string, updatedAt: string) => ({
+  number,
+  title: `PR ${number}`,
+  state,
+  updated_at: updatedAt,
+});
+
+function mockPages(...pages: unknown[][]) {
+  mockOctokitInstance.paginate.iterator.mockReturnValue(
+    (async function* () {
+      for (const data of pages) yield { data };
+    })()
+  );
 }
 
 describe("GitHubAdapter", () => {
@@ -250,6 +266,45 @@ describe("GitHubAdapter", () => {
       const result = await adapter.getPRFiles(123);
 
       expect(result).toHaveLength(150);
+    });
+  });
+
+  describe("listPullRequests", () => {
+    it("lists open and closed PRs, newest activity first", async () => {
+      mockPages([pr(2, "open", "2026-03-02T00:00:00Z"), pr(1, "closed", "2026-03-01T00:00:00Z")]);
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 10 });
+
+      expect(result).toEqual([
+        { number: 2, title: "PR 2", state: "open", updatedAt: "2026-03-02T00:00:00Z" },
+        { number: 1, title: "PR 1", state: "closed", updatedAt: "2026-03-01T00:00:00Z" },
+      ]);
+      expect(mockOctokitInstance.paginate.iterator).toHaveBeenCalledWith(
+        mockOctokitInstance.pulls.list,
+        expect.objectContaining({ state: "all", sort: "updated", direction: "desc" })
+      );
+    });
+
+    it("stops at the first PR older than since", async () => {
+      mockPages(
+        [pr(3, "open", "2026-03-03T00:00:00Z")],
+        [pr(2, "open", "2026-01-01T00:00:00Z"), pr(1, "open", "2026-03-01T00:00:00Z")]
+      );
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({
+        since: new Date("2026-02-01T00:00:00Z"),
+        limit: 10,
+      });
+
+      expect(result.map((p) => p.number)).toEqual([3]);
+    });
+
+    it("stops at the limit", async () => {
+      mockPages([pr(3, "open", "2026-03-03T00:00:00Z"), pr(2, "open", "2026-03-02T00:00:00Z")]);
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 1 });
+
+      expect(result.map((p) => p.number)).toEqual([3]);
     });
   });
 

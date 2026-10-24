@@ -1,11 +1,14 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import type {
   ExistingComment,
+  ListPullRequestsOptions,
   FileStatus,
   PBIDetails,
   PlatformAdapter,
   PRDetails,
   PRFile,
+  PullRequestLister,
+  PullRequestSummary,
   ProjectDetails,
   RepoInfo,
   UnresolvedComment,
@@ -32,7 +35,7 @@ const TRUSTED_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
 /**
  * Platform adapter for GitHub pull requests.
  */
-export class GitHubAdapter implements PlatformAdapter {
+export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
   private readonly octokit: Octokit;
   private readonly owner: string;
   private readonly repo: string;
@@ -277,6 +280,39 @@ export class GitHubAdapter implements PlatformAdapter {
       );
       throw error;
     }
+  }
+
+  /**
+   * Lists pull requests (open and closed), most recently updated first.
+   * @param options - Lower bound on last update and maximum number of PRs
+   * @returns PR summaries, stopping once PRs older than `since` are reached
+   */
+  async listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]> {
+    const sinceMs = options.since?.getTime();
+    const pulls: PullRequestSummary[] = [];
+
+    const iterator = this.octokit.paginate.iterator(this.octokit.pulls.list, {
+      owner: this.owner,
+      repo: this.repo,
+      state: "all",
+      sort: "updated",
+      direction: "desc",
+      per_page: DEFAULT_PAGE_SIZE,
+    });
+
+    for await (const page of iterator) {
+      for (const pr of page.data) {
+        if (sinceMs !== undefined && Date.parse(pr.updated_at) < sinceMs) return pulls;
+        pulls.push({
+          number: pr.number,
+          title: pr.title,
+          state: pr.state === "open" ? "open" : "closed",
+          updatedAt: pr.updated_at,
+        });
+        if (pulls.length >= options.limit) return pulls;
+      }
+    }
+    return pulls;
   }
 
   /**

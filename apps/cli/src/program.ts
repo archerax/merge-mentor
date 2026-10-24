@@ -27,7 +27,13 @@ import {
   hasBlockingFindings,
   STAGE_BLOCKING_EXIT_CODE,
 } from "./commands/stage.js";
-import { executeStatsCommand, parseSince, type StatsOptions } from "./commands/stats.js";
+import {
+  executeStatsCommand,
+  parseLimit,
+  parseSince,
+  type StatsOptions,
+  DEFAULT_STATS_PR_LIMIT,
+} from "./commands/stats.js";
 import { DEFAULT_UI_PORT, executeUiCommand, parseUiPort } from "./commands/ui.js";
 
 // Re-export types and functions for backward compatibility
@@ -590,18 +596,38 @@ program
 // Review statistics command
 program
   .command("stats")
-  .description("Show how many PRs have been reviewed and how many comments have been posted")
+  .description("Show how many PRs Merge Mentor has reviewed and how many comments it has posted")
   .optionsGroup("General Options")
   .option(
+    "--source <source>",
+    "Where to read from: live (query the platform's real PRs) or audit (local audit logs)",
+    "live"
+  )
+  .option(
     "--since <date|Nd>",
-    "Only count activity since a date (2026-01-31) or window (30d)",
+    "Only count PRs/activity since a date (2026-01-31) or window (30d). Live default: 30d",
     parseSince
   )
+  .option(
+    "--limit <number>",
+    `Maximum number of PRs to inspect in live mode (default: ${DEFAULT_STATS_PR_LIMIT})`,
+    parseLimit
+  )
   .option("--json", "Output statistics as JSON", false)
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
     "--temp-path <path>",
     "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
   )
+  .optionsGroup("GitHub Configuration")
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
   .action(async (options: StatsOptions) => {
     try {
       await executeStatsCommand(options);

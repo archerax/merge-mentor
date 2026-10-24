@@ -1,6 +1,13 @@
 import { join } from "node:path";
 
-import { loadConfig } from "@merge-mentor/config/config.js";
+import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
+import {
+  collectLiveReviewStats,
+  type LiveReviewStats,
+} from "@merge-mentor/core/review/reviewStats.js";
+import type { Platform } from "@merge-mentor/domain/platform.js";
+import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
+import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { readAuditEvents } from "@merge-mentor/shared/audit/auditReader.js";
 import { computeAuditStats, type AuditStats } from "@merge-mentor/shared/audit/auditStats.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
@@ -10,9 +17,42 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Options accepted by the `stats` command. */
 export interface StatsOptions {
+  /** `live` queries the platform's real PRs; `audit` reads local audit logs. Default: `live`. */
+  readonly source?: string;
   readonly since?: Date;
+  /** Maximum number of PRs to inspect in live mode. */
+  readonly limit?: number;
   readonly json?: boolean;
   readonly tempPath?: string;
+  readonly platform?: string;
+  readonly githubToken?: string;
+  readonly githubRepoOwner?: string;
+  readonly githubRepoName?: string;
+  readonly azureToken?: string;
+  readonly azureOrg?: string;
+  readonly azureProject?: string;
+  readonly azureRepo?: string;
+}
+
+/** Default number of PRs inspected in live mode. */
+export const DEFAULT_STATS_PR_LIMIT = 100;
+
+/** Default window for live mode, keeping API usage bounded. */
+const DEFAULT_LIVE_WINDOW_DAYS = 30;
+
+/**
+ * Parses the `--limit` option.
+ *
+ * @param value - Raw option value
+ * @returns A positive integer
+ * @throws InvalidArgumentError when the value is not a positive integer
+ */
+export function parseLimit(value: string): number {
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new InvalidArgumentError("Expected a positive integer.");
+  }
+  return limit;
 }
 
 /**
@@ -35,11 +75,25 @@ export function parseSince(value: string, now: Date = new Date()): Date {
 
 /**
  * Executes the `stats` command: summarizes how many PRs have been reviewed and
- * how many comments have been posted, based on the persisted audit logs.
+ * how many comments have been posted, either from the platform's real PRs (default)
+ * or from the persisted audit logs.
  *
- * @param options - Time window, output format, and temp path override
+ * @param options - Source, time window, platform settings, and output format
  */
 export async function executeStatsCommand(options: StatsOptions): Promise<void> {
+  const source = options.source ?? "live";
+  if (source !== "live" && source !== "audit") {
+    throw new Error(`Invalid source "${source}". Must be "live" or "audit".`);
+  }
+
+  if (source === "audit") {
+    await executeAuditStats(options);
+  } else {
+    await executeLiveStats(options);
+  }
+}
+
+async function executeAuditStats(options: StatsOptions): Promise<void> {
   const config = loadConfig({ tempPath: options.tempPath });
   const entries = await readAuditEvents({ logsDir: join(config.tempPath, "logs") });
   const stats = computeAuditStats(entries, { since: options.since });
@@ -50,6 +104,79 @@ export async function executeStatsCommand(options: StatsOptions): Promise<void> 
   }
 
   for (const line of formatStats(stats, options.since)) consoleOutputWriter.log(line);
+}
+
+async function executeLiveStats(options: StatsOptions): Promise<void> {
+  const config = loadConfig({
+    platform: options.platform,
+    githubToken: options.githubToken,
+    githubRepoOwner: options.githubRepoOwner,
+    githubRepoName: options.githubRepoName,
+    azureToken: options.azureToken,
+    azureOrg: options.azureOrg,
+    azureProject: options.azureProject,
+    azureRepo: options.azureRepo,
+    tempPath: options.tempPath,
+  });
+  const platform = (options.platform ?? config.defaultPlatform) as Platform;
+  if (platform !== "github" && platform !== "azure") {
+    throw new Error(`Invalid platform "${platform}". Must be "github" or "azure".`);
+  }
+  validateConfig(config, platform);
+
+  const adapter =
+    platform === "github" ? new GitHubAdapter(config) : new AzureDevOpsAdapter(config);
+  const since = options.since ?? new Date(Date.now() - DEFAULT_LIVE_WINDOW_DAYS * MS_PER_DAY);
+  const stats = await collectLiveReviewStats(adapter, {
+    since,
+    limit: options.limit ?? DEFAULT_STATS_PR_LIMIT,
+  });
+
+  if (options.json) {
+    consoleOutputWriter.log(JSON.stringify({ since: since.toISOString(), ...stats }, null, 2));
+    return;
+  }
+
+  for (const line of formatLiveStats(stats, since)) consoleOutputWriter.log(line);
+}
+
+/**
+ * Renders live platform statistics as human-readable lines.
+ *
+ * @param stats - Statistics gathered from the platform
+ * @param since - Start of the inspected window
+ * @returns Lines to print
+ */
+export function formatLiveStats(stats: LiveReviewStats, since: Date): string[] {
+  const lines = [
+    "",
+    `📊 Merge Mentor stats for ${stats.project} (${stats.platform}, PRs since ${since.toISOString()})`,
+    "",
+    `  PRs scanned:      ${stats.prsScanned}`,
+    `  PRs reviewed:     ${stats.prsReviewed}`,
+    `  Comments posted:  ${stats.totalComments}` +
+      ` (${stats.inlineComments} inline, ${stats.generalComments} general)`,
+  ];
+  if (stats.prsFailed > 0) {
+    lines.push(`  PRs unreadable:   ${stats.prsFailed} (excluded from totals)`);
+  }
+
+  if (stats.reviewedPullRequests.length > 0) {
+    lines.push("", "  Reviewed PRs:");
+    for (const pr of stats.reviewedPullRequests) {
+      lines.push(
+        `    #${pr.number} [${pr.state}] ${pr.title} — ${pr.inlineComments + pr.generalComments} comments`
+      );
+    }
+  }
+  if (stats.truncated) {
+    lines.push(
+      "",
+      "  ⚠️  PR limit reached; older PRs were not counted. Raise --limit to include them."
+    );
+  }
+  lines.push("");
+  return lines;
 }
 
 /**

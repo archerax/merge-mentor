@@ -1,11 +1,28 @@
-import { Alert, Code, Paper, SimpleGrid, Stack, Table, Text } from "@mantine/core";
-import { createFileRoute } from "@tanstack/react-router";
+import {
+  Alert,
+  Anchor,
+  Code,
+  Paper,
+  SegmentedControl,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+} from "@mantine/core";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { PageHeader } from "../components/PageHeader.js";
-import { getAuditStats } from "../server/audit.functions.js";
+import { getLiveStats } from "../server/stats.functions.js";
+
+const WINDOWS = [7, 30, 90] as const;
+const DEFAULT_DAYS = 30;
 
 export const Route = createFileRoute("/stats")({
-  loader: () => getAuditStats(),
+  validateSearch: (search: Record<string, unknown>): { days: number } => ({
+    days: WINDOWS.find((days) => days === Number(search.days)) ?? DEFAULT_DAYS,
+  }),
+  loaderDeps: ({ search }) => ({ days: search.days }),
+  loader: ({ deps }) => getLiveStats({ data: { days: deps.days } }),
   component: StatsPage,
 });
 
@@ -28,8 +45,9 @@ function StatTile({ label, value, hint }: { label: string; value: number; hint?:
 }
 
 function StatsPage() {
-  const stats = Route.useLoaderData();
-  const { comments } = stats;
+  const result = Route.useLoaderData();
+  const { days } = Route.useSearch();
+  const navigate = useNavigate({ from: "/stats" });
 
   return (
     <Stack gap="lg">
@@ -37,53 +55,91 @@ function StatsPage() {
         title="Stats"
         description={
           <>
-            Pull requests reviewed and comments posted, derived from the audit events in{" "}
-            <Code>.mergementor/logs</Code>.
+            Live counts from the pull requests in the configured repository: PRs carrying a Merge
+            Mentor comment, and the comments it has posted.
           </>
+        }
+        actions={
+          <SegmentedControl
+            value={String(days)}
+            onChange={(value) => void navigate({ search: { days: Number(value) } })}
+            data={WINDOWS.map((window) => ({ label: `${window}d`, value: String(window) }))}
+          />
         }
       />
 
-      {stats.reviewRuns === 0 && comments.total === 0 ? (
-        <Alert title="No review activity found" color="gray">
-          Run a review with the Merge Mentor CLI to generate audit logs, then reload this page.
+      {!result.ok ? (
+        <Alert title="Could not load live stats" color="red">
+          {result.error} Check the <Anchor href="/config">configuration</Anchor> for the platform
+          token and repository.
         </Alert>
       ) : (
-        <>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-            <StatTile label="PRs reviewed" value={stats.prsReviewed} />
-            <StatTile label="Review runs" value={stats.reviewRuns} />
-            <StatTile label="Files reviewed" value={stats.filesReviewed} />
-            <StatTile
-              label="Comments posted"
-              value={comments.total}
-              hint={`${comments.inline} inline, ${comments.replies} replies, ${comments.general} general${comments.failed > 0 ? `, ${comments.failed} failed` : ""}`}
-            />
-          </SimpleGrid>
-
-          <Table fz="sm" striped>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Platform</Table.Th>
-                <Table.Th>PRs reviewed</Table.Th>
-                <Table.Th>Review runs</Table.Th>
-                <Table.Th>Comments posted</Table.Th>
-                <Table.Th>Comments failed</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {stats.byPlatform.map((p) => (
-                <Table.Tr key={p.platform}>
-                  <Table.Td>{p.platform}</Table.Td>
-                  <Table.Td>{p.prsReviewed}</Table.Td>
-                  <Table.Td>{p.reviewRuns}</Table.Td>
-                  <Table.Td>{p.comments.total}</Table.Td>
-                  <Table.Td>{p.comments.failed}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </>
+        <LiveStats stats={result.stats} days={days} />
       )}
     </Stack>
+  );
+}
+
+function LiveStats({
+  stats,
+  days,
+}: {
+  stats: Extract<Awaited<ReturnType<typeof getLiveStats>>, { ok: true }>["stats"];
+  days: number;
+}) {
+  return (
+    <>
+      <Text size="sm" c="dimmed">
+        <Code>{stats.project}</Code> on {stats.platform}, PRs from the last {days} days.
+      </Text>
+
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
+        <StatTile label="PRs scanned" value={stats.prsScanned} />
+        <StatTile label="PRs reviewed" value={stats.prsReviewed} />
+        <StatTile
+          label="Comments posted"
+          value={stats.totalComments}
+          hint={`${stats.inlineComments} inline, ${stats.generalComments} general`}
+        />
+      </SimpleGrid>
+
+      {stats.truncated && (
+        <Alert color="yellow" title="PR limit reached">
+          Only the {stats.prsScanned} most recent PRs were inspected. Choose a shorter window, or
+          use <Code>merge-mentor stats --limit</Code> for a larger scan.
+        </Alert>
+      )}
+      {stats.prsFailed > 0 && (
+        <Alert color="yellow" title="Some PRs could not be read">
+          {stats.prsFailed} PR(s) were excluded from the totals because their comments could not be
+          fetched.
+        </Alert>
+      )}
+
+      {stats.reviewedPullRequests.length > 0 && (
+        <Table fz="sm" striped>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>PR</Table.Th>
+              <Table.Th>Title</Table.Th>
+              <Table.Th>State</Table.Th>
+              <Table.Th>Inline</Table.Th>
+              <Table.Th>General</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {stats.reviewedPullRequests.map((pr) => (
+              <Table.Tr key={pr.number}>
+                <Table.Td>#{pr.number}</Table.Td>
+                <Table.Td>{pr.title}</Table.Td>
+                <Table.Td>{pr.state}</Table.Td>
+                <Table.Td>{pr.inlineComments}</Table.Td>
+                <Table.Td>{pr.generalComments}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+    </>
   );
 }
