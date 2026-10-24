@@ -10,6 +10,9 @@ import {
 
 const t = (text: string) => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`;
 
+const del = (inner: string): string =>
+  `<w:del w:id="9"><w:r><w:delText>x</w:delText></w:r>${inner}</w:del>`;
+
 describe("extractCommentAnchors", () => {
   it("returns the text between range start and end", () => {
     const xml = `<w:body><w:p>${t("Before ")}<w:commentRangeStart w:id="3"/>${t("anchored")}<w:commentRangeEnd w:id="3"/>${t(" after")}</w:p></w:body>`;
@@ -44,8 +47,6 @@ describe("extractCommentAnchors", () => {
   });
 
   it("honours range markers inside skipped content, so ranges close and keep accepted text", () => {
-    const del = (inner: string): string =>
-      `<w:del w:id="9"><w:r><w:delText>x</w:delText></w:r>${inner}</w:del>`;
     // Start inside a deletion: the accepted text that follows is genuinely covered.
     const startInDel = `<w:p>${del('<w:commentRangeStart w:id="1"/>')}${t("accepted")}<w:commentRangeEnd w:id="1"/>${t(" after")}</w:p>`;
     expect(extractCommentAnchors(startInDel).get("1")).toBe("accepted");
