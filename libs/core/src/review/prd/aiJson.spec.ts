@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { AIResponse } from "../../ai/types.js";
 import { parseAIJson } from "./aiJson.js";
 

@@ -401,8 +401,7 @@ describe("chunkDocument", () => {
   it("renders Word comments attached to a heading", async () => {
     const buffer = await buildDocx({
       body:
-        paraXml(commentStart(0) + run("Login") + commentEnd(0), "Heading1") +
-        para("Users log in."),
+        paraXml(commentStart(0) + run("Login") + commentEnd(0), "Heading1") + para("Users log in."),
       comments: [{ id: 0, author: "Jane Doe", text: "Rename this section." }],
     });
 
