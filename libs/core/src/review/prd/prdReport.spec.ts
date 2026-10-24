@@ -74,6 +74,11 @@ describe("readinessFromCounts", () => {
     expect(readinessFromCounts({ Blocker: 0, Major: 1, Minor: 0 })).toBe("needs-work");
     expect(readinessFromCounts({ Blocker: 0, Major: 0, Minor: 9 })).toBe("ready");
   });
+
+  it("never reads as ready when the review is incomplete", () => {
+    expect(readinessFromCounts({ Blocker: 0, Major: 0, Minor: 0 }, false)).toBe("needs-work");
+    expect(readinessFromCounts({ Blocker: 1, Major: 0, Minor: 0 }, false)).toBe("not-ready");
+  });
 });
 
 describe("fallbackReadinessSummary", () => {
@@ -83,6 +88,14 @@ describe("fallbackReadinessSummary", () => {
     );
     expect(fallbackReadinessSummary({ Blocker: 2, Major: 0, Minor: 1 })).toBe(
       "The review found 2 blocker issues, 1 minor issue."
+    );
+  });
+});
+
+describe("fallbackReadinessSummary (partial)", () => {
+  it("says the review was partial", () => {
+    expect(fallbackReadinessSummary({ Blocker: 0, Major: 0, Minor: 0 }, false)).toMatch(
+      /^This was a partial review.*this assessment may be incomplete\. The review found no issues/
     );
   });
 });

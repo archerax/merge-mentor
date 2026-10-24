@@ -43,7 +43,10 @@ export interface PrdReviewReport {
     readonly commentCount: number;
   };
   readonly readiness: {
-    /** Derived from the verified findings (any Blocker: not ready; any Major: needs work). */
+    /**
+     * Derived from the verified findings (any Blocker: not ready; any Major:
+     * needs work); never "ready" when the review is incomplete.
+     */
     readonly verdict: PrdReadinessVerdict;
     readonly summary: string;
     /** The verdict the model gave in the consistency pass, if it ran. */
@@ -90,17 +93,32 @@ export function verdictLabel(verdict: PrdReadinessVerdict): string {
   return VERDICT_LABELS[verdict];
 }
 
-/** Derives the readiness verdict from the verified findings. */
+/**
+ * Derives the readiness verdict from the verified findings. A partial review
+ * (`complete` false) is never "ready": unreviewed parts may hold problems, so
+ * the verdict is capped at "needs-work".
+ */
 export function readinessFromCounts(
-  counts: Readonly<Record<PrdSeverity, number>>
+  counts: Readonly<Record<PrdSeverity, number>>,
+  complete = true
 ): PrdReadinessVerdict {
   if (counts.Blocker > 0) return "not-ready";
-  if (counts.Major > 0) return "needs-work";
+  if (counts.Major > 0 || !complete) return "needs-work";
   return "ready";
 }
 
 /** Plain-language fallback summary when the model gave none. */
-export function fallbackReadinessSummary(counts: Readonly<Record<PrdSeverity, number>>): string {
+export function fallbackReadinessSummary(
+  counts: Readonly<Record<PrdSeverity, number>>,
+  complete = true
+): string {
+  const base = describeCounts(counts);
+  return complete
+    ? base
+    : `This was a partial review: some parts of the document were not reviewed (see “Not reviewed”), so this assessment may be incomplete. ${base}`;
+}
+
+function describeCounts(counts: Readonly<Record<PrdSeverity, number>>): string {
   const total = counts.Blocker + counts.Major + counts.Minor;
   if (total === 0) return "The review found no issues in the text it could check.";
   const parts = SEVERITY_ORDER.filter((severity) => counts[severity] > 0).map(

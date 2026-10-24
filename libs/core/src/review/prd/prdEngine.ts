@@ -343,7 +343,6 @@ class PrdReviewRun {
 
     const findings = orderFindings(verification.findings, document);
     const counts = countBySeverity(findings);
-    const verdict = readinessFromCounts(counts);
     const notReviewed: PrdNotReviewedItem[] = [
       ...failed.map((result) => ({
         kind: "failed-section" as const,
@@ -376,6 +375,8 @@ class PrdReviewRun {
       consistency !== undefined &&
       document.warnings.length === 0;
 
+    const verdict = readinessFromCounts(counts, complete);
+
     const report: PrdReviewReport = {
       schemaVersion: 1,
       kind: "prd",
@@ -399,10 +400,11 @@ class PrdReviewRun {
       readiness: {
         verdict,
         // The model's summary was written for its own verdict; use it only when
-        // that agrees with the verdict derived from the verified findings.
+        // that agrees with the verdict derived from the verified findings and
+        // the review was complete (a partial review gets the partial summary).
         summary:
-          (consistency?.verdict === verdict ? consistency.summary : "") ||
-          fallbackReadinessSummary(counts),
+          (complete && consistency?.verdict === verdict ? consistency.summary : "") ||
+          fallbackReadinessSummary(counts, complete),
         ...(consistency ? { modelVerdict: consistency.verdict } : {}),
       },
       complete,

@@ -476,9 +476,49 @@ describe("runPrdReview", () => {
     expect(report.complete).toBe(false);
     expect(report.readiness).toEqual({
       verdict: "needs-work",
-      summary: "The review found 1 major issue, 1 minor issue.",
+      summary: expect.stringMatching(
+        /^This was a partial review.*The review found 1 major issue, 1 minor issue\.$/
+      ),
     });
     expect(report.notReviewed.map((item) => item.kind)).toContain("consistency-check");
+  });
+
+  it("never reports ready when the review is partial, even with no findings", async () => {
+    const ai = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-consistency") return { raw: "garbage", parsed: null };
+      if (opts?.promptType === "prd-section") {
+        return jsonResponse({ summary: "Part.", keyStatements: [], findings: [] });
+      }
+      return defaultHandler(prompt, opts);
+    });
+
+    const { report, reportMarkdown } = await runPrdReview(options(), { aiClient: ai });
+
+    expect(report.complete).toBe(false);
+    expect(report.counts).toEqual({ Blocker: 0, Major: 0, Minor: 0 });
+    expect(report.readiness.verdict).toBe("needs-work");
+    expect(report.readiness.summary).toMatch(/^This was a partial review/);
+    expect(reportMarkdown).not.toContain("Ready for development");
+  });
+
+  it("ignores a model summary that calls an incomplete review ready", async () => {
+    const ai = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-consistency")
+        return jsonResponse({
+          readiness: { verdict: "needs-work", summary: "Looks complete." },
+          findings: [],
+        });
+      if (opts?.promptType === "prd-section") {
+        return prompt.includes("Overview [s1]")
+          ? { raw: "Sorry", parsed: null }
+          : jsonResponse({ summary: "Part.", keyStatements: [], findings: [] });
+      }
+      return defaultHandler(prompt, opts);
+    });
+    const { report } = await runPrdReview(options(), { aiClient: ai });
+    expect(report.complete).toBe(false);
+    expect(report.readiness.verdict).toBe("needs-work");
+    expect(report.readiness.summary).toMatch(/^This was a partial review/);
   });
 
   it("uses the model summary only when its verdict agrees with the verified findings", async () => {
