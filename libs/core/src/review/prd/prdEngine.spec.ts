@@ -405,6 +405,21 @@ describe("runPrdReview", () => {
     expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
   });
 
+  it("warns about retained session data when the run fails without a report", async () => {
+    const ai = createFakeAIClient((_prompt, opts) => {
+      opts?.onSessionDiscardFailed?.("delete failed");
+      throw new Error("provider down");
+    });
+    const output = createCapturingOutputWriter();
+
+    await expect(runPrdReview(options({ output }), { aiClient: ai })).rejects.toThrow(
+      "None of the 5 part(s)"
+    );
+
+    const text = output.output.map((entry) => entry.data).join("\n");
+    expect(text).toContain("could not delete its saved conversation for 5 request(s)");
+  });
+
   it("warns, and still throws the original error, when a failed run cannot be cleaned up", async () => {
     const ai = createFakeAIClient(() => {
       throw new Error("provider down");

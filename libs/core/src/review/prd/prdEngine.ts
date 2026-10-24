@@ -277,6 +277,12 @@ class PrdReviewRun {
       );
       return await this.review({ createdAt, fileName, runId, paths, buffer, document, chunks });
     } catch (error) {
+      // No report will carry the warning, so surface it here.
+      if (this.discardFailures.length > 0) {
+        this.output.error(
+          `⚠️ The AI provider could not delete its saved conversation for ${this.discardFailures.length} request(s). Parts of the document may remain in the provider's own storage, outside the .mergementor folder.`
+        );
+      }
       // Do not leave a copy of a confidential document (or a half-written
       // report pair) behind for a failed run.
       await deletePrdRun(runId, {
