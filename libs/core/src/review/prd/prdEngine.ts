@@ -30,7 +30,7 @@ import {
   type OutputWriter,
   systemClock,
 } from "@merge-mentor/shared/ports/index.js";
-import { type PrdRunPaths, prdRunPaths } from "@merge-mentor/shared/reports/index.js";
+import { deletePrdRun, type PrdRunPaths, prdRunPaths } from "@merge-mentor/shared/reports/index.js";
 import { mergeTokenUsage } from "@merge-mentor/shared/utils/tokenUsage.js";
 
 import packageJson from "../../../package.json" with { type: "json" };
@@ -277,8 +277,12 @@ class PrdReviewRun {
       );
       return await this.review({ createdAt, fileName, runId, paths, buffer, document, chunks });
     } catch (error) {
-      // Do not leave a copy of a confidential document behind for a failed run.
-      await this.fs.rm(paths.runDir, { recursive: true, force: true }).catch(() => undefined);
+      // Do not leave a copy of a confidential document (or a half-written
+      // report pair) behind for a failed run.
+      await deletePrdRun(runId, {
+        tempPath: options.tempPath ?? "./.mergementor",
+        fs: this.fs,
+      }).catch(() => undefined);
       throw error;
     }
   }

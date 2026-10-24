@@ -8,6 +8,7 @@ import {
   ValidationError,
 } from "@merge-mentor/shared/errors/index.js";
 import { createFixedClock } from "@merge-mentor/shared/ports/clock.test-helper.js";
+import { nodeFs } from "@merge-mentor/shared/ports/index.js";
 import { createCapturingOutputWriter } from "@merge-mentor/shared/ports/outputWriter.test-helper.js";
 import { deletePrdRun, listReports } from "@merge-mentor/shared/reports/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -385,6 +386,24 @@ describe("runPrdReview", () => {
     expect(events).toContainEqual(expect.objectContaining({ id: "ai-review", status: "error" }));
     // The source copy of a failed run is removed again.
     expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
+  });
+
+  it("removes the Markdown report too when writing the JSON report fails", async () => {
+    const ai = createFakeAIClient(defaultHandler);
+    const failingFs = {
+      ...nodeFs,
+      writeFile: async (file: string, data: string, encoding: BufferEncoding) => {
+        if (file.endsWith("-review-report.json")) throw new Error("disk full");
+        return nodeFs.writeFile(file, data, encoding);
+      },
+    };
+
+    await expect(
+      runPrdReview(options(), { aiClient: ai, fileSystem: failingFs as typeof nodeFs })
+    ).rejects.toThrow("disk full");
+
+    expect(await readdir(path.join(tempPath, "prd"))).toEqual([]);
+    expect(await readdir(path.join(tempPath, "reports"))).toEqual([]);
   });
 
   it("records in the report when the provider could not delete session data", async () => {
