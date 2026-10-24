@@ -398,6 +398,41 @@ describe("chunkDocument", () => {
     );
   });
 
+  it("renders Word comments attached to a heading", async () => {
+    const buffer = await buildDocx({
+      body:
+        paraXml(commentStart(0) + run("Login") + commentEnd(0), "Heading1") +
+        para("Users log in."),
+      comments: [{ id: 0, author: "Jane Doe", text: "Rename this section." }],
+    });
+
+    const chunks = chunkDocument(await parseDocx(buffer));
+
+    expect(chunks[0]?.text).toContain(
+      '[existing comment 0 by Jane Doe on "Login"]: Rename this section.'
+    );
+  });
+
+  it("keeps heading comments when a section is split into parts", async () => {
+    const buffer = await buildDocx({
+      body:
+        paraXml(commentStart(0) + run("Login") + commentEnd(0), "Heading1") +
+        para(words(40)) +
+        para(words(40)),
+      comments: [{ id: 0, author: "Jane Doe", text: "Rename this section." }],
+    });
+
+    const chunks = chunkDocument(await parseDocx(buffer), {
+      maxChars: 300,
+      minChars: 10,
+      fallbackChunkChars: 200,
+      overlapChars: 20,
+    });
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.some((chunk) => chunk.text.includes("Rename this section."))).toBe(true);
+  });
+
   it("chunks a parsed .docx end to end", async () => {
     const buffer = await buildDocx({
       body:

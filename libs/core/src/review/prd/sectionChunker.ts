@@ -186,6 +186,12 @@ function splitSection(
     options.maxChars - longestHeader.length - "\n\n".length
   );
   const pieces = section.blocks.map((block) => renderer.block(block));
+  // The header is repeated per part, so the heading's comments ride with the
+  // first block instead.
+  const headingComments = renderer.headingComments(section);
+  if (headingComments.length > 0) {
+    pieces.unshift({ text: headingComments.join("\n"), paragraphIds: [] });
+  }
   const groups = packWithOverlap(pieces, budget, options.overlapChars);
   return groups.map((group, index) => {
     const part = { index: index + 1, total: groups.length };
@@ -351,6 +357,8 @@ function joinPieces(pieces: readonly Piece[]): { text: string; paragraphIds: str
  */
 class Renderer {
   private readonly comments: Map<string, DocxComment>;
+  /** Comments by the paragraph they are anchored to (used for heading paragraphs). */
+  private readonly commentsByParagraph = new Map<string, DocxComment[]>();
   private readonly images: Map<string, DocxImage>;
 
   constructor(
@@ -359,6 +367,20 @@ class Renderer {
   ) {
     this.comments = new Map(document.comments.map((comment) => [comment.id, comment]));
     this.images = new Map(document.images.map((image) => [image.id, image]));
+    for (const comment of document.comments) {
+      if (comment.paragraphId === null) continue;
+      const list = this.commentsByParagraph.get(comment.paragraphId) ?? [];
+      list.push(comment);
+      this.commentsByParagraph.set(comment.paragraphId, list);
+    }
+  }
+
+  /** The comments on a section's heading paragraph, one line each. */
+  headingComments(section: DocxSection): string[] {
+    if (!section.headingParagraphId) return [];
+    return (this.commentsByParagraph.get(section.headingParagraphId) ?? []).map((comment) =>
+      this.comment(comment)
+    );
   }
 
   /** The heading line plus one piece per block. */
@@ -367,7 +389,8 @@ class Renderer {
     const pieces = section.blocks.map((block) => this.block(block));
     if (!header) return pieces;
     const headingIds = section.headingParagraphId ? [section.headingParagraphId] : [];
-    return [{ text: header, paragraphIds: headingIds }, ...pieces];
+    const text = [header, ...this.headingComments(section)].join("\n");
+    return [{ text, paragraphIds: headingIds }, ...pieces];
   }
 
   header(section: DocxSection, part: { index: number; total: number } | undefined): string {
