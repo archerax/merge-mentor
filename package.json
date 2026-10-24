@@ -63,7 +63,7 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.23",
+    "@github/copilot-sdk": "^1.0.26",
     "@octokit/rest": "^22.0.1",
     "@opencode-ai/sdk": "^1.19.3",
     "azure-devops-node-api": "^17.0.1",

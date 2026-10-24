@@ -9,3 +9,6 @@ allowBuilds:
 
 patchedDependencies:
   "@stryker-mutator/vitest-runner@10.0.0": patches/@stryker-mutator__vitest-runner@10.0.0.patch
+
+overrides:
+  "@github/copilot-sdk>zod": "4.6.7"
