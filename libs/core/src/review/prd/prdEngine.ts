@@ -339,6 +339,7 @@ class PrdReviewRun {
 
     const findings = orderFindings(verification.findings, document);
     const counts = countBySeverity(findings);
+    const verdict = readinessFromCounts(counts);
     const notReviewed: PrdNotReviewedItem[] = [
       ...failed.map((result) => ({
         kind: "failed-section" as const,
@@ -388,8 +389,12 @@ class PrdReviewRun {
         commentCount: document.comments.length,
       },
       readiness: {
-        verdict: readinessFromCounts(counts),
-        summary: consistency?.summary || fallbackReadinessSummary(counts),
+        verdict,
+        // The model's summary was written for its own verdict; use it only when
+        // that agrees with the verdict derived from the verified findings.
+        summary:
+          (consistency?.verdict === verdict ? consistency.summary : "") ||
+          fallbackReadinessSummary(counts),
         ...(consistency ? { modelVerdict: consistency.verdict } : {}),
       },
       complete,

@@ -153,6 +153,17 @@ function withSupport(
   });
 }
 
+function withConsistencyVerdict(
+  verdict: string,
+  summary: string
+): ReturnType<typeof createFakeAIClient> {
+  return createFakeAIClient((prompt, opts) =>
+    opts?.promptType === "prd-consistency"
+      ? jsonResponse({ readiness: { verdict, summary }, findings: [] })
+      : defaultHandler(prompt, opts)
+  );
+}
+
 describe("runPrdReview", () => {
   let tempPath: string;
   let docxPath: string;
@@ -441,6 +452,27 @@ describe("runPrdReview", () => {
       summary: "The review found 1 major, 1 minor issues.",
     });
     expect(report.notReviewed.map((item) => item.kind)).toContain("consistency-check");
+  });
+
+  it("uses the model summary only when its verdict agrees with the verified findings", async () => {
+    // The verified findings are Major/Minor only, so the derived verdict is needs-work.
+    const contradicting = await runPrdReview(options(), {
+      aiClient: withConsistencyVerdict("ready", "Looks great, ship it."),
+    });
+    expect(contradicting.report.readiness).toEqual({
+      verdict: "needs-work",
+      summary: expect.not.stringContaining("ship it"),
+      modelVerdict: "ready",
+    });
+    expect(contradicting.report.readiness.summary).toMatch(/^The review found/);
+
+    const agreeing = await runPrdReview(options({ runId: "run-2" }), {
+      aiClient: withConsistencyVerdict("needs-work", "Two gaps to close."),
+    });
+    expect(agreeing.report.readiness).toMatchObject({
+      verdict: "needs-work",
+      summary: "Two gaps to close.",
+    });
   });
 
   it("accepts an in-memory upload, streams with one section at a time, and lists images when the client cannot check image support", async () => {
