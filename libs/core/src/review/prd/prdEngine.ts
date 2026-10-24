@@ -501,7 +501,7 @@ class PrdReviewRun {
       this.addUsage(response.tokenUsage);
       const json = parseAIJson(response);
       const parsed = PrdSectionResultSchema.safeParse(json);
-      if (!parsed.success || !hasResponseKeys(json, ["findings", "summary"])) {
+      if (!parsed.success || !hasResponseKeys(json, ["findings", "summary", "keyStatements"])) {
         throw new MergeMentorError("the AI response for this section could not be read");
       }
       this.step(label, "done", `${parsed.data.findings.length} possible issue(s)`);

@@ -501,6 +501,7 @@ describe("runPrdReview", () => {
   it.each([
     ["section", "{}", "failed-section"],
     ["section", '{"summary":"Part."}', "failed-section"],
+    ["section", '{"summary":"Part.","findings":[]}', "failed-section"],
     ["consistency", "{}", "consistency-check"],
     ["consistency", '{"readiness":{"verdict":"ready","summary":"ok"}}', "consistency-check"],
   ])(
