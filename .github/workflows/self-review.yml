@@ -46,5 +46,8 @@ jobs:
         run: pnpm start review --ci --write --strategy fast
         env:
           GITHUB_TOKEN: ${{ secrets.MERGE_MENTOR_GITHUB_TOKEN }}
-          MM_COPILOT_TOKEN: ${{ secrets.MERGE_MENTOR_COPILOT_TOKEN }}
-          MM_AI_MODEL: ${{ vars.MERGE_MENTOR_COPILOT_MODEL }}
+          # DeepSeek is OpenAI-compatible, so it runs through copilot-sdk BYOK
+          # (same setup as eval.yml). No Copilot quota is used.
+          MM_AI_BASE_URL: ${{ vars.MM_AI_BASE_URL || 'https://api.deepseek.com' }}
+          MM_AI_MODEL: ${{ vars.MM_AI_MODEL || 'deepseek-flash' }}
+          MM_AI_API_KEY: ${{ secrets.MM_AI_API_KEY }}
