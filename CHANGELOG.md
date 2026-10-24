@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-24
+
+Adds PRD and FRD review: a plain-language first pass over a Word requirements
+document, from the CLI or the web dashboard.
+
 ### Added
 
 - **`merge-mentor prd <file.docx>`**: a first-pass review of a Word requirements
@@ -26,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the extracted text and images and the AI transcripts of each review stay in
   `.mergementor` on your computer, and Delete on the Reports page removes them all
   at once.
+
+### Fixed
+
+- **Web dashboard**: PBI and project reviews started from the dashboard now honour
+  the configured AI timeout (`MM_AI_TIMEOUT`) instead of the provider default.
 
 ## [4.0.0] - 2026-10-23
 
