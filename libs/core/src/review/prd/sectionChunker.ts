@@ -315,16 +315,20 @@ function packWithOverlap(pieces: readonly Piece[], size: number, overlap: number
 /**
  * Splits an oversized table at row boundaries. Every slice repeats the table
  * title and header rows, so a value stays next to its identifier and column
- * labels. A row larger than the budget is split at whitespace as a last resort
+ * labels (a header too big to repeat is emitted once, as leading slices). A row larger than the budget is split at whitespace as a last resort
  * (each fragment still carries the header). Rows are not overlapped between
  * slices: the repeated header is the shared context.
  */
 function splitTable(parts: TableParts, size: number, overlap: number): Piece[] {
-  // A header taking more than half the budget would crowd out the rows.
-  const head: Piece =
-    parts.head.text.length > size / 2 ? { text: parts.title, paragraphIds: [] } : parts.head;
+  // A header taking more than half the budget would crowd out the rows, so it
+  // is not repeated: it is emitted once, up front, as its own slice(s), and the
+  // body slices carry only the title line. Its text is still reviewed.
+  const tooBig = parts.head.text.length > size / 2;
+  const head: Piece = tooBig ? { text: parts.title, paragraphIds: [] } : parts.head;
   const room = Math.max(1, size - head.text.length - 1);
-  const slices: Piece[] = [];
+  const slices: Piece[] = tooBig
+    ? splitPiece({ ...parts.head, table: undefined }, size, overlap)
+    : [];
   let rows: Piece[] = [];
   let length = 0;
   const emit = (body: readonly Piece[]): void => {

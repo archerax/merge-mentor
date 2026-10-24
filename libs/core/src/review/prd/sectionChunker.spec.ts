@@ -298,6 +298,42 @@ describe("chunkDocument", () => {
       );
     });
 
+    it("emits a header too big to repeat once, so its text is still reviewed", () => {
+      const matrix = {
+        kind: "table" as const,
+        table: {
+          id: "t1",
+          rows: [
+            row("h", "ID", words(120, "hdr"), true),
+            ...Array.from({ length: 6 }, (_, i) => row(`r${i}`, `FR-${i}`, words(8, `v${i}`))),
+          ],
+        },
+      };
+
+      const chunks = chunkDocument(doc([s("s1", "Matrix", [matrix])]), {
+        maxChars: 300,
+        minChars: 0,
+        overlapChars: 20,
+      });
+
+      expect(chunks.every((chunk) => chunk.text.length <= 300)).toBe(true);
+      const covered = new Set(chunks.flatMap((chunk) => chunk.paragraphIds));
+      const all = ["hk", "hv", ...Array.from({ length: 6 }, (_, i) => [`r${i}k`, `r${i}v`]).flat()];
+      expect(all.filter((id) => !covered.has(id))).toEqual([]);
+      // The header text is present, but only in the leading slice(s), not repeated.
+      const withHeader = chunks.filter((chunk) => chunk.text.includes("hdr"));
+      expect(withHeader.length).toBeGreaterThan(0);
+      expect(
+        chunks
+          .filter((chunk) => chunk.text.includes("FR-"))
+          .every((chunk) => !chunk.text.includes("hdr"))
+      ).toBe(true);
+      // Body slices still carry the table title.
+      for (const chunk of chunks.filter((c) => c.text.includes("FR-"))) {
+        expect(chunk.text).toContain("[t1] Table:");
+      }
+    });
+
     it("splits a single row bigger than the budget only as a last resort, keeping the header", () => {
       const matrix = {
         kind: "table" as const,
