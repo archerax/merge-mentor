@@ -483,6 +483,45 @@ describe("runPrdReview", () => {
     expect(report.notReviewed.map((item) => item.kind)).toContain("consistency-check");
   });
 
+  it.each([
+    ["section", "{}", "failed-section"],
+    ["section", '{"summary":"Part."}', "failed-section"],
+    ["consistency", "{}", "consistency-check"],
+    ["consistency", '{"readiness":{"verdict":"ready","summary":"ok"}}', "consistency-check"],
+  ])(
+    "treats a structurally empty %s response %s as a failed pass",
+    async (pass, body, expectedKind) => {
+      const promptType = pass === "section" ? "prd-section" : "prd-consistency";
+      const ai = createFakeAIClient((prompt, opts) =>
+        opts?.promptType === promptType && (pass !== "section" || prompt.includes("Overview [s1]"))
+          ? { raw: body, parsed: JSON.parse(body) as unknown }
+          : defaultHandler(prompt, opts)
+      );
+
+      const { report } = await runPrdReview(options(), { aiClient: ai, clock: CLOCK });
+
+      expect(report.complete).toBe(false);
+      expect(report.notReviewed.map((item) => item.kind)).toContain(expectedKind);
+    }
+  );
+
+  it("still accepts legitimate responses with empty findings arrays", async () => {
+    const ai = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-section") {
+        return jsonResponse({ summary: "", keyStatements: [], findings: [] });
+      }
+      if (opts?.promptType === "prd-consistency") {
+        return jsonResponse({ readiness: { verdict: "ready", summary: "Fine." }, findings: [] });
+      }
+      return defaultHandler(prompt, opts);
+    });
+
+    const { report } = await runPrdReview(options(), { aiClient: ai, clock: CLOCK });
+
+    expect(report.complete).toBe(true);
+    expect(report.notReviewed.filter((item) => item.kind !== "image")).toEqual([]);
+  });
+
   it("never reports ready when the review is partial, even with no findings", async () => {
     const ai = createFakeAIClient((prompt, opts) => {
       if (opts?.promptType === "prd-consistency") return { raw: "garbage", parsed: null };
@@ -950,6 +989,21 @@ describe("runPrdReview", () => {
         aiClient: failing,
       });
       expect(failed.report.complete).toBe(false);
+    });
+
+    it("lists an image batch whose response is structurally empty as not reviewed", async () => {
+      const ai = withSupport(
+        imageHandler(() => jsonResponse({})),
+        { supported: true, mediaTypes: ["image/png"] }
+      );
+
+      const { report } = await runPrdReview(options({ includeImages: true }), { aiClient: ai });
+
+      expect(report.imageReview).toEqual({ supported: true, reviewed: 0 });
+      expect(report.complete).toBe(false);
+      expect(
+        report.notReviewed.filter((item) => item.description.includes("AI request failed"))
+      ).toHaveLength(2);
     });
 
     it("lists every image with the reason and warns when the model cannot read images", async () => {

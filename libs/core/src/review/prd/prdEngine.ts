@@ -493,8 +493,9 @@ class PrdReviewRun {
         ...(this.streaming ? { onStreamData: this.stream("ai-review") } : {}),
       });
       this.addUsage(response.tokenUsage);
-      const parsed = PrdSectionResultSchema.safeParse(parseAIJson(response));
-      if (!parsed.success) {
+      const json = parseAIJson(response);
+      const parsed = PrdSectionResultSchema.safeParse(json);
+      if (!parsed.success || !hasResponseKeys(json, ["findings", "summary"])) {
         throw new MergeMentorError("the AI response for this section could not be read");
       }
       this.step(label, "done", `${parsed.data.findings.length} possible issue(s)`);
@@ -548,8 +549,9 @@ class PrdReviewRun {
         ...(this.streaming ? { onStreamData: this.stream("consistency") } : {}),
       });
       this.addUsage(response.tokenUsage);
-      const parsed = PrdConsistencyResultSchema.safeParse(parseAIJson(response));
-      if (!parsed.success) {
+      const json = parseAIJson(response);
+      const parsed = PrdConsistencyResultSchema.safeParse(json);
+      if (!parsed.success || !hasResponseKeys(json, ["findings", "readiness"])) {
         throw new MergeMentorError(
           "the AI response for the whole-document check could not be read"
         );
@@ -791,8 +793,9 @@ class PrdReviewRun {
         ...(this.streaming ? { onStreamData: this.stream("images") } : {}),
       });
       this.addUsage(response.tokenUsage);
-      const parsed = PrdImageResultSchema.safeParse(parseAIJson(response));
-      if (!parsed.success) {
+      const json = parseAIJson(response);
+      const parsed = PrdImageResultSchema.safeParse(json);
+      if (!parsed.success || !hasResponseKeys(json, ["findings"])) {
         throw new MergeMentorError("the AI response for these images could not be read");
       }
       const ids = new Set(batch.images.map((image) => image.id));
@@ -982,6 +985,20 @@ function imageBatches(
     }
   }
   return batches;
+}
+
+/**
+ * Whether an AI response carries every expected key, with `findings` (when
+ * expected) as an array. The result schemas default missing fields, which would
+ * turn an empty or malformed response (`{}`) into a successful pass with no
+ * findings; an explicit empty `findings` array remains a legitimate result.
+ */
+function hasResponseKeys(json: unknown, keys: readonly string[]): boolean {
+  if (typeof json !== "object" || json === null || Array.isArray(json)) return false;
+  const record = json as Record<string, unknown>;
+  return keys.every((key) =>
+    key === "findings" ? Array.isArray(record[key]) : record[key] !== undefined
+  );
 }
 
 function sourceFileName(source: PrdReviewSource): string {
