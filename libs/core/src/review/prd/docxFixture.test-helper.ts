@@ -34,12 +34,12 @@ export function run(text: string): string {
 
 /** A tracked insertion. */
 export function ins(text: string, author = "Reviewer"): string {
-  return `<w:ins w:id="${nextId()}" w:author="${author}" w:date="2026-01-01T00:00:00Z">${run(text)}</w:ins>`;
+  return `<w:ins w:id="${nextId()}" w:author="${escapeXml(author)}" w:date="2026-01-01T00:00:00Z">${run(text)}</w:ins>`;
 }
 
 /** A tracked deletion. */
 export function del(text: string, author = "Reviewer"): string {
-  return `<w:del w:id="${nextId()}" w:author="${author}" w:date="2026-01-01T00:00:00Z"><w:r><w:delText xml:space="preserve">${escapeXml(text)}</w:delText></w:r></w:del>`;
+  return `<w:del w:id="${nextId()}" w:author="${escapeXml(author)}" w:date="2026-01-01T00:00:00Z"><w:r><w:delText xml:space="preserve">${escapeXml(text)}</w:delText></w:r></w:del>`;
 }
 
 /** Comment range start marker. */

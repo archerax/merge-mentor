@@ -258,6 +258,17 @@ describe("parseDocx", () => {
     ]);
   });
 
+  it("escapes special characters in tracked-change authors so the fixture stays well-formed", async () => {
+    const author = `A&B <"Q">`;
+    const buffer = await buildDocx({
+      body: heading(1, "Scope") + paraXml(run("Keep ") + del("old ", author) + ins("new ", author)),
+    });
+
+    const doc = await parseDocx(buffer);
+
+    expect(paragraphs(section(doc, "s1").blocks).map((p) => p.text)).toEqual(["Keep new"]);
+  });
+
   it("merges paragraphs whose paragraph mark was deleted", async () => {
     const deletedMark =
       `<w:p><w:pPr><w:rPr><w:del w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"/></w:rPr></w:pPr>${run("First half ")}</w:p>` +
