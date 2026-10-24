@@ -33,24 +33,27 @@ const FIELD = "docx";
  */
 export function assertZipEntriesWithinDeclaredSizes(buffer: Uint8Array, maxEntries?: number): void {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  for (const entry of readCentralDirectory(buffer, maxEntries)) {
-    if (entry.method !== METHOD_DEFLATE) continue;
-    const header = entry.localHeaderOffset;
-    if (
-      header + LOCAL_HEADER_LENGTH > view.byteLength ||
-      view.getUint32(header, true) !== LOCAL_HEADER_SIGNATURE
-    ) {
-      throw new ValidationError(FIELD, "file is not a valid zip archive (corrupt entry header)");
+  const located = readCentralDirectory(buffer, maxEntries)
+    .filter((entry) => entry.method === METHOD_DEFLATE)
+    .map((entry) => ({ entry, ...locateData(view, entry) }));
+
+  // Honest archives never share bytes between entries. Many central records
+  // pointing at the same (or overlapping) local data would otherwise be
+  // inflated once per record; refusing them up front also keeps the compressed
+  // bytes processed within the archive size.
+  const sorted = located.toSorted((a, b) => a.header - b.header);
+  for (let index = 1; index < sorted.length; index++) {
+    const previous = sorted[index - 1];
+    const current = sorted[index];
+    if (previous && current && current.header < previous.end) {
+      throw new ValidationError(
+        FIELD,
+        "file is not a valid zip archive (entries share the same data)"
+      );
     }
-    const start =
-      header +
-      LOCAL_HEADER_LENGTH +
-      view.getUint16(header + 26, true) +
-      view.getUint16(header + 28, true);
-    const end = start + entry.compressedSize;
-    if (end > view.byteLength) {
-      throw new ValidationError(FIELD, "file is not a valid zip archive (truncated entry)");
-    }
+  }
+
+  for (const { entry, start, end } of located) {
     let inflatedLength: number;
     try {
       inflatedLength = inflateRawSync(buffer.subarray(start, end), {
@@ -75,4 +78,28 @@ export function assertZipEntriesWithinDeclaredSizes(buffer: Uint8Array, maxEntri
       );
     }
   }
+}
+
+/** Validates the local header of `entry` and returns where its header and data lie. */
+function locateData(
+  view: DataView,
+  entry: { localHeaderOffset: number; compressedSize: number }
+): { header: number; start: number; end: number } {
+  const header = entry.localHeaderOffset;
+  if (
+    header + LOCAL_HEADER_LENGTH > view.byteLength ||
+    view.getUint32(header, true) !== LOCAL_HEADER_SIGNATURE
+  ) {
+    throw new ValidationError(FIELD, "file is not a valid zip archive (corrupt entry header)");
+  }
+  const start =
+    header +
+    LOCAL_HEADER_LENGTH +
+    view.getUint16(header + 26, true) +
+    view.getUint16(header + 28, true);
+  const end = start + entry.compressedSize;
+  if (end > view.byteLength) {
+    throw new ValidationError(FIELD, "file is not a valid zip archive (truncated entry)");
+  }
+  return { header, start, end };
 }
