@@ -1,7 +1,9 @@
 # Plan: PRD / FRD Review (`merge-mentor prd`)
 
-Status: phases 1-5 implemented (spike, core, CLI, web UI, images); phase 6
-(pilot on real team documents, prompt tuning, release notes) remains.
+Status: phases 1-5 implemented (spike, core, CLI, web UI, images). The phase 1
+spike ran on generated `.docx` fixtures only; parsing 3-5 real documents is
+still outstanding and is folded into phase 6 (pilot on real team documents,
+prompt tuning, release notes), which remains.
 Supersedes the MVP scope in `prd-review-feature.md` (that document remains the
 original idea and roadmap).
 
@@ -140,19 +142,22 @@ Web `/prd` route  ─┴─> prdEngine (libs/core/src/review)
 
 1. **Spike (small):** parse 3-5 real documents with mammoth; confirm headings,
    tables, tracked changes, comments and image extraction; decide whether mammoth
-   is sufficient.
+   is sufficient. _Fixture-based spike done; the real-document confirmation
+   (3-5 files) is outstanding and moves to phase 6._
 2. **Core:** document model, `prdEngine`, rubrics, verifier, report output, unit
    tests with mocked AI.
 3. **CLI:** `prd` command, options, config/env wiring, `docs/prd.md`, README entry.
 4. **Web UI:** upload route, run streaming, report view, Reports page integration.
 5. **Images:** `--include-images` behind the per-provider check.
 
-   Phases 1-5 are done. AI transcripts for a run are written to
+   Phases 1-5 are done (phase 1 on generated fixtures; its real-document check
+   is outstanding, see phase 6). AI transcripts for a run are written to
    `prd/<runId>/transcripts/` (provider `transcriptDir` option), so the per-run
    delete removes everything a run produced.
 
-6. **Pilot (remaining):** run on real team documents (confirming the spike's
-   mammoth findings and image handling on real files), tune prompts, then
+6. **Pilot (remaining):** run on real team documents (including the phase 1
+   real-document parse of 3-5 files: confirming the spike's mammoth findings and
+   image handling on real files), tune prompts, then
    release notes.
 
 ## 7. Out of scope (later)
