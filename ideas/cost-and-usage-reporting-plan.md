@@ -27,7 +27,7 @@ should record usage per run and report it in the CLI and the web dashboard.
 | Data source | Stored report (no separate ledger); audit log keeps per-call detail |
 | Scope | Per project: reports under `<tempPath>/reports` (default `./.mergementor`) |
 | CI / ephemeral runners | Out of scope for v1 |
-| Ledger fields | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
+| Recorded fields | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
 | Opt-out | None; usage is written with the report (local-only) |
 | Retention | Same as reports (whatever cleans reports removes usage) |
 | Dashboard | Runs on the same machine as the CLI; reads the same reports directory |
@@ -50,15 +50,15 @@ should record usage per run and report it in the CLI and the web dashboard.
 4. **`stats --usage`**: totals and per-PR averages over a window, by model and
    provider, read from report sidecars in the local reports directory (not
    the GitHub/Azure API like the existing `stats`); shows "not reported" (never zero) and "partial" markers.
-5. **Web dashboard**: usage view reading the same ledger.
+5. **Web dashboard**: usage view reading the same sidecars.
 6. **Cost display**: show `$` derived from AICs when the provider reports them
    (`aics * 0.01`); otherwise tokens only. No bundled model price tables.
 
 ## Guardrails
 
 - Local only; consistent with the zero-telemetry promise.
-- PR title is stored locally in the ledger; document this and allow disabling
-  the ledger.
+- Usage lives alongside reports, which already contain PR titles; no new
+  sensitive data is stored.
 - Providers that do not report usage show "not reported", never zero.
 
 ## Tests
