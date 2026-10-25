@@ -45,6 +45,16 @@ describe("Config", () => {
       expect(loadConfig(undefined, env).defaultPlatform).toBe("github");
     });
 
+    it.each([
+      [" GitHub ", "github"],
+      ["AZURE", "azure"],
+      ["gitlab", "azure"],
+    ])("should resolve a platform override of %j to %s", (platform, expected) => {
+      const env = createStubEnvironment({});
+
+      expect(loadConfig({ platform }, env).defaultPlatform).toBe(expected);
+    });
+
     it("should honor MM_PLATFORM=github", () => {
       const env = createStubEnvironment({ MM_PLATFORM: "github" });
 

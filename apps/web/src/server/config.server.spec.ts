@@ -39,6 +39,17 @@ describe("config.server", () => {
     fs.writeFileSync(envFile, body, "utf8");
   }
 
+  function writeEnvMissing(
+    platform: "github" | "azure",
+    complete: Record<string, string>,
+    missing: string
+  ): void {
+    const lines = Object.entries({ ...complete, [missing]: "" }).map(
+      ([envVar, value]) => `${envVar}=${value}`
+    );
+    writeEnv([`MM_PLATFORM=${platform}`, ...lines, ""].join("\n"));
+  }
+
   describe("buildConfigView", () => {
     it("builds sanitized sections with secrets masked and set flags", () => {
       writeEnv(
@@ -92,43 +103,61 @@ describe("config.server", () => {
   });
 
   describe("warnings", () => {
-    const requiredByPlatform = [
-      {
-        platform: "github",
-        name: "GitHub",
-        fields: {
-          MM_GITHUB_TOKEN: "GitHub token",
-          MM_GITHUB_REPO_OWNER: "GitHub repository owner",
-          MM_GITHUB_REPO_NAME: "GitHub repository name",
-        },
-      },
-      {
-        platform: "azure",
-        name: "Azure DevOps",
-        fields: {
-          MM_AZURE_TOKEN: "Azure DevOps token",
-          MM_AZURE_ORG: "Azure DevOps organization",
-          MM_AZURE_PROJECT: "Azure DevOps project",
-          MM_AZURE_REPO: "Azure DevOps repository",
-        },
-      },
-    ] as const;
+    const githubEnv = {
+      MM_GITHUB_TOKEN: "value",
+      MM_GITHUB_REPO_OWNER: "value",
+      MM_GITHUB_REPO_NAME: "value",
+    };
+    const azureEnv = {
+      MM_AZURE_TOKEN: "value",
+      MM_AZURE_ORG: "value",
+      MM_AZURE_PROJECT: "value",
+      MM_AZURE_REPO: "value",
+    };
 
-    for (const { platform, name, fields } of requiredByPlatform) {
-      for (const [missing, label] of Object.entries(fields)) {
-        it(`names ${missing} by its label when it is missing on ${platform}`, () => {
-          const lines = [`MM_PLATFORM=${platform}`];
-          for (const envVar of Object.keys(fields)) {
-            lines.push(`${envVar}=${envVar === missing ? "" : "value"}`);
-          }
-          writeEnv(lines.join("\n") + "\n");
+    it.each([
+      ["github", githubEnv, "MM_GITHUB_TOKEN", "GitHub token: Required for GitHub platform."],
+      [
+        "github",
+        githubEnv,
+        "MM_GITHUB_REPO_OWNER",
+        "GitHub repository owner: Required for GitHub platform.",
+      ],
+      [
+        "github",
+        githubEnv,
+        "MM_GITHUB_REPO_NAME",
+        "GitHub repository name: Required for GitHub platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_TOKEN",
+        "Azure DevOps token: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_ORG",
+        "Azure DevOps organization: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_PROJECT",
+        "Azure DevOps project: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_REPO",
+        "Azure DevOps repository: Required for Azure DevOps platform.",
+      ],
+    ] as const)("labels a missing %s setting on %s", (platform, complete, missing, expected) => {
+      writeEnvMissing(platform, complete, missing);
 
-          const { warnings } = buildConfigView();
-
-          expect(warnings).toEqual([`${label}: Required for ${name} platform.`]);
-        });
-      }
-    }
+      expect(buildConfigView().warnings).toEqual([expected]);
+    });
 
     it("names a malformed Copilot token by its label", () => {
       writeEnv(
@@ -142,11 +171,9 @@ describe("config.server", () => {
         ].join("\n")
       );
 
-      const { warnings } = buildConfigView();
-
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatch(/^Copilot token: /);
-      expect(warnings[0]).not.toMatch(/MM_|--/);
+      expect(buildConfigView().warnings).toEqual([
+        "Copilot token: GitHub Copilot requires a fine-grained personal access token starting with 'github_pat_'.",
+      ]);
     });
   });
 

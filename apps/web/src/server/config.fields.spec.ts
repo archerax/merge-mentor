@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { CONFIG_SECTIONS } from "./config.fields.js";
 
+function findField(envVar: string) {
+  return CONFIG_SECTIONS.flatMap((section) => section.fields).find(
+    (candidate) => candidate.envVar === envVar
+  );
+}
+
 describe("CONFIG_SECTIONS", () => {
   it("exposes the expected sections", () => {
     expect(CONFIG_SECTIONS.map((section) => section.title)).toEqual([
@@ -20,6 +26,9 @@ describe("CONFIG_SECTIONS", () => {
         expect(field.envVar).toMatch(/^MM_/);
         expect(field.label.length).toBeGreaterThan(0);
         expect(field.description.length).toBeGreaterThan(0);
+        expect(field.label).not.toMatch(/MM_[A-Z_]+|--[a-z-]+/);
+        expect(field.description).not.toMatch(/MM_[A-Z_]+|--[a-z-]+/);
+        expect(field.note ?? "").not.toMatch(/MM_[A-Z_]+|--[a-z-]+/);
         expect(["text", "number", "boolean", "enum", "secret"]).toContain(field.type);
       }
     }
@@ -47,27 +56,24 @@ describe("CONFIG_SECTIONS", () => {
     expect(new Set(envVars).size).toBe(envVars.length);
   });
 
-  it("keeps the settings needed to run a review out of the advanced group", () => {
-    const required = [
-      "MM_PLATFORM",
-      "MM_GITHUB_TOKEN",
-      "MM_GITHUB_REPO_OWNER",
-      "MM_GITHUB_REPO_NAME",
-      "MM_AZURE_TOKEN",
-      "MM_AZURE_ORG",
-      "MM_AZURE_PROJECT",
-      "MM_AZURE_REPO",
-      "MM_AI_PROVIDER",
-      "MM_AI_MODEL",
-      "MM_COPILOT_TOKEN",
-      "MM_REVIEW_STRATEGY",
-    ];
-    const fields = CONFIG_SECTIONS.flatMap((section) => section.fields);
-    for (const envVar of required) {
-      const field = fields.find((candidate) => candidate.envVar === envVar);
-      expect(field).toBeDefined();
-      expect(field?.advanced).toBeFalsy();
-    }
+  it.each([
+    "MM_PLATFORM",
+    "MM_GITHUB_TOKEN",
+    "MM_GITHUB_REPO_OWNER",
+    "MM_GITHUB_REPO_NAME",
+    "MM_AZURE_TOKEN",
+    "MM_AZURE_ORG",
+    "MM_AZURE_PROJECT",
+    "MM_AZURE_REPO",
+    "MM_AI_PROVIDER",
+    "MM_AI_MODEL",
+    "MM_COPILOT_TOKEN",
+    "MM_REVIEW_STRATEGY",
+  ])("keeps %s, which a review needs, out of the advanced group", (envVar) => {
+    const field = findField(envVar);
+
+    expect(field).toBeDefined();
+    expect(field?.advanced).toBeFalsy();
   });
 
   it("leaves every section with at least one basic setting", () => {
@@ -76,18 +82,17 @@ describe("CONFIG_SECTIONS", () => {
     }
   });
 
-  it("tags credentials and repository settings with the platform they belong to", () => {
-    const fields = CONFIG_SECTIONS.flatMap((section) => section.fields);
-    for (const field of fields) {
-      const expected = field.envVar.startsWith("MM_AZURE_")
-        ? "azure"
-        : field.envVar.startsWith("MM_GITHUB_")
-          ? "github"
-          : undefined;
-      expect({ envVar: field.envVar, platform: field.platform }).toEqual({
-        envVar: field.envVar,
-        platform: expected,
-      });
-    }
+  it.each([
+    ["MM_AZURE_TOKEN", "azure"],
+    ["MM_AZURE_ORG", "azure"],
+    ["MM_AZURE_PROJECT", "azure"],
+    ["MM_AZURE_REPO", "azure"],
+    ["MM_GITHUB_TOKEN", "github"],
+    ["MM_GITHUB_REPO_OWNER", "github"],
+    ["MM_GITHUB_REPO_NAME", "github"],
+    ["MM_PLATFORM", undefined],
+    ["MM_AI_PROVIDER", undefined],
+  ])("tags %s with platform %s", (envVar, platform) => {
+    expect(findField(envVar)?.platform).toBe(platform);
   });
 });
