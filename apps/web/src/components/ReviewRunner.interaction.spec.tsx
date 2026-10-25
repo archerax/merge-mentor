@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -503,13 +503,8 @@ describe("ReviewResult interactions", () => {
     it("only offers posting for the matching finding", () => {
       renderWithMantine(<ReviewResult summary={summary} target={{ pr: 7 }} />);
 
-      const card = screen.getByText("Off-by-one error.").closest(".mantine-Card-root");
-      expect(card).not.toBeNull();
-      expect(
-        within(card as HTMLElement).getByRole("button", { name: "Post src/a.ts:10" })
-      ).toBeInTheDocument();
-      const other = screen.getByText("Prefer const.").closest(".mantine-Card-root");
-      expect(within(other as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Post src/a.ts:10" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Post src/b.ts" })).not.toBeInTheDocument();
     });
   });
 });

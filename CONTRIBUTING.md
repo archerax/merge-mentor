@@ -56,7 +56,7 @@ pnpm install
 
 - Colocate specs with source as `*.spec.ts`; run with `pnpm test`.
 - Coverage thresholds (80% lines/functions/branches/statements) are enforced via `pnpm test:coverage` — don't let coverage drop.
-- **Web UI specs** (`apps/web`): components that only render can be checked with `renderToStaticMarkup`. For anything interactive (clicks, typing, state, hooks), use React Testing Library with `// @vitest-environment jsdom` at the top of the spec and `renderWithMantine` from `apps/web/src/test/`. Route modules go in `apps/web/src/test/routes/` (not `routes/`, where TanStack Router would treat them as routes) and use `routerMock`.
+- **Web UI specs** (`apps/web`): components that only render can be checked with `renderToStaticMarkup`. For anything interactive (clicks, typing, state, hooks), use React Testing Library with `// @vitest-environment jsdom` at the top of the spec. Keep the existing `X.spec.tsx` for render-only assertions and put the jsdom cases in `X.interaction.spec.tsx` (a component with no static spec can use a plain `X.spec.tsx`) and `renderWithMantine` from `apps/web/src/test/`. Route modules go in `apps/web/src/test/routes/` (not `routes/`, where TanStack Router would treat them as routes) and use `routerMock`.
 - Tests must be hermetic: mock only true external boundaries (platform APIs, AI SDKs), use the port test-helper fakes, and never write into the repository working directory (use `os.tmpdir()` for filesystem tests, with cleanup).
 
 ### Changelog

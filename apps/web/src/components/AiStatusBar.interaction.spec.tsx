@@ -64,7 +64,8 @@ describe("AiStatusBar", () => {
     await user.click(refresh);
     await waitFor(() => expect(refresh).toHaveAttribute("data-loading"));
 
-    refreshed.resolve({ kind: "other-provider", provider: "opencode" });
+    refreshed.resolve({ kind: "copilot", login: "hubot", usesConfiguredToken: false });
+    expect(await screen.findByText("Copilot: hubot")).toBeInTheDocument();
     await waitFor(() => expect(refresh).not.toHaveAttribute("data-loading"));
   });
 });

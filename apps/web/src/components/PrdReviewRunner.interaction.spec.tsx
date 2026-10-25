@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
 import type { PrdReviewReport } from "@merge-mentor/core/review/prd/prdReport.js";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -97,6 +98,30 @@ describe("PrdReviewRunner interactions", () => {
     await user.click(screen.getByRole("button", { name: "Review document" }));
 
     expect(screen.getByText(/older Word file \(\.doc\)/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty file", async () => {
+    const user = setup();
+    renderWithMantine(<PrdReviewRunner />);
+
+    await user.upload(fileInput(), docx("Empty.docx", 0));
+    await user.click(screen.getByRole("button", { name: "Review document" }));
+
+    expect(screen.getByText("This file is empty.")).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file over the size limit and says what the limit is", async () => {
+    const user = setup();
+    renderWithMantine(<PrdReviewRunner />);
+    const oversized = docx("Big.docx");
+    Object.defineProperty(oversized, "size", { value: MAX_DOCX_BYTES + 1 });
+
+    await user.upload(fileInput(), oversized);
+    await user.click(screen.getByRole("button", { name: "Review document" }));
+
+    expect(screen.getByText(/the limit is 20 MB/)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 
