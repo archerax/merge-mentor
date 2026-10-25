@@ -59,7 +59,9 @@ describe("CONFIG_SECTIONS", () => {
     ];
     const fields = CONFIG_SECTIONS.flatMap((section) => section.fields);
     for (const envVar of required) {
-      expect(fields.find((field) => field.envVar === envVar)?.advanced).toBeFalsy();
+      const field = fields.find((candidate) => candidate.envVar === envVar);
+      expect(field).toBeDefined();
+      expect(field?.advanced).toBeFalsy();
     }
   });
 

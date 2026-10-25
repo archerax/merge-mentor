@@ -55,11 +55,15 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     }
   }
 
+  // A cleared platform means "use the default", so no platform is assumed and both groups show.
+  const draftPlatform = draft.MM_PLATFORM;
   const selectedPlatform =
-    draft.MM_PLATFORM ||
-    view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
-      ?.value ||
-    undefined;
+    draftPlatform === ""
+      ? undefined
+      : (draftPlatform ??
+        view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
+          ?.value ??
+        undefined);
 
   function isVisible(field: ConfigFieldView): boolean {
     return isFieldVisible(field, {
@@ -203,14 +207,16 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
               <Tabs.Tab
                 key={section.title}
                 value={section.title}
+                aria-label={
+                  hasError
+                    ? `${section.title} — has invalid values`
+                    : modified
+                      ? `${section.title} — has unsaved changes`
+                      : undefined
+                }
                 rightSection={
                   hasError || modified ? (
-                    <Badge
-                      size="xs"
-                      circle
-                      color={hasError ? "red" : "yellow"}
-                      aria-label={hasError ? "Has invalid values" : "Has unsaved changes"}
-                    />
+                    <Badge size="xs" circle color={hasError ? "red" : "yellow"} aria-hidden />
                   ) : null
                 }
               >

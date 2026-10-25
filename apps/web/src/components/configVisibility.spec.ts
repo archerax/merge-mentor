@@ -48,6 +48,13 @@ describe("isFieldVisible", () => {
     expect(isFieldVisible(github, { ...base, touched: true })).toBe(true);
   });
 
+  it("hides an advanced setting for the other platform even when it holds a value", () => {
+    const github = field({ platform: "github", advanced: true, set: true });
+
+    expect(isFieldVisible(github, base)).toBe(false);
+    expect(isFieldVisible(github, { ...base, selectedPlatform: "github" })).toBe(true);
+  });
+
   it("shows platform settings when the selected platform is not known", () => {
     const azure = field({ platform: "azure" });
 

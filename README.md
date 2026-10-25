@@ -43,11 +43,13 @@ Merge Mentor is a **self-hosted CLI tool** that runs directly on your local work
 ## Quick Start
 
 ```bash
-# Run a review (dry-run mode) instantly with npx - using environment variables
-MM_PLATFORM=github \
-MM_GITHUB_TOKEN=your_token \
-MM_GITHUB_REPO_OWNER=owner \
-MM_GITHUB_REPO_NAME=repo \
+# Configure with environment variables (Azure DevOps is the default platform)
+export MM_PLATFORM=github
+export MM_GITHUB_TOKEN=your_token
+export MM_GITHUB_REPO_OWNER=owner
+export MM_GITHUB_REPO_NAME=repo
+
+# Run a review (dry-run mode) instantly with npx
 npx merge-mentor@latest review --pr 123
 
 # Post comments directly to PR

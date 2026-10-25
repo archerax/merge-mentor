@@ -24,7 +24,7 @@ export function isFieldVisible(field: ConfigFieldView, context: FieldVisibilityC
   return (
     (!field.advanced && !otherPlatform) ||
     context.showAdvanced ||
-    (field.advanced && field.set) ||
+    (!otherPlatform && field.advanced && field.set) ||
     context.touched
   );
 }
