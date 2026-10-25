@@ -24,7 +24,7 @@ should record usage per run and report it in the CLI and the web dashboard.
 |---|---|
 | Budget caps | None for now |
 | Surfaces | `stats --usage` (CLI) and web dashboard |
-| Data source | Stored report (no separate ledger); audit log keeps per-call detail |
+| Data source | JSON sidecar next to each report (no separate ledger); audit log keeps per-call detail |
 | Scope | Per project: reports under `<tempPath>/reports` (default `./.mergementor`) |
 | CI / ephemeral runners | Out of scope for v1 |
 | Recorded fields | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
@@ -71,8 +71,6 @@ should record usage per run and report it in the CLI and the web dashboard.
 
 ## Open Questions
 
-- Sidecar vs. embedding a machine-readable usage block in the markdown report?
-  Recommendation: JSON sidecar (the markdown stays human-oriented).
 - Does the Copilot SDK `assistant.usage` event expose AIC cost (or only tokens
   and a model multiplier)? Verify against the installed SDK version; if absent,
   decide whether to compute from tokens or show tokens only for Copilot.
