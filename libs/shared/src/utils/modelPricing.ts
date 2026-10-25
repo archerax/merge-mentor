@@ -26,6 +26,9 @@ export const DEEPSEEK_PRICES_AS_OF = "2026-10-25";
 const DEEPSEEK_V4_1_FLASH: ModelPrice = { inputCacheHit: 0.003, inputCacheMiss: 0.15, output: 0.6 };
 const DEEPSEEK_V4_PRO: ModelPrice = { inputCacheHit: 0.022, inputCacheMiss: 0.66, output: 1.98 };
 
+/** `deepseek-chat` is the API alias for DeepSeek Flash. */
+const DEEPSEEK_CHAT_ALIAS = "deepseek-chat";
+
 const TOKENS_PER_PRICE_UNIT = 1_000_000;
 
 /** Matches `pro` as a whole word so `deepseek-v4-pro-0813` matches but `prover` does not. */
@@ -35,8 +38,9 @@ const FLASH_WORD = /(^|[^a-z0-9])flash($|[^a-z0-9])/;
 /**
  * Finds the price row for a model id.
  *
- * Matches case-insensitively on `deepseek` plus the `flash` or `pro` word, so dated
- * suffixes (`-1017`) and provider prefixes (`deepseek/`) are tolerated.
+ * Matches case-insensitively on `deepseek` plus the `flash` or `pro` word, or the
+ * `deepseek-chat` alias (DeepSeek Flash), so dated suffixes (`-1017`) and provider
+ * prefixes (`deepseek/`) are tolerated.
  *
  * @param model - Model id as reported by the provider
  * @returns The price row, or `undefined` when the model is not in the table
@@ -44,7 +48,7 @@ const FLASH_WORD = /(^|[^a-z0-9])flash($|[^a-z0-9])/;
 export function findModelPrice(model: string | undefined): ModelPrice | undefined {
   const id = model?.toLowerCase();
   if (!id?.includes("deepseek")) return undefined;
-  if (FLASH_WORD.test(id)) return DEEPSEEK_V4_1_FLASH;
+  if (FLASH_WORD.test(id) || id.includes(DEEPSEEK_CHAT_ALIAS)) return DEEPSEEK_V4_1_FLASH;
   if (PRO_WORD.test(id)) return DEEPSEEK_V4_PRO;
   return undefined;
 }

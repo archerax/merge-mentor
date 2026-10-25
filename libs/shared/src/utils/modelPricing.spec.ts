@@ -9,6 +9,9 @@ describe("findModelPrice", () => {
     "DeepSeek-V4.1-Flash-1017",
     "deepseek/deepseek-v4.1-flash",
     "deepseek-flash",
+    "deepseek-chat",
+    "deepseek/deepseek-chat",
+    "DeepSeek-Chat",
   ])("matches the Flash row for %s", (model) => {
     expect(findModelPrice(model)?.output).toBe(0.6);
   });
@@ -20,12 +23,17 @@ describe("findModelPrice", () => {
     }
   );
 
-  it.each([undefined, "", "gpt-4.1", "claude-sonnet", "deepseek-chat", "deepseek-prover", "pro"])(
-    "has no price for %s",
-    (model) => {
-      expect(findModelPrice(model)).toBeUndefined();
-    }
-  );
+  it.each([
+    undefined,
+    "",
+    "gpt-4.1",
+    "claude-sonnet",
+    "deepseek-reasoner",
+    "deepseek-prover",
+    "pro",
+  ])("has no price for %s", (model) => {
+    expect(findModelPrice(model)).toBeUndefined();
+  });
 });
 
 describe("withEstimatedCost", () => {
