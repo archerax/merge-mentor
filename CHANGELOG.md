@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Web settings screen**: every setting now has a plain-language description
-  and shows its environment variable, edited fields are marked "Modified",
+- **Web settings screen**: every setting now has a plain-language description,
+  edited fields are marked "Modified",
   switches read Enabled/Disabled, settings are grouped into tabs (marked when they hold unsaved or invalid
   values), and the save bar stays visible with an unsaved
   change count. Several cryptic labels were renamed (for example "BYOK base URL"

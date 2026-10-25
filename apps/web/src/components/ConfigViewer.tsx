@@ -34,6 +34,9 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
 
+  const labels = new Map(
+    view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
+  );
   const changeCount = Object.keys(draft).length + cleared.length;
   const dirty = changeCount > 0;
 
@@ -113,7 +116,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
           <Stack gap={4}>
             {errors.map((error) => (
               <Text key={error.envVar} size="sm">
-                <Code>{error.envVar}</Code>: {error.message}
+                <b>{labels.get(error.envVar) ?? error.envVar}</b>: {error.message}
               </Text>
             ))}
           </Stack>
@@ -247,7 +250,6 @@ function ConfigRow({ field, draftValue, cleared, error, onChange, onToggleClear 
               {field.note}
             </Text>
           )}
-          <Code style={{ alignSelf: "flex-start" }}>{field.envVar}</Code>
         </Stack>
       </Grid.Col>
       <Grid.Col span={{ base: 12, sm: 7 }}>
