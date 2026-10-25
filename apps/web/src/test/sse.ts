@@ -10,7 +10,7 @@ export function sseFrames(events: readonly ReviewStreamEvent<unknown>[], startSe
 /** A streaming `text/event-stream` response whose body is delivered in `chunks`. */
 export function sseResponse(
   chunks: readonly string[],
-  init: ResponseInit = { status: 200 }
+  init: ResponseInit = { status: 200, headers: { "Content-Type": "text/event-stream" } }
 ): Response {
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({

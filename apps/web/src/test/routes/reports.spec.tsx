@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReportDocument } from "@merge-mentor/shared/reports/index.js";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -160,10 +160,12 @@ describe("reports route", () => {
     expect(getReport).toHaveBeenCalledWith({ data: { name: "pbi-1.md" } });
     expect(document.querySelector(".mantine-Skeleton-root")).not.toBeNull();
 
-    pending.resolve(document_(pbi, "# Loaded PBI body"));
+    await act(async () => {
+      pending.resolve(document_(pbi, "# Loaded PBI body"));
+    });
 
     expect(await screen.findByRole("heading", { name: "Loaded PBI body" })).toBeInTheDocument();
-    expect(document.querySelector(".mantine-Skeleton-root")).toBeNull();
+    await waitFor(() => expect(document.querySelector(".mantine-Skeleton-root")).toBeNull());
   });
 
   describe("deleting a PRD review", () => {
@@ -185,7 +187,7 @@ describe("reports route", () => {
       expect(screen.getByText("Select a report to view its contents.")).toBeInTheDocument();
     });
 
-    it("keeps the current report when a different one is not the deleted run", async () => {
+    it("removes only the deleted run from the list", async () => {
       const user = userEvent.setup();
       vi.mocked(deletePrdReport).mockResolvedValue({ deleted: true } as never);
       loaded([review, prd], prd);

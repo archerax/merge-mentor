@@ -20,7 +20,7 @@ function Runner(name: string) {
   return function MockRunner(props: RunnerProps) {
     return (
       <div>
-        <span>{`${name} run=${props.runId ?? "none"} kind=${props.kind ?? "-"} endpoint=${props.endpoint ?? "-"}`}</span>
+        <span>{`${name} run=${props.runId ?? "none"} kind=${props.kind ?? "-"} endpoint=${props.endpoint ?? "-"} result=${typeof props.renderResult}`}</span>
         <button onClick={() => props.onRunCreated?.("new-run")}>create run</button>
       </div>
     );
@@ -43,14 +43,29 @@ const routes = {
 };
 
 const cases = [
-  { name: "review", title: "PR Review", marker: "pr run=", kind: "-", endpoint: "-" },
-  { name: "prd", title: "PRD / FRD Review", marker: "prd run=", kind: "-", endpoint: "-" },
+  {
+    name: "review",
+    title: "PR Review",
+    marker: "pr run=",
+    kind: "-",
+    endpoint: "-",
+    result: "undefined",
+  },
+  {
+    name: "prd",
+    title: "PRD / FRD Review",
+    marker: "prd run=",
+    kind: "-",
+    endpoint: "-",
+    result: "undefined",
+  },
   {
     name: "pbi",
     title: "PBI Review",
     marker: "work-item run=",
     kind: "pbi",
     endpoint: "/api/pbi/stream",
+    result: "function",
   },
   {
     name: "project",
@@ -58,6 +73,7 @@ const cases = [
     marker: "work-item run=",
     kind: "project",
     endpoint: "/api/project/stream",
+    result: "function",
   },
 ] as const;
 
@@ -84,7 +100,9 @@ describe.each(cases)("$name route", (testCase) => {
     expect(screen.getByRole("heading", { name: testCase.title })).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`^${testCase.marker}existing`))).toBeInTheDocument();
     expect(
-      screen.getByText(new RegExp(`kind=${testCase.kind} endpoint=${testCase.endpoint}$`))
+      screen.getByText(
+        new RegExp(`kind=${testCase.kind} endpoint=${testCase.endpoint} result=${testCase.result}$`)
+      )
     ).toBeInTheDocument();
   });
 

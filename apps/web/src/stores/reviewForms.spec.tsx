@@ -1,23 +1,17 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useReviewForm } from "./reviewForms.js";
+type UseReviewForm = typeof import("./reviewForms.js").useReviewForm;
 
-function resetForms(): void {
-  for (const key of ["pr", "pbi", "project"] as const) {
-    const { result } = renderHook(() => useReviewForm(key));
-    act(() => {
-      result.current.setInput("");
-      result.current.setWrite(false);
-      result.current.setStrategy(null);
-      result.current.setRuns(null);
-    });
-  }
-}
+/** A hook bound to a pristine store: the module-level store is recreated for each test. */
+let useReviewForm: UseReviewForm;
 
 describe("useReviewForm", () => {
-  beforeEach(resetForms);
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ useReviewForm } = await import("./reviewForms.js"));
+  });
 
   it("starts with an empty form", () => {
     const { result } = renderHook(() => useReviewForm("pr"));

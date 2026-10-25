@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { LiveReviewStats } from "@merge-mentor/core/review/reviewStats.js";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +14,7 @@ const { getLiveStats } = await import("../../server/stats.functions.js");
 const { Route } = await import("../../routes/stats.js");
 const StatsPage = optionsOf(Route).component;
 
-const stats = {
+const stats: LiveReviewStats = {
   platform: "github",
   project: "acme/widgets",
   prsScanned: 40,
@@ -24,7 +25,7 @@ const stats = {
   prsFailed: 0,
   truncated: false,
   reviewedPullRequests: [
-    { number: 7, title: "Add widget", state: "merged", inlineComments: 3, generalComments: 1 },
+    { number: 7, title: "Add widget", state: "closed", inlineComments: 3, generalComments: 1 },
   ],
 };
 
@@ -57,7 +58,16 @@ describe("stats route", () => {
 
     expect(getLiveStats).toHaveBeenCalledWith({ data: { days: 7 } });
     expect(result).toEqual({ ok: true, stats });
-    expect(optionsOf(Route).loaderDeps({ search: { days: 7 } })).toEqual({ days: 7 });
+  });
+
+  it("derives the loader window from the search parameters", async () => {
+    vi.mocked(getLiveStats).mockResolvedValue({ ok: true, stats } as never);
+
+    const deps = optionsOf(Route).loaderDeps({ search: { days: 90 } });
+    await optionsOf(Route).loader({ deps: deps as Record<string, unknown> });
+
+    expect(deps).toEqual({ days: 90 });
+    expect(getLiveStats).toHaveBeenCalledWith({ data: { days: 90 } });
   });
 
   it("renders the totals, hints and reviewed pull requests", () => {
@@ -67,9 +77,9 @@ describe("stats route", () => {
 
     expect(screen.getByText("acme/widgets")).toBeInTheDocument();
     expect(screen.getByText(/PRs from the last 30 days/)).toBeInTheDocument();
-    expect(screen.getByText("PRs scanned").nextElementSibling).toHaveTextContent("40");
-    expect(screen.getByText("PRs reviewed").nextElementSibling).toHaveTextContent("12");
-    expect(screen.getByText("1,234")).toBeInTheDocument();
+    expect(screen.getByText("40")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText((1234).toLocaleString())).toBeInTheDocument();
     expect(screen.getByText("1000 inline, 234 general")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Add widget" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "#7" })).toBeInTheDocument();
@@ -77,19 +87,31 @@ describe("stats route", () => {
     expect(screen.queryByText("Some PRs could not be read")).not.toBeInTheDocument();
   });
 
-  it("warns when the PR limit was reached or some PRs could not be read", () => {
+  it("warns only about the PR limit when it was reached", () => {
     routeState.loaderData = {
       ok: true,
-      stats: { ...stats, truncated: true, prsFailed: 3, reviewedPullRequests: [] },
+      stats: { ...stats, truncated: true, prsFailed: 0, reviewedPullRequests: [] },
     };
     routeState.search = { days: 7 };
     renderWithMantine(<StatsPage />);
 
     expect(screen.getByText("PR limit reached")).toBeInTheDocument();
     expect(screen.getByText(/Only the 40 most recent PRs were inspected/)).toBeInTheDocument();
+    expect(screen.queryByText("Some PRs could not be read")).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("warns only about unreadable PRs when some failed", () => {
+    routeState.loaderData = {
+      ok: true,
+      stats: { ...stats, truncated: false, prsFailed: 3 },
+    };
+    routeState.search = { days: 7 };
+    renderWithMantine(<StatsPage />);
+
     expect(screen.getByText("Some PRs could not be read")).toBeInTheDocument();
     expect(screen.getByText(/3 PR\(s\) were excluded/)).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("PR limit reached")).not.toBeInTheDocument();
   });
 
   it("explains a failure to load stats and links to the configuration", () => {

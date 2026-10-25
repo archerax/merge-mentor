@@ -118,7 +118,7 @@ describe("useReviewStream", () => {
     expect(result.current.entries).toHaveLength(1);
   });
 
-  it("ignores frames it has already seen, making reconnects idempotent", async () => {
+  it("ignores repeated sequence ids and still accepts frames that carry none", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ runId: "run-4" }))
       .mockResolvedValueOnce(
@@ -136,6 +136,59 @@ describe("useReviewStream", () => {
     expect(result.current.entries.map((entry) => entry.text)).toEqual([
       "once\n",
       "no sequence id\n",
+    ]);
+  });
+
+  it("resumes from the last sequence number after a dropped stream without duplicating entries", async () => {
+    vi.useFakeTimers();
+    const encoder = new TextEncoder();
+    let delivered = false;
+    const dropped = new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (delivered) {
+            controller.error(new Error("connection reset"));
+            return;
+          }
+          delivered = true;
+          controller.enqueue(
+            encoder.encode(
+              sseFrames([
+                { type: "log", message: "one" },
+                { type: "log", message: "two" },
+              ])
+            )
+          );
+        },
+      })
+    );
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ runId: "run-resume" }))
+      .mockResolvedValueOnce(dropped)
+      .mockResolvedValueOnce(
+        sseResponse([
+          sseFrames(
+            [
+              { type: "log", message: "one" },
+              { type: "log", message: "two" },
+              { type: "log", message: "three" },
+            ],
+            1
+          ),
+        ])
+      );
+    const { result } = renderHook(() => useReviewStream({ endpoint: ENDPOINT }));
+
+    act(() => {
+      void result.current.run({});
+    });
+    await act(() => vi.advanceTimersByTimeAsync(500));
+
+    expect(fetchMock.mock.calls[2][0]).toBe(`${ENDPOINT}?run=run-resume&from=2`);
+    expect(result.current.entries.map((entry) => entry.text)).toEqual([
+      "one\n",
+      "two\n",
+      "three\n",
     ]);
   });
 
@@ -318,7 +371,7 @@ describe("useReviewStream", () => {
     act(() => {
       void result.current.run({});
     });
-    await act(() => vi.advanceTimersByTimeAsync(500 + 1000 + 1500 + 2000));
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
 
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("Review stream failed (HTTP 503).");
