@@ -16,8 +16,8 @@ merge-mentor review --pr 123
 # Post comments to PR
 merge-mentor review --pr 123 --write
 
-# Specify a platform (default is github)
-merge-mentor review --pr 456 --platform azure --write
+# Specify a platform (default is azure)
+merge-mentor review --pr 456 --platform github --write
 
 # Use OpenCode SDK instead of Copilot SDK
 merge-mentor review --pr 123 --provider opencode-sdk --write
@@ -43,7 +43,7 @@ unsafe or malformed replacements do not produce native suggestions.
 | `--pr <number>`                 | Pull request number (required unless `--pr-url` or `--ci` is used)        | -              | -                |
 | `--pr-url <url>`                | PR URL (automatically parses platform, repository details, and PR number) | -              | -                |
 | `--ci`                          | CI mode: auto-detect platform and PR from environment variables           | -              | `false`          |
-| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`  | `github`         |
+| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`  | `azure`          |
 | `--write`                       | Post comments to PR (otherwise dry-run; CI mode defaults to write)        | -              | `false`          |
 | `--temp-path <path>`            | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH` | `./.mergementor` |
 | `--local-workspace-path <path>` | Path to a pre-existing local repository checkout                          | -              | -                |

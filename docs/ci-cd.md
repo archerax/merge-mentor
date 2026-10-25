@@ -136,6 +136,7 @@ If you choose not to use the automated `--ci` flag, you must provide all values 
 ```bash
 npx merge-mentor@latest review \
   --pr ${{ github.event.pull_request.number }} \
+  --platform github \
   --write
 # Requires env variables: MM_GITHUB_TOKEN, MM_GITHUB_REPO_OWNER, MM_GITHUB_REPO_NAME
 ```

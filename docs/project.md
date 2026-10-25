@@ -34,7 +34,7 @@ merge-mentor project 5432 --platform azure --write
 | `[id]`                  | The ID of the root planning item/Epic                                  | -              | -                |
 | `--id <id>`             | The ID of the root planning item/Epic                                  | -              | -                |
 | `--url <url>`           | Azure DevOps work-item URL (sets platform, organization, and project)  | -              | -                |
-| `--platform <platform>` | Platform to use (`github` or `azure`)                                  | `MM_PLATFORM`  | `github`         |
+| `--platform <platform>` | Platform to use (`github` or `azure`)                                  | `MM_PLATFORM`  | `azure`          |
 | `--write`               | Post comments back to the root planning item (default is dry-run mode) | -              | `false`          |
 | `--temp-path <path>`    | Base path for temporary files                                          | `MM_TEMP_PATH` | `./.mergementor` |
 

@@ -172,7 +172,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         advanced: true,
         label: "Parallel passes",
         type: "number",
-        note: "Default 4",
+        note: "Default 2",
         description:
           "How many multi-agent passes may run at the same time. Lower this if you hit rate limits.",
       },
@@ -227,7 +227,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         label: "Live output lines",
         type: "number",
         note: "Default 9",
-        description: "How many lines of live output to show at once (1–20).",
+        description: "How many lines of live output to show at once.",
       },
       {
         envVar: "MM_GIT_BACKEND",

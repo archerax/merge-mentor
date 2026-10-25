@@ -18,7 +18,7 @@ merge-mentor stats --since 90d --limit 300
 merge-mentor stats --since 2026-01-31
 
 # Another repository, and machine-readable output
-merge-mentor stats --github-repo-owner my-org --github-repo-name my-repo --json
+merge-mentor stats --platform github --github-repo-owner my-org --github-repo-name my-repo --json
 
 # Azure DevOps
 merge-mentor stats --platform azure
@@ -35,7 +35,7 @@ The token needs the same read access as `review` (comments and pull requests).
 | `--limit <number>`            | Maximum number of PRs to inspect (1-1000)                             | -                      | `100`            |
 | `--temp-path <path>`          | Base path for temporary files, including audit `logs`                 | `MM_TEMP_PATH`         | `./.mergementor` |
 | `--json`                      | Output statistics as JSON                                             | -                      | `false`          |
-| `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `github`         |
+| `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `azure`          |
 | `--github-token <token>`      | GitHub personal access token                                          | `MM_GITHUB_TOKEN`      | -                |
 | `--github-repo-owner <owner>` | GitHub repository owner                                               | `MM_GITHUB_REPO_OWNER` | -                |
 | `--github-repo-name <name>`   | GitHub repository name                                                | `MM_GITHUB_REPO_NAME`  | -                |

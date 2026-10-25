@@ -67,7 +67,6 @@ describe("ConfigViewer", () => {
     const html = renderHtml(<ConfigViewer view={view(sections)} />);
 
     expect(html).toContain("Basic setting");
-    expect(html).not.toContain("Tuning knob");
     expect(html).not.toContain("Tuning");
     expect(html).toContain("1 setting is hidden.");
     expect(html).toContain("Show advanced settings");

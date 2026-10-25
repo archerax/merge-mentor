@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 
 import { saveConfig } from "../server/config.functions.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
+import { isFieldVisible } from "./configVisibility.js";
 
 interface ConfigViewerProps {
   readonly view: ConfigView;
@@ -60,21 +61,15 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       ?.value ||
     undefined;
 
-  /**
-   * Advanced settings and settings for the unselected platform are hidden until
-   * advanced settings are shown. Edits and errors always stay visible, and advanced
-   * settings that already hold a value do too.
-   */
   function isVisible(field: ConfigFieldView): boolean {
-    const otherPlatform = field.platform !== undefined && field.platform !== selectedPlatform;
-    return (
-      (!field.advanced && !otherPlatform) ||
-      showAdvanced ||
-      (field.advanced && field.set) ||
-      draft[field.envVar] !== undefined ||
-      cleared.includes(field.envVar) ||
-      errors.some((item) => item.envVar === field.envVar)
-    );
+    return isFieldVisible(field, {
+      showAdvanced,
+      selectedPlatform,
+      touched:
+        draft[field.envVar] !== undefined ||
+        cleared.includes(field.envVar) ||
+        errors.some((item) => item.envVar === field.envVar),
+    });
   }
 
   const sections = view.sections

@@ -44,6 +44,7 @@ Merge Mentor is a **self-hosted CLI tool** that runs directly on your local work
 
 ```bash
 # Run a review (dry-run mode) instantly with npx - using environment variables
+MM_PLATFORM=github \
 MM_GITHUB_TOKEN=your_token \
 MM_GITHUB_REPO_OWNER=owner \
 MM_GITHUB_REPO_NAME=repo \
