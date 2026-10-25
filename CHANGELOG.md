@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Web settings screen**: every setting now has a plain-language description
+  and shows its environment variable, edited fields are marked "Modified",
+  switches read Enabled/Disabled, and the save bar stays visible with an unsaved
+  change count. Several cryptic labels were renamed (for example "BYOK base URL"
+  is now "Custom endpoint URL (bring your own key)").
+
 ## [4.1.0] - 2026-10-24
 
 Adds PRD and FRD review: a plain-language first pass over a Word requirements

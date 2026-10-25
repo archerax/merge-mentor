@@ -76,6 +76,7 @@ function buildField(
   return {
     envVar: definition.envVar,
     label: definition.label,
+    description: definition.description,
     note: definition.note,
     type: definition.type,
     options: definition.options,

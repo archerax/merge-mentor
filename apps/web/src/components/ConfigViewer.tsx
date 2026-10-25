@@ -1,9 +1,11 @@
 import {
   Alert,
+  Badge,
   Button,
   Code,
   Grid,
   Group,
+  Paper,
   PasswordInput,
   Select,
   Stack,
@@ -31,7 +33,8 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");
 
-  const dirty = Object.keys(draft).length > 0 || cleared.length > 0;
+  const changeCount = Object.keys(draft).length + cleared.length;
+  const dirty = changeCount > 0;
 
   function updateField(envVar: string, value: string, original: string) {
     setDraft((previous) => {
@@ -146,14 +149,30 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Stack>
       ))}
 
-      <Group justify="flex-end">
-        <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
-          Reset
-        </Button>
-        <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
-          Save changes
-        </Button>
-      </Group>
+      <Paper
+        withBorder
+        p="sm"
+        radius="md"
+        style={{ position: "sticky", bottom: 0, zIndex: 10 }}
+        role="region"
+        aria-label="Save configuration"
+      >
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            {dirty
+              ? `${changeCount} unsaved ${changeCount === 1 ? "change" : "changes"}`
+              : "No unsaved changes"}
+          </Text>
+          <Group>
+            <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
+              Discard changes
+            </Button>
+            <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
+              Save changes
+            </Button>
+          </Group>
+        </Group>
+      </Paper>
     </Stack>
   );
 }
@@ -179,14 +198,25 @@ function ConfigRow({ field, draftValue, cleared, error, onChange, onToggleClear 
     <>
       <Grid.Col span={{ base: 12, sm: 5 }}>
         <Stack gap={2}>
-          <Text size="sm" fw={500}>
-            {field.label}
+          <Group gap="xs">
+            <Text size="sm" fw={500}>
+              {field.label}
+            </Text>
+            {(draftValue !== undefined || cleared) && (
+              <Badge size="xs" variant="light" color="yellow">
+                Modified
+              </Badge>
+            )}
+          </Group>
+          <Text size="xs" c="dimmed">
+            {field.description}
           </Text>
           {field.note && (
             <Text size="xs" c="dimmed">
               {field.note}
             </Text>
           )}
+          <Code style={{ alignSelf: "flex-start" }}>{field.envVar}</Code>
         </Stack>
       </Grid.Col>
       <Grid.Col span={{ base: 12, sm: 7 }}>
@@ -228,18 +258,18 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
       return (
         <Group gap="xs" wrap="nowrap">
           <Switch
+            aria-label={field.label}
             checked={value === "true"}
             onChange={(event) => onChange(event.currentTarget.checked ? "true" : "false")}
+            label={value === "true" ? "Enabled" : "Disabled"}
           />
-          <Text size="sm" c="dimmed">
-            {value === "true" ? "true" : "false"}
-          </Text>
         </Group>
       );
     case "enum":
       return (
         <Select
           style={{ flex: 1, minWidth: 0 }}
+          aria-label={field.label}
           data={field.options ?? []}
           value={value === "" ? null : value}
           onChange={(next) => onChange(next ?? "")}
@@ -251,6 +281,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
       return (
         <TextInput
           style={{ flex: 1, minWidth: 0 }}
+          aria-label={field.label}
           type="number"
           min={1}
           value={value}
@@ -261,6 +292,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
     case "secret":
       return (
         <PasswordInput
+          aria-label={field.label}
           style={{ flex: 1, minWidth: 0 }}
           value={value}
           placeholder={
@@ -272,6 +304,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
     case "text":
       return (
         <TextInput
+          aria-label={field.label}
           style={{ flex: 1, minWidth: 0 }}
           value={value}
           placeholder="Not set"

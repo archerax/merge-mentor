@@ -21,7 +21,9 @@ export interface ConfigFieldView {
   readonly secret: boolean;
   /** Whether the underlying environment variable was explicitly provided. */
   readonly set: boolean;
-  /** Optional fallback or resolution note shown beneath the setting name. */
+  /** Plain-language explanation of what the setting does. */
+  readonly description: string;
+  /** Optional fallback or resolution note shown beneath the description. */
   readonly note?: string;
   /** Input control used when editing this field. */
   readonly type: ConfigFieldType;
