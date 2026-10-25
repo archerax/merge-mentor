@@ -5,7 +5,7 @@
 Teams adopting Merge Mentor in CI need to decide what blocks a build, and need a
 way to say "this finding is accepted here" without switching review off.
 
-> **Constraint:** the CEO decision is *no custom rules*. Gating is a pipeline
+> **Constraint:** the CEO decision is _no custom rules_. Gating is a pipeline
 > threshold, not a rule. Suppressions are the closest thing to configuration in
 > this list and need an explicit go/no-go (see Open Decisions).
 

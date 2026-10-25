@@ -1,6 +1,6 @@
 # Feature Plan: Repository Intelligence & Team Coaching
 
-> **Update (CEO decision):** Merge Mentor will not introduce its own custom rules; it respects the repository's `AGENTS.md` (see `agents-md-support-plan.md`). The *auto-generated AGENTS.md rules* part of `analyze` is therefore on hold. The frequent-issues report and `coach` are unaffected. The AGENTS.md loader gap noted below is addressed by that plan.
+> **Update (CEO decision):** Merge Mentor will not introduce its own custom rules; it respects the repository's `AGENTS.md` (see `agents-md-support-plan.md`). The _auto-generated AGENTS.md rules_ part of `analyze` is therefore on hold. The frequent-issues report and `coach` are unaffected. The AGENTS.md loader gap noted below is addressed by that plan.
 
 ## Overview
 

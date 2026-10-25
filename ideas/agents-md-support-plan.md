@@ -31,7 +31,7 @@ making the behaviour visible and safe.
   workspace access and receive nothing.
 - **Workspace is the PR head checkout** (`checkoutRef` in
   `libs/core/src/review/engine.ts`). Auto-loading therefore reads the
-  *PR author's* version of AGENTS.md.
+  _PR author's_ version of AGENTS.md.
 
 ## Gaps
 
