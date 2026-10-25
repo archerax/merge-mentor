@@ -1,13 +1,21 @@
+import { join } from "node:path";
+
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import { collectLiveReviewStats } from "@merge-mentor/core/review/reviewStats.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
+import {
+  listUsageRecords,
+  summarizeUsage,
+  type UsageRecord,
+} from "@merge-mentor/shared/reports/usageReport.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_STATS_PR_LIMIT,
   executeStatsCommand,
   formatLiveStats,
+  formatUsageSummary,
   parseLimit,
   parseSince,
 } from "./stats.js";
@@ -17,6 +25,11 @@ vi.mock("@merge-mentor/core/review/reviewStats.js", () => ({ collectLiveReviewSt
 vi.mock("@merge-mentor/shared/logger.js", () => ({ initLogger: vi.fn() }));
 vi.mock("@merge-mentor/shared/ports/index.js", () => ({
   consoleOutputWriter: { log: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("@merge-mentor/shared/reports/usageReport.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@merge-mentor/shared/reports/usageReport.js")>()),
+  listUsageRecords: vi.fn(),
 }));
 
 const githubAdapter = vi.hoisted(() => vi.fn());
@@ -173,5 +186,103 @@ describe("executeStatsCommand", () => {
     });
 
     await expect(executeStatsCommand({})).rejects.toThrow(/MM_GITHUB_TOKEN/);
+  });
+});
+
+function usageRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
+  return {
+    schemaVersion: 1,
+    generatedAt: "2026-03-30T00:00:00.000Z",
+    platform: "github",
+    projectId: "o-r",
+    prNumber: 1,
+    prTitle: "PR",
+    aiProvider: "copilot-sdk",
+    tokenUsage: { inputTokens: 1000, outputTokens: 200, model: "gpt-4.1" },
+    ...overrides,
+  };
+}
+
+describe("formatUsageSummary", () => {
+  const since = new Date("2026-03-01T00:00:00.000Z");
+  const render = (records: UsageRecord[]): string =>
+    formatUsageSummary(summarizeUsage(records), since, "/tmp/mm/reports").join("\n");
+
+  it("explains when there are no usage records", () => {
+    expect(render([])).toContain("No usage records found");
+  });
+
+  it("says usage was not reported rather than showing zeros", () => {
+    const out = render([usageRecord({ tokenUsage: undefined })]);
+    expect(out).toContain("Usage not reported by the AI provider");
+    expect(out).not.toContain("Input tokens");
+  });
+
+  it("shows totals, averages and breakdowns, with unreported fields marked", () => {
+    const out = render([
+      usageRecord(),
+      usageRecord({ prNumber: 2, tokenUsage: { inputTokens: 500, outputTokens: 100 } }),
+    ]);
+    expect(out).toContain("Total tokens:     1,800");
+    expect(out).toContain("Avg per review:   900 tokens");
+    expect(out).toContain("Avg per PR:       900 tokens");
+    expect(out).toContain("Reasoning tokens: not reported");
+    expect(out).toContain("Cost:             not reported");
+    expect(out).toContain("gpt-4.1: 1,200 tokens over 1 run(s)");
+  });
+
+  it("converts provider-reported nano-AIU to credits and dollars", () => {
+    const out = render([
+      usageRecord({ tokenUsage: { inputTokens: 1, outputTokens: 1, nanoAiu: 2.5e9 } }),
+    ]);
+    expect(out).toContain("2.50 AI credits (~$0.03)");
+  });
+
+  it("flags partial and unreported reviews", () => {
+    const out = render([
+      usageRecord({ calls: { total: 3, reported: 1 } }),
+      usageRecord({ prNumber: 2, tokenUsage: undefined }),
+    ]);
+    expect(out).toContain("1 review(s) are partial");
+    expect(out).toContain("1 review(s) did not report usage and are excluded");
+  });
+});
+
+describe("executeStatsCommand --usage", () => {
+  const now = new Date("2026-03-31T00:00:00.000Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    vi.mocked(loadConfig).mockReturnValue({ tempPath: "/tmp/mm" } as ReturnType<typeof loadConfig>);
+    vi.mocked(listUsageRecords).mockResolvedValue([usageRecord()]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("reads local reports without querying the platform or requiring credentials", async () => {
+    await executeStatsCommand({ usage: true });
+
+    expect(listUsageRecords).toHaveBeenCalledWith({
+      reportsDir: join("/tmp/mm", "reports"),
+      since: new Date("2026-03-01T00:00:00.000Z"),
+    });
+    expect(collectLiveReviewStats).not.toHaveBeenCalled();
+    expect(validateConfig).not.toHaveBeenCalled();
+    expect(vi.mocked(consoleOutputWriter.log).mock.calls.flat().join("\n")).toContain(
+      "Merge Mentor AI usage"
+    );
+  });
+
+  it("honours --since and emits JSON", async () => {
+    const since = new Date("2026-03-20T00:00:00.000Z");
+    await executeStatsCommand({ usage: true, json: true, since });
+
+    expect(vi.mocked(listUsageRecords).mock.calls[0][0]?.since).toEqual(since);
+    const printed = JSON.parse(vi.mocked(consoleOutputWriter.log).mock.calls[0][0] as string);
+    expect(printed).toMatchObject({ since: since.toISOString(), runs: 1, inputTokens: 1000 });
   });
 });

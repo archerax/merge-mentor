@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { loadConfig, validateConfig } from "@merge-mentor/config/config.js";
 import {
   collectLiveReviewStats,
@@ -8,6 +10,14 @@ import { AzureDevOpsAdapter } from "@merge-mentor/platforms/azure.js";
 import { GitHubAdapter } from "@merge-mentor/platforms/github.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
+import {
+  listUsageRecords,
+  nanoAiuToCredits,
+  nanoAiuToUsd,
+  summarizeUsage,
+  type UsageGroupTotals,
+  type UsageSummary,
+} from "@merge-mentor/shared/reports/usageReport.js";
 import { InvalidArgumentError } from "commander";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -18,6 +28,8 @@ export interface StatsOptions {
   /** Maximum number of PRs to inspect. */
   readonly limit?: number;
   readonly json?: boolean;
+  /** Report AI token usage from local review reports instead of querying the platform. */
+  readonly usage?: boolean;
   readonly tempPath?: string;
   readonly platform?: string;
   readonly githubToken?: string;
@@ -84,6 +96,10 @@ export function parseSince(value: string, now: Date = new Date()): Date {
  * @param options - Time window, platform settings, and output format
  */
 export async function executeStatsCommand(options: StatsOptions): Promise<void> {
+  if (options.usage) {
+    await executeUsageStats(options);
+    return;
+  }
   const config = loadConfig({
     platform: options.platform,
     githubToken: options.githubToken,
@@ -153,6 +169,118 @@ export function formatLiveStats(stats: LiveReviewStats, since: Date): string[] {
       "  ⚠️  PR limit reached; older PRs were not counted. Raise --limit to include them."
     );
   }
+  lines.push("");
+  return lines;
+}
+
+/**
+ * Executes `stats --usage`: summarizes AI token usage from the usage records stored next
+ * to local PR review reports. Reads local files only; no platform credentials are needed.
+ *
+ * @param options - Time window, temp path, and output format
+ */
+async function executeUsageStats(options: StatsOptions): Promise<void> {
+  const config = loadConfig({ tempPath: options.tempPath });
+  const since = options.since ?? new Date(Date.now() - DEFAULT_LIVE_WINDOW_DAYS * MS_PER_DAY);
+  const reportsDir = join(config.tempPath, "reports");
+  const summary = summarizeUsage(await listUsageRecords({ reportsDir, since }));
+
+  if (options.json) {
+    consoleOutputWriter.log(
+      JSON.stringify({ since: since.toISOString(), reportsDir, ...summary }, null, 2)
+    );
+    return;
+  }
+
+  for (const line of formatUsageSummary(summary, since, reportsDir)) consoleOutputWriter.log(line);
+}
+
+function formatCount(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+function formatOptionalCount(n: number | undefined): string {
+  return n === undefined ? "not reported" : formatCount(n);
+}
+
+function formatTotalTokens(group: UsageGroupTotals): number {
+  return group.inputTokens + group.outputTokens + (group.reasoningTokens ?? 0);
+}
+
+function formatCost(nanoAiu: number | undefined): string {
+  if (nanoAiu === undefined) return "not reported";
+  return `${nanoAiuToCredits(nanoAiu).toFixed(2)} AI credits (~$${nanoAiuToUsd(nanoAiu).toFixed(2)})`;
+}
+
+function formatGroupLine(group: UsageGroupTotals & { readonly key: string }): string {
+  const cost = group.nanoAiu === undefined ? "" : `, ${formatCost(group.nanoAiu)}`;
+  return `    ${group.key}: ${formatCount(formatTotalTokens(group))} tokens over ${group.runs} run(s)${cost}`;
+}
+
+/**
+ * Renders a usage summary as human-readable lines.
+ *
+ * Runs that reported no usage are counted separately and never contribute zero-valued
+ * totals; runs where only some AI calls reported usage are flagged as partial.
+ *
+ * @param summary - Aggregated usage from local reports
+ * @param since - Start of the window
+ * @param reportsDir - Directory the usage records were read from
+ * @returns Lines to print
+ */
+export function formatUsageSummary(
+  summary: UsageSummary,
+  since: Date,
+  reportsDir: string
+): string[] {
+  const totalRuns = summary.runs + summary.notReportedRuns;
+  const lines = [
+    "",
+    `📊 Merge Mentor AI usage (reviews since ${since.toISOString()})`,
+    `  Source: ${reportsDir}`,
+    "",
+    `  PR reviews:       ${totalRuns} (${summary.prs} PR(s))`,
+  ];
+  if (totalRuns === 0) {
+    lines.push("", "  No usage records found. Run a PR review to start recording usage.", "");
+    return lines;
+  }
+  if (summary.runs === 0) {
+    lines.push("", "  Usage not reported by the AI provider for these reviews.", "");
+    return lines;
+  }
+
+  const totalTokens = formatTotalTokens(summary);
+  lines.push(
+    `  Usage reported:   ${summary.runs} of ${totalRuns} review(s)`,
+    `  Input tokens:     ${formatCount(summary.inputTokens)}`,
+    `  Output tokens:    ${formatCount(summary.outputTokens)}`,
+    `  Reasoning tokens: ${formatOptionalCount(summary.reasoningTokens)}`,
+    `  Cached tokens:    ${formatOptionalCount(summary.cachedTokens)}`,
+    `  Total tokens:     ${formatCount(totalTokens)}`,
+    `  Cost:             ${formatCost(summary.nanoAiu)}`,
+    "",
+    `  Avg per review:   ${formatCount(Math.round(totalTokens / summary.runs))} tokens`,
+    `  Avg per PR:       ${formatCount(Math.round(totalTokens / summary.reportedPrs))} tokens`
+  );
+  if (summary.nanoAiu !== undefined) {
+    lines.push(
+      `  Avg cost/review:  ${formatCost(summary.nanoAiu / summary.runs)}`,
+      `  Avg cost/PR:      ${formatCost(summary.nanoAiu / summary.reportedPrs)}`
+    );
+  }
+
+  lines.push("", "  By model:", ...summary.byModel.map(formatGroupLine));
+  lines.push("", "  By provider:", ...summary.byProvider.map(formatGroupLine));
+
+  const notes: string[] = [];
+  if (summary.partialRuns > 0) {
+    notes.push(`${summary.partialRuns} review(s) are partial: only some AI calls reported usage`);
+  }
+  if (summary.notReportedRuns > 0) {
+    notes.push(`${summary.notReportedRuns} review(s) did not report usage and are excluded`);
+  }
+  if (notes.length > 0) lines.push("", ...notes.map((note) => `  ⚠️  ${note}`));
   lines.push("");
   return lines;
 }

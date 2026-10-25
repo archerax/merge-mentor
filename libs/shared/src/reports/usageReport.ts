@@ -3,6 +3,7 @@ import path from "node:path";
 import type { TokenUsage } from "@merge-mentor/domain/ai.js";
 
 import { nodeFs } from "../ports/index.js";
+import { sumOptional } from "../utils/tokenUsage.js";
 import type { ReportFileSystem } from "./reportReader.js";
 
 /**
@@ -18,7 +19,7 @@ import type { ReportFileSystem } from "./reportReader.js";
 export const USAGE_RECORD_SCHEMA_VERSION = 1;
 
 /** AI calls made during a run, and how many of them reported usage. */
-export interface UsageCallCoverage {
+interface UsageCallCoverage {
   readonly total: number;
   readonly reported: number;
 }
@@ -209,8 +210,10 @@ export interface UsageGroupTotals {
   readonly runs: number;
   readonly inputTokens: number;
   readonly outputTokens: number;
-  readonly reasoningTokens: number;
-  readonly cachedTokens: number;
+  /** Undefined when no run in the group reported reasoning tokens. */
+  readonly reasoningTokens?: number;
+  /** Undefined when no run in the group reported cached tokens. */
+  readonly cachedTokens?: number;
   /** Sum of provider-reported cost; undefined when no run in the group reported one. */
   readonly nanoAiu?: number;
 }
@@ -219,6 +222,8 @@ export interface UsageGroupTotals {
 export interface UsageSummary extends UsageGroupTotals {
   /** Distinct PRs (platform + project + number) with at least one run. */
   readonly prs: number;
+  /** Distinct PRs with at least one run that reported usage. */
+  readonly reportedPrs: number;
   readonly completeRuns: number;
   readonly partialRuns: number;
   readonly notReportedRuns: number;
@@ -232,8 +237,8 @@ interface MutableTotals {
   runs: number;
   inputTokens: number;
   outputTokens: number;
-  reasoningTokens: number;
-  cachedTokens: number;
+  reasoningTokens: number | undefined;
+  cachedTokens: number | undefined;
   nanoAiu: number | undefined;
 }
 
@@ -242,8 +247,8 @@ function emptyTotals(): MutableTotals {
     runs: 0,
     inputTokens: 0,
     outputTokens: 0,
-    reasoningTokens: 0,
-    cachedTokens: 0,
+    reasoningTokens: undefined,
+    cachedTokens: undefined,
     nanoAiu: undefined,
   };
 }
@@ -261,11 +266,19 @@ function addUsage(totals: MutableTotals, usage: TokenUsage): void {
   totals.runs += 1;
   totals.inputTokens += usage.inputTokens;
   totals.outputTokens += usage.outputTokens;
-  totals.reasoningTokens += usage.reasoningTokens ?? 0;
-  totals.cachedTokens += usage.cachedTokens ?? 0;
-  if (usage.nanoAiu !== undefined) {
-    totals.nanoAiu = (totals.nanoAiu ?? 0) + usage.nanoAiu;
-  }
+  totals.reasoningTokens = sumOptional(totals.reasoningTokens, usage.reasoningTokens);
+  totals.cachedTokens = sumOptional(totals.cachedTokens, usage.cachedTokens);
+  totals.nanoAiu = sumOptional(totals.nanoAiu, usage.nanoAiu);
+}
+
+function optionalTotals(
+  totals: MutableTotals
+): Pick<UsageGroupTotals, "reasoningTokens" | "cachedTokens" | "nanoAiu"> {
+  return {
+    ...(totals.reasoningTokens !== undefined ? { reasoningTokens: totals.reasoningTokens } : {}),
+    ...(totals.cachedTokens !== undefined ? { cachedTokens: totals.cachedTokens } : {}),
+    ...(totals.nanoAiu !== undefined ? { nanoAiu: totals.nanoAiu } : {}),
+  };
 }
 
 function groupToList(
@@ -277,9 +290,7 @@ function groupToList(
       runs: totals.runs,
       inputTokens: totals.inputTokens,
       outputTokens: totals.outputTokens,
-      reasoningTokens: totals.reasoningTokens,
-      cachedTokens: totals.cachedTokens,
-      ...(totals.nanoAiu !== undefined ? { nanoAiu: totals.nanoAiu } : {}),
+      ...optionalTotals(totals),
     }))
     .toSorted((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
 }
@@ -293,17 +304,20 @@ export function summarizeUsage(records: readonly UsageRecord[]): UsageSummary {
   const byModel = new Map<string, MutableTotals>();
   const byProvider = new Map<string, MutableTotals>();
   const prKeys = new Set<string>();
+  const reportedPrKeys = new Set<string>();
   let completeRuns = 0;
   let partialRuns = 0;
   let notReportedRuns = 0;
 
   for (const record of records) {
-    prKeys.add(`${record.platform}/${record.projectId}/${record.prNumber}`);
+    const prKey = `${record.platform}/${record.projectId}/${record.prNumber}`;
+    prKeys.add(prKey);
     const completeness = usageCompleteness(record);
     if (completeness === "not-reported" || !record.tokenUsage) {
       notReportedRuns += 1;
       continue;
     }
+    reportedPrKeys.add(prKey);
     if (completeness === "partial") partialRuns += 1;
     else completeRuns += 1;
 
@@ -316,10 +330,9 @@ export function summarizeUsage(records: readonly UsageRecord[]): UsageSummary {
     runs: totals.runs,
     inputTokens: totals.inputTokens,
     outputTokens: totals.outputTokens,
-    reasoningTokens: totals.reasoningTokens,
-    cachedTokens: totals.cachedTokens,
-    ...(totals.nanoAiu !== undefined ? { nanoAiu: totals.nanoAiu } : {}),
+    ...optionalTotals(totals),
     prs: prKeys.size,
+    reportedPrs: reportedPrKeys.size,
     completeRuns,
     partialRuns,
     notReportedRuns,

@@ -27,6 +27,25 @@ merge-mentor stats --platform azure
 
 The token needs the same read access as `review` (comments and pull requests).
 
+## AI usage and cost (`--usage`)
+
+```bash
+# Token usage and cost for PR reviews run in this project (last 30 days)
+merge-mentor stats --usage
+
+# A different window, machine-readable
+merge-mentor stats --usage --since 90d --json
+```
+
+Every PR review writes a small usage record next to its markdown report (`<tempPath>/reports/<pr>-review-usage-<timestamp>.json`). `stats --usage` reads those local files: it needs no platform credentials, makes no API calls, and nothing leaves your machine. Each review run gets its own record, so re-reviews of the same PR are all counted.
+
+It reports input, output, reasoning and cached tokens; averages per review and per PR; and breakdowns by model and provider.
+
+- **Not reported, never zero.** Providers that do not report usage (or a field such as cached tokens) show `not reported`. Reviews without usage are counted separately and excluded from the totals.
+- **Partial runs.** If only some of a review's AI calls reported usage, the totals cover those calls and the review is flagged as partial.
+- **Cost** is shown only when the provider reports it. GitHub Copilot reports cost per request, shown as AI credits (1 credit = $0.01). There is no built-in price table for other providers, so they show tokens only.
+- Records are per project (`--temp-path` / `MM_TEMP_PATH`), and reviews run before this feature existed have no record. Only PR reviews are recorded.
+
 ## Options
 
 | Option                        | Description                                                           | Env Variable           | Default          |
@@ -35,6 +54,7 @@ The token needs the same read access as `review` (comments and pull requests).
 | `--limit <number>`            | Maximum number of PRs to inspect (1-1000)                             | -                      | `100`            |
 | `--temp-path <path>`          | Base path for temporary files, including audit `logs`                 | `MM_TEMP_PATH`         | `./.mergementor` |
 | `--json`                      | Output statistics as JSON                                             | -                      | `false`          |
+| `--usage`                     | Report AI token usage and cost from local review reports              | -                      | `false`          |
 | `--platform <platform>`       | `github` or `azure`                                                   | `MM_PLATFORM`          | `azure`          |
 | `--github-token <token>`      | GitHub personal access token                                          | `MM_GITHUB_TOKEN`      | -                |
 | `--github-repo-owner <owner>` | GitHub repository owner                                               | `MM_GITHUB_REPO_OWNER` | -                |

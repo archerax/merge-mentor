@@ -157,6 +157,7 @@ describe("summarizeUsage", () => {
     expect(summary).toMatchObject({
       runs: 3,
       prs: 2,
+      reportedPrs: 2,
       inputTokens: 111,
       outputTokens: 56,
       reasoningTokens: 10,
@@ -179,8 +180,17 @@ describe("summarizeUsage", () => {
     const summary = summarizeUsage([record({ tokenUsage: undefined, calls: undefined })]);
     expect(summary.runs).toBe(0);
     expect(summary.prs).toBe(1);
+    expect(summary.reportedPrs).toBe(0);
     expect(summary.notReportedRuns).toBe(1);
     expect(summary.nanoAiu).toBeUndefined();
+  });
+
+  it("leaves reasoning, cached and cost undefined when no run reported them", () => {
+    const summary = summarizeUsage([record()]);
+    expect(summary.reasoningTokens).toBeUndefined();
+    expect(summary.cachedTokens).toBeUndefined();
+    expect(summary.nanoAiu).toBeUndefined();
+    expect(summary.byModel[0].cachedTokens).toBeUndefined();
   });
 });
 

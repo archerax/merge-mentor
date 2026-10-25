@@ -608,6 +608,11 @@ program
     `Maximum number of PRs to inspect (default: ${DEFAULT_STATS_PR_LIMIT})`,
     parseLimit
   )
+  .option(
+    "--usage",
+    "Report AI token usage and cost from local review reports instead of platform PR stats",
+    false
+  )
   .option("--json", "Output statistics as JSON", false)
   .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
   .option(
