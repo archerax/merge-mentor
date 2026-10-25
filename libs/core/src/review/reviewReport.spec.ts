@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReviewResult } from "./engine.js";
 import { generateMarkdownReport, saveReviewReport } from "./reviewReport.js";
@@ -82,6 +82,64 @@ describe("saveReviewReport", () => {
     expect(stripGenerated(readFileSync(reportFile, "utf-8"))).toBe(
       stripGenerated(generateMarkdownReport(result, "copilot-sdk", true))
     );
+  });
+
+  it("writes a timestamped usage record per run next to the report", () => {
+    const base = createResult();
+    const result: ReviewResult = {
+      ...base,
+      tokenUsage: { inputTokens: 10, outputTokens: 5, model: "gpt-4.1" },
+      usageCalls: { total: 3, reported: 2 },
+    };
+    const options = {
+      result,
+      aiProvider: "copilot-sdk" as const,
+      dryRun: true,
+      platform: "github" as const,
+      projectId: "owner-repo",
+      tempPath,
+    };
+
+    saveReviewReport(options);
+    // Re-review of the same PR must not overwrite earlier usage.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.now() + 5000));
+    try {
+      saveReviewReport(options);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const files = readdirSync(join(tempPath, "reports")).filter((f) =>
+      f.startsWith("Github-owner-repo-PR42-review-usage-")
+    );
+    expect(files).toHaveLength(2);
+    const parsed = JSON.parse(readFileSync(join(tempPath, "reports", files[0]), "utf-8"));
+    expect(parsed).toMatchObject({
+      schemaVersion: 1,
+      platform: "github",
+      projectId: "owner-repo",
+      prNumber: 42,
+      prTitle: "Test PR",
+      aiProvider: "copilot-sdk",
+      tokenUsage: { inputTokens: 10, outputTokens: 5, model: "gpt-4.1" },
+      calls: { total: 3, reported: 2 },
+    });
+  });
+
+  it("omits tokenUsage from the usage record when the provider reported none", () => {
+    saveReviewReport({
+      result: createResult(),
+      aiProvider: "copilot-sdk",
+      dryRun: true,
+      platform: "github",
+      projectId: "owner-repo",
+      tempPath,
+    });
+    const file = readdirSync(join(tempPath, "reports")).find((f) => f.includes("-review-usage-"));
+    expect(file).toBeDefined();
+    const parsed = JSON.parse(readFileSync(join(tempPath, "reports", file ?? ""), "utf-8"));
+    expect(parsed.tokenUsage).toBeUndefined();
   });
 
   it("sanitizes the project identifier used in the file name", () => {

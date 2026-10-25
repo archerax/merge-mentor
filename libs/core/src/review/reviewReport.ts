@@ -9,6 +9,12 @@ import {
   type ReviewStrategy,
 } from "@merge-mentor/config/reviewSelection.js";
 import { CATEGORY_EMOJI, SEVERITY_EMOJI } from "@merge-mentor/shared/constants.js";
+import { createChildLogger } from "@merge-mentor/shared/logger.js";
+import {
+  USAGE_RECORD_SCHEMA_VERSION,
+  type UsageRecord,
+  usageRecordFileName,
+} from "@merge-mentor/shared/reports/usageReport.js";
 import {
   generatePRIdentifier,
   sanitizeProjectName,
@@ -226,8 +232,46 @@ export function saveReviewReport(options: SaveReviewReportOptions): string {
 
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(reportFile, markdown, "utf-8");
+  saveUsageRecord(options, reportDir, prIdentifier, projectId);
 
   return reportFile;
+}
+
+/**
+ * Writes the run's usage record next to the report. Best-effort: a failure here
+ * must not fail the review report itself.
+ */
+function saveUsageRecord(
+  options: SaveReviewReportOptions,
+  reportDir: string,
+  prIdentifier: string,
+  projectId: string
+): void {
+  const { result } = options;
+  const generatedAt = new Date();
+  const record: UsageRecord = {
+    schemaVersion: USAGE_RECORD_SCHEMA_VERSION,
+    generatedAt: generatedAt.toISOString(),
+    platform: options.platform,
+    projectId,
+    prNumber: result.prDetails.number,
+    prTitle: result.prDetails.title,
+    aiProvider: options.aiProvider,
+    ...(result.tokenUsage ? { tokenUsage: result.tokenUsage } : {}),
+    ...(result.usageCalls ? { calls: result.usageCalls } : {}),
+  };
+  try {
+    writeFileSync(
+      join(reportDir, usageRecordFileName(prIdentifier, generatedAt)),
+      `${JSON.stringify(record, null, 2)}\n`,
+      "utf-8"
+    );
+  } catch (error) {
+    createChildLogger({ component: "reviewReport" }).warn(
+      { error: (error as Error).message },
+      "Failed to write usage record"
+    );
+  }
 }
 
 /**

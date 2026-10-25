@@ -20,22 +20,22 @@ should record usage per run and report it in the CLI and the web dashboard.
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Budget caps | None for now |
-| Surfaces | `stats --usage` (CLI) and web dashboard |
-| Data source | JSON sidecar next to each report (no separate ledger); audit log keeps per-call detail |
-| Scope | Per project: reports under `<tempPath>/reports` (default `./.mergementor`) |
-| CI / ephemeral runners | Out of scope for v1 |
-| Recorded fields | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
-| Review types | PR reviews only in v1 |
-| Opt-out | None; usage is written with the report (local-only) |
-| Retention | Same as reports (whatever cleans reports removes usage) |
-| Dashboard | Runs on the same machine as the CLI; reads the same reports directory |
-| Output | Totals first; no `--json` in v1 |
-| Reasoning tokens | New optional `reasoningTokens`; `outputTokens` becomes completion-only |
-| Partial data | Show totals from reported calls, mark run "partial (N of M calls reported)" |
-| Cost unit | Provider-reported cost only (Copilot bills in AICs, 1 AIC = $0.01) |
+| Topic                  | Decision                                                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Budget caps            | None for now                                                                                                                                         |
+| Surfaces               | `stats --usage` (CLI) and web dashboard                                                                                                              |
+| Data source            | JSON sidecar next to each report (no separate ledger); audit log keeps per-call detail                                                               |
+| Scope                  | Per project: reports under `<tempPath>/reports` (default `./.mergementor`)                                                                           |
+| CI / ephemeral runners | Out of scope for v1                                                                                                                                  |
+| Recorded fields        | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
+| Review types           | PR reviews only in v1                                                                                                                                |
+| Opt-out                | None; usage is written with the report (local-only)                                                                                                  |
+| Retention              | Same as reports (whatever cleans reports removes usage)                                                                                              |
+| Dashboard              | Runs on the same machine as the CLI; reads the same reports directory                                                                                |
+| Output                 | Totals first; no `--json` in v1                                                                                                                      |
+| Reasoning tokens       | New optional `reasoningTokens`; `outputTokens` becomes completion-only                                                                               |
+| Partial data           | Show totals from reported calls, mark run "partial (N of M calls reported)"                                                                          |
+| Cost unit              | Provider-reported cost only (Copilot bills in AICs, 1 AIC = $0.01)                                                                                   |
 
 ## Proposal
 

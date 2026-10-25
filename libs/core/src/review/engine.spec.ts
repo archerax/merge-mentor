@@ -180,6 +180,23 @@ function createMockPlatform(): PlatformAdapter {
   };
 }
 
+async function reviewWithUsage(
+  mockPlatform: PlatformAdapter,
+  tokenUsage: { inputTokens: number; outputTokens: number } | undefined
+) {
+  const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
+  vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
+  vi.mocked(mockPlatform.getPRFiles).mockResolvedValue([createPRFile({ patch: undefined })]);
+  vi.mocked(mockPlatform.getExistingBotComments).mockResolvedValue([]);
+  mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {}, tokenUsage });
+  mockParseCrossFileReview.mockReturnValue({
+    overallAssessment: "Good",
+    findings: [],
+    recommendations: [],
+  });
+  return engine.reviewPR(123);
+}
+
 function createPRDetails(): PRDetails {
   return {
     number: 123,
@@ -603,6 +620,20 @@ describe("ReviewEngine", () => {
 
       expect(result.filesReviewed).toBe(0);
       expect(mockExecutePrompt).toHaveBeenCalledTimes(1); // Only cross-file
+    });
+
+    describe("usage coverage", () => {
+      it("counts AI calls that reported usage", async () => {
+        const result = await reviewWithUsage(mockPlatform, { inputTokens: 10, outputTokens: 5 });
+        expect(result.usageCalls).toEqual({ total: 1, reported: 1 });
+        expect(result.tokenUsage).toMatchObject({ inputTokens: 10, outputTokens: 5 });
+      });
+
+      it("counts AI calls that reported no usage without inventing totals", async () => {
+        const result = await reviewWithUsage(mockPlatform, undefined);
+        expect(result.usageCalls).toEqual({ total: 1, reported: 0 });
+        expect(result.tokenUsage).toBeUndefined();
+      });
     });
 
     it("shows dry run actions for inline comment", async () => {

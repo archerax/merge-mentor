@@ -167,6 +167,8 @@ export interface ReviewResult {
   readonly linesDeleted: number;
   /** Aggregated token usage across all AI calls in this review */
   readonly tokenUsage?: TokenUsage;
+  /** AI calls made in this review and how many of them reported usage. */
+  readonly usageCalls?: { readonly total: number; readonly reported: number };
 }
 
 /** Unaggregated outcome of one review pass. */
@@ -816,8 +818,12 @@ export class ReviewEngine {
     let filesSkipped: number;
     let filesAnalyzed: number | undefined; // overridden in fast mode to reflect files sent to AI
     let tokenUsage: TokenUsage | undefined;
+    let usageCallsTotal = 0;
+    let usageCallsReported = 0;
 
     const onTokenUsage = (usage: TokenUsage | undefined): void => {
+      usageCallsTotal += 1;
+      if (usage) usageCallsReported += 1;
       tokenUsage = mergeTokenUsage(tokenUsage, usage);
       if (usage?.model) {
         this.commentManager.updateModel(usage.model);
@@ -968,6 +974,7 @@ export class ReviewEngine {
       commentErrors,
       plannedComments,
       tokenUsage,
+      usageCalls: { total: usageCallsTotal, reported: usageCallsReported },
     };
   }
 
