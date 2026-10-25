@@ -39,6 +39,12 @@ describe("Config", () => {
       expect(loadConfig(undefined, env).defaultPlatform).toBe("azure");
     });
 
+    it("should ignore case and surrounding whitespace in MM_PLATFORM", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: " GitHub " });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("github");
+    });
+
     it("should honor MM_PLATFORM=github", () => {
       const env = createStubEnvironment({ MM_PLATFORM: "github" });
 

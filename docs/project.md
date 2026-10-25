@@ -29,14 +29,14 @@ merge-mentor project 5432 --platform azure --write
 
 ### General & Platform Options
 
-| Option                  | Description                                                            | Env Variable   | Default          |
-| ----------------------- | ---------------------------------------------------------------------- | -------------- | ---------------- |
-| `[id]`                  | The ID of the root planning item/Epic                                  | -              | -                |
-| `--id <id>`             | The ID of the root planning item/Epic                                  | -              | -                |
-| `--url <url>`           | Azure DevOps work-item URL (sets platform, organization, and project)  | -              | -                |
-| `--platform <platform>` | Platform to use (`github` or `azure`)                                  | `MM_PLATFORM`  | `azure`          |
-| `--write`               | Post comments back to the root planning item (default is dry-run mode) | -              | `false`          |
-| `--temp-path <path>`    | Base path for temporary files                                          | `MM_TEMP_PATH` | `./.mergementor` |
+| Option                  | Description                                                                                                                         | Env Variable   | Default          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `[id]`                  | The ID of the root planning item/Epic                                                                                               | -              | -                |
+| `--id <id>`             | The ID of the root planning item/Epic                                                                                               | -              | -                |
+| `--url <url>`           | Azure DevOps work-item URL (sets platform, organization, and project)                                                               | -              | -                |
+| `--platform <platform>` | Platform to use (`github` or `azure`). Unset: detected from the git remote, else `azure`; project review supports Azure DevOps only | `MM_PLATFORM`  | `azure`          |
+| `--write`               | Post comments back to the root planning item (default is dry-run mode)                                                              | -              | `false`          |
+| `--temp-path <path>`    | Base path for temporary files                                                                                                       | `MM_TEMP_PATH` | `./.mergementor` |
 
 ### Platform Credentials
 
