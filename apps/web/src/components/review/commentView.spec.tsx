@@ -41,6 +41,9 @@ function controller(overrides: Partial<PostCommentsController> = {}): PostCommen
   };
 }
 
+// The preview keeps 177 characters of the collapsed body plus the ellipsis.
+const PREVIEW_LENGTH = 178;
+
 describe("commentLocation", () => {
   it("returns the bare path when there is no line", () => {
     expect(commentLocation(comment({ line: undefined }))).toBe("src/a.ts");
@@ -86,7 +89,7 @@ describe("PostableCommentRow", () => {
     renderWithMantine(<PostableCommentRow comment={comment({ body })} controller={controller()} />);
 
     const preview = screen.getByText(/^line one line two x+…$/);
-    expect(preview.textContent).toHaveLength(178);
+    expect(preview.textContent).toHaveLength(PREVIEW_LENGTH);
   });
 
   it("toggles selection through the checkbox", async () => {

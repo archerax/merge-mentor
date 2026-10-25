@@ -66,7 +66,7 @@ describe("PostCommentsAction interactions", () => {
       <PostCommentsAction kind="pr" target={target} comments={[comment("a"), comment("b")]} />
     );
 
-    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("checkbox", { name: /src\/a\.ts:1/ }));
     await user.click(screen.getByRole("button", { name: "Post 1 comment" }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));

@@ -405,7 +405,9 @@ describe("ProjectReviewResult", () => {
 
   it("copies a markdown report including findings", async () => {
     const user = userEvent.setup();
-    renderWithMantine(<ProjectReviewResult summary={projectSummary()} />);
+    renderWithMantine(
+      <ProjectReviewResult summary={projectSummary({ estimationConsistency: "Consistent." })} />
+    );
 
     await user.click(screen.getByRole("button", { name: "Copy report" }));
 
@@ -425,7 +427,7 @@ describe("ProjectReviewResult", () => {
         "Aligned.",
         "",
         "## Estimation & scope consistency",
-        "",
+        "Consistent.",
         "",
         "## Findings (2)",
         "- [high/dependency] #12 Circular dependency.",

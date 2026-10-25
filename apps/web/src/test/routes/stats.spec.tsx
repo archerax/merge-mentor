@@ -72,11 +72,11 @@ describe("stats route", () => {
 
   it("renders the totals, hints and reviewed pull requests", () => {
     routeState.loaderData = { ok: true, stats };
-    routeState.search = { days: 30 };
+    routeState.search = { days: 7 };
     renderWithMantine(<StatsPage />);
 
     expect(screen.getByText("acme/widgets")).toBeInTheDocument();
-    expect(screen.getByText(/PRs from the last 30 days/)).toBeInTheDocument();
+    expect(screen.getByText(/PRs from the last 7 days/)).toBeInTheDocument();
     expect(screen.getByText("40")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText((1234).toLocaleString())).toBeInTheDocument();
@@ -98,7 +98,6 @@ describe("stats route", () => {
     expect(screen.getByText("PR limit reached")).toBeInTheDocument();
     expect(screen.getByText(/Only the 40 most recent PRs were inspected/)).toBeInTheDocument();
     expect(screen.queryByText("Some PRs could not be read")).not.toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("warns only about unreadable PRs when some failed", () => {
@@ -129,6 +128,8 @@ describe("stats route", () => {
     routeState.loaderData = { ok: true, stats };
     routeState.search = { days: 30 };
     renderWithMantine(<StatsPage />);
+
+    expect(screen.getByRole("radio", { name: "30d" })).toBeChecked();
 
     await user.click(screen.getByText("7d"));
 

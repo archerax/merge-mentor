@@ -361,7 +361,7 @@ describe("useReviewStream", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("reconnects with backoff after a dropped stream, then gives up", async () => {
+  it("waits a growing delay between reconnect attempts, then gives up", async () => {
     vi.useFakeTimers();
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ runId: "flaky" }))
@@ -371,8 +371,17 @@ describe("useReviewStream", () => {
     act(() => {
       void result.current.run({});
     });
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(499));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
+    await act(() => vi.advanceTimersByTimeAsync(999));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("Review stream failed (HTTP 503).");
     // one create call plus five attach attempts
@@ -413,9 +422,13 @@ describe("useReviewStream", () => {
     await waitFor(() => expect(result.current.running).toBe(true));
 
     act(() => result.current.stop());
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(result.current.status).toBe("idle");
     expect(result.current.error).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("stops quietly when aborted while waiting to reconnect", async () => {

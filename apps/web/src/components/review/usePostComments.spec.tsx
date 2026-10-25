@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PendingCommentView, PostCommentsResult } from "../../server/review.types.js";
 import { deferred } from "../../test/deferred.js";
+import { jsonResponse } from "../../test/sse.js";
 import { usePostComments } from "./usePostComments.js";
 
 function comment(fingerprint: string, overrides: Partial<PendingCommentView> = {}) {
@@ -15,13 +16,6 @@ function comment(fingerprint: string, overrides: Partial<PendingCommentView> = {
     posted: false,
     ...overrides,
   } satisfies PendingCommentView;
-}
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
 
 function postResult(overrides: Partial<PostCommentsResult> = {}): PostCommentsResult {

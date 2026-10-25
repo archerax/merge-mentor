@@ -96,8 +96,17 @@ describe("ReviewRunner", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects an empty field before calling the server", async () => {
+    const user = userEvent.setup();
+    renderWithMantine(<ReviewRunner />);
+
+    await user.click(screen.getByRole("button", { name: "Run review" }));
+
+    expect(screen.getByText("Enter a PR URL or number.")).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
-    ["", "Enter a PR URL or number."],
     ["   ", "Enter a PR URL or number."],
     ["abc", "Enter a valid PR URL or a positive PR number."],
     ["0", "Enter a valid PR URL or a positive PR number."],
@@ -106,7 +115,7 @@ describe("ReviewRunner", () => {
     const user = userEvent.setup();
     renderWithMantine(<ReviewRunner />);
 
-    if (input) await user.type(screen.getByLabelText("Pull request"), input);
+    await user.type(screen.getByLabelText("Pull request"), input);
     await user.click(screen.getByRole("button", { name: "Run review" }));
 
     expect(screen.getByText("Review failed")).toBeInTheDocument();
