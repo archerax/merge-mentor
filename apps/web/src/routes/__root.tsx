@@ -34,6 +34,7 @@ import {
 } from "@tabler/icons-react";
 import { HeadContent, Link, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
 
+import { AiStatusBar } from "../components/AiStatusBar.js";
 import { theme } from "../theme.js";
 
 import appCss from "../styles.css?url";
@@ -125,6 +126,7 @@ function AppFrame({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       header={{ height: 64 }}
+      footer={{ height: 36 }}
       navbar={{ width: 260, breakpoint: "sm", collapsed: { mobile: !navOpened } }}
       padding="md"
     >
@@ -197,6 +199,15 @@ function AppFrame({ children }: { children: React.ReactNode }) {
           })}
         </Stack>
       </AppShell.Navbar>
+
+      <AppShell.Footer
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 92%, transparent)",
+          borderColor: "var(--mantine-color-default-border)",
+        }}
+      >
+        <AiStatusBar />
+      </AppShell.Footer>
 
       <AppShell.Main>
         <Box py="md">

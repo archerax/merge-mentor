@@ -166,6 +166,87 @@ export function createReviewPermissionHandler(
 }
 
 /**
+ * Creates a {@link CopilotClient} using the transport and credentials every
+ * review session uses, so status probes report the identity real requests run as.
+ *
+ * Prefers the in-process (FFI) transport when no explicit CLI path is set.
+ * The SDK's default stdio transport spawns the bundled `copilot-runtime`
+ * wrapper, which resolves its companion `runtime.node` relative to its own
+ * executable path. On hardlinked installs under proot (e.g. Android/Termux)
+ * that resolves to a broken path such as `/.l2s/runtime.node`, so the CLI
+ * server exits before authentication. The in-process transport loads the
+ * cdylib directly instead. `COPILOT_CLI_PATH` still opts into stdio for a
+ * custom CLI installation.
+ *
+ * @param token - Optional GitHub token; omitted to use local credentials.
+ */
+function createCopilotClient(token?: string): CopilotClient {
+  const cliPath = process.env.COPILOT_CLI_PATH;
+  const config: Record<string, unknown> = {
+    connection: cliPath
+      ? RuntimeConnection.forStdio({ path: cliPath })
+      : RuntimeConnection.forInProcess(),
+  };
+  if (token) {
+    config.gitHubToken = token;
+  }
+  return new CopilotClient(config);
+}
+
+/** Identity a Copilot request would run under, as reported by the SDK. */
+export interface CopilotAuthIdentity {
+  /** Whether the SDK reports an authenticated user. */
+  readonly isAuthenticated: boolean;
+  /** How the user authenticated (e.g. `gh-cli`, `env`, `token`, `user`). */
+  readonly authType?: GetAuthStatusResponse["authType"];
+  /** GitHub host the identity belongs to. */
+  readonly host?: string;
+  /** GitHub login of the authenticated user. */
+  readonly login?: string;
+  /** Human-readable status message from the SDK. */
+  readonly statusMessage?: string;
+}
+
+/**
+ * Asks the Copilot SDK which user requests would be made under, without
+ * sending any prompt. Starts a short-lived client and always stops it.
+ *
+ * @param options - Optional token (as used for reviews) and timeout in milliseconds.
+ * @throws When the client cannot start or does not answer within the timeout.
+ */
+export async function getCopilotAuthIdentity(options?: {
+  readonly token?: string;
+  readonly timeoutMs?: number;
+}): Promise<CopilotAuthIdentity> {
+  const timeoutMs = options?.timeoutMs ?? 15_000;
+  const client = createCopilotClient(options?.token);
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Copilot did not respond within ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+  try {
+    const status = await Promise.race([client.start().then(() => client.getAuthStatus()), timeout]);
+    return {
+      isAuthenticated: status.isAuthenticated,
+      authType: status.authType,
+      host: status.host,
+      login: status.login,
+      statusMessage: status.statusMessage,
+    };
+  } finally {
+    clearTimeout(timer);
+    try {
+      await client.stop();
+    } catch {
+      // Ignore shutdown errors
+    }
+  }
+}
+
+/**
  * AI provider implementation using the @github/copilot-sdk package.
  *
  * Unlike the CLI-based CopilotProvider, this SDK provider:
@@ -393,27 +474,7 @@ export class CopilotSdkProvider implements AIProviderClient {
 
   private getClient(): CopilotClient {
     if (this.client) return this.client;
-
-    const cliPath = process.env.COPILOT_CLI_PATH;
-
-    // Prefer the in-process (FFI) transport when no explicit CLI path is set.
-    // The SDK's default stdio transport spawns the bundled `copilot-runtime`
-    // wrapper, which resolves its companion `runtime.node` relative to its own
-    // executable path. On hardlinked installs under proot (e.g. Android/Termux)
-    // that resolves to a broken path such as `/.l2s/runtime.node`, so the CLI
-    // server exits before authentication. The in-process transport loads the
-    // cdylib directly instead. `COPILOT_CLI_PATH` still opts into stdio for a
-    // custom CLI installation.
-    const config: Record<string, unknown> = {
-      connection: cliPath
-        ? RuntimeConnection.forStdio({ path: cliPath })
-        : RuntimeConnection.forInProcess(),
-    };
-    if (this.token) {
-      config.gitHubToken = this.token;
-    }
-
-    this.client = new CopilotClient(config);
+    this.client = createCopilotClient(this.token);
     return this.client;
   }
 

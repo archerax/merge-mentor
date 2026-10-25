@@ -61,7 +61,11 @@ import { nodeFs } from "@merge-mentor/shared/ports/index.js";
 
 import type { FindingsCollector } from "../tools/index.js";
 import type { AIProviderOptions, AIResponse } from "../types.js";
-import { CopilotSdkProvider, createReviewPermissionHandler } from "./copilot-sdk.js";
+import {
+  CopilotSdkProvider,
+  createReviewPermissionHandler,
+  getCopilotAuthIdentity,
+} from "./copilot-sdk.js";
 
 function createAIResponse(parsed: unknown): AIResponse {
   return { raw: JSON.stringify(parsed), parsed };
@@ -2290,5 +2294,34 @@ describe("CopilotSdkProvider.checkImageSupport", () => {
       supported: false,
       reason: "the Copilot model list could not be read (not authenticated)",
     });
+  });
+});
+
+describe("getCopilotAuthIdentity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.start.mockResolvedValue(undefined);
+    mockClient.stop.mockResolvedValue([]);
+  });
+
+  it("returns the identity reported by the SDK and stops the client", async () => {
+    mockClient.getAuthStatus.mockResolvedValueOnce({
+      isAuthenticated: true,
+      authType: "gh-cli",
+      login: "octocat",
+      host: "https://github.com",
+    });
+    const identity = await getCopilotAuthIdentity({ token: "github_pat_x" });
+    expect(identity).toMatchObject({ isAuthenticated: true, login: "octocat", authType: "gh-cli" });
+    expect(MockCopilotClient).toHaveBeenCalledWith(
+      expect.objectContaining({ gitHubToken: "github_pat_x" })
+    );
+    expect(mockClient.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the client and rejects when the SDK fails", async () => {
+    mockClient.start.mockRejectedValueOnce(new Error("Client not connected"));
+    await expect(getCopilotAuthIdentity()).rejects.toThrow("Client not connected");
+    expect(mockClient.stop).toHaveBeenCalledTimes(1);
   });
 });
