@@ -17,7 +17,7 @@ describe("Config", () => {
       const env = createStubEnvironment();
       const config = loadConfig(undefined, env);
 
-      expect(config.defaultPlatform).toBe("github");
+      expect(config.defaultPlatform).toBe("azure");
       expect(config.github.token).toBe("");
       expect(config.github.owner).toBe("");
       expect(config.github.repo).toBe("");
@@ -31,6 +31,34 @@ describe("Config", () => {
       expect(config.skipPreExisting).toBe(true);
       expect(config.reviewPasses).toEqual([]);
       expect(config.reviewStrategy).toBe("fast");
+    });
+
+    it("should default MM_PLATFORM to azure for unrecognized values", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: "gitlab" });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("azure");
+    });
+
+    it("should ignore case and surrounding whitespace in MM_PLATFORM", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: " GitHub " });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("github");
+    });
+
+    it.each([
+      [" GitHub ", "github"],
+      ["AZURE", "azure"],
+      ["gitlab", "azure"],
+    ])("should resolve a platform override of %j to %s", (platform, expected) => {
+      const env = createStubEnvironment({});
+
+      expect(loadConfig({ platform }, env).defaultPlatform).toBe(expected);
+    });
+
+    it("should honor MM_PLATFORM=github", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: "github" });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("github");
     });
 
     it("should load values from environment variables", () => {

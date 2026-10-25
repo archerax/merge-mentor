@@ -41,7 +41,7 @@ merge-mentor reply --pr 123 --comment-id 987654321
 | `--resolve`               | Automatically resolve the thread if AI confirms defect is fixed           | -                | `false`          |
 | `--interactive`           | Interactively prompt before replying to each thread                       | -                | `false`          |
 | `--write`                 | Post replies and resolve threads on platform (default is dry-run mode)    | -                | `false`          |
-| `--platform <platform>`   | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `github`         |
+| `--platform <platform>`   | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `azure`          |
 | `--temp-path <path>`      | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH`   | `./.mergementor` |
 | `--git-backend <backend>` | Git backend for cloning/fetching (`cli` or `isomorphic`)                  | `MM_GIT_BACKEND` | `cli`            |
 

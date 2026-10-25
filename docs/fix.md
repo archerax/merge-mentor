@@ -44,7 +44,7 @@ merge-mentor fix --pr 123 --allow-dirty
 | `--pr <number>`                 | Pull request number (required unless `--pr-url` or `--ci` is used)        | -                | -                |
 | `--pr-url <url>`                | PR URL (automatically parses platform, repository details, and PR number) | -                | -                |
 | `--ci`                          | CI mode: auto-detect platform and PR from environment variables           | -                | `false`          |
-| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `github`         |
+| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`    | `azure`          |
 | `--allow-dirty`                 | Allow execution even if the local Git workspace has uncommitted changes   | -                | `false`          |
 | `--interactive`                 | Interactively prompt before applying fixes for each review comment        | -                | `false`          |
 | `--allow-untrusted-comments`    | Also fix threads with comments from non-collaborators (GitHub)            | -                | `false`          |

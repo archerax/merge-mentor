@@ -31,7 +31,7 @@ merge-mentor describe --pr 123 --write
 | `--pr <number>`                 | Pull request number (required unless `--pr-url` or `--ci` is used)        | -              | -                |
 | `--pr-url <url>`                | PR URL (automatically parses platform, repository details, and PR number) | -              | -                |
 | `--ci`                          | CI mode: auto-detect platform and PR from environment variables           | -              | `false`          |
-| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`  | `github`         |
+| `--platform <platform>`         | Platform to use (`github` or `azure`)                                     | `MM_PLATFORM`  | `azure`          |
 | `--suggest-title`               | Suggest a Conventional Commit style title for the PR                      | -              | `false`          |
 | `--write`                       | Update the PR description and/or title on the remote platform             | -              | `false`          |
 | `--temp-path <path>`            | Base path for temporary files (cache, diffs, logs, etc.)                  | `MM_TEMP_PATH` | `./.mergementor` |

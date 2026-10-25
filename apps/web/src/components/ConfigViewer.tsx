@@ -1,22 +1,25 @@
 import {
   Alert,
+  Badge,
   Button,
   Code,
   Grid,
   Group,
+  Paper,
   PasswordInput,
   Select,
   Stack,
   Switch,
+  Tabs,
   Text,
   TextInput,
-  Title,
 } from "@mantine/core";
 import { useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { saveConfig } from "../server/config.functions.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
+import { isFieldVisible } from "./configVisibility.js";
 
 interface ConfigViewerProps {
   readonly view: ConfigView;
@@ -24,14 +27,75 @@ interface ConfigViewerProps {
 
 type SaveStatus = "idle" | "saving" | "saved";
 
+const ADVANCED_STORAGE_KEY = "merge-mentor:config:show-advanced";
+
 export function ConfigViewer({ view }: ConfigViewerProps) {
   const router = useRouter();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [cleared, setCleared] = useState<readonly string[]>([]);
   const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const dirty = Object.keys(draft).length > 0 || cleared.length > 0;
+  useEffect(() => {
+    try {
+      setShowAdvanced(window.localStorage.getItem(ADVANCED_STORAGE_KEY) === "true");
+    } catch {
+      // Storage can be unavailable (private mode, blocked site data); default to hidden.
+    }
+  }, []);
+
+  function toggleAdvanced(next: boolean) {
+    setShowAdvanced(next);
+    try {
+      window.localStorage.setItem(ADVANCED_STORAGE_KEY, String(next));
+    } catch {
+      // The preference simply won't persist.
+    }
+  }
+
+  // A cleared platform means "use the default", so no platform is assumed and both groups show.
+  const draftPlatform = draft.MM_PLATFORM;
+  const selectedPlatform = toPlatform(
+    draftPlatform === ""
+      ? undefined
+      : (draftPlatform ??
+          view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
+            ?.value)
+  );
+
+  function isVisible(field: ConfigFieldView): boolean {
+    return isFieldVisible(field, {
+      showAdvanced,
+      selectedPlatform,
+      touched:
+        draft[field.envVar] !== undefined ||
+        cleared.includes(field.envVar) ||
+        errors.some((item) => item.envVar === field.envVar),
+    });
+  }
+
+  const sections = view.sections
+    .map((section) => ({ ...section, fields: section.fields.filter(isVisible) }))
+    .filter((section) => section.fields.length > 0);
+  const hiddenCount = view.sections
+    .flatMap((section) => section.fields)
+    .filter((field) => !isVisible(field)).length;
+  const currentTab = sections.some((section) => section.title === activeTab)
+    ? activeTab
+    : (sections[0]?.title ?? null);
+
+  // Keep state in step with the displayed tab when the active one is filtered out.
+  useEffect(() => {
+    if (currentTab !== activeTab) setActiveTab(currentTab);
+  }, [currentTab, activeTab]);
+
+  const labels = new Map(
+    view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
+  );
+  const changeCount = Object.keys(draft).length + cleared.length;
+  const dirty = changeCount > 0;
 
   function updateField(envVar: string, value: string, original: string) {
     setDraft((previous) => {
@@ -109,7 +173,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
           <Stack gap={4}>
             {errors.map((error) => (
               <Text key={error.envVar} size="sm">
-                <Code>{error.envVar}</Code>: {error.message}
+                <b>{labels.get(error.envVar) ?? error.envVar}</b>: {error.message}
               </Text>
             ))}
           </Stack>
@@ -122,40 +186,106 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Alert>
       )}
 
-      {view.sections.map((section) => (
-        <Stack key={section.title} gap="xs">
-          <div>
-            <Title order={4}>{section.title}</Title>
-            <Text c="dimmed" size="sm">
-              {section.description}
-            </Text>
-          </div>
-          <Grid gap="md" align="flex-start">
-            {section.fields.map((field) => (
-              <ConfigRow
-                key={field.envVar}
-                field={field}
-                draftValue={draft[field.envVar]}
-                cleared={cleared.includes(field.envVar)}
-                error={errors.find((item) => item.envVar === field.envVar)?.message}
-                onChange={(value) => updateField(field.envVar, value, originalValue(field))}
-                onToggleClear={() => toggleClear(field.envVar)}
-              />
-            ))}
-          </Grid>
-        </Stack>
-      ))}
-
-      <Group justify="flex-end">
-        <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
-          Reset
-        </Button>
-        <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
-          Save changes
-        </Button>
+      <Group justify="space-between">
+        <Text size="sm" c="dimmed">
+          {hiddenCount > 0
+            ? `${hiddenCount} ${hiddenCount === 1 ? "setting is" : "settings are"} hidden.`
+            : "\u00A0"}
+        </Text>
+        <Switch
+          label="Show advanced settings"
+          checked={showAdvanced}
+          onChange={(event) => toggleAdvanced(event.currentTarget.checked)}
+        />
       </Group>
+
+      <Tabs value={currentTab} onChange={setActiveTab} keepMounted={false}>
+        <Tabs.List>
+          {sections.map((section) => {
+            const hasError = section.fields.some((field) =>
+              errors.some((item) => item.envVar === field.envVar)
+            );
+            const modified = section.fields.some(
+              (field) => draft[field.envVar] !== undefined || cleared.includes(field.envVar)
+            );
+            return (
+              <Tabs.Tab
+                key={section.title}
+                value={section.title}
+                aria-label={
+                  hasError
+                    ? `${section.title} — has invalid values`
+                    : modified
+                      ? `${section.title} — has unsaved changes`
+                      : undefined
+                }
+                rightSection={
+                  hasError || modified ? (
+                    <Badge size="xs" circle color={hasError ? "red" : "yellow"} aria-hidden />
+                  ) : null
+                }
+              >
+                {section.title}
+              </Tabs.Tab>
+            );
+          })}
+        </Tabs.List>
+
+        {sections.map((section) => (
+          <Tabs.Panel key={section.title} value={section.title} pt="md">
+            <Stack gap="md">
+              <Text c="dimmed" size="sm">
+                {section.description}
+              </Text>
+              <Grid gap="md" align="flex-start">
+                {section.fields.map((field) => (
+                  <ConfigRow
+                    key={field.envVar}
+                    field={field}
+                    draftValue={draft[field.envVar]}
+                    cleared={cleared.includes(field.envVar)}
+                    error={errors.find((item) => item.envVar === field.envVar)?.message}
+                    onChange={(value) => updateField(field.envVar, value, originalValue(field))}
+                    onToggleClear={() => toggleClear(field.envVar)}
+                  />
+                ))}
+              </Grid>
+            </Stack>
+          </Tabs.Panel>
+        ))}
+      </Tabs>
+
+      <Paper
+        withBorder
+        p="sm"
+        radius="md"
+        style={{ position: "sticky", bottom: 0, zIndex: 10 }}
+        role="region"
+        aria-label="Save configuration"
+      >
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            {dirty
+              ? `${changeCount} unsaved ${changeCount === 1 ? "change" : "changes"}`
+              : "No unsaved changes"}
+          </Text>
+          <Group>
+            <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
+              Discard changes
+            </Button>
+            <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
+              Save changes
+            </Button>
+          </Group>
+        </Group>
+      </Paper>
     </Stack>
   );
+}
+
+/** Narrows a raw setting value to a known platform; anything else means "unknown". */
+function toPlatform(value: string | null | undefined): ConfigFieldView["platform"] {
+  return value === "github" || value === "azure" ? value : undefined;
 }
 
 /** Returns the value an untouched field currently resolves to. */
@@ -179,8 +309,18 @@ function ConfigRow({ field, draftValue, cleared, error, onChange, onToggleClear 
     <>
       <Grid.Col span={{ base: 12, sm: 5 }}>
         <Stack gap={2}>
-          <Text size="sm" fw={500}>
-            {field.label}
+          <Group gap="xs">
+            <Text size="sm" fw={500}>
+              {field.label}
+            </Text>
+            {(draftValue !== undefined || cleared) && (
+              <Badge size="xs" variant="light" color="yellow">
+                Modified
+              </Badge>
+            )}
+          </Group>
+          <Text size="xs" c="dimmed">
+            {field.description}
           </Text>
           {field.note && (
             <Text size="xs" c="dimmed">
@@ -228,18 +368,18 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
       return (
         <Group gap="xs" wrap="nowrap">
           <Switch
+            aria-label={field.label}
             checked={value === "true"}
             onChange={(event) => onChange(event.currentTarget.checked ? "true" : "false")}
+            label={value === "true" ? "Enabled" : "Disabled"}
           />
-          <Text size="sm" c="dimmed">
-            {value === "true" ? "true" : "false"}
-          </Text>
         </Group>
       );
     case "enum":
       return (
         <Select
           style={{ flex: 1, minWidth: 0 }}
+          aria-label={field.label}
           data={field.options ?? []}
           value={value === "" ? null : value}
           onChange={(next) => onChange(next ?? "")}
@@ -251,6 +391,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
       return (
         <TextInput
           style={{ flex: 1, minWidth: 0 }}
+          aria-label={field.label}
           type="number"
           min={1}
           value={value}
@@ -261,6 +402,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
     case "secret":
       return (
         <PasswordInput
+          aria-label={field.label}
           style={{ flex: 1, minWidth: 0 }}
           value={value}
           placeholder={
@@ -272,6 +414,7 @@ function ConfigInput({ field, value, cleared, onChange }: ConfigInputProps) {
     case "text":
       return (
         <TextInput
+          aria-label={field.label}
           style={{ flex: 1, minWidth: 0 }}
           value={value}
           placeholder="Not set"

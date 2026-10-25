@@ -29,14 +29,14 @@ merge-mentor pbi 1024 --platform azure --write
 
 ### General & Platform Options
 
-| Option                  | Description                                                   | Env Variable   | Default          |
-| ----------------------- | ------------------------------------------------------------- | -------------- | ---------------- |
-| `[id]`                  | The ID of the issue or Product Backlog Item                   | -              | -                |
-| `--id <id>`             | The ID of the issue or Product Backlog Item                   | -              | -                |
-| `--url <url>`           | GitHub issue or Azure DevOps work-item URL                    | -              | -                |
-| `--platform <platform>` | Platform to use (`github` or `azure`)                         | `MM_PLATFORM`  | `github`         |
-| `--write`               | Post comments back to the PBI/Issue (default is dry-run mode) | -              | `false`          |
-| `--temp-path <path>`    | Base path for temporary files                                 | `MM_TEMP_PATH` | `./.mergementor` |
+| Option                  | Description                                                                              | Env Variable   | Default          |
+| ----------------------- | ---------------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `[id]`                  | The ID of the issue or Product Backlog Item                                              | -              | -                |
+| `--id <id>`             | The ID of the issue or Product Backlog Item                                              | -              | -                |
+| `--url <url>`           | GitHub issue or Azure DevOps work-item URL                                               | -              | -                |
+| `--platform <platform>` | Platform to use (`github` or `azure`). Unset: detected from the git remote, else `azure` | `MM_PLATFORM`  | `azure`          |
+| `--write`               | Post comments back to the PBI/Issue (default is dry-run mode)                            | -              | `false`          |
+| `--temp-path <path>`    | Base path for temporary files                                                            | `MM_TEMP_PATH` | `./.mergementor` |
 
 ### Platform Credentials
 

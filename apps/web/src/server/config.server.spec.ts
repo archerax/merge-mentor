@@ -39,6 +39,17 @@ describe("config.server", () => {
     fs.writeFileSync(envFile, body, "utf8");
   }
 
+  function writeEnvMissing(
+    platform: "github" | "azure",
+    complete: Record<string, string>,
+    missing: string
+  ): void {
+    const lines = Object.entries({ ...complete, [missing]: "" }).map(
+      ([envVar, value]) => `${envVar}=${value}`
+    );
+    writeEnv([`MM_PLATFORM=${platform}`, ...lines, ""].join("\n"));
+  }
+
   describe("buildConfigView", () => {
     it("builds sanitized sections with secrets masked and set flags", () => {
       writeEnv(
@@ -65,6 +76,11 @@ describe("config.server", () => {
       expect(owner).toMatchObject({ secret: false, value: "acme", set: true });
 
       expect(findField(view, "MM_AI_PROVIDER")?.value).toBe("opencode-sdk");
+
+      expect(findField(view, "MM_AZURE_TOKEN")?.platform).toBe("azure");
+      expect(findField(view, "MM_AI_TIMEOUT")?.advanced).toBe(true);
+      expect(findField(view, "MM_AI_PROVIDER")?.advanced).toBe(false);
+      expect(findField(view, "MM_AI_PROVIDER")?.description.length).toBeGreaterThan(0);
     });
 
     it("collects a warning when required configuration is missing", () => {
@@ -82,7 +98,82 @@ describe("config.server", () => {
 
       expect(view.error).toBeNull();
       expect(view.warnings).toHaveLength(1);
-      expect(view.warnings[0]).toContain("MM_GITHUB_TOKEN");
+      expect(view.warnings[0]).toBe("GitHub token: Required for GitHub platform.");
+    });
+  });
+
+  describe("warnings", () => {
+    const githubEnv = {
+      MM_GITHUB_TOKEN: "value",
+      MM_GITHUB_REPO_OWNER: "value",
+      MM_GITHUB_REPO_NAME: "value",
+    };
+    const azureEnv = {
+      MM_AZURE_TOKEN: "value",
+      MM_AZURE_ORG: "value",
+      MM_AZURE_PROJECT: "value",
+      MM_AZURE_REPO: "value",
+    };
+
+    it.each([
+      ["github", githubEnv, "MM_GITHUB_TOKEN", "GitHub token: Required for GitHub platform."],
+      [
+        "github",
+        githubEnv,
+        "MM_GITHUB_REPO_OWNER",
+        "GitHub repository owner: Required for GitHub platform.",
+      ],
+      [
+        "github",
+        githubEnv,
+        "MM_GITHUB_REPO_NAME",
+        "GitHub repository name: Required for GitHub platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_TOKEN",
+        "Azure DevOps token: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_ORG",
+        "Azure DevOps organization: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_PROJECT",
+        "Azure DevOps project: Required for Azure DevOps platform.",
+      ],
+      [
+        "azure",
+        azureEnv,
+        "MM_AZURE_REPO",
+        "Azure DevOps repository: Required for Azure DevOps platform.",
+      ],
+    ] as const)("labels a missing %s setting on %s", (platform, complete, missing, expected) => {
+      writeEnvMissing(platform, complete, missing);
+
+      expect(buildConfigView().warnings).toEqual([expected]);
+    });
+
+    it("names a malformed Copilot token by its label", () => {
+      writeEnv(
+        [
+          "MM_PLATFORM=github",
+          "MM_GITHUB_TOKEN=value",
+          "MM_GITHUB_REPO_OWNER=value",
+          "MM_GITHUB_REPO_NAME=value",
+          "MM_COPILOT_TOKEN=not-a-pat",
+          "",
+        ].join("\n")
+      );
+
+      expect(buildConfigView().warnings).toEqual([
+        "Copilot token: GitHub Copilot requires a fine-grained personal access token starting with 'github_pat_'.",
+      ]);
     });
   });
 
@@ -118,7 +209,7 @@ describe("config.server", () => {
       expect(result.errors.map((error) => error.message)).toEqual([
         "Must be a positive whole number.",
         "Must be true or false.",
-        "Must be one of: github, azure.",
+        "Must be one of: azure, github.",
       ]);
     });
 

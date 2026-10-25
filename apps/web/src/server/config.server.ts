@@ -76,6 +76,9 @@ function buildField(
   return {
     envVar: definition.envVar,
     label: definition.label,
+    platform: definition.platform,
+    advanced: definition.advanced === true,
+    description: definition.description,
     note: definition.note,
     type: definition.type,
     options: definition.options,
@@ -93,6 +96,20 @@ function buildSections(config: Config): ConfigSectionView[] {
     description: section.description,
     fields: section.fields.map((definition) => buildField(definition, values)),
   }));
+}
+
+/**
+ * Rewrites a validation error so it names the setting by its label.
+ *
+ * The loader's messages point at environment variables and CLI flags, which the
+ * settings screen does not show.
+ */
+function toWarning(error: ConfigurationError): string {
+  const label = FIELDS_BY_ENV_VAR.get(error.field)?.label ?? error.field;
+  const detail = error.message
+    .replace(`Configuration error for ${error.field}: `, "")
+    .replace(/\s*Set via \S+ env var or \S+ CLI flag\.$/, "");
+  return `${label}: ${detail}`;
 }
 
 /** Extracts a human-readable message from an unknown thrown value. */
@@ -122,7 +139,7 @@ export function buildConfigView(): ConfigView {
     validateConfig(config, config.defaultPlatform);
   } catch (error) {
     if (error instanceof ConfigurationError) {
-      warnings.push(error.message);
+      warnings.push(toWarning(error));
     } else {
       throw error;
     }

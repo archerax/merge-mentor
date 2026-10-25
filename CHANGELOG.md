@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: Azure DevOps is now the default platform.** When `MM_PLATFORM` and
+  `--platform` are not set (or hold an unrecognized value), Merge Mentor uses
+  Azure DevOps instead of GitHub. Set `MM_PLATFORM=github` to keep the old
+  behavior. The web settings screen now hides the settings for the platform
+  you did not select until advanced settings are shown.
+
+- **Web settings screen**: every setting now has a plain-language description,
+  edited fields are marked "Modified",
+  switches read Enabled/Disabled, settings are grouped into tabs (marked when they hold unsaved or invalid
+  values), tuning settings are hidden behind a "Show advanced settings" switch
+  (settings already configured in your environment stay visible), and the save bar stays visible with an unsaved
+  change count. Several cryptic labels were renamed (for example "BYOK base URL"
+  is now "Custom endpoint URL (bring your own key)"). The custom endpoint URL
+  (`MM_AI_BASE_URL`) is now shown in plain text: if you put credentials in it,
+  move them to `MM_AI_API_KEY` and rotate the old values.
+
 ## [4.1.0] - 2026-10-24
 
 Adds PRD and FRD review: a plain-language first pass over a Word requirements
