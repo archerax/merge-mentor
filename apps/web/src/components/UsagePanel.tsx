@@ -1,10 +1,12 @@
 import { Alert, Paper, SimpleGrid, Table, Text, Title } from "@mantine/core";
 import type { UsageGroupTotals, UsageSummary } from "@merge-mentor/shared/reports/usageReport.js";
 import {
-  formatNanoAiuCost,
+  formatUsageCost,
+  formatUsd,
   nanoAiuToCredits,
   nanoAiuToUsd,
 } from "@merge-mentor/shared/utils/aiCredits.js";
+import { DEEPSEEK_PRICES_AS_OF } from "@merge-mentor/shared/utils/modelPricing.js";
 
 interface UsagePanelProps {
   readonly usage: UsageSummary;
@@ -47,6 +49,34 @@ function UsageTile({
   );
 }
 
+function CostTile({ usage }: { usage: UsageSummary }) {
+  const { nanoAiu, costUsd } = usage;
+  if (nanoAiu === undefined && costUsd === undefined) {
+    return (
+      <UsageTile label="Cost" value="not reported" muted hint="the provider did not report cost" />
+    );
+  }
+  if (nanoAiu === undefined) {
+    return (
+      <UsageTile
+        label="Cost"
+        value={formatUsd(costUsd ?? 0)}
+        hint={`from DeepSeek list prices as of ${DEEPSEEK_PRICES_AS_OF} (off-peak)`}
+      />
+    );
+  }
+  return (
+    <UsageTile
+      label="Cost"
+      value={`${nanoAiuToCredits(nanoAiu).toFixed(2)} AI credits`}
+      hint={
+        `~${formatUsd(nanoAiuToUsd(nanoAiu))}, as reported by the provider` +
+        (costUsd === undefined ? "" : `, plus ${formatUsd(costUsd)} from list prices`)
+      }
+    />
+  );
+}
+
 function GroupTable({
   title,
   groups,
@@ -74,7 +104,7 @@ function GroupTable({
               <Table.Td>{group.key}</Table.Td>
               <Table.Td>{group.runs}</Table.Td>
               <Table.Td>{tokens(group).toLocaleString()}</Table.Td>
-              <Table.Td>{formatNanoAiuCost(group.nanoAiu)}</Table.Td>
+              <Table.Td>{formatUsageCost(group)}</Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
@@ -129,20 +159,7 @@ export function UsagePanel({ usage, days }: UsagePanelProps) {
               muted={usage.cachedTokens === undefined}
               hint="served from the provider's cache"
             />
-            <UsageTile
-              label="Cost"
-              value={
-                usage.nanoAiu === undefined
-                  ? "not reported"
-                  : `${nanoAiuToCredits(usage.nanoAiu).toFixed(2)} AI credits`
-              }
-              muted={usage.nanoAiu === undefined}
-              hint={
-                usage.nanoAiu === undefined
-                  ? "the provider did not report cost"
-                  : `~$${nanoAiuToUsd(usage.nanoAiu).toFixed(2)}, as reported by the provider`
-              }
-            />
+            <CostTile usage={usage} />
             <UsageTile
               label="Avg per PR"
               value={Math.round(tokens(usage) / usage.reportedPrs).toLocaleString()}

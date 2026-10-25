@@ -1,5 +1,7 @@
 import type { TokenUsage } from "@merge-mentor/domain/ai.js";
 
+import { formatUsageCost } from "./aiCredits.js";
+
 /**
  * Sums two optional numeric values. When at least one is defined, returns the
  * sum (treating the other as 0). When both are undefined, returns undefined.
@@ -13,7 +15,7 @@ export function sumOptional(a: number | undefined, b: number | undefined): numbe
  *
  * - `inputTokens` and `outputTokens` are always summed.
  * - `reasoningTokens`, `cachedTokens`, `durationApiSeconds`, `durationWallSeconds`,
- *   `premiumRequests`, and `nanoAiu` are summed when at least one side is defined.
+ *   `premiumRequests`, `nanoAiu`, and `costUsd` are summed when at least one side is defined.
  * - `model` prefers the first non-undefined value, falling back to the second.
  *
  * @param a - First token usage (may be undefined)
@@ -38,6 +40,7 @@ export function mergeTokenUsage(
     model: a.model ?? b.model,
     premiumRequests: sumOptional(a.premiumRequests, b.premiumRequests),
     nanoAiu: sumOptional(a.nanoAiu, b.nanoAiu),
+    costUsd: sumOptional(a.costUsd, b.costUsd),
   };
 }
 
@@ -62,6 +65,9 @@ export function formatTokenUsage(usage: TokenUsage): string[] {
   }
   const total = usage.inputTokens + usage.outputTokens + (usage.reasoningTokens ?? 0);
   lines.push(`Total tokens:   ${formatNumber(total)}`);
+  if (usage.nanoAiu !== undefined || usage.costUsd !== undefined) {
+    lines.push(`Cost:           ${formatUsageCost(usage)}`);
+  }
   if (usage.model) {
     lines.push(`Model:          ${usage.model}`);
   }

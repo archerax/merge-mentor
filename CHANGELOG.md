@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the dashboard's Stats page) summarizes it locally with no platform credentials. Fields a
   provider does not report show "not reported", never zero; reviews where only some AI
   calls reported usage are flagged as partial. GitHub Copilot's reported cost is shown as AI
-  credits (1 credit = $0.01).
+  credits (1 credit = $0.01). Costs for BYOK DeepSeek V4.1-Flash and V4-Pro models are
+  estimated from built-in off-peak list prices.
 
 ### Changed
 

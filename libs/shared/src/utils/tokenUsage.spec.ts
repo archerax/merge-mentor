@@ -37,6 +37,14 @@ describe("mergeTokenUsage reasoning and cost", () => {
     expect(mergeTokenUsage(a, a)).toMatchObject({ reasoningTokens: 8, nanoAiu: 200 });
   });
 
+  it("sums costUsd and shows cost in formatted output", () => {
+    const a: TokenUsage = { inputTokens: 1, outputTokens: 1, costUsd: 0.001 };
+    const merged = mergeTokenUsage(a, { ...a, costUsd: 0.002 });
+    expect(merged?.costUsd).toBeCloseTo(0.003);
+    expect(formatTokenUsage(merged as TokenUsage)).toContain("Cost:           $0.0030");
+    expect(formatTokenUsage({ inputTokens: 1, outputTokens: 1 }).join("\n")).not.toContain("Cost:");
+  });
+
   it("leaves reasoningTokens and nanoAiu undefined when neither side reports them", () => {
     const a: TokenUsage = { inputTokens: 1, outputTokens: 1 };
     const merged = mergeTokenUsage(a, a);

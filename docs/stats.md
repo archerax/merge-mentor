@@ -43,7 +43,7 @@ It reports input, output, reasoning and cached tokens; averages per review and p
 
 - **Not reported, never zero.** Providers that do not report usage (or a field such as cached tokens) show `not reported`. Reviews without usage are counted separately and excluded from the totals.
 - **Partial runs.** If only some of a review's AI calls reported usage, the totals cover those calls and the review is flagged as partial.
-- **Cost** is shown only when the provider reports it. GitHub Copilot reports cost per request, shown as AI credits (1 credit = $0.01). There is no built-in price table for other providers, so they show tokens only.
+- **Cost** is shown only when it is known. GitHub Copilot reports cost per request, shown as AI credits (1 credit = $0.01). For BYOK DeepSeek models (model ids containing `deepseek` and `flash` or `pro`), the cost is estimated at review time from DeepSeek's published off-peak list prices (taken from the [DeepSeek pricing page](https://api-docs.deepseek.com/quick_start/pricing/) on 2026-10-25), billing reported input tokens as cache misses, cached tokens as cache hits, and reasoning tokens as output. Peak-hour rates, other models and other providers show tokens only. Prices are built in and change only with a Merge Mentor release.
 - The **Stats** page of the [web dashboard](./ui.md) shows the same usage in an **AI usage** section, read from the same local files. It works even when the platform token is not configured.
 - Records are per project (`--temp-path` / `MM_TEMP_PATH`), and reviews run before this feature existed have no record. Only PR reviews are recorded.
 

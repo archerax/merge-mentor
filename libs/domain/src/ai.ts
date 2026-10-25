@@ -12,6 +12,8 @@ export interface TokenUsage {
   readonly premiumRequests?: number;
   /** Provider-reported cost in nano-AI units (1 AI credit = 1e9), when reported. */
   readonly nanoAiu?: number;
+  /** Estimated cost in US dollars from a built-in price table, when the provider reports none. */
+  readonly costUsd?: number;
   /** Model identifier the usage report corresponds to, when reported. */
   readonly model?: string;
   /** API-side duration of the call in seconds, when reported. */

@@ -71,7 +71,25 @@ describe("UsagePanel", () => {
       nanoAiu: 2.5e9,
     });
     expect(html).toContain("2.50 AI credits");
-    expect(html).toContain("~$0.03");
+    expect(html).toContain("~$0.0250");
+  });
+
+  it("shows estimated dollars from list prices with the price date", () => {
+    const html = render({
+      ...empty,
+      runs: 1,
+      prs: 1,
+      reportedPrs: 1,
+      completeRuns: 1,
+      inputTokens: 10,
+      outputTokens: 5,
+      costUsd: 0.0042,
+      byModel: [
+        { key: "deepseek-v4.1-flash", runs: 1, inputTokens: 10, outputTokens: 5, costUsd: 0.0042 },
+      ],
+    });
+    expect(html).toContain("$0.0042");
+    expect(html).toContain("DeepSeek list prices as of 2026-10-25");
   });
 
   it("flags partial and unreported reviews", () => {

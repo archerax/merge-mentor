@@ -182,7 +182,7 @@ function createMockPlatform(): PlatformAdapter {
 
 async function reviewWithUsage(
   mockPlatform: PlatformAdapter,
-  tokenUsage: { inputTokens: number; outputTokens: number } | undefined
+  tokenUsage: { inputTokens: number; outputTokens: number; model?: string } | undefined
 ) {
   const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", { verbose: false });
   vi.mocked(mockPlatform.getPRDetails).mockResolvedValue(createPRDetails());
@@ -627,6 +627,22 @@ describe("ReviewEngine", () => {
         const result = await reviewWithUsage(mockPlatform, { inputTokens: 10, outputTokens: 5 });
         expect(result.usageCalls).toEqual({ total: 1, reported: 1 });
         expect(result.tokenUsage).toMatchObject({ inputTokens: 10, outputTokens: 5 });
+      });
+
+      it("estimates cost from list prices for DeepSeek models only", async () => {
+        const priced = await reviewWithUsage(mockPlatform, {
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          model: "deepseek-v4.1-flash",
+        });
+        expect(priced.tokenUsage?.costUsd).toBeCloseTo(0.15 + 0.6);
+
+        const unpriced = await reviewWithUsage(mockPlatform, {
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          model: "gpt-4.1",
+        });
+        expect(unpriced.tokenUsage?.costUsd).toBeUndefined();
       });
 
       it("counts AI calls that reported no usage without inventing totals", async () => {

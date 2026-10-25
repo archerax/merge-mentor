@@ -65,6 +65,7 @@ describe("parseUsageRecord", () => {
         reasoningTokens: 3,
         cachedTokens: 4,
         nanoAiu: 5,
+        costUsd: 0.5,
         model: "m",
       },
     });
@@ -183,11 +184,24 @@ describe("summarizeUsage", () => {
     expect(summary.nanoAiu).toBeUndefined();
   });
 
+  it("sums estimated dollar cost per group", () => {
+    const summary = summarizeUsage([
+      record({ tokenUsage: { inputTokens: 1, outputTokens: 1, costUsd: 0.25, model: "a" } }),
+      record({
+        prNumber: 2,
+        tokenUsage: { inputTokens: 1, outputTokens: 1, costUsd: 0.5, model: "a" },
+      }),
+    ]);
+    expect(summary.costUsd).toBeCloseTo(0.75);
+    expect(summary.byModel[0].costUsd).toBeCloseTo(0.75);
+  });
+
   it("leaves reasoning, cached and cost undefined when no run reported them", () => {
     const summary = summarizeUsage([record()]);
     expect(summary.reasoningTokens).toBeUndefined();
     expect(summary.cachedTokens).toBeUndefined();
     expect(summary.nanoAiu).toBeUndefined();
+    expect(summary.costUsd).toBeUndefined();
     expect(summary.byModel[0].cachedTokens).toBeUndefined();
   });
 });

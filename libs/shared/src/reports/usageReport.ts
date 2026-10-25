@@ -97,6 +97,7 @@ function parseTokenUsage(value: unknown): TokenUsage | undefined {
       ? { premiumRequests: raw.premiumRequests as number }
       : {}),
     ...(optionalNumber(raw, "nanoAiu") !== undefined ? { nanoAiu: raw.nanoAiu as number } : {}),
+    ...(optionalNumber(raw, "costUsd") !== undefined ? { costUsd: raw.costUsd as number } : {}),
     ...(typeof raw.model === "string" ? { model: raw.model } : {}),
     ...(optionalNumber(raw, "durationApiSeconds") !== undefined
       ? { durationApiSeconds: raw.durationApiSeconds as number }
@@ -212,6 +213,8 @@ export interface UsageGroupTotals {
   readonly cachedTokens?: number;
   /** Sum of provider-reported cost; undefined when no run in the group reported one. */
   readonly nanoAiu?: number;
+  /** Sum of estimated dollar cost from the built-in price table; undefined when none was estimated. */
+  readonly costUsd?: number;
 }
 
 /** Aggregated usage over a window of runs. */
@@ -236,6 +239,7 @@ interface MutableTotals {
   reasoningTokens: number | undefined;
   cachedTokens: number | undefined;
   nanoAiu: number | undefined;
+  costUsd: number | undefined;
 }
 
 function emptyTotals(): MutableTotals {
@@ -246,6 +250,7 @@ function emptyTotals(): MutableTotals {
     reasoningTokens: undefined,
     cachedTokens: undefined,
     nanoAiu: undefined,
+    costUsd: undefined,
   };
 }
 
@@ -265,15 +270,17 @@ function addUsage(totals: MutableTotals, usage: TokenUsage): void {
   totals.reasoningTokens = sumOptional(totals.reasoningTokens, usage.reasoningTokens);
   totals.cachedTokens = sumOptional(totals.cachedTokens, usage.cachedTokens);
   totals.nanoAiu = sumOptional(totals.nanoAiu, usage.nanoAiu);
+  totals.costUsd = sumOptional(totals.costUsd, usage.costUsd);
 }
 
 function optionalTotals(
   totals: MutableTotals
-): Pick<UsageGroupTotals, "reasoningTokens" | "cachedTokens" | "nanoAiu"> {
+): Pick<UsageGroupTotals, "reasoningTokens" | "cachedTokens" | "nanoAiu" | "costUsd"> {
   return {
     ...(totals.reasoningTokens !== undefined ? { reasoningTokens: totals.reasoningTokens } : {}),
     ...(totals.cachedTokens !== undefined ? { cachedTokens: totals.cachedTokens } : {}),
     ...(totals.nanoAiu !== undefined ? { nanoAiu: totals.nanoAiu } : {}),
+    ...(totals.costUsd !== undefined ? { costUsd: totals.costUsd } : {}),
   };
 }
 

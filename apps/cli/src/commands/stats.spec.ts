@@ -235,7 +235,20 @@ describe("formatUsageSummary", () => {
     const out = render([
       usageRecord({ tokenUsage: { inputTokens: 1, outputTokens: 1, nanoAiu: 2.5e9 } }),
     ]);
-    expect(out).toContain("2.50 AI credits (~$0.03)");
+    expect(out).toContain("2.50 AI credits (~$0.0250)");
+  });
+
+  it("shows estimated dollars from list prices, including averages", () => {
+    const out = render([
+      usageRecord({ tokenUsage: { inputTokens: 10, outputTokens: 5, costUsd: 0.004 } }),
+      usageRecord({
+        prNumber: 2,
+        tokenUsage: { inputTokens: 10, outputTokens: 5, costUsd: 0.002 },
+      }),
+    ]);
+    expect(out).toContain("Cost:             $0.0060");
+    expect(out).toContain("Avg cost/review:  $0.0030");
+    expect(out).toContain("Avg cost/PR:      $0.0030");
   });
 
   it("flags partial and unreported reviews", () => {

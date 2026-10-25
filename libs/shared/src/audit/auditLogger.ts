@@ -454,6 +454,7 @@ export class AuditLogger {
       cachedTokens?: number;
       premiumRequests?: number;
       nanoAiu?: number;
+      costUsd?: number;
       model?: string;
       durationApiSeconds?: number;
       durationWallSeconds?: number;

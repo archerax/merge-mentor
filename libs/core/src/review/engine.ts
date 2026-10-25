@@ -70,6 +70,7 @@ import {
   type OutputWriter,
 } from "@merge-mentor/shared/ports/index.js";
 import { filterPRFiles, getIgnorePatterns } from "@merge-mentor/shared/utils/ignoreFilter.js";
+import { withEstimatedCost } from "@merge-mentor/shared/utils/modelPricing.js";
 import {
   generatePRIdentifier,
   parsePRNumberSafe,
@@ -821,7 +822,9 @@ export class ReviewEngine {
     let usageCallsTotal = 0;
     let usageCallsReported = 0;
 
-    const onTokenUsage = (usage: TokenUsage | undefined): void => {
+    const onTokenUsage = (reported: TokenUsage | undefined): void => {
+      // Price each call by its own model, so runs mixing models are costed correctly.
+      const usage = reported && withEstimatedCost(reported);
       usageCallsTotal += 1;
       if (usage) usageCallsReported += 1;
       tokenUsage = mergeTokenUsage(tokenUsage, usage);

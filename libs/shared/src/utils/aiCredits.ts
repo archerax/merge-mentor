@@ -18,12 +18,31 @@ export function nanoAiuToUsd(nanoAiu: number): number {
   return nanoAiuToCredits(nanoAiu) * USD_PER_AI_CREDIT;
 }
 
+/** Formats dollars compactly: sub-dollar amounts keep four decimals (`$0.0042`). */
+export function formatUsd(usd: number): string {
+  return `$${usd < 1 ? usd.toFixed(4) : usd.toFixed(2)}`;
+}
+
+/** Cost figures from a usage record or summary. */
+interface UsageCost {
+  /** Provider-reported cost in nano-AIU (Copilot). */
+  readonly nanoAiu?: number;
+  /** Estimated dollars from the built-in price table (BYOK). */
+  readonly costUsd?: number;
+}
+
 /**
- * Formats provider-reported cost, e.g. `2.50 AI credits (~$0.03)`.
+ * Formats cost, e.g. `2.50 AI credits (~$0.03)`, `$0.0042`, or both joined with ` + `.
  *
- * @returns `not reported` when the provider reported no cost
+ * @returns `not reported` when neither a provider-reported nor an estimated cost exists
  */
-export function formatNanoAiuCost(nanoAiu: number | undefined): string {
-  if (nanoAiu === undefined) return "not reported";
-  return `${nanoAiuToCredits(nanoAiu).toFixed(2)} AI credits (~$${nanoAiuToUsd(nanoAiu).toFixed(2)})`;
+export function formatUsageCost(cost: UsageCost): string {
+  const parts: string[] = [];
+  if (cost.nanoAiu !== undefined) {
+    parts.push(
+      `${nanoAiuToCredits(cost.nanoAiu).toFixed(2)} AI credits (~${formatUsd(nanoAiuToUsd(cost.nanoAiu))})`
+    );
+  }
+  if (cost.costUsd !== undefined) parts.push(formatUsd(cost.costUsd));
+  return parts.length > 0 ? parts.join(" + ") : "not reported";
 }
