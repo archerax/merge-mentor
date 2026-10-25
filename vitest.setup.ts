@@ -1,4 +1,7 @@
-import { afterAll, vi } from "vitest";
+import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
+import { afterAll, expect, vi } from "vitest";
+
+expect.extend(jestDomMatchers);
 
 // Mock pino to avoid CI issues with worker threads and file system operations
 vi.mock("pino", () => {
@@ -26,3 +29,28 @@ vi.mock("pino", () => {
 afterAll(async () => {
   // No need to cleanup mocked logger
 });
+
+// Mantine components rely on browser APIs that jsdom does not implement. Specs
+// opt in to jsdom with a `@vitest-environment jsdom` docblock; node-environment
+// specs skip this block.
+if (typeof window !== "undefined") {
+  window.matchMedia ??= (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }) as unknown as MediaQueryList;
+
+  Element.prototype.scrollIntoView ??= vi.fn();
+
+  globalThis.ResizeObserver ??= class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
