@@ -57,13 +57,13 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
 
   // A cleared platform means "use the default", so no platform is assumed and both groups show.
   const draftPlatform = draft.MM_PLATFORM;
-  const selectedPlatform =
+  const selectedPlatform = toPlatform(
     draftPlatform === ""
       ? undefined
       : (draftPlatform ??
-        view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
-          ?.value ??
-        undefined);
+          view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
+            ?.value)
+  );
 
   function isVisible(field: ConfigFieldView): boolean {
     return isFieldVisible(field, {
@@ -281,6 +281,11 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       </Paper>
     </Stack>
   );
+}
+
+/** Narrows a raw setting value to a known platform; anything else means "unknown". */
+function toPlatform(value: string | null | undefined): ConfigFieldView["platform"] {
+  return value === "github" || value === "azure" ? value : undefined;
 }
 
 /** Returns the value an untouched field currently resolves to. */

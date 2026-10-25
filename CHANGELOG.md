@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   values), tuning settings are hidden behind a "Show advanced settings" switch
   (settings already configured in your environment stay visible), and the save bar stays visible with an unsaved
   change count. Several cryptic labels were renamed (for example "BYOK base URL"
-  is now "Custom endpoint URL (bring your own key)").
+  is now "Custom endpoint URL (bring your own key)"). The custom endpoint URL
+  (`MM_AI_BASE_URL`) is now shown in plain text: if you put credentials in it,
+  move them to `MM_AI_API_KEY` and rotate the old values.
 
 ## [4.1.0] - 2026-10-24
 

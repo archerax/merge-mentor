@@ -4,7 +4,7 @@ interface FieldVisibilityContext {
   /** Whether the user turned on "Show advanced settings". */
   readonly showAdvanced: boolean;
   /** Platform whose settings should be shown, when known. */
-  readonly selectedPlatform: string | undefined;
+  readonly selectedPlatform: ConfigFieldView["platform"];
   /** Whether the field has an unsaved edit, a pending clear, or a validation error. */
   readonly touched: boolean;
 }
