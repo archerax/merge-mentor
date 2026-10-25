@@ -43,10 +43,6 @@ export interface UsageRecord {
 const USAGE_FILE_MARKER = "-review-usage-";
 const USAGE_FILE_SUFFIX = ".json";
 
-/** One AI credit costs $0.01. */
-const USD_PER_AI_CREDIT = 0.01;
-const NANO_AIU_PER_AI_CREDIT = 1e9;
-
 /**
  * Builds the file name for a run's usage record.
  *
@@ -339,14 +335,4 @@ export function summarizeUsage(records: readonly UsageRecord[]): UsageSummary {
     byModel: groupToList(byModel),
     byProvider: groupToList(byProvider),
   };
-}
-
-/** Converts provider-reported nano-AIU to AI credits. */
-export function nanoAiuToCredits(nanoAiu: number): number {
-  return nanoAiu / NANO_AIU_PER_AI_CREDIT;
-}
-
-/** Converts provider-reported nano-AIU to US dollars (1 AI credit = $0.01). */
-export function nanoAiuToUsd(nanoAiu: number): number {
-  return nanoAiuToCredits(nanoAiu) * USD_PER_AI_CREDIT;
 }

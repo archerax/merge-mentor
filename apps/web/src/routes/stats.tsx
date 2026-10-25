@@ -11,7 +11,9 @@ import {
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { PageHeader } from "../components/PageHeader.js";
+import { UsagePanel } from "../components/UsagePanel.js";
 import { getLiveStats } from "../server/stats.functions.js";
+import { getUsageStats } from "../server/usage.functions.js";
 
 const WINDOWS = [7, 30, 90] as const;
 const DEFAULT_DAYS = 30;
@@ -23,7 +25,13 @@ export const Route = createFileRoute("/stats")({
   loaderDeps: ({ search }) => ({ days: search.days }),
   staleTime: 60_000,
   preloadStaleTime: 60_000,
-  loader: ({ deps }) => getLiveStats({ data: { days: deps.days } }),
+  loader: async ({ deps }) => {
+    const [live, usage] = await Promise.all([
+      getLiveStats({ data: { days: deps.days } }),
+      getUsageStats({ data: { days: deps.days } }),
+    ]);
+    return { live, usage };
+  },
   component: StatsPage,
 });
 
@@ -46,7 +54,7 @@ function StatTile({ label, value, hint }: { label: string; value: number; hint?:
 }
 
 function StatsPage() {
-  const result = Route.useLoaderData();
+  const { live: result, usage } = Route.useLoaderData();
   const { days } = Route.useSearch();
   const navigate = useNavigate({ from: "/stats" });
 
@@ -76,6 +84,14 @@ function StatsPage() {
         </Alert>
       ) : (
         <LiveStats stats={result.stats} days={days} />
+      )}
+
+      {usage.ok ? (
+        <UsagePanel usage={usage.usage} days={days} />
+      ) : (
+        <Alert title="Could not load AI usage" color="red">
+          {usage.error}
+        </Alert>
       )}
     </Stack>
   );

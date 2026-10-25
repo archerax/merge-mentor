@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AI usage and cost tracking.** Each PR review now writes a usage record next to its
+  report (`<tempPath>/reports/<pr>-review-usage-<timestamp>.json`) with token usage, model,
+  provider and call coverage. `merge-mentor stats --usage` (and the **AI usage** section of
+  the dashboard's Stats page) summarizes it locally with no platform credentials. Fields a
+  provider does not report show "not reported", never zero; reviews where only some AI
+  calls reported usage are flagged as partial. GitHub Copilot's reported cost is shown as AI
+  credits (1 credit = $0.01).
+
+### Changed
+
+- Token usage now reports reasoning tokens separately: for OpenCode, `outputTokens` no
+  longer includes reasoning tokens, which appear as `reasoningTokens`.
+
 ## [4.2.0] - 2026-10-25
 
 ### Changed

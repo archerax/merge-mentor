@@ -70,18 +70,18 @@ should record usage per run and report it in the CLI and the web dashboard.
   from before this change show "not reported".
 - Reasoning-token split in OpenCode mapper.
 
-## Open Questions
+## Status
 
-- Does the Copilot SDK `assistant.usage` event expose AIC cost (or only tokens
-  and a model multiplier)? Verify against the installed SDK version; if absent,
-  decide whether to compute from tokens or show tokens only for Copilot.
+- Done: `TokenUsage` extension (reasoning, nano-AIU), per-run usage files,
+  call coverage, `stats --usage`, dashboard AI usage section.
+- Open: none.
 
 ## Future
 
 - Usage for PBI, project, and PRD reviews (PRD already has JSON reports).
 - Per-phase/specialist usage breakdown (tag at `onTokenUsage` call sites; could
   source from audit log events).
-- `stats --usage --json`; cross-project aggregation; configurable reports path for stats.
+- cross-project aggregation; configurable reports path for stats.
 - Budget caps (`--max-tokens` / `MM_AI_MAX_TOKENS`): hard stop vs. warn-only,
   overshoot handling between AI calls.
 - CI story: upload/cache recipe or job-summary output.

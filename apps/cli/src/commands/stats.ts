@@ -12,12 +12,11 @@ import { initLogger } from "@merge-mentor/shared/logger.js";
 import { consoleOutputWriter } from "@merge-mentor/shared/ports/index.js";
 import {
   listUsageRecords,
-  nanoAiuToCredits,
-  nanoAiuToUsd,
   summarizeUsage,
   type UsageGroupTotals,
   type UsageSummary,
 } from "@merge-mentor/shared/reports/usageReport.js";
+import { formatNanoAiuCost } from "@merge-mentor/shared/utils/aiCredits.js";
 import { InvalidArgumentError } from "commander";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -207,13 +206,8 @@ function formatTotalTokens(group: UsageGroupTotals): number {
   return group.inputTokens + group.outputTokens + (group.reasoningTokens ?? 0);
 }
 
-function formatCost(nanoAiu: number | undefined): string {
-  if (nanoAiu === undefined) return "not reported";
-  return `${nanoAiuToCredits(nanoAiu).toFixed(2)} AI credits (~$${nanoAiuToUsd(nanoAiu).toFixed(2)})`;
-}
-
 function formatGroupLine(group: UsageGroupTotals & { readonly key: string }): string {
-  const cost = group.nanoAiu === undefined ? "" : `, ${formatCost(group.nanoAiu)}`;
+  const cost = group.nanoAiu === undefined ? "" : `, ${formatNanoAiuCost(group.nanoAiu)}`;
   return `    ${group.key}: ${formatCount(formatTotalTokens(group))} tokens over ${group.runs} run(s)${cost}`;
 }
 
@@ -258,15 +252,15 @@ export function formatUsageSummary(
     `  Reasoning tokens: ${formatOptionalCount(summary.reasoningTokens)}`,
     `  Cached tokens:    ${formatOptionalCount(summary.cachedTokens)}`,
     `  Total tokens:     ${formatCount(totalTokens)}`,
-    `  Cost:             ${formatCost(summary.nanoAiu)}`,
+    `  Cost:             ${formatNanoAiuCost(summary.nanoAiu)}`,
     "",
     `  Avg per review:   ${formatCount(Math.round(totalTokens / summary.runs))} tokens`,
     `  Avg per PR:       ${formatCount(Math.round(totalTokens / summary.reportedPrs))} tokens`
   );
   if (summary.nanoAiu !== undefined) {
     lines.push(
-      `  Avg cost/review:  ${formatCost(summary.nanoAiu / summary.runs)}`,
-      `  Avg cost/PR:      ${formatCost(summary.nanoAiu / summary.reportedPrs)}`
+      `  Avg cost/review:  ${formatNanoAiuCost(summary.nanoAiu / summary.runs)}`,
+      `  Avg cost/PR:      ${formatNanoAiuCost(summary.nanoAiu / summary.reportedPrs)}`
     );
   }
 

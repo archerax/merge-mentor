@@ -6,8 +6,6 @@ import type { ReportFileSystem } from "./reportReader.js";
 import {
   isUsageRecordName,
   listUsageRecords,
-  nanoAiuToCredits,
-  nanoAiuToUsd,
   parseUsageRecord,
   summarizeUsage,
   USAGE_RECORD_SCHEMA_VERSION,
@@ -191,12 +189,5 @@ describe("summarizeUsage", () => {
     expect(summary.cachedTokens).toBeUndefined();
     expect(summary.nanoAiu).toBeUndefined();
     expect(summary.byModel[0].cachedTokens).toBeUndefined();
-  });
-});
-
-describe("cost conversion", () => {
-  it("converts nano-AIU to credits and dollars at $0.01 per credit", () => {
-    expect(nanoAiuToCredits(2.5e9)).toBe(2.5);
-    expect(nanoAiuToUsd(2.5e9)).toBeCloseTo(0.025);
   });
 });
