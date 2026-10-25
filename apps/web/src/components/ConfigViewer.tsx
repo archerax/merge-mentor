@@ -10,9 +10,9 @@ import {
   Select,
   Stack,
   Switch,
+  Tabs,
   Text,
   TextInput,
-  Title,
 } from "@mantine/core";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -32,6 +32,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const [cleared, setCleared] = useState<readonly string[]>([]);
   const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
 
   const changeCount = Object.keys(draft).length + cleared.length;
   const dirty = changeCount > 0;
@@ -125,29 +126,59 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Alert>
       )}
 
-      {view.sections.map((section) => (
-        <Stack key={section.title} gap="xs">
-          <div>
-            <Title order={4}>{section.title}</Title>
-            <Text c="dimmed" size="sm">
-              {section.description}
-            </Text>
-          </div>
-          <Grid gap="md" align="flex-start">
-            {section.fields.map((field) => (
-              <ConfigRow
-                key={field.envVar}
-                field={field}
-                draftValue={draft[field.envVar]}
-                cleared={cleared.includes(field.envVar)}
-                error={errors.find((item) => item.envVar === field.envVar)?.message}
-                onChange={(value) => updateField(field.envVar, value, originalValue(field))}
-                onToggleClear={() => toggleClear(field.envVar)}
-              />
-            ))}
-          </Grid>
-        </Stack>
-      ))}
+      <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
+        <Tabs.List>
+          {view.sections.map((section) => {
+            const hasError = section.fields.some((field) =>
+              errors.some((item) => item.envVar === field.envVar)
+            );
+            const modified = section.fields.some(
+              (field) => draft[field.envVar] !== undefined || cleared.includes(field.envVar)
+            );
+            return (
+              <Tabs.Tab
+                key={section.title}
+                value={section.title}
+                rightSection={
+                  hasError || modified ? (
+                    <Badge
+                      size="xs"
+                      circle
+                      color={hasError ? "red" : "yellow"}
+                      aria-label={hasError ? "Has invalid values" : "Has unsaved changes"}
+                    />
+                  ) : null
+                }
+              >
+                {section.title}
+              </Tabs.Tab>
+            );
+          })}
+        </Tabs.List>
+
+        {view.sections.map((section) => (
+          <Tabs.Panel key={section.title} value={section.title} pt="md">
+            <Stack gap="md">
+              <Text c="dimmed" size="sm">
+                {section.description}
+              </Text>
+              <Grid gap="md" align="flex-start">
+                {section.fields.map((field) => (
+                  <ConfigRow
+                    key={field.envVar}
+                    field={field}
+                    draftValue={draft[field.envVar]}
+                    cleared={cleared.includes(field.envVar)}
+                    error={errors.find((item) => item.envVar === field.envVar)?.message}
+                    onChange={(value) => updateField(field.envVar, value, originalValue(field))}
+                    onToggleClear={() => toggleClear(field.envVar)}
+                  />
+                ))}
+              </Grid>
+            </Stack>
+          </Tabs.Panel>
+        ))}
+      </Tabs>
 
       <Paper
         withBorder
