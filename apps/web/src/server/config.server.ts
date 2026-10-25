@@ -76,6 +76,7 @@ function buildField(
   return {
     envVar: definition.envVar,
     label: definition.label,
+    platform: definition.platform,
     advanced: definition.advanced === true,
     description: definition.description,
     note: definition.note,

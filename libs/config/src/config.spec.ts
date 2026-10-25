@@ -17,7 +17,7 @@ describe("Config", () => {
       const env = createStubEnvironment();
       const config = loadConfig(undefined, env);
 
-      expect(config.defaultPlatform).toBe("github");
+      expect(config.defaultPlatform).toBe("azure");
       expect(config.github.token).toBe("");
       expect(config.github.owner).toBe("");
       expect(config.github.repo).toBe("");

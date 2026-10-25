@@ -21,6 +21,8 @@ export interface ConfigFieldView {
   readonly secret: boolean;
   /** Whether the underlying environment variable was explicitly provided. */
   readonly set: boolean;
+  /** Hosting platform this setting applies to; omitted for settings that apply to both. */
+  readonly platform?: "github" | "azure";
   /** Whether this is a tuning setting hidden until advanced settings are shown. */
   readonly advanced: boolean;
   /** Plain-language explanation of what the setting does. */

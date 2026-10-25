@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking: Azure DevOps is now the default platform.** When `MM_PLATFORM` and
+  `--platform` are not set (or hold an unrecognized value), Merge Mentor uses
+  Azure DevOps instead of GitHub. Set `MM_PLATFORM=github` to keep the old
+  behavior. The web settings screen now hides the settings for the platform
+  you did not select until advanced settings are shown.
+
 - **Web settings screen**: every setting now has a plain-language description,
   edited fields are marked "Modified",
   switches read Enabled/Disabled, settings are grouped into tabs (marked when they hold unsaved or invalid

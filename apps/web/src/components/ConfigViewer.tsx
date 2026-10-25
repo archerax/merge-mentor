@@ -54,12 +54,23 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     }
   }
 
-  /** Advanced settings stay visible once they hold a value, an edit, or an error. */
+  const selectedPlatform =
+    draft.MM_PLATFORM ||
+    view.sections.flatMap((section) => section.fields).find((f) => f.envVar === "MM_PLATFORM")
+      ?.value ||
+    undefined;
+
+  /**
+   * Advanced settings and settings for the unselected platform are hidden until
+   * advanced settings are shown. Edits and errors always stay visible, and advanced
+   * settings that already hold a value do too.
+   */
   function isVisible(field: ConfigFieldView): boolean {
+    const otherPlatform = field.platform !== undefined && field.platform !== selectedPlatform;
     return (
-      !field.advanced ||
+      (!field.advanced && !otherPlatform) ||
       showAdvanced ||
-      field.set ||
+      (field.advanced && field.set) ||
       draft[field.envVar] !== undefined ||
       cleared.includes(field.envVar) ||
       errors.some((item) => item.envVar === field.envVar)
@@ -174,7 +185,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
           {hiddenCount > 0
-            ? `${hiddenCount} advanced ${hiddenCount === 1 ? "setting is" : "settings are"} hidden.`
+            ? `${hiddenCount} ${hiddenCount === 1 ? "setting is" : "settings are"} hidden.`
             : "\u00A0"}
         </Text>
         <Switch

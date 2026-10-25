@@ -68,4 +68,19 @@ describe("CONFIG_SECTIONS", () => {
       expect(section.fields.some((field) => !field.advanced)).toBe(true);
     }
   });
+
+  it("tags credentials and repository settings with the platform they belong to", () => {
+    const fields = CONFIG_SECTIONS.flatMap((section) => section.fields);
+    for (const field of fields) {
+      const expected = field.envVar.startsWith("MM_AZURE_")
+        ? "azure"
+        : field.envVar.startsWith("MM_GITHUB_")
+          ? "github"
+          : undefined;
+      expect({ envVar: field.envVar, platform: field.platform }).toEqual({
+        envVar: field.envVar,
+        platform: expected,
+      });
+    }
+  });
 });

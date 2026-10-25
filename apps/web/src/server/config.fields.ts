@@ -10,6 +10,8 @@ export interface ConfigFieldDefinition {
   readonly type: ConfigFieldType;
   /** Allowed values when {@link type} is `enum`. */
   readonly options?: readonly string[];
+  /** Hosting platform this setting applies to; hidden while the other platform is selected. */
+  readonly platform?: "github" | "azure";
   /** Tuning setting that most users can leave alone; hidden until advanced settings are shown. */
   readonly advanced?: boolean;
   /** Plain-language explanation of what the setting does, shown beneath the label. */
@@ -34,36 +36,18 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
   {
     title: "Platform",
     description:
-      "Where your code is hosted. Fill in only the group for the platform you use (GitHub or Azure DevOps).",
+      "Where your code is hosted. Settings for the platform you didn't select are hidden; turn on advanced settings to see them.",
     fields: [
       {
         envVar: "MM_PLATFORM",
         label: "Default platform",
         type: "enum",
-        options: ["github", "azure"],
+        options: ["azure", "github"],
         description: "Which hosting platform reviews run against unless you say otherwise.",
       },
       {
-        envVar: "MM_GITHUB_TOKEN",
-        label: "GitHub token",
-        type: "secret",
-        description:
-          "Personal access token used to read pull requests and post comments. Needs the repo scope (or public_repo for public repositories).",
-      },
-      {
-        envVar: "MM_GITHUB_REPO_OWNER",
-        label: "GitHub repository owner",
-        type: "text",
-        description: "The user or organization that owns the repository, e.g. octocat.",
-      },
-      {
-        envVar: "MM_GITHUB_REPO_NAME",
-        label: "GitHub repository name",
-        type: "text",
-        description: "The repository to review pull requests in, e.g. hello-world.",
-      },
-      {
         envVar: "MM_AZURE_TOKEN",
+        platform: "azure",
         label: "Azure DevOps token",
         type: "secret",
         description:
@@ -71,21 +55,46 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_AZURE_ORG",
+        platform: "azure",
         label: "Azure DevOps organization",
         type: "text",
         description: "The organization name from your dev.azure.com/<organization> URL.",
       },
       {
         envVar: "MM_AZURE_PROJECT",
+        platform: "azure",
         label: "Azure DevOps project",
         type: "text",
         description: "The project that contains the repository and work items.",
       },
       {
         envVar: "MM_AZURE_REPO",
+        platform: "azure",
         label: "Azure DevOps repository",
         type: "text",
         description: "The repository to review pull requests in.",
+      },
+      {
+        envVar: "MM_GITHUB_TOKEN",
+        platform: "github",
+        label: "GitHub token",
+        type: "secret",
+        description:
+          "Personal access token used to read pull requests and post comments. Needs the repo scope (or public_repo for public repositories).",
+      },
+      {
+        envVar: "MM_GITHUB_REPO_OWNER",
+        platform: "github",
+        label: "GitHub repository owner",
+        type: "text",
+        description: "The user or organization that owns the repository, e.g. octocat.",
+      },
+      {
+        envVar: "MM_GITHUB_REPO_NAME",
+        platform: "github",
+        label: "GitHub repository name",
+        type: "text",
+        description: "The repository to review pull requests in, e.g. hello-world.",
       },
     ],
   },

@@ -30,6 +30,25 @@ function renderHtml(ui: ReactNode): string {
   return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
 }
 
+function platformView(platform: string): ConfigView {
+  return view([
+    {
+      title: "Platform",
+      description: "Where your code is hosted",
+      fields: [
+        field({
+          envVar: "MM_PLATFORM",
+          label: "Default platform",
+          type: "enum",
+          value: platform,
+        }),
+        field({ envVar: "AZ", label: "Azure org", platform: "azure" }),
+        field({ envVar: "GH", label: "GitHub owner", platform: "github", set: true }),
+      ],
+    },
+  ]);
+}
+
 describe("ConfigViewer", () => {
   const sections: ConfigView["sections"] = [
     {
@@ -50,7 +69,7 @@ describe("ConfigViewer", () => {
     expect(html).toContain("Basic setting");
     expect(html).not.toContain("Tuning knob");
     expect(html).not.toContain("Tuning");
-    expect(html).toContain("1 advanced setting is hidden.");
+    expect(html).toContain("1 setting is hidden.");
     expect(html).toContain("Show advanced settings");
   });
 
@@ -66,5 +85,22 @@ describe("ConfigViewer", () => {
 
     expect(html).toContain("Tuning");
     expect(html).not.toContain("hidden.");
+  });
+
+  describe("platform settings", () => {
+    it("hides GitHub settings while Azure DevOps is selected, even when they hold a value", () => {
+      const html = renderHtml(<ConfigViewer view={platformView("azure")} />);
+
+      expect(html).toContain("Azure org");
+      expect(html).not.toContain("GitHub owner");
+      expect(html).toContain("1 setting is hidden.");
+    });
+
+    it("hides Azure DevOps settings while GitHub is selected", () => {
+      const html = renderHtml(<ConfigViewer view={platformView("github")} />);
+
+      expect(html).toContain("GitHub owner");
+      expect(html).not.toContain("Azure org");
+    });
   });
 });

@@ -117,7 +117,7 @@ const AIProviderSchema = z.enum(["copilot-sdk", "opencode-sdk"]).catch("copilot-
 const GitBackendSchema = z.enum(["cli", "isomorphic"]).catch("cli");
 
 const ConfigParserSchema = z.object({
-  platform: z.enum(["github", "azure"]).catch("github"),
+  platform: z.enum(["github", "azure"]).catch("azure"),
   aiProvider: AIProviderSchema,
   gitBackend: GitBackendSchema,
   reviewStrategy: z.enum(["deep", "fast", "multi-agent"]).catch("fast"),
@@ -178,7 +178,7 @@ const ConfigParserSchema = z.object({
  * @example
  * ```typescript
  * const config = loadConfig();
- * console.log(config.defaultPlatform); // 'github'
+ * console.log(config.defaultPlatform); // 'azure'
  * ```
  */
 export function loadConfig(

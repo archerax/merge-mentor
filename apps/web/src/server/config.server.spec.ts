@@ -118,7 +118,7 @@ describe("config.server", () => {
       expect(result.errors.map((error) => error.message)).toEqual([
         "Must be a positive whole number.",
         "Must be true or false.",
-        "Must be one of: github, azure.",
+        "Must be one of: azure, github.",
       ]);
     });
 

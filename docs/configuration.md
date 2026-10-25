@@ -22,6 +22,8 @@ Merge Mentor can be configured using environment variables, command-line paramet
 
 All environment variables use the `MM_` prefix to avoid conflicts with other applications.
 
+The default platform is Azure DevOps. Set `MM_PLATFORM=github` (or pass `--platform github`) to default to GitHub instead.
+
 ### GitHub Platform Configuration
 
 ```bash
