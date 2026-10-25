@@ -46,4 +46,26 @@ describe("CONFIG_SECTIONS", () => {
     );
     expect(new Set(envVars).size).toBe(envVars.length);
   });
+
+  it("keeps the settings needed to run a review out of the advanced group", () => {
+    const required = [
+      "MM_PLATFORM",
+      "MM_GITHUB_TOKEN",
+      "MM_AZURE_TOKEN",
+      "MM_AI_PROVIDER",
+      "MM_AI_MODEL",
+      "MM_COPILOT_TOKEN",
+      "MM_REVIEW_STRATEGY",
+    ];
+    const fields = CONFIG_SECTIONS.flatMap((section) => section.fields);
+    for (const envVar of required) {
+      expect(fields.find((field) => field.envVar === envVar)?.advanced).toBeFalsy();
+    }
+  });
+
+  it("leaves every section with at least one basic setting", () => {
+    for (const section of CONFIG_SECTIONS) {
+      expect(section.fields.some((field) => !field.advanced)).toBe(true);
+    }
+  });
 });

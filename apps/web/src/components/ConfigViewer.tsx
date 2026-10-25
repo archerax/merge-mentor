@@ -15,7 +15,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { saveConfig } from "../server/config.functions.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
@@ -26,6 +26,8 @@ interface ConfigViewerProps {
 
 type SaveStatus = "idle" | "saving" | "saved";
 
+const ADVANCED_STORAGE_KEY = "merge-mentor:config:show-advanced";
+
 export function ConfigViewer({ view }: ConfigViewerProps) {
   const router = useRouter();
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -33,6 +35,46 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    try {
+      setShowAdvanced(window.localStorage.getItem(ADVANCED_STORAGE_KEY) === "true");
+    } catch {
+      // Storage can be unavailable (private mode, blocked site data); default to hidden.
+    }
+  }, []);
+
+  function toggleAdvanced(next: boolean) {
+    setShowAdvanced(next);
+    try {
+      window.localStorage.setItem(ADVANCED_STORAGE_KEY, String(next));
+    } catch {
+      // The preference simply won't persist.
+    }
+  }
+
+  /** Advanced settings stay visible once they hold a value, an edit, or an error. */
+  function isVisible(field: ConfigFieldView): boolean {
+    return (
+      !field.advanced ||
+      showAdvanced ||
+      field.set ||
+      draft[field.envVar] !== undefined ||
+      cleared.includes(field.envVar) ||
+      errors.some((item) => item.envVar === field.envVar)
+    );
+  }
+
+  const sections = view.sections
+    .map((section) => ({ ...section, fields: section.fields.filter(isVisible) }))
+    .filter((section) => section.fields.length > 0);
+  const hiddenCount = view.sections
+    .flatMap((section) => section.fields)
+    .filter((field) => !isVisible(field)).length;
+  const currentTab = sections.some((section) => section.title === activeTab)
+    ? activeTab
+    : (sections[0]?.title ?? null);
 
   const labels = new Map(
     view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
@@ -129,9 +171,22 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
+      <Group justify="space-between">
+        <Text size="sm" c="dimmed">
+          {hiddenCount > 0
+            ? `${hiddenCount} advanced ${hiddenCount === 1 ? "setting is" : "settings are"} hidden.`
+            : "\u00A0"}
+        </Text>
+        <Switch
+          label="Show advanced settings"
+          checked={showAdvanced}
+          onChange={(event) => toggleAdvanced(event.currentTarget.checked)}
+        />
+      </Group>
+
+      <Tabs value={currentTab} onChange={setActiveTab} keepMounted={false}>
         <Tabs.List>
-          {view.sections.map((section) => {
+          {sections.map((section) => {
             const hasError = section.fields.some((field) =>
               errors.some((item) => item.envVar === field.envVar)
             );
@@ -159,7 +214,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
           })}
         </Tabs.List>
 
-        {view.sections.map((section) => (
+        {sections.map((section) => (
           <Tabs.Panel key={section.title} value={section.title} pt="md">
             <Stack gap="md">
               <Text c="dimmed" size="sm">

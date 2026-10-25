@@ -10,6 +10,8 @@ export interface ConfigFieldDefinition {
   readonly type: ConfigFieldType;
   /** Allowed values when {@link type} is `enum`. */
   readonly options?: readonly string[];
+  /** Tuning setting that most users can leave alone; hidden until advanced settings are shown. */
+  readonly advanced?: boolean;
   /** Plain-language explanation of what the setting does, shown beneath the label. */
   readonly description: string;
   /** Optional fallback or resolution note shown beneath the description. */
@@ -106,6 +108,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_AI_TIMEOUT",
+        advanced: true,
         label: "Request timeout",
         type: "number",
         note: "Milliseconds (default 3600000, i.e. 1 hour)",
@@ -120,6 +123,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_AI_BASE_URL",
+        advanced: true,
         label: "Custom endpoint URL (bring your own key)",
         type: "text",
         description:
@@ -127,6 +131,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_AI_API_KEY",
+        advanced: true,
         label: "Custom endpoint API key (bring your own key)",
         type: "secret",
         description: "Optional. The key for the custom endpoint above.",
@@ -147,6 +152,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_REVIEW_PASSES",
+        advanced: true,
         label: "Review passes",
         type: "text",
         note: "Comma-separated; requires the multi-agent strategy",
@@ -154,6 +160,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_MULTI_AGENT_MAX_PARALLEL",
+        advanced: true,
         label: "Parallel passes",
         type: "number",
         note: "Default 4",
@@ -162,6 +169,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_REVIEW_RUNS",
+        advanced: true,
         label: "Repeat each review",
         type: "number",
         note: "Default 1",
@@ -179,10 +187,11 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
   },
   {
     title: "Behavior & Runtime",
-    description: "Advanced tuning for how reviews run on this machine.",
+    description: "Where files are stored and how reviews run on this machine.",
     fields: [
       {
         envVar: "MM_REASONING",
+        advanced: true,
         label: "Reasoning effort",
         type: "enum",
         options: ["low", "medium", "high", "xhigh"],
@@ -190,6 +199,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_LONG_CONTEXT",
+        advanced: true,
         label: "Long context",
         type: "boolean",
         description:
@@ -197,12 +207,14 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_STREAMING_ENABLED",
+        advanced: true,
         label: "Show live output",
         type: "boolean",
         description: "Display the AI's output as it is produced, when the provider supports it.",
       },
       {
         envVar: "MM_STREAMING_LINES",
+        advanced: true,
         label: "Live output lines",
         type: "number",
         note: "Default 9",
@@ -210,6 +222,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_GIT_BACKEND",
+        advanced: true,
         label: "Git backend",
         type: "enum",
         options: ["cli", "isomorphic"],
@@ -225,6 +238,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       },
       {
         envVar: "MM_EXPERIMENTAL_TOOLS",
+        advanced: true,
         label: "Experimental tools",
         type: "boolean",
         description:

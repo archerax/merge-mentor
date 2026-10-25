@@ -21,6 +21,8 @@ export interface ConfigFieldView {
   readonly secret: boolean;
   /** Whether the underlying environment variable was explicitly provided. */
   readonly set: boolean;
+  /** Whether this is a tuning setting hidden until advanced settings are shown. */
+  readonly advanced: boolean;
   /** Plain-language explanation of what the setting does. */
   readonly description: string;
   /** Optional fallback or resolution note shown beneath the description. */
