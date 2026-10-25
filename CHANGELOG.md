@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edited fields are marked "Modified",
   switches read Enabled/Disabled, settings are grouped into tabs (marked when they hold unsaved or invalid
   values), tuning settings are hidden behind a "Show advanced settings" switch
-  (settings that already have a value stay visible), and the save bar stays visible with an unsaved
+  (settings already configured in your environment stay visible), and the save bar stays visible with an unsaved
   change count. Several cryptic labels were renamed (for example "BYOK base URL"
   is now "Custom endpoint URL (bring your own key)").
 

@@ -20,9 +20,9 @@ function ConfigPage() {
         description={
           <>
             Settings that control how Merge Mentor connects to your repository and AI provider and
-            how it runs reviews. Anything you leave empty uses its built-in default. Changes are
-            saved to the project <Code>.env</Code> file; tokens and keys are never displayed, so
-            type a new value to replace one.
+            how it runs reviews. Empty settings use their built-in default. Changes are saved to the
+            project <Code>.env</Code> file; tokens and keys are never displayed, so leave them empty
+            to keep the current value, or type a new one to replace it.
           </>
         }
       />

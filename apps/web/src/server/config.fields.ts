@@ -251,7 +251,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
         label: "Experimental tools",
         type: "boolean",
         description:
-          "Try structured output through Copilot tool calls. May be unstable; leave off unless you need it.",
+          "Try structured output through provider tool calls. May be unstable; leave off unless you need it.",
       },
     ],
   },

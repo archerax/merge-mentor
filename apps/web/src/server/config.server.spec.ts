@@ -65,6 +65,11 @@ describe("config.server", () => {
       expect(owner).toMatchObject({ secret: false, value: "acme", set: true });
 
       expect(findField(view, "MM_AI_PROVIDER")?.value).toBe("opencode-sdk");
+
+      expect(findField(view, "MM_AZURE_TOKEN")?.platform).toBe("azure");
+      expect(findField(view, "MM_AI_TIMEOUT")?.advanced).toBe(true);
+      expect(findField(view, "MM_AI_PROVIDER")?.advanced).toBe(false);
+      expect(findField(view, "MM_AI_PROVIDER")?.description.length).toBeGreaterThan(0);
     });
 
     it("collects a warning when required configuration is missing", () => {
@@ -82,7 +87,7 @@ describe("config.server", () => {
 
       expect(view.error).toBeNull();
       expect(view.warnings).toHaveLength(1);
-      expect(view.warnings[0]).toContain("MM_GITHUB_TOKEN");
+      expect(view.warnings[0]).toBe("GitHub token: Required for GitHub platform.");
     });
   });
 
