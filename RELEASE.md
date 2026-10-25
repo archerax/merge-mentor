@@ -10,7 +10,7 @@ merge-mentor follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 - **MINOR** (e.g., 1.28.0) - New features added in a backward-compatible manner
 - **PATCH** (e.g., 1.27.1) - Bug fixes and non-functional improvements
 
-Current version can be found in `package.json`.
+Current version can be found in `package.json`. Every workspace package carries the same version.
 
 ## Release Checklist
 
@@ -77,30 +77,26 @@ This runs:
 
 ### Step 4: Bump Version
 
-Use `pnpm version` to automatically:
-
-- Update `package.json` version
-- Create a git tag (e.g., `v1.28.0`)
-- Create a version commit
+All workspace packages (the root, `apps/*` and `libs/*`) share one version, and
+`pnpm version` only updates the root `package.json`. Set the version in every
+package, then commit and tag by hand:
 
 ```bash
-# For minor version bump (features)
-pnpm version minor
+VERSION=X.Y.Z   # e.g. 4.2.0
 
-# For patch version bump (bug fixes)
-pnpm version patch
+# Root plus every workspace package
+npm pkg set version=$VERSION
+pnpm -r exec npm pkg set version=$VERSION
 
-# For major version bump (breaking changes)
-pnpm version major
+# Confirm nothing was missed (every line should show the new version)
+grep -H '"version"' package.json apps/*/package.json libs/*/package.json
+
+git add package.json apps/*/package.json libs/*/package.json
+git commit -m "chore: bump version to $VERSION"
+git tag -a v$VERSION -m "v$VERSION"
 ```
 
-This command:
-
-1. Updates `package.json` version field
-2. Creates a commit with message "X.Y.Z"
-3. Creates an annotated git tag `vX.Y.Z`
-
-**Note:** This will run `pnpm check` as a pre-version hook.
+There is no pre-version hook, so run `pnpm check` (Step 3) yourself first.
 
 ### Step 5: Push to Repository
 
@@ -158,9 +154,11 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 # 4. Verify everything works
 pnpm check
 
-# 5. Bump version (choose one)
-pnpm version minor    # For features (1.27.0 → 1.28.0)
-pnpm version patch    # For fixes (1.27.0 → 1.27.1)
+# 5. Bump version in every package, commit and tag (see Step 4)
+VERSION=X.Y.Z
+npm pkg set version=$VERSION && pnpm -r exec npm pkg set version=$VERSION
+git commit -am "chore: bump version to $VERSION"
+git tag -a v$VERSION -m "v$VERSION"
 
 # 6. Push to origin
 git push origin vX.Y.Z --no-verify
