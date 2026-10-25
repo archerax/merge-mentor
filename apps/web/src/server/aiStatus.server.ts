@@ -49,6 +49,8 @@ async function resolveStatus(): Promise<AiStatus> {
       host: identity.host,
       authType: identity.authType,
       usesConfiguredToken: token !== undefined,
+      copilotPlan: identity.copilotPlan,
+      organizations: identity.organizations,
     };
   } catch (error) {
     return { kind: "copilot-error", message: (error as Error).message };

@@ -205,6 +205,49 @@ export interface CopilotAuthIdentity {
   readonly login?: string;
   /** Human-readable status message from the SDK. */
   readonly statusMessage?: string;
+  /** Copilot plan of the account (e.g. `individual`, `business`), when known. */
+  readonly copilotPlan?: string;
+  /** Organizations the Copilot seat may be provided through, when known. */
+  readonly organizations?: readonly string[];
+}
+
+/** Subset of `account.getCurrentAuth` used to identify the user; may carry a credential. */
+interface CurrentAuthInfo {
+  readonly host?: string;
+  readonly login?: string;
+  readonly token?: string;
+  readonly copilotUser?: {
+    readonly login?: string;
+    readonly copilot_plan?: string;
+    readonly organization_login_list?: string[];
+  };
+}
+
+/**
+ * Resolves the login a token belongs to via the GitHub API on the token's own host.
+ * The token is sent only to that host and is never returned.
+ */
+async function lookupLoginForToken(host: string, token: string): Promise<string | undefined> {
+  if (!URL.canParse(host)) return undefined;
+  const { protocol, origin, hostname } = new URL(host);
+  if (protocol !== "https:") return undefined;
+  const apiUrl =
+    hostname === "github.com" ? "https://api.github.com/user" : `${origin}/api/v3/user`;
+  try {
+    const response = await fetch(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "merge-mentor",
+      },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { login?: unknown };
+    return typeof body.login === "string" && body.login.length > 0 ? body.login : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -229,12 +272,31 @@ export async function getCopilotAuthIdentity(options?: {
   });
   try {
     const status = await Promise.race([client.start().then(() => client.getAuthStatus()), timeout]);
+    // `auth.getStatus` often omits the login (token / env credentials), so ask
+    // for the full current auth, which also carries the Copilot plan and orgs.
+    let current: CurrentAuthInfo | undefined;
+    if (status.isAuthenticated) {
+      try {
+        current = (await Promise.race([client.rpc.account.getCurrentAuth(), timeout])).authInfo as
+          | CurrentAuthInfo
+          | undefined;
+      } catch {
+        // Experimental RPC; fall back to what getAuthStatus reported.
+      }
+    }
+    const host = status.host ?? current?.host;
+    let login = status.login ?? current?.login ?? current?.copilotUser?.login;
+    if (!login && status.isAuthenticated && host && current?.token) {
+      login = await lookupLoginForToken(host, current.token);
+    }
     return {
       isAuthenticated: status.isAuthenticated,
       authType: status.authType,
-      host: status.host,
-      login: status.login,
+      host,
+      login,
       statusMessage: status.statusMessage,
+      copilotPlan: current?.copilotUser?.copilot_plan,
+      organizations: current?.copilotUser?.organization_login_list,
     };
   } finally {
     clearTimeout(timer);

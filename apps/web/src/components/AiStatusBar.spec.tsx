@@ -23,6 +23,23 @@ describe("describeAiStatus", () => {
     expect(display.color).toBe("green");
   });
 
+  it("includes plan and organizations so personal and company seats are distinguishable", () => {
+    const display = describeAiStatus({
+      kind: "copilot",
+      login: "me",
+      usesConfiguredToken: false,
+      copilotPlan: "business",
+      organizations: ["acme", "widgets"],
+    });
+    expect(display.label).toBe("Copilot: me (business)");
+    expect(display.detail).toContain("Organizations: acme, widgets.");
+  });
+
+  it("says plainly when the user could not be identified", () => {
+    const display = describeAiStatus({ kind: "copilot", usesConfiguredToken: false });
+    expect(display.label).toContain("user unknown");
+  });
+
   it("attributes the identity to MM_COPILOT_TOKEN when configured", () => {
     const display = describeAiStatus({ kind: "copilot", login: "me", usesConfiguredToken: true });
     expect(display.detail).toContain("MM_COPILOT_TOKEN");

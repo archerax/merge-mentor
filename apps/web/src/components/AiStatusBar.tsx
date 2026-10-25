@@ -32,9 +32,15 @@ export function describeAiStatus(status: AiStatus): AiStatusDisplay {
           ? (AUTH_TYPE_LABELS[status.authType] ?? status.authType)
           : "local credentials";
       const host = status.host ? ` on ${status.host}` : "";
+      const plan = status.copilotPlan ? ` Plan: ${status.copilotPlan}.` : "";
+      const orgs = status.organizations?.length
+        ? ` Organizations: ${status.organizations.join(", ")}.`
+        : "";
       return {
-        label: status.login ? `Copilot: ${status.login}` : "Copilot: signed in",
-        detail: `Requests run as ${status.login ?? "the signed-in Copilot user"}${host} via ${source}.`,
+        label: status.login
+          ? `Copilot: ${status.login}${status.copilotPlan ? ` (${status.copilotPlan})` : ""}`
+          : "Copilot: signed in (user unknown)",
+        detail: `Requests run as ${status.login ?? "an unidentified Copilot user"}${host} via ${source}.${plan}${orgs}`,
         color: "green",
         icon: "user",
       };

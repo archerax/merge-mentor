@@ -2319,6 +2319,73 @@ describe("getCopilotAuthIdentity", () => {
     expect(mockClient.stop).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to getCurrentAuth for login, plan and organizations", async () => {
+    mockClient.getAuthStatus.mockResolvedValueOnce({ isAuthenticated: true, authType: "env" });
+    (mockClient as Record<string, unknown>).rpc = {
+      account: {
+        getCurrentAuth: vi.fn().mockResolvedValue({
+          authInfo: {
+            host: "https://github.com",
+            login: "work-user",
+            copilotUser: { copilot_plan: "business", organization_login_list: ["acme"] },
+          },
+        }),
+      },
+    };
+    const identity = await getCopilotAuthIdentity();
+    expect(identity).toMatchObject({
+      login: "work-user",
+      host: "https://github.com",
+      copilotPlan: "business",
+      organizations: ["acme"],
+    });
+  });
+
+  it("looks the login up from the token's host when the SDK has none", async () => {
+    mockClient.getAuthStatus.mockResolvedValueOnce({ isAuthenticated: true, authType: "token" });
+    (mockClient as Record<string, unknown>).rpc = {
+      account: {
+        getCurrentAuth: vi.fn().mockResolvedValue({
+          authInfo: { host: "https://github.com", token: "ghp_secret" },
+        }),
+      },
+    };
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ login: "octocat" })));
+    try {
+      const identity = await getCopilotAuthIdentity();
+      expect(identity.login).toBe("octocat");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.github.com/user",
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: "Bearer ghp_secret" }),
+        })
+      );
+      expect(JSON.stringify(identity)).not.toContain("ghp_secret");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("never sends the token over a non-https host", async () => {
+    mockClient.getAuthStatus.mockResolvedValueOnce({ isAuthenticated: true });
+    (mockClient as Record<string, unknown>).rpc = {
+      account: {
+        getCurrentAuth: vi
+          .fn()
+          .mockResolvedValue({ authInfo: { host: "http://ghe.local", token: "t" } }),
+      },
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      expect((await getCopilotAuthIdentity()).login).toBeUndefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("stops the client and rejects when the SDK fails", async () => {
     mockClient.start.mockRejectedValueOnce(new Error("Client not connected"));
     await expect(getCopilotAuthIdentity()).rejects.toThrow("Client not connected");

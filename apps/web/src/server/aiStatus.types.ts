@@ -12,6 +12,10 @@ export type AiStatus =
       readonly authType?: string;
       /** Whether an explicit `MM_COPILOT_TOKEN` is configured. */
       readonly usesConfiguredToken: boolean;
+      /** Copilot plan (e.g. `individual`, `business`), when known. */
+      readonly copilotPlan?: string;
+      /** Organizations the seat may come through, when known. */
+      readonly organizations?: readonly string[];
     }
   | { readonly kind: "copilot-unauthenticated"; readonly message: string }
   | { readonly kind: "copilot-error"; readonly message: string }
