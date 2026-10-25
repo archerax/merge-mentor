@@ -121,7 +121,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
       {
         envVar: "MM_AI_BASE_URL",
         label: "Custom endpoint URL (bring your own key)",
-        type: "secret",
+        type: "text",
         description:
           "Optional. Point reviews at your own OpenAI-compatible endpoint, such as Azure OpenAI or a local Ollama server. Copilot SDK only; use together with the API key below.",
       },
