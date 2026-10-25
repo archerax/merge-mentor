@@ -33,6 +33,18 @@ describe("Config", () => {
       expect(config.reviewStrategy).toBe("fast");
     });
 
+    it("should default MM_PLATFORM to azure for unrecognized values", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: "gitlab" });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("azure");
+    });
+
+    it("should honor MM_PLATFORM=github", () => {
+      const env = createStubEnvironment({ MM_PLATFORM: "github" });
+
+      expect(loadConfig(undefined, env).defaultPlatform).toBe("github");
+    });
+
     it("should load values from environment variables", () => {
       const env = createStubEnvironment({
         MM_PLATFORM: "azure",
