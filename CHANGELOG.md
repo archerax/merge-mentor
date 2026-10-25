@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-10-25
+
+Shows which account AI requests will run under, so company data is not sent
+through a personal Copilot subscription by mistake.
+
+### Added
+
+- **Web UI AI account status bar**: a footer on every page shows the identity
+  AI requests run as. For GitHub Copilot it shows the signed-in login, the
+  Copilot plan (for example `individual` or `business`) and, in the tooltip, the
+  host, how you authenticated and the organizations the seat comes through.
+  When a custom endpoint is configured (`MM_AI_BASE_URL`) it shows a distinct
+  orange **BYOK** badge with the endpoint instead, and other providers
+  (such as `opencode-sdk`) are labelled as not using Copilot. A refresh button
+  re-checks the account. Tokens and API keys never reach the browser, and
+  credentials or query strings in the endpoint URL are stripped.
+- The login for token and environment credentials (`MM_COPILOT_TOKEN`,
+  `GH_TOKEN`), which the Copilot SDK's auth status leaves out, is resolved from
+  the SDK's current-auth details or, failing that, from the GitHub API on the
+  token's own HTTPS host. If it cannot be determined the bar says
+  "user unknown" rather than just "signed in".
+
 ## [4.2.0] - 2026-10-25
 
 ### Changed
