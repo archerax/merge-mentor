@@ -51,7 +51,12 @@ describe("CONFIG_SECTIONS", () => {
     const required = [
       "MM_PLATFORM",
       "MM_GITHUB_TOKEN",
+      "MM_GITHUB_REPO_OWNER",
+      "MM_GITHUB_REPO_NAME",
       "MM_AZURE_TOKEN",
+      "MM_AZURE_ORG",
+      "MM_AZURE_PROJECT",
+      "MM_AZURE_REPO",
       "MM_AI_PROVIDER",
       "MM_AI_MODEL",
       "MM_COPILOT_TOKEN",

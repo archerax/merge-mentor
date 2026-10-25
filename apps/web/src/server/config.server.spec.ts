@@ -91,6 +91,65 @@ describe("config.server", () => {
     });
   });
 
+  describe("warnings", () => {
+    const requiredByPlatform = [
+      {
+        platform: "github",
+        name: "GitHub",
+        fields: {
+          MM_GITHUB_TOKEN: "GitHub token",
+          MM_GITHUB_REPO_OWNER: "GitHub repository owner",
+          MM_GITHUB_REPO_NAME: "GitHub repository name",
+        },
+      },
+      {
+        platform: "azure",
+        name: "Azure DevOps",
+        fields: {
+          MM_AZURE_TOKEN: "Azure DevOps token",
+          MM_AZURE_ORG: "Azure DevOps organization",
+          MM_AZURE_PROJECT: "Azure DevOps project",
+          MM_AZURE_REPO: "Azure DevOps repository",
+        },
+      },
+    ] as const;
+
+    for (const { platform, name, fields } of requiredByPlatform) {
+      for (const [missing, label] of Object.entries(fields)) {
+        it(`names ${missing} by its label when it is missing on ${platform}`, () => {
+          const lines = [`MM_PLATFORM=${platform}`];
+          for (const envVar of Object.keys(fields)) {
+            lines.push(`${envVar}=${envVar === missing ? "" : "value"}`);
+          }
+          writeEnv(lines.join("\n") + "\n");
+
+          const { warnings } = buildConfigView();
+
+          expect(warnings).toEqual([`${label}: Required for ${name} platform.`]);
+        });
+      }
+    }
+
+    it("names a malformed Copilot token by its label", () => {
+      writeEnv(
+        [
+          "MM_PLATFORM=github",
+          "MM_GITHUB_TOKEN=value",
+          "MM_GITHUB_REPO_OWNER=value",
+          "MM_GITHUB_REPO_NAME=value",
+          "MM_COPILOT_TOKEN=not-a-pat",
+          "",
+        ].join("\n")
+      );
+
+      const { warnings } = buildConfigView();
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/^Copilot token: /);
+      expect(warnings[0]).not.toMatch(/MM_|--/);
+    });
+  });
+
   describe("applyConfigEdits", () => {
     beforeEach(() => {
       writeEnv(

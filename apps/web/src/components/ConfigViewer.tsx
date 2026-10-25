@@ -86,6 +86,11 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     ? activeTab
     : (sections[0]?.title ?? null);
 
+  // Keep state in step with the displayed tab when the active one is filtered out.
+  useEffect(() => {
+    if (currentTab !== activeTab) setActiveTab(currentTab);
+  }, [currentTab, activeTab]);
+
   const labels = new Map(
     view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
   );
