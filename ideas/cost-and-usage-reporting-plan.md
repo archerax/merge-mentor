@@ -28,6 +28,7 @@ should record usage per run and report it in the CLI and the web dashboard.
 | Scope | Per project: reports under `<tempPath>/reports` (default `./.mergementor`) |
 | CI / ephemeral runners | Out of scope for v1 |
 | Recorded fields | tokens in/out, cached, reasoning, model, provider, PR identity (repo, number, title, from the report); per-phase/specialist breakdown is a follow-up |
+| Review types | PR reviews only in v1 |
 | Opt-out | None; usage is written with the report (local-only) |
 | Retention | Same as reports (whatever cleans reports removes usage) |
 | Dashboard | Runs on the same machine as the CLI; reads the same reports directory |
@@ -77,6 +78,7 @@ should record usage per run and report it in the CLI and the web dashboard.
 
 ## Future
 
+- Usage for PBI, project, and PRD reviews (PRD already has JSON reports).
 - Per-phase/specialist usage breakdown (tag at `onTokenUsage` call sites; could
   source from audit log events).
 - `stats --usage --json`; cross-project aggregation; configurable reports path for stats.
