@@ -3,12 +3,15 @@ import { Readable } from "node:stream";
 import type { Config } from "@merge-mentor/config/config.js";
 import type {
   ExistingComment,
+  ListPullRequestsOptions,
   FileStatus,
   PBIComment,
   PBIDetails,
   PlatformAdapter,
   PRDetails,
   PRFile,
+  PullRequestLister,
+  PullRequestSummary,
   ProjectDependency,
   ProjectDetails,
   ProjectWorkItem,
@@ -48,6 +51,15 @@ const AzureThreadStatus = {
   PENDING: 6,
 } as const;
 
+/** Azure DevOps pull request status values used in search criteria and results. */
+const AzurePullRequestStatus = {
+  ACTIVE: 1,
+  ALL: 4,
+} as const;
+
+/** Azure DevOps pull request time range: filter by creation date. */
+const AZURE_TIME_RANGE_CREATED = 1;
+
 /** Azure DevOps comment type values. */
 const AzureCommentType = {
   TEXT: 1,
@@ -56,7 +68,7 @@ const AzureCommentType = {
 /**
  * Platform adapter for Azure DevOps pull requests.
  */
-export class AzureDevOpsAdapter implements PlatformAdapter {
+export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
   private readonly connection: azdev.WebApi;
   private readonly project: string;
   private readonly repoName: string;
@@ -702,6 +714,52 @@ export class AzureDevOpsAdapter implements PlatformAdapter {
       );
       throw error;
     }
+  }
+
+  /**
+   * Lists pull requests (active, completed, and abandoned), newest first.
+   *
+   * Azure DevOps can only filter by creation or closing time, so `since` bounds
+   * the PR creation date rather than its last update.
+   * @param options - Lower bound on creation time and maximum number of PRs
+   * @returns PR summaries
+   */
+  async listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]> {
+    if (options.limit <= 0) return [];
+
+    const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+    const pulls = await withRateLimitHandling(() =>
+      gitApi.getPullRequests(
+        this.repoName,
+        {
+          status: AzurePullRequestStatus.ALL,
+          ...(options.since
+            ? { minTime: options.since, queryTimeRangeType: AZURE_TIME_RANGE_CREATED }
+            : {}),
+        },
+        this.project,
+        undefined,
+        0,
+        options.limit
+      )
+    );
+
+    return (pulls || []).flatMap((pr) =>
+      pr.pullRequestId === undefined
+        ? []
+        : [
+            {
+              number: pr.pullRequestId,
+              title: pr.title ?? "",
+              state:
+                pr.status === AzurePullRequestStatus.ACTIVE
+                  ? ("open" as const)
+                  : ("closed" as const),
+              // Azure has no update time, so this is the creation date (see PullRequestSummary).
+              updatedAt: (pr.creationDate ?? new Date(0)).toISOString(),
+            },
+          ]
+    );
   }
 
   /**

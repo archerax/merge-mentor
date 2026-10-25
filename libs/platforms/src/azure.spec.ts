@@ -27,6 +27,7 @@ const mockGitApiInstance = {
   getPullRequestIterationChanges: vi.fn(),
   getFileDiffs: vi.fn(),
   getThreads: vi.fn(),
+  getPullRequests: vi.fn(),
   createThread: vi.fn(),
   updateThread: vi.fn(),
   createComment: vi.fn(),
@@ -658,6 +659,69 @@ describe("AzureDevOpsAdapter", () => {
       // Should have made 2 pagination calls (first page + second empty page)
       const paginationCalls = mockFetch.mock.calls.filter((call) => call[0].includes("/changes?"));
       expect(paginationCalls).toHaveLength(2);
+    });
+  });
+
+  describe("listPullRequests", () => {
+    it("lists PRs of every status and maps state", async () => {
+      mockGitApiInstance.getPullRequests.mockResolvedValue([
+        { pullRequestId: 5, title: "Active one", status: 1, creationDate: new Date("2026-03-05") },
+        {
+          pullRequestId: 4,
+          title: "Done",
+          status: 3,
+          creationDate: new Date("2026-03-01"),
+          closedDate: new Date("2026-03-04"),
+        },
+        { title: "No id", status: 1 },
+      ]);
+
+      const result = await new AzureDevOpsAdapter(createTestConfig()).listPullRequests({
+        since: new Date("2026-02-01"),
+        limit: 50,
+      });
+
+      expect(result).toEqual([
+        {
+          number: 5,
+          title: "Active one",
+          state: "open",
+          updatedAt: new Date("2026-03-05").toISOString(),
+        },
+        {
+          number: 4,
+          title: "Done",
+          state: "closed",
+          updatedAt: new Date("2026-03-01").toISOString(),
+        },
+      ]);
+      expect(mockGitApiInstance.getPullRequests).toHaveBeenCalledWith(
+        "test-repo",
+        { status: 4, minTime: new Date("2026-02-01"), queryTimeRangeType: 1 },
+        "test-project",
+        undefined,
+        0,
+        50
+      );
+    });
+
+    it("returns nothing for a non-positive limit without calling the API", async () => {
+      const result = await new AzureDevOpsAdapter(createTestConfig()).listPullRequests({
+        limit: 0,
+      });
+
+      expect(result).toEqual([]);
+      expect(mockGitApiInstance.getPullRequests).not.toHaveBeenCalled();
+    });
+
+    it("returns an empty list when the API returns nothing", async () => {
+      mockGitApiInstance.getPullRequests.mockResolvedValue(null);
+
+      const result = await new AzureDevOpsAdapter(createTestConfig()).listPullRequests({
+        limit: 10,
+      });
+
+      expect(result).toEqual([]);
     });
   });
 

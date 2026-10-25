@@ -1,11 +1,14 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import type {
   ExistingComment,
+  ListPullRequestsOptions,
   FileStatus,
   PBIDetails,
   PlatformAdapter,
   PRDetails,
   PRFile,
+  PullRequestLister,
+  PullRequestSummary,
   ProjectDetails,
   RepoInfo,
   UnresolvedComment,
@@ -32,7 +35,7 @@ const TRUSTED_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
 /**
  * Platform adapter for GitHub pull requests.
  */
-export class GitHubAdapter implements PlatformAdapter {
+export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
   private readonly octokit: Octokit;
   private readonly owner: string;
   private readonly repo: string;
@@ -276,6 +279,47 @@ export class GitHubAdapter implements PlatformAdapter {
         (error as Error).message
       );
       throw error;
+    }
+  }
+
+  /**
+   * Lists pull requests (open and closed), most recently updated first.
+   * @param options - Lower bound on last update and maximum number of PRs
+   * @returns PR summaries, stopping once PRs older than `since` are reached
+   */
+  async listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]> {
+    const sinceMs = options.since?.getTime();
+    const pulls: PullRequestSummary[] = [];
+    if (options.limit <= 0) return pulls;
+    // Offset paging over a mutable sort key can repeat a PR that was updated between requests.
+    const seen = new Set<number>();
+
+    for (let page = 1; ; page += 1) {
+      const { data } = await withRateLimitHandling(() =>
+        this.octokit.pulls.list({
+          owner: this.owner,
+          repo: this.repo,
+          state: "all",
+          sort: "updated",
+          direction: "desc",
+          per_page: DEFAULT_PAGE_SIZE,
+          page,
+        })
+      );
+
+      for (const pr of data) {
+        if (sinceMs !== undefined && Date.parse(pr.updated_at) < sinceMs) return pulls;
+        if (seen.has(pr.number)) continue;
+        seen.add(pr.number);
+        pulls.push({
+          number: pr.number,
+          title: pr.title,
+          state: pr.state === "open" ? "open" : "closed",
+          updatedAt: pr.updated_at,
+        });
+        if (pulls.length >= options.limit) return pulls;
+      }
+      if (data.length < DEFAULT_PAGE_SIZE) return pulls;
     }
   }
 

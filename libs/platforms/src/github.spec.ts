@@ -1,5 +1,6 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import { resolveReviewProfile } from "@merge-mentor/config/reviewSelection.js";
+import { DEFAULT_PAGE_SIZE } from "@merge-mentor/shared/constants.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GitHubAdapter } from "./github.js";
@@ -7,6 +8,7 @@ import { GitHubAdapter } from "./github.js";
 const mockOctokitInstance = {
   pulls: {
     get: vi.fn(),
+    list: vi.fn(),
     update: vi.fn(),
     listFiles: vi.fn(),
     listReviewComments: vi.fn(),
@@ -74,6 +76,18 @@ function createTestConfig(): Config {
     reviewRuns: 1,
   };
 }
+
+const pr = (number: number, state: "open" | "closed", updatedAt: string) => ({
+  number,
+  title: `PR ${number}`,
+  state,
+  updated_at: updatedAt,
+});
+
+const fullPage = (firstNumber: number) =>
+  Array.from({ length: DEFAULT_PAGE_SIZE }, (_, i) =>
+    pr(firstNumber - i, "open", "2026-03-01T00:00:00Z")
+  );
 
 describe("GitHubAdapter", () => {
   beforeEach(() => {
@@ -250,6 +264,86 @@ describe("GitHubAdapter", () => {
       const result = await adapter.getPRFiles(123);
 
       expect(result).toHaveLength(150);
+    });
+  });
+
+  describe("listPullRequests", () => {
+    const list = mockOctokitInstance.pulls.list;
+
+    it("lists open and closed PRs, newest activity first", async () => {
+      list.mockResolvedValueOnce({
+        data: [pr(2, "open", "2026-03-02T00:00:00Z"), pr(1, "closed", "2026-03-01T00:00:00Z")],
+      });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 10 });
+
+      expect(result).toEqual([
+        { number: 2, title: "PR 2", state: "open", updatedAt: "2026-03-02T00:00:00Z" },
+        { number: 1, title: "PR 1", state: "closed", updatedAt: "2026-03-01T00:00:00Z" },
+      ]);
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ state: "all", sort: "updated", direction: "desc", page: 1 })
+      );
+    });
+
+    it("accumulates PRs across pages", async () => {
+      list
+        .mockResolvedValueOnce({ data: fullPage(150) })
+        .mockResolvedValueOnce({ data: [pr(50, "closed", "2026-02-01T00:00:00Z")] });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 500 });
+
+      expect(result).toHaveLength(101);
+      expect(result.at(-1)?.number).toBe(50);
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+    });
+
+    it("stops at the first PR older than since without fetching more pages", async () => {
+      list.mockResolvedValueOnce({
+        data: [
+          pr(3, "open", "2026-03-03T00:00:00Z"),
+          pr(2, "open", "2026-02-01T00:00:00Z"),
+          pr(1, "open", "2026-01-01T00:00:00Z"),
+        ],
+      });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({
+        since: new Date("2026-02-01T00:00:00Z"),
+        limit: 10,
+      });
+
+      expect(result.map((p) => p.number)).toEqual([3, 2]);
+      expect(list).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops at the limit, including when it is reached on a later page", async () => {
+      list
+        .mockResolvedValueOnce({ data: fullPage(150) })
+        .mockResolvedValueOnce({ data: fullPage(50) });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 102 });
+
+      expect(result).toHaveLength(102);
+    });
+
+    it("skips a PR repeated across pages when it was updated between requests", async () => {
+      const first = fullPage(150);
+      list.mockResolvedValueOnce({ data: first }).mockResolvedValueOnce({
+        data: [first.at(-1), pr(50, "closed", "2026-02-01T00:00:00Z")],
+      });
+
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 500 });
+
+      expect(result).toHaveLength(DEFAULT_PAGE_SIZE + 1);
+      expect(new Set(result.map((p) => p.number)).size).toBe(result.length);
+    });
+
+    it("returns nothing for a non-positive limit", async () => {
+      const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 0 });
+
+      expect(result).toEqual([]);
+      expect(list).not.toHaveBeenCalled();
     });
   });
 
