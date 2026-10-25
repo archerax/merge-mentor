@@ -624,6 +624,47 @@ describe("CopilotSdkProvider", () => {
       });
     });
 
+    it("captures reasoning tokens and provider-reported cost from assistant.usage", async () => {
+      const provider = createProvider();
+      mockSuccessfulPrompt();
+
+      mockSession.on.mockImplementation((eventType: string, handler: (e: unknown) => void) => {
+        if (eventType === "assistant.usage") {
+          handler({
+            type: "assistant.usage",
+            data: {
+              inputTokens: 100,
+              outputTokens: 50,
+              reasoningTokens: 12,
+              model: "gpt-4.1",
+              copilotUsage: { totalNanoAiu: 2_500_000_000 },
+            },
+          });
+          handler({
+            type: "assistant.usage",
+            data: {
+              inputTokens: 10,
+              outputTokens: 5,
+              model: "gpt-4.1",
+              copilotUsage: { totalNanoAiu: 500_000_000 },
+            },
+          });
+        }
+        return () => {};
+      });
+
+      const resultPromise = provider.executePrompt("Review the following file test.ts");
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.tokenUsage).toMatchObject({
+        inputTokens: 110,
+        outputTokens: 55,
+        reasoningTokens: 12,
+        nanoAiu: 3_000_000_000,
+      });
+    });
+
     it("accumulates token usage across multiple assistant.usage events in one call", async () => {
       const provider = createProvider();
       mockSuccessfulPrompt();

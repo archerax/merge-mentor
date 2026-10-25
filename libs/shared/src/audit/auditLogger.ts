@@ -450,8 +450,10 @@ export class AuditLogger {
     tokenUsage?: {
       inputTokens: number;
       outputTokens: number;
+      reasoningTokens?: number;
       cachedTokens?: number;
       premiumRequests?: number;
+      nanoAiu?: number;
       model?: string;
       durationApiSeconds?: number;
       durationWallSeconds?: number;

@@ -689,7 +689,8 @@ export class OpenCodeSdkProvider implements AIProviderClient {
 
     return {
       inputTokens: tokens.input ?? 0,
-      outputTokens: (tokens.output ?? 0) + (tokens.reasoning ?? 0),
+      outputTokens: tokens.output ?? 0,
+      ...(tokens.reasoning !== undefined ? { reasoningTokens: tokens.reasoning } : {}),
       ...(tokens.cache
         ? { cachedTokens: (tokens.cache.read ?? 0) + (tokens.cache.write ?? 0) }
         : {}),

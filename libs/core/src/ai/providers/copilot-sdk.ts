@@ -553,11 +553,21 @@ export class CopilotSdkProvider implements AIProviderClient {
       });
 
       const unsubscribeUsage = session.on("assistant.usage", (event) => {
-        const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, model, duration } =
-          event.data;
+        const {
+          inputTokens,
+          outputTokens,
+          reasoningTokens,
+          cacheReadTokens,
+          cacheWriteTokens,
+          model,
+          duration,
+          copilotUsage,
+        } = event.data;
         const usageEvent: TokenUsage = {
           inputTokens: inputTokens ?? 0,
           outputTokens: outputTokens ?? 0,
+          ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+          ...(copilotUsage ? { nanoAiu: copilotUsage.totalNanoAiu } : {}),
           ...(cacheReadTokens !== undefined || cacheWriteTokens !== undefined
             ? { cachedTokens: (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0) }
             : {}),

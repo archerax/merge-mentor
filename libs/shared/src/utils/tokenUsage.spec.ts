@@ -29,6 +29,22 @@ describe("sumOptional", () => {
   });
 });
 
+describe("mergeTokenUsage reasoning and cost", () => {
+  it("sums reasoningTokens and nanoAiu when either side reports them", () => {
+    const a: TokenUsage = { inputTokens: 1, outputTokens: 1, reasoningTokens: 4, nanoAiu: 100 };
+    const b: TokenUsage = { inputTokens: 1, outputTokens: 1 };
+    expect(mergeTokenUsage(a, b)).toMatchObject({ reasoningTokens: 4, nanoAiu: 100 });
+    expect(mergeTokenUsage(a, a)).toMatchObject({ reasoningTokens: 8, nanoAiu: 200 });
+  });
+
+  it("leaves reasoningTokens and nanoAiu undefined when neither side reports them", () => {
+    const a: TokenUsage = { inputTokens: 1, outputTokens: 1 };
+    const merged = mergeTokenUsage(a, a);
+    expect(merged?.reasoningTokens).toBeUndefined();
+    expect(merged?.nanoAiu).toBeUndefined();
+  });
+});
+
 describe("mergeTokenUsage", () => {
   it("returns undefined when both inputs are undefined", () => {
     expect(mergeTokenUsage(undefined, undefined)).toBeUndefined();

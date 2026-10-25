@@ -316,7 +316,8 @@ describe("OpenCodeSdkProvider", () => {
 
       expect(result.tokenUsage).toEqual({
         inputTokens: 100,
-        outputTokens: 60,
+        outputTokens: 50,
+        reasoningTokens: 10,
         cachedTokens: 25,
         model: "openai/gpt-5",
         durationWallSeconds: 1.5,

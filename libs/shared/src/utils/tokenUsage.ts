@@ -12,8 +12,8 @@ export function sumOptional(a: number | undefined, b: number | undefined): numbe
  * Merges two TokenUsage objects by summing all numeric fields.
  *
  * - `inputTokens` and `outputTokens` are always summed.
- * - `cachedTokens`, `durationApiSeconds`, `durationWallSeconds`, and
- *   `premiumRequests` are summed when at least one side is defined.
+ * - `reasoningTokens`, `cachedTokens`, `durationApiSeconds`, `durationWallSeconds`,
+ *   `premiumRequests`, and `nanoAiu` are summed when at least one side is defined.
  * - `model` prefers the first non-undefined value, falling back to the second.
  *
  * @param a - First token usage (may be undefined)
@@ -31,11 +31,13 @@ export function mergeTokenUsage(
   return {
     inputTokens: a.inputTokens + b.inputTokens,
     outputTokens: a.outputTokens + b.outputTokens,
+    reasoningTokens: sumOptional(a.reasoningTokens, b.reasoningTokens),
     cachedTokens: sumOptional(a.cachedTokens, b.cachedTokens),
     durationApiSeconds: sumOptional(a.durationApiSeconds, b.durationApiSeconds),
     durationWallSeconds: sumOptional(a.durationWallSeconds, b.durationWallSeconds),
     model: a.model ?? b.model,
     premiumRequests: sumOptional(a.premiumRequests, b.premiumRequests),
+    nanoAiu: sumOptional(a.nanoAiu, b.nanoAiu),
   };
 }
 
@@ -52,10 +54,13 @@ export function formatTokenUsage(usage: TokenUsage): string[] {
 
   lines.push(`Input tokens:   ${formatNumber(usage.inputTokens)}`);
   lines.push(`Output tokens:  ${formatNumber(usage.outputTokens)}`);
+  if (usage.reasoningTokens !== undefined) {
+    lines.push(`Reasoning:       ${formatNumber(usage.reasoningTokens)}`);
+  }
   if (usage.cachedTokens !== undefined) {
     lines.push(`Cached tokens:  ${formatNumber(usage.cachedTokens)}`);
   }
-  const total = usage.inputTokens + usage.outputTokens;
+  const total = usage.inputTokens + usage.outputTokens + (usage.reasoningTokens ?? 0);
   lines.push(`Total tokens:   ${formatNumber(total)}`);
   if (usage.model) {
     lines.push(`Model:          ${usage.model}`);
