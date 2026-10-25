@@ -215,14 +215,20 @@ describe("usePostComments", () => {
     await waitFor(() => expect(result.current.rowError("a")).toBe("kaput"));
   });
 
-  it("does nothing without a target or without selected comments", () => {
-    const withoutTarget = renderHook(() => usePostComments("pr", null, [a]));
-    act(() => withoutTarget.result.current.postOne(a));
-    act(() => withoutTarget.result.current.postSelected());
+  it("does not post without a target", () => {
+    const { result } = renderHook(() => usePostComments("pr", null, [a]));
 
-    const nothingSelected = renderHook(() => usePostComments("pr", target, [a]));
-    act(() => nothingSelected.result.current.clearSelection());
-    act(() => nothingSelected.result.current.postSelected());
+    act(() => result.current.postOne(a));
+    act(() => result.current.postSelected());
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not post a batch when nothing is selected", () => {
+    const { result } = renderHook(() => usePostComments("pr", target, [a]));
+
+    act(() => result.current.clearSelection());
+    act(() => result.current.postSelected());
 
     expect(fetchMock).not.toHaveBeenCalled();
   });

@@ -101,7 +101,7 @@ describe("AuditLogTable", () => {
     await user.click(screen.getByText("Error"));
     await user.type(screen.getByPlaceholderText("Search events..."), "bob");
 
-    expect(screen.queryAllByRole("row").length).toBe(1);
+    expect(screen.queryAllByRole("row")).toHaveLength(1);
     expect(screen.getByText("No events match the current filters.")).toBeInTheDocument();
   });
 

@@ -85,9 +85,9 @@ describe("PostCommentsAction interactions", () => {
     expect(selectAll).toBeDisabled();
 
     await user.click(clear);
-    expect(screen.getAllByRole("checkbox").every((box) => !(box as HTMLInputElement).checked)).toBe(
-      true
-    );
+    const [first, second] = screen.getAllByRole("checkbox");
+    expect(first).not.toBeChecked();
+    expect(second).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Post 0 comments" })).toBeDisabled();
 
     await user.click(selectAll);

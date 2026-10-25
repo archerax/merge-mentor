@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigFieldView, ConfigSaveResult, ConfigView } from "../server/config.types.js";
 import { renderWithMantine } from "../test/renderWithMantine.js";
@@ -85,6 +85,10 @@ describe("ConfigViewer interactions", () => {
     window.localStorage.clear();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders sections as tabs, with descriptions and notes", async () => {
     const user = userEvent.setup();
     renderWithMantine(<ConfigViewer view={view()} />);
@@ -140,7 +144,6 @@ describe("ConfigViewer interactions", () => {
     await user.click(screen.getByRole("switch", { name: "Show advanced settings" }));
 
     expect(screen.getByLabelText("Tuning")).toBeInTheDocument();
-    vi.restoreAllMocks();
   });
 
   it("tracks edits to a text field and can revert to the original value", async () => {

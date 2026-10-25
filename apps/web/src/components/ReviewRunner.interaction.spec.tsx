@@ -249,10 +249,14 @@ describe("ReviewRunner", () => {
       await user.type(screen.getByLabelText("Pull request"), "7");
       await user.click(await screen.findByRole("switch", { name: /Re-review/ }));
       await user.type(screen.getByLabelText("Pull request"), "1");
-
       await waitFor(() =>
         expect(screen.queryByRole("switch", { name: /Re-review/ })).not.toBeInTheDocument()
       );
+
+      await user.click(screen.getByRole("button", { name: "Run review" }));
+
+      await screen.findByText("Review result");
+      expect(requestBody()).toEqual({ pr: 71, write: false });
     });
 
     it("keeps working when the cache lookup fails", async () => {
