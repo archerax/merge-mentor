@@ -36,8 +36,12 @@ describe("root route", () => {
         { name: "viewport", content: "width=device-width, initial-scale=1" },
       ])
     );
-    const hrefs = head.links.map((link) => link.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/mantine.css", "/app.css"]));
+    expect(head.links).toEqual(
+      expect.arrayContaining([
+        { rel: "stylesheet", href: "/mantine.css" },
+        { rel: "stylesheet", href: "/app.css" },
+      ])
+    );
   });
 
   it("wraps the page content in the app frame", () => {

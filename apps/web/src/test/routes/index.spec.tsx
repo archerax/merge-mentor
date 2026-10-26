@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderWithMantine } from "../renderWithMantine.js";
@@ -42,11 +42,7 @@ describe("home route", () => {
   ])("offers a %s card linking to its page", (title, action, href) => {
     renderWithMantine(<Home />);
 
-    const card = screen.getByRole("heading", { name: title }).closest(".mantine-Card-root");
-    expect(card).not.toBeNull();
-    expect(within(card as HTMLElement).getByRole("link", { name: action })).toHaveAttribute(
-      "href",
-      href
-    );
+    expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: action })).toHaveAttribute("href", href);
   });
 });

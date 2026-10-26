@@ -122,13 +122,19 @@ describe.each(cases)("$name route", (testCase) => {
 
   it("stores a newly created run id in the URL, replacing the history entry", async () => {
     const { default: userEvent } = await import("@testing-library/user-event");
-    renderWithMantine(<Page />);
+    const { rerender } = renderWithMantine(<Page />);
 
     await userEvent.setup().click(screen.getByRole("button", { name: "create run" }));
 
     expect(routeState.navigate).toHaveBeenCalledTimes(1);
     const options = routeState.navigate.mock.calls[0][0];
     expect(options.replace).toBe(true);
-    expect(options.search({ other: "kept" })).toEqual({ other: "kept", run: "new-run" });
+    const nextSearch = options.search({ other: "kept" });
+    expect(nextSearch).toEqual({ other: "kept", run: "new-run" });
+
+    // The router applies the new search and re-renders the page with the run id.
+    routeState.search = nextSearch;
+    rerender(<Page />);
+    expect(screen.getByText(new RegExp(`^${testCase.marker}new-run`))).toBeInTheDocument();
   });
 });

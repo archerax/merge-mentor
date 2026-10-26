@@ -87,6 +87,9 @@ describe("stats route", () => {
     expect(screen.getByText("1000 inline, 234 general")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Add widget" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "#7" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "closed" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "3" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "1" })).toBeInTheDocument();
     expect(screen.queryByText("PR limit reached")).not.toBeInTheDocument();
     expect(screen.queryByText("Some PRs could not be read")).not.toBeInTheDocument();
   });

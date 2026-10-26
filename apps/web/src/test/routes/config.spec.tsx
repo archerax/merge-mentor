@@ -9,7 +9,9 @@ import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 vi.mock("../../server/config.functions.js", () => ({ getConfig: vi.fn(), saveConfig: vi.fn() }));
 vi.mock("../../components/ConfigViewer.js", () => ({
-  ConfigViewer: ({ view }: { view: ConfigView }) => <div>viewer:{view.sections.length}</div>,
+  ConfigViewer: ({ view }: { view: ConfigView }) => (
+    <div>{`viewer:${view.sections.length}:${view.warnings.length}:${String(view.error)}`}</div>
+  ),
 }));
 
 const { getConfig } = await import("../../server/config.functions.js");
@@ -41,7 +43,7 @@ describe("config route", () => {
     renderWithMantine(<ConfigPage />);
 
     expect(screen.getByRole("heading", { name: "Configuration" })).toBeInTheDocument();
-    expect(screen.getByText("viewer:1")).toBeInTheDocument();
+    expect(screen.getByText("viewer:1:0:null")).toBeInTheDocument();
   });
 
   it("shows the load error instead of the editor", () => {

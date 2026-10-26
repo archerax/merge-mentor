@@ -26,7 +26,12 @@ interface LinkProps {
 }
 
 function Link({ to, search, children, onClick, ...rest }: LinkProps) {
-  const params = search ? new URLSearchParams(search as Record<string, string>).toString() : "";
+  const params =
+    search && typeof search === "object"
+      ? new URLSearchParams(
+          Object.entries(search).map(([key, value]) => [key, String(value)])
+        ).toString()
+      : "";
   return (
     <a
       href={params ? `${to}?${params}` : to}
