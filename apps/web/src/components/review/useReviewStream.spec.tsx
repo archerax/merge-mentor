@@ -241,6 +241,21 @@ describe("useReviewStream", () => {
     expect(result.current.activity).toBeNull();
   });
 
+  it("shows the current activity label until a phase finishes", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ runId: "run-act" }))
+      .mockResolvedValueOnce(
+        sseResponse([
+          sseFrames([{ type: "progress", event: { kind: "activity", label: "Reading diff" } }]),
+        ])
+      );
+    const { result } = renderHook(() => useReviewStream({ endpoint: ENDPOINT }));
+
+    await act(() => result.current.run({}));
+
+    expect(result.current.activity).toBe("Reading diff");
+  });
+
   it("restarts a phase that is reported as started again", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ runId: "run-6" })).mockResolvedValueOnce(
       sseResponse([

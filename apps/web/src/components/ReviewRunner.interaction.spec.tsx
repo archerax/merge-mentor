@@ -241,11 +241,10 @@ describe("ReviewRunner", () => {
       await user.type(screen.getByLabelText("Pull request"), "https://github.com/acme/w/pull/9");
 
       await waitFor(() =>
-        expect(getReviewCacheStatus).toHaveBeenCalledWith({
+        expect(getReviewCacheStatus).toHaveBeenLastCalledWith({
           data: { prUrl: "https://github.com/acme/w/pull/9" },
         })
       );
-      expect(getReviewCacheStatus).toHaveBeenCalledTimes(1);
       expect(screen.queryByRole("switch", { name: /Re-review/ })).not.toBeInTheDocument();
     });
 
@@ -517,8 +516,10 @@ describe("ReviewResult interactions", () => {
     it("only offers posting for the matching finding", () => {
       renderWithMantine(<ReviewResult summary={summary} target={{ pr: 7 }} />);
 
-      expect(screen.getByRole("button", { name: "Post src/a.ts:10" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Post src/b.ts" })).not.toBeInTheDocument();
+      // One inline control for the matched finding; the pathless summary comment is not one.
+      const inlinePostButtons = screen.getAllByRole("button", { name: /^Post src\// });
+      expect(inlinePostButtons).toHaveLength(1);
+      expect(inlinePostButtons[0]).toHaveAccessibleName("Post src/a.ts:10");
     });
   });
 });

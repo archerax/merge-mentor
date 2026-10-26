@@ -1,23 +1,21 @@
 import { MantineProvider } from "@mantine/core";
 import { render, type RenderResult } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { theme } from "../theme.js";
 
-/** Renders a component inside the MantineProvider every UI component expects. */
-export function renderWithMantine(ui: ReactElement): RenderResult {
-  const result = render(
+function Providers({ children }: { readonly children: ReactNode }) {
+  return (
     <MantineProvider theme={theme} env="test">
-      {ui}
+      {children}
     </MantineProvider>
   );
-  return {
-    ...result,
-    rerender: (next) =>
-      result.rerender(
-        <MantineProvider theme={theme} env="test">
-          {next}
-        </MantineProvider>
-      ),
-  };
+}
+
+/**
+ * Renders a component inside the MantineProvider every UI component expects.
+ * The provider is a `wrapper`, so `rerender` keeps it.
+ */
+export function renderWithMantine(ui: ReactElement): RenderResult {
+  return render(ui, { wrapper: Providers });
 }

@@ -41,8 +41,8 @@ function controller(overrides: Partial<PostCommentsController> = {}): PostCommen
   };
 }
 
-// The preview keeps 177 characters of the collapsed body plus the ellipsis.
-const PREVIEW_LENGTH = 178;
+// Longest collapsed body shown in full; anything longer is cut to this minus 3, plus an ellipsis.
+const PREVIEW_LIMIT = 180;
 
 describe("commentLocation", () => {
   it("returns the bare path when there is no line", () => {
@@ -84,12 +84,25 @@ describe("PostableCommentRow", () => {
     expect(screen.queryByText("posted")).not.toBeInTheDocument();
   });
 
-  it("collapses whitespace and truncates long previews", () => {
-    const body = `line one\n\n   line two ${"x".repeat(300)}`;
+  it("collapses whitespace in the preview", () => {
+    const body = "line one\n\n   line two";
     renderWithMantine(<PostableCommentRow comment={comment({ body })} controller={controller()} />);
 
-    const preview = screen.getByText(/^line one line two x+…$/);
-    expect(preview.textContent).toHaveLength(PREVIEW_LENGTH);
+    expect(screen.getByText("line one line two")).toBeInTheDocument();
+  });
+
+  it("leaves a preview of exactly the limit untouched", () => {
+    const body = "x".repeat(PREVIEW_LIMIT);
+    renderWithMantine(<PostableCommentRow comment={comment({ body })} controller={controller()} />);
+
+    expect(screen.getByText(body)).toBeInTheDocument();
+  });
+
+  it("truncates a preview one character over the limit, ending with an ellipsis", () => {
+    const body = "x".repeat(PREVIEW_LIMIT + 1);
+    renderWithMantine(<PostableCommentRow comment={comment({ body })} controller={controller()} />);
+
+    expect(screen.getByText(`${"x".repeat(PREVIEW_LIMIT - 3)}…`)).toBeInTheDocument();
   });
 
   it("toggles selection through the checkbox", async () => {

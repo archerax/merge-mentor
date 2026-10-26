@@ -30,22 +30,39 @@ vi.mock("@tanstack/react-router", () => ({
 const { PrdReviewResult, PrdReviewRunner } = await import("./PrdReviewRunner.js");
 
 function buildSummary(overrides: Partial<PrdReviewReport> = {}): PrdReviewSummary {
-  const report = {
+  const report: PrdReviewReport = {
     schemaVersion: 1,
     kind: "prd",
     runId: "run-1",
     createdAt: "2026-10-23T12:00:00.000Z",
     documentType: "prd",
     source: { fileName: "Checkout.docx", sizeBytes: 1000, sha256: "abc" },
-    document: { title: "Checkout" },
+    document: {
+      title: "Checkout",
+      sectionCount: 3,
+      chunkCount: 1,
+      reviewedChunkCount: 1,
+      hasHeadings: true,
+      imageCount: 0,
+      commentCount: 0,
+    },
     readiness: { verdict: "ready", summary: "Good." },
     complete: true,
     counts: { Blocker: 0, Major: 1, Minor: 2 },
     findings: [],
     notReviewed: [],
+    verification: {
+      candidates: 3,
+      droppedUnsupportedQuote: 0,
+      droppedDuplicate: 0,
+      droppedByVerifier: 0,
+      kept: 3,
+      verifierFailed: false,
+    },
     includeImages: false,
+    version: "4.0.0",
     ...overrides,
-  } as unknown as PrdReviewReport;
+  };
   return {
     prdRunId: report.runId,
     reportName: "prd-run-1-review-report.md",
