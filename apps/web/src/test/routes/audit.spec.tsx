@@ -4,7 +4,7 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf, resetRouteState, routeState } from "../routerMock.js";
+import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 vi.mock("../../server/audit.functions.js", () => ({ getAuditEvents: vi.fn() }));
@@ -26,6 +26,10 @@ const entry: AuditLogEntry = {
 };
 
 describe("audit route", () => {
+  it("registers the /audit path", () => {
+    expect(routeIdOf(Route)).toBe("/audit");
+  });
+
   beforeEach(() => {
     resetRouteState();
   });

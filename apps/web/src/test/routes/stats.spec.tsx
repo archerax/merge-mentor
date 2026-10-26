@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf, resetRouteState, routeState } from "../routerMock.js";
+import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 vi.mock("../../server/stats.functions.js", () => ({ getLiveStats: vi.fn() }));
@@ -32,6 +32,10 @@ const stats: LiveReviewStats = {
 const validate = (search: Record<string, unknown>) => optionsOf(Route).validateSearch(search);
 
 describe("stats route", () => {
+  it("registers the /stats path", () => {
+    expect(routeIdOf(Route)).toBe("/stats");
+  });
+
   beforeEach(() => {
     resetRouteState();
     vi.mocked(getLiveStats).mockReset();

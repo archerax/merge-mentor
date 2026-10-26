@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, MouseEvent, ReactNode } from "react";
 import { vi } from "vitest";
 
 /** Mutable values the mocked router hooks return; reset between tests with {@link resetRouteState}. */
@@ -20,13 +20,23 @@ export function resetRouteState(): void {
 
 interface LinkProps {
   readonly to: string;
+  readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly search?: unknown;
   readonly children?: ReactNode;
 }
 
-function Link({ to, search: _search, children, ...rest }: LinkProps) {
+function Link({ to, search, children, onClick, ...rest }: LinkProps) {
+  const params = search ? new URLSearchParams(search as Record<string, string>).toString() : "";
   return (
-    <a href={to} {...rest}>
+    <a
+      href={params ? `${to}?${params}` : to}
+      onClick={(event) => {
+        // jsdom cannot navigate; keep the click observable without leaving the page.
+        event.preventDefault();
+        onClick?.(event);
+      }}
+      {...rest}
+    >
       {children}
     </a>
   );
@@ -39,7 +49,8 @@ function Link({ to, search: _search, children, ...rest }: LinkProps) {
  * {@link routeState}.
  */
 export const routerMock = {
-  createFileRoute: () => (options: Record<string, unknown>) => ({
+  createFileRoute: (id: string) => (options: Record<string, unknown>) => ({
+    id,
     options,
     useLoaderData: () => routeState.loaderData,
     useSearch: () => routeState.search,
@@ -70,4 +81,9 @@ interface RouteOptions {
 /** Reads the options a route was created with (see {@link routerMock}). */
 export function optionsOf(route: unknown): RouteOptions {
   return (route as { options: RouteOptions }).options;
+}
+
+/** The path a route module registered with `createFileRoute`. */
+export function routeIdOf(route: unknown): string {
+  return (route as { id: string }).id;
 }

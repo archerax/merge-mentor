@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigView } from "../../server/config.types.js";
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf, resetRouteState, routeState } from "../routerMock.js";
+import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 vi.mock("../../server/config.functions.js", () => ({ getConfig: vi.fn(), saveConfig: vi.fn() }));
@@ -17,6 +17,10 @@ const { Route } = await import("../../routes/config.js");
 const ConfigPage = optionsOf(Route).component;
 
 describe("config route", () => {
+  it("registers the /config path", () => {
+    expect(routeIdOf(Route)).toBe("/config");
+  });
+
   beforeEach(() => {
     resetRouteState();
   });

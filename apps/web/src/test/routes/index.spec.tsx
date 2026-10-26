@@ -3,7 +3,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf } from "../routerMock.js";
+import { optionsOf, routeIdOf } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 
@@ -11,6 +11,10 @@ const { Route } = await import("../../routes/index.js");
 const Home = optionsOf(Route).component;
 
 describe("home route", () => {
+  it("registers the / path", () => {
+    expect(routeIdOf(Route)).toBe("/");
+  });
+
   it("renders the hero with its primary actions", () => {
     renderWithMantine(<Home />);
 

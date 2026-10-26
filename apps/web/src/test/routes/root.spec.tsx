@@ -82,12 +82,18 @@ describe("root route", () => {
     const user = userEvent.setup();
     renderShell();
     const nav = screen.getByRole("navigation");
+    const burger = screen.getByRole("button", { name: "Toggle navigation" });
+    // The burger icon reflects the open state; the navbar then slides into view.
+    const isOpen = () => burger.firstElementChild?.getAttribute("data-opened");
+    expect(isOpen()).toBeNull();
     expect(nav.style.transform).toBe("");
 
-    await user.click(screen.getByRole("button", { name: "Toggle navigation" }));
+    await user.click(burger);
+    expect(isOpen()).toBe("true");
     expect(nav.style.transform).toBe("none");
 
     await user.click(within(nav).getByRole("link", { name: "Reports" }));
+    expect(isOpen()).toBeNull();
     expect(nav.style.transform).toBe("");
   });
 

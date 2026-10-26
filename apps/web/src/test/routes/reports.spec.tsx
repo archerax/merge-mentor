@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportListItem } from "../../server/reports.server.js";
 import { deferred } from "../deferred.js";
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf, resetRouteState, routeState } from "../routerMock.js";
+import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 vi.mock("../../server/reports.functions.js", () => ({
@@ -44,6 +44,10 @@ function loaded(reports: ReportListItem[], selected: ReportListItem | null = rep
 }
 
 describe("reports route", () => {
+  it("registers the /reports path", () => {
+    expect(routeIdOf(Route)).toBe("/reports");
+  });
+
   beforeEach(() => {
     resetRouteState();
     vi.mocked(getReports).mockReset();

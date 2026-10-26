@@ -55,7 +55,6 @@ export default defineConfig({
         "libs/*/src/**/types.ts",
         "apps/web/src/**/*.spec.ts",
         "apps/web/src/**/*.spec.tsx",
-        "apps/web/src/test/**",
         "apps/web/src/server/**/*.types.ts",
         "apps/web/src/server/**/*.functions.ts",
       ],

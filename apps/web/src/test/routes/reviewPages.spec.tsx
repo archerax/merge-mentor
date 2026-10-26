@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithMantine } from "../renderWithMantine.js";
-import { optionsOf, resetRouteState, routeState } from "../routerMock.js";
+import { optionsOf, resetRouteState, routeIdOf, routeState } from "../routerMock.js";
 
 vi.mock("@tanstack/react-router", async () => (await import("../routerMock.js")).routerMock);
 
@@ -45,6 +45,7 @@ const routes = {
 const cases = [
   {
     name: "review",
+    path: "/review",
     title: "PR Review",
     marker: "pr run=",
     kind: "-",
@@ -53,6 +54,7 @@ const cases = [
   },
   {
     name: "prd",
+    path: "/prd",
     title: "PRD / FRD Review",
     marker: "prd run=",
     kind: "-",
@@ -61,6 +63,7 @@ const cases = [
   },
   {
     name: "pbi",
+    path: "/pbi",
     title: "PBI Review",
     marker: "work-item run=",
     kind: "pbi",
@@ -69,6 +72,7 @@ const cases = [
   },
   {
     name: "project",
+    path: "/project",
     title: "Project Review",
     marker: "work-item run=",
     kind: "project",
@@ -83,6 +87,10 @@ describe.each(cases)("$name route", (testCase) => {
 
   beforeEach(() => {
     resetRouteState();
+  });
+
+  it("registers its path", () => {
+    expect(routeIdOf(route)).toBe(testCase.path);
   });
 
   it("keeps a run id from the URL", () => {
