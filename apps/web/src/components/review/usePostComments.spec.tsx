@@ -115,6 +115,18 @@ describe("usePostComments", () => {
     expect(result.current.busy).toBe(false);
   });
 
+  it("posts only the comments left selected", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(postResult({ postedFingerprints: ["a"] })));
+    const { result } = renderHook(() => usePostComments("pr", target, [a, b]));
+
+    act(() => result.current.toggle("b"));
+    act(() => result.current.postSelected());
+
+    await waitFor(() => expect(result.current.isPosted("a")).toBe(true));
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).comments).toEqual([a]);
+    expect(result.current.isPosted("b")).toBe(false);
+  });
+
   it("is busy and marks rows as posting while a request is in flight", async () => {
     const response = deferred<Response>();
     fetchMock.mockReturnValue(response.promise);

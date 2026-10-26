@@ -502,7 +502,7 @@ describe("useReviewStream", () => {
     await act(() => vi.advanceTimersByTimeAsync(2000));
 
     expect(result.current.running).toBe(true);
-    expect(result.current.elapsedMs).toBeGreaterThanOrEqual(1500);
+    expect(result.current.elapsedMs).toBe(2000);
     expect(result.current.startedAt).not.toBeNull();
   });
 

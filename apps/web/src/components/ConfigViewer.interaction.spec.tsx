@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFieldView, ConfigSaveResult, ConfigView } from "../server/config.types.js";
 import { renderWithMantine } from "../test/renderWithMantine.js";
 
-const invalidate = vi.fn();
+const invalidate = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate }) }));
 vi.mock("../server/config.functions.js", () => ({ saveConfig: vi.fn() }));
 
@@ -68,14 +68,6 @@ function view(overrides: Partial<ConfigView> = {}): ConfigView {
 
 function saveResult(overrides: Partial<ConfigSaveResult> = {}): ConfigSaveResult {
   return { ok: true, view: view(), errors: [], ...overrides };
-}
-
-/** The edits sent by the first `saveConfig` call. */
-function savedEdits(): readonly { envVar: string; value: string }[] {
-  const [request] = vi.mocked(saveConfig).mock.calls[0] as unknown as [
-    { data: { edits: { envVar: string; value: string }[] } },
-  ];
-  return request.data.edits;
 }
 
 describe("ConfigViewer interactions", () => {
@@ -179,16 +171,16 @@ describe("ConfigViewer interactions", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(1));
-    const edits = savedEdits();
-    expect(edits).toEqual(
-      expect.arrayContaining([
-        { envVar: "MM_COUNT", value: "5" },
-        { envVar: "MM_VERBOSE", value: "true" },
-        { envVar: "MM_STRATEGY", value: "deep" },
-        { envVar: "MM_TOKEN", value: expect.stringContaining("s3cret") },
-      ])
-    );
-    expect(edits).toHaveLength(4);
+    expect(saveConfig).toHaveBeenCalledWith({
+      data: {
+        edits: [
+          { envVar: "MM_COUNT", value: "5" },
+          { envVar: "MM_VERBOSE", value: "true" },
+          { envVar: "MM_STRATEGY", value: "deep" },
+          { envVar: "MM_TOKEN", value: "s3cret" },
+        ],
+      },
+    });
   });
 
   it("clears an enum selection back to the default", async () => {
@@ -203,7 +195,9 @@ describe("ConfigViewer interactions", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(saveConfig).toHaveBeenCalled());
-    expect(savedEdits()).toEqual([{ envVar: "MM_STRATEGY", value: "" }]);
+    expect(saveConfig).toHaveBeenCalledWith({
+      data: { edits: [{ envVar: "MM_STRATEGY", value: "" }] },
+    });
   });
 
   it("clears and un-clears a stored secret", async () => {
@@ -223,7 +217,9 @@ describe("ConfigViewer interactions", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(saveConfig).toHaveBeenCalled());
-    expect(savedEdits()).toEqual([{ envVar: "MM_TOKEN", value: "" }]);
+    expect(saveConfig).toHaveBeenCalledWith({
+      data: { edits: [{ envVar: "MM_TOKEN", value: "" }] },
+    });
   });
 
   it("does not offer Clear for a secret that is not set", () => {

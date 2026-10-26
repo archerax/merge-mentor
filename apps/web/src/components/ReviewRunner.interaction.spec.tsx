@@ -3,7 +3,7 @@ import { act, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ReviewSummary } from "../server/review.types.js";
+import type { PendingCommentView, ReviewSummary } from "../server/review.types.js";
 import { useReviewForm } from "../stores/reviewForms.js";
 import { renderWithMantine } from "../test/renderWithMantine.js";
 import { jsonResponse, sseFrames, sseResponse } from "../test/sse.js";
@@ -468,6 +468,11 @@ describe("ReviewResult interactions", () => {
       expect(await screen.findByText("Comments posted")).toBeInTheDocument();
       expect(screen.getByText(/2 comments posted\./)).toBeInTheDocument();
       expect(screen.getByText("All planned comments have been posted.")).toBeInTheDocument();
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string);
+      expect(body.comments.map((comment: PendingCommentView) => comment.fingerprint)).toEqual([
+        "fp-a",
+        "fp-summary",
+      ]);
     });
 
     it("lets the user deselect a finding and clear or re-select everything", async () => {
