@@ -5,11 +5,11 @@
 <h1 align="center">Merge Mentor</h1>
 
 <p align="center">
-  <strong>An AI-powered code review tool that delivers a first-pass review on your pull requests in minutes — catching bugs, security issues, and quality problems before your team needs to spend time on them.</strong>
+  <strong>An AI-powered assistant for the whole delivery lifecycle — from reviewing requirements and planning work, to reviewing, fixing and describing pull requests — catching gaps, bugs and quality problems before your team needs to spend time on them.</strong>
 </p>
 
 <p align="center">
-  Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple enterprise AI providers including GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, and OpenCode SDK.
+  Covers PRDs, backlog items, project plans, implementation plans and pull requests. Works with GitHub and Azure DevOps, integrates into CI pipelines, and supports multiple enterprise AI providers including GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, and OpenCode SDK.
 </p>
 
 <br>
@@ -25,16 +25,17 @@ Merge Mentor is a **self-hosted CLI tool** that runs directly on your local work
 - **Your Approved AI Provider Only**: Merge Mentor does not route your code through any third-party SaaS server. It connects directly to **your enterprise-approved AI provider** (such as GitHub Copilot SDK, Amazon Bedrock, Azure OpenAI, or OpenCode SDK) using your own credentials.
 - **Zero Telemetry**: No usage tracking, analytics, or telemetry of any kind are collected.
 - **Local Data & Logs**: Audit logs, execution caches, and reports stay strictly on your local disk under `./.mergementor`.
-- **Dry-Run by Default**: Reviews run in preview mode by default. Comments are only published to your pull requests when you explicitly pass `--write`.
+- **Dry-Run by Default**: Commands run in preview mode by default. Comments are only published to your pull requests when you explicitly pass `--write`.
 - **Local-Only Dashboard**: The optional web dashboard (`merge-mentor ui`) listens on `127.0.0.1` only and requires a per-launch access token, so other machines and websites cannot reach it.
 
 ---
 
 ## Why Merge Mentor?
 
-- **⚡ Faster feedback cycle** — Developers get actionable feedback the moment they open a PR.
+- **🧭 Support across the lifecycle** — Review PRDs and backlog items, break requirements into epics, features and PBIs, plan implementation, then review, fix and describe the resulting pull requests.
+- **⚡ Faster feedback cycle** — Teams get actionable feedback the moment a document, work item or PR is ready.
 - **🧑‍💻 Free up your senior engineers** — AI handles the routine first pass so human reviewers can focus on architectural decisions.
-- **🎯 Goes beyond linting** — Surfaces logic errors, insecure trust boundaries, missing edge cases, and cross-file issues.
+- **🎯 Goes beyond linting** — Surfaces logic errors, insecure trust boundaries, missing edge cases, ambiguous requirements, and cross-file issues.
 - **🔒 Control where your code goes** — Supports OpenAI-compatible endpoints (Ollama, vLLM, Azure OpenAI) for private hosting.
 - **🔁 Safe to try** — Dry-run is the default; preview every review before posting a single comment.
 
@@ -60,21 +61,29 @@ npx merge-mentor@latest review --pr 123 --write
 
 ## CLI Commands
 
-Merge Mentor offers a set of subcommands to support reviews, plan checks, and automatic fixes:
+Merge Mentor offers subcommands that span requirements, planning, and pull request workflows.
+
+**Pull requests**
 
 - **[review](./docs/review.md)**: Reviews a pull request and identifies potential bugs, security issues, and quality problems.
 - **[fix](./docs/fix.md)**: Interactively fixes active review comments on a PR using an AI provider.
 - **[reply](./docs/reply.md)**: Generates responses to review comments and optionally resolves comment threads.
 - **[describe](./docs/describe.md)**: Generates a title, summary, and changelog for a pull request.
-- **[doctor](./docs/doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
-- **[repos](./docs/repos.md)**: Manages local cloned repositories used for context loading.
-- **[pbi](./docs/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
-- **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
+
+**Requirements & planning**
+
 - **[prd](./docs/prd.md)**: Reviews a PRD or FRD Word document (`.docx`) for gaps, ambiguity and testability before development starts.
 - **[prd-breakdown](./docs/prd.md#work-breakdown)**: Breaks a PRD or FRD Word document down into epics, features and PBIs in a logical delivery order, as a Markdown file you can refine.
+- **[pbi](./docs/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
+- **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[plan](./docs/plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
+
+**Setup & insight**
+
+- **[doctor](./docs/doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
+- **[repos](./docs/repos.md)**: Manages local cloned repositories used for context loading.
 - **[stats](./docs/stats.md)**: Reports how many PRs Merge Mentor has reviewed and how many comments it has posted, queried live from your repository.
-- **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive reviews.
+- **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive use.
 
 For full configuration settings and options, refer to the **[Configuration Guide](./docs/configuration.md)**.
 
