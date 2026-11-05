@@ -520,6 +520,25 @@ describe("runPrdBreakdown", () => {
     expect(await exists(paths.breakdownMarkdown)).toBe(false);
   });
 
+  it("does not reuse the id of an existing run, so it cannot overwrite or delete it", async () => {
+    const paths = prdRunPaths(tempPath, "run-1");
+    await mkdir(paths.runDir, { recursive: true });
+    await writeFile(paths.documentJson, "existing review data");
+    const client = createFakeAIClient(defaultHandler);
+
+    await expect(runPrdBreakdown(options(), { aiClient: client })).rejects.toThrow(
+      "a run with the id run-1 already exists"
+    );
+    expect(client.executePrompt).not.toHaveBeenCalled();
+    expect(await readFile(paths.documentJson, "utf-8")).toBe("existing review data");
+    expect(await exists(paths.runDir)).toBe(true);
+
+    // An unsafe id is refused too, before anything is written.
+    await expect(runPrdBreakdown(options({ runId: "../x" }), { aiClient: client })).rejects.toThrow(
+      ValidationError
+    );
+  });
+
   it("reports progress through phases and steps", async () => {
     const events: ReviewProgressEvent[] = [];
     await runPrdBreakdown(options({ onProgress: (event) => events.push(event) }), {
@@ -646,6 +665,26 @@ describe("runPrdBreakdown", () => {
         runPrdBreakdown(options({ source: { fromRun: "missing" } }), { aiClient: client })
       ).rejects.toThrow(/no stored document was found/);
       expect(client.executePrompt).not.toHaveBeenCalled();
+    });
+
+    it("says what is wrong with a stored document that exists but cannot be read", async () => {
+      const paths = prdRunPaths(tempPath, "run-1");
+      await mkdir(paths.runDir, { recursive: true });
+      await writeFile(paths.documentJson, '{"document": {"sections": [');
+      await expect(
+        runPrdBreakdown(options({ source: { fromRun: "run-1" } }), {
+          aiClient: createFakeAIClient(defaultHandler),
+        })
+      ).rejects.toThrow(/stored document for run run-1 is damaged/);
+
+      // A directory where the file should be is another read failure, not a missing run.
+      await rm(paths.documentJson);
+      await mkdir(paths.documentJson);
+      await expect(
+        runPrdBreakdown(options({ source: { fromRun: "run-1" } }), {
+          aiClient: createFakeAIClient(defaultHandler),
+        })
+      ).rejects.toThrow(/stored document for run run-1 could not be read/);
     });
 
     it("rejects a stored document it cannot read", async () => {

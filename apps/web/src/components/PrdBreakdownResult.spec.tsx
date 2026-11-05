@@ -186,6 +186,41 @@ describe("PrdBreakdownResult", () => {
     expect(html).not.toContain("Every part of the document with text produced");
   });
 
+  it("renders repeated criteria, questions and notes without duplicate keys", () => {
+    const [first] = EPICS;
+    const repeated = first
+      ? {
+          ...first,
+          features: first.features.map((feature) => ({
+            ...feature,
+            pbis: feature.pbis.map((pbi) => ({
+              ...pbi,
+              acceptanceCriteria: ["Same check.", "Same check."],
+            })),
+          })),
+        }
+      : undefined;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const html = renderHtml(
+      <PrdBreakdownResult
+        expanded
+        summary={buildSummary({
+          epics: repeated ? [repeated] : [],
+          openQuestions: [
+            { question: "Same?", headingPath: [] },
+            { question: "Same?", headingPath: [] },
+          ],
+          notes: ["Same note.", "Same note."],
+        })}
+      />
+    );
+    expect(html.match(/Same check\./g)).toHaveLength(2);
+    expect(html.match(/Same\?/g)).toHaveLength(2);
+    expect(html.match(/Same note\./g)).toHaveLength(2);
+    expect(errors.mock.calls.flat().join(" ")).not.toContain("same key");
+    errors.mockRestore();
+  });
+
   it("warns when the breakdown is unordered or partial", () => {
     const html = renderHtml(
       <PrdBreakdownResult summary={buildSummary({ ordered: false, complete: false })} />

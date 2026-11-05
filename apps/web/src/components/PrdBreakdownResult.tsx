@@ -66,8 +66,8 @@ function PbiPanel({ pbi }: { readonly pbi: PrdBreakdownPbi }) {
             Acceptance criteria
           </Text>
           <List size="sm" spacing={2} mt={4}>
-            {pbi.acceptanceCriteria.map((criterion) => (
-              <List.Item key={criterion}>{criterion}</List.Item>
+            {pbi.acceptanceCriteria.map((criterion, index) => (
+              <List.Item key={`${index}-${criterion}`}>{criterion}</List.Item>
             ))}
           </List>
         </div>
@@ -377,8 +377,8 @@ export function PrdBreakdownResult({
           <div>
             <Title order={5}>Open questions</Title>
             <List size="sm" spacing={4} mt="xs">
-              {report.openQuestions.map((item) => (
-                <List.Item key={item.question}>
+              {report.openQuestions.map((item, index) => (
+                <List.Item key={`${index}-${item.question}`}>
                   {item.question}
                   {item.headingPath.length > 0 && (
                     <Text span size="xs" c="dimmed">
@@ -419,8 +419,8 @@ export function PrdBreakdownResult({
               )}
               {report.notes.length > 0 && (
                 <List size="sm" spacing={4}>
-                  {report.notes.map((note) => (
-                    <List.Item key={note}>{note}</List.Item>
+                  {report.notes.map((note, index) => (
+                    <List.Item key={`${index}-${note}`}>{note}</List.Item>
                   ))}
                 </List>
               )}

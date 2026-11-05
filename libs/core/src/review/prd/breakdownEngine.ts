@@ -341,9 +341,20 @@ class PrdBreakdownRun {
       stored = parseStoredDocument(await this.fs.readFile(paths.documentJson, "utf-8"));
     } catch (error) {
       if (error instanceof ValidationError) throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") {
+        throw new ValidationError(
+          "runId",
+          `no stored document was found for run ${runId}. Run a review of the document first, or break the file down directly`,
+          { cause: error }
+        );
+      }
+      // A truncated or damaged file is not a missing one: say what is wrong.
       throw new ValidationError(
         "runId",
-        `no stored document was found for run ${runId}. Run a review of the document first, or break the file down directly`,
+        error instanceof SyntaxError
+          ? `the stored document for run ${runId} is damaged and cannot be read`
+          : `the stored document for run ${runId} could not be read (${error instanceof Error ? error.message : String(error)})`,
         { cause: error }
       );
     }
@@ -395,6 +406,17 @@ class PrdBreakdownRun {
     }
   }
 
+  private async pathExists(target: string): Promise<boolean> {
+    try {
+      await this.fs.stat(target);
+      return true;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") return false;
+      throw error;
+    }
+  }
+
   private async loadNewDocument(
     source: PrdDocumentSource,
     createdAt: Date
@@ -403,6 +425,11 @@ class PrdBreakdownRun {
     const fileName = sourceFileName(source);
     const runId = options.runId ?? createRunId(createdAt, fileName);
     const paths = prdRunPaths(options.tempPath ?? "./.mergementor", runId);
+    // A chosen id must not land on an existing run: that would overwrite its
+    // document, and a later failure would then delete the run with its review.
+    if (options.runId !== undefined && (await this.pathExists(paths.runDir))) {
+      throw new ValidationError("runId", `a run with the id ${runId} already exists`);
+    }
     this.output.log(`\n🧩 Breaking down ${fileName}...\n`);
 
     const buffer =
