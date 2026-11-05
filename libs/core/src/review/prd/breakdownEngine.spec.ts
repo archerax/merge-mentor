@@ -241,6 +241,67 @@ describe("runPrdBreakdown", () => {
     expect(report.epics[2]?.title).toBe("Needs placement");
   });
 
+  it("treats null text from the model as empty, not as the word null", async () => {
+    const client = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-breakdown-extract" && prompt.includes("Goals [s2]")) {
+        return jsonResponse({
+          epics: [
+            {
+              title: "Guest checkout",
+              goal: null,
+              features: [
+                {
+                  title: "Guest payment",
+                  description: null,
+                  pbis: [
+                    {
+                      title: "Guest can pay by card",
+                      description: null,
+                      acceptanceCriteria: [null, "A guest pays."],
+                      sectionId: null,
+                      quote: "Guests can pay without creating an account.",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          openQuestions: [],
+        });
+      }
+      if (opts?.promptType === "prd-breakdown-extract") {
+        return jsonResponse({ epics: [], openQuestions: [] });
+      }
+      return jsonResponse({
+        summary: null,
+        epics: [
+          {
+            title: null,
+            goal: null,
+            rationale: null,
+            epicIds: ["E1"],
+            features: [{ title: null, description: null, featureIds: ["F1"], pbiIds: ["P1"] }],
+          },
+        ],
+        dependencies: [],
+        gaps: [],
+      });
+    });
+    const result = await runPrdBreakdown(options(), { aiClient: client, clock: CLOCK });
+    const [epic] = result.report.epics;
+    // Blank titles fall back to the items that were merged.
+    expect(epic?.title).toBe("Guest checkout");
+    expect(epic?.goal).toBe("");
+    expect(epic?.features[0]?.title).toBe("Guest payment");
+    expect(epic?.features[0]?.pbis[0]).toMatchObject({
+      description: "",
+      acceptanceCriteria: ["", "A guest pays."].filter(Boolean),
+      quoteVerified: true,
+    });
+    expect(result.report.summary).toBe("");
+    expect(result.reportMarkdown).not.toContain("null");
+  });
+
   it("grounds each PBI in the document and flags a quote that cannot be found", async () => {
     const result = await runPrdBreakdown(options(), {
       aiClient: createFakeAIClient(defaultHandler),
@@ -542,6 +603,38 @@ describe("runPrdBreakdown", () => {
       expect(await exists(paths.documentJson)).toBe(true);
       expect(await exists(paths.reportJson)).toBe(true);
       expect(await exists(paths.breakdownMarkdown)).toBe(false);
+    });
+
+    it("keeps an earlier breakdown when a later run fails or is refused", async () => {
+      await storeReview("ready");
+      const paths = prdRunPaths(tempPath, "run-1");
+      await runPrdBreakdown(options({ source: { fromRun: "run-1" } }), {
+        aiClient: createFakeAIClient(defaultHandler),
+        clock: CLOCK,
+      });
+      const before = await readFile(paths.breakdownMarkdown, "utf-8");
+
+      const failing = createFakeAIClient(() => {
+        throw new Error("provider down");
+      });
+      await expect(
+        runPrdBreakdown(options({ source: { fromRun: "run-1" } }), { aiClient: failing })
+      ).rejects.toThrow(MergeMentorError);
+      expect(await readFile(paths.breakdownMarkdown, "utf-8")).toBe(before);
+      expect(await exists(paths.breakdownJson)).toBe(true);
+
+      await writeFile(
+        paths.reportJson,
+        JSON.stringify({
+          documentType: "prd",
+          source: { fileName: "Checkout PRD.docx" },
+          readiness: { verdict: "not-ready" },
+        })
+      );
+      await expect(
+        runPrdBreakdown(options({ source: { fromRun: "run-1" } }), { aiClient: failing })
+      ).rejects.toThrow(ValidationError);
+      expect(await readFile(paths.breakdownMarkdown, "utf-8")).toBe(before);
     });
 
     it("rejects an unsafe or unknown run id", async () => {

@@ -136,6 +136,63 @@ describe("renderPrdBreakdownMarkdown", () => {
     );
   });
 
+  it("keeps model text from adding headings, lists, rules or HTML to the document", () => {
+    const [first] = EPICS;
+    const hostile: PrdBreakdownEpic = {
+      number: "1",
+      title: "# Fake title\n## Epic 9: Fake",
+      goal: "Goal\n## Epic 9: Fake goal",
+      rationale: "- injected\n---",
+      dependsOn: [],
+      features: [
+        {
+          number: "1.1",
+          title: "Feature <script>alert(1)</script>",
+          description: "# Heading\n\n- item",
+          pbis: [
+            {
+              number: "1.1.1",
+              title: "1. Numbered",
+              description: "Text\n\n## Epic 9: Fake\n<!-- hidden -->",
+              acceptanceCriteria: ["> quote\n# heading"],
+              dependsOn: [],
+              sectionId: "s1",
+              headingPath: ["# Section", "<b>x</b>"],
+              quote: "Line one\n<img src=x>\n# not a heading",
+              quoteVerified: true,
+            },
+          ],
+        },
+      ],
+    };
+    const markdown = renderPrdBreakdownMarkdown(
+      report({
+        epics: first ? [hostile] : [],
+        summary: "Summary\n## Epic 9: Fake summary",
+        notes: ["# Note\n---"],
+        openQuestions: [{ question: "## Q?", headingPath: [] }],
+      })
+    );
+    const headings = markdown.split("\n").filter((line) => /^#{1,6} /.test(line));
+    expect(headings).toEqual([
+      "# Work breakdown: Checkout PRD",
+      "## Suggested order",
+      "## Epic 1: \\# Fake title ## Epic 9: Fake",
+      "### Feature 1.1: Feature &lt;script>alert(1)&lt;/script>",
+      "#### PBI 1.1.1: \\1. Numbered",
+      "## Open questions",
+      "## Not covered",
+      "## About this breakdown",
+    ]);
+    // Only the footer rule remains; injected rules are escaped.
+    expect(markdown.split("\n").filter((line) => line === "---")).toHaveLength(1);
+    expect(markdown).not.toContain("<script>");
+    expect(markdown).not.toContain("<img");
+    expect(markdown).not.toContain("<b>");
+    expect(markdown).not.toContain("<!-- hidden -->");
+    expect(markdown).toContain("> Line one\n> &lt;img src=x>\n> # not a heading");
+  });
+
   it("lists open questions, uncovered sections and notes", () => {
     const markdown = renderPrdBreakdownMarkdown(
       report({

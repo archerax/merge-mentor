@@ -303,16 +303,17 @@ class PrdBreakdownRun {
     }
   }
 
-  /** Removes what a failed breakdown wrote: all of a new run, only the breakdown of a stored one. */
+  /**
+   * Removes what a failed breakdown left behind. A new run is removed whole. A
+   * stored run is left alone: it holds the review, and a breakdown made
+   * earlier stays, because the report is only written once every AI request
+   * has succeeded.
+   */
   private async cleanUp(loaded: LoadedDocument): Promise<void> {
+    if (!loaded.created) return;
     const tempPath = this.options.tempPath ?? "./.mergementor";
     try {
-      if (loaded.created) {
-        await deletePrdRun(loaded.runId, { tempPath, fs: this.fs });
-      } else {
-        await this.fs.rm(loaded.paths.breakdownMarkdown, { force: true });
-        await this.fs.rm(loaded.paths.breakdownJson, { force: true });
-      }
+      await deletePrdRun(loaded.runId, { tempPath, fs: this.fs });
     } catch (cleanupError: unknown) {
       this.output.error(
         `⚠️ The breakdown failed and its files could not be fully removed (${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}). Delete ${loaded.paths.runDir} by hand if the document is confidential.`

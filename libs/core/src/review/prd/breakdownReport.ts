@@ -134,30 +134,37 @@ export function countBreakdown(epics: readonly PrdBreakdownEpic[]): PrdBreakdown
   return { epics: epics.length, features, pbis };
 }
 
-function blockquote(text: string): string {
-  return text
+function blockquote(quote: string): string {
+  return quote
+    .replace(/</g, "&lt;")
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
 }
 
-/** Collapses text onto one line, for list items and headings. */
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+/**
+ * Makes model- or document-derived text safe to place in the Markdown: it is
+ * collapsed onto one line, so it cannot start a heading, list or rule of its
+ * own, and anything that could open a Markdown structure or raw HTML at the
+ * start of the line or anywhere in it is escaped.
+ */
+function text(value: string): string {
+  const flat = value.replace(/\s+/g, " ").trim().replace(/</g, "&lt;");
+  return /^(?:[#>*+\-|]|\d+[.)]|={2,}|`{3})/.test(flat) ? `\\${flat}` : flat;
 }
 
 function where(headingPath: readonly string[]): string {
-  return headingPath.length > 0 ? headingPath.join(" › ") : "Document";
+  return headingPath.length > 0 ? text(headingPath.join(" › ")) : "Document";
 }
 
 function renderPbi(pbi: PrdBreakdownPbi): string {
-  const lines = [`#### PBI ${pbi.number}: ${oneLine(pbi.title)}`, ""];
-  if (pbi.description) lines.push(pbi.description, "");
+  const lines = [`#### PBI ${pbi.number}: ${text(pbi.title)}`, ""];
+  if (pbi.description) lines.push(text(pbi.description), "");
   if (pbi.acceptanceCriteria.length > 0) {
     lines.push(
       "**Acceptance criteria**",
       "",
-      ...pbi.acceptanceCriteria.map((criterion) => `- [ ] ${oneLine(criterion)}`),
+      ...pbi.acceptanceCriteria.map((criterion) => `- [ ] ${text(criterion)}`),
       ""
     );
   }
@@ -173,16 +180,16 @@ function renderPbi(pbi: PrdBreakdownPbi): string {
 }
 
 function renderFeature(feature: PrdBreakdownFeature): string {
-  const lines = [`### Feature ${feature.number}: ${oneLine(feature.title)}`, ""];
-  if (feature.description) lines.push(feature.description, "");
+  const lines = [`### Feature ${feature.number}: ${text(feature.title)}`, ""];
+  if (feature.description) lines.push(text(feature.description), "");
   for (const pbi of feature.pbis) lines.push(renderPbi(pbi), "");
   return lines.join("\n");
 }
 
 function renderEpic(epic: PrdBreakdownEpic): string {
-  const lines = [`## Epic ${epic.number}: ${oneLine(epic.title)}`, ""];
-  if (epic.goal) lines.push(`**Goal:** ${epic.goal}`, "");
-  if (epic.rationale) lines.push(`**Why it is here:** ${epic.rationale}`, "");
+  const lines = [`## Epic ${epic.number}: ${text(epic.title)}`, ""];
+  if (epic.goal) lines.push(`**Goal:** ${text(epic.goal)}`, "");
+  if (epic.rationale) lines.push(`**Why it is here:** ${text(epic.rationale)}`, "");
   if (epic.dependsOn.length > 0) {
     lines.push(
       `**Needs first:** ${epic.dependsOn.map((number) => `Epic ${number}`).join(", ")}`,
@@ -197,13 +204,13 @@ function renderEpic(epic: PrdBreakdownEpic): string {
 export function renderPrdBreakdownMarkdown(report: PrdBreakdownReport): string {
   const name = report.document.title ?? report.source.fileName;
   const label = report.documentType.toUpperCase();
-  const out: string[] = [`# Work breakdown: ${name}`, ""];
+  const out: string[] = [`# Work breakdown: ${text(name)}`, ""];
 
   out.push(
     `${report.counts.epics} epic${report.counts.epics === 1 ? "" : "s"}, ${report.counts.features} feature${report.counts.features === 1 ? "" : "s"}, ${report.counts.pbis} PBI${report.counts.pbis === 1 ? "" : "s"}, listed in the suggested order to build them.`,
     ""
   );
-  if (report.summary) out.push(report.summary, "");
+  if (report.summary) out.push(text(report.summary), "");
   if (!report.ordered) {
     out.push(
       "> ⚠️ **Not ordered.** The step that works out a delivery order could not run, so the items follow the order of the document.",
@@ -226,10 +233,10 @@ export function renderPrdBreakdownMarkdown(report: PrdBreakdownReport): string {
   if (report.epics.length > 0) {
     out.push("## Suggested order", "");
     for (const epic of report.epics) {
-      out.push(`${epic.number}. **${oneLine(epic.title)}**`);
+      out.push(`${epic.number}. **${text(epic.title)}**`);
       for (const feature of epic.features) {
         out.push(
-          `   - ${feature.number} ${oneLine(feature.title)} (${feature.pbis.length} PBI${feature.pbis.length === 1 ? "" : "s"})`
+          `   - ${feature.number} ${text(feature.title)} (${feature.pbis.length} PBI${feature.pbis.length === 1 ? "" : "s"})`
         );
       }
     }
@@ -245,7 +252,7 @@ export function renderPrdBreakdownMarkdown(report: PrdBreakdownReport): string {
     out.push("## Open questions", "");
     for (const question of report.openQuestions) {
       const place = question.headingPath.length > 0 ? ` _(${where(question.headingPath)})_` : "";
-      out.push(`- ${oneLine(question.question)}${place}`);
+      out.push(`- ${text(question.question)}${place}`);
     }
     out.push("");
   }
@@ -262,19 +269,19 @@ export function renderPrdBreakdownMarkdown(report: PrdBreakdownReport): string {
         ""
       );
     }
-    if (report.notes.length > 0) out.push(...report.notes.map((note) => `- ${note}`), "");
+    if (report.notes.length > 0) out.push(...report.notes.map((note) => `- ${text(note)}`), "");
   }
 
   out.push(
     "## About this breakdown",
     "",
     `- Document type: ${label}`,
-    `- File: ${report.source.fileName}`,
+    `- File: ${text(report.source.fileName)}`,
     `- Read in ${report.document.processedChunkCount} of ${report.document.chunkCount} parts`,
     "- This is an automated first draft of a backlog. Check it, reorder it and refine it with your team before planning work from it.",
     "",
     "---",
-    `${APP_NAME_LINK} v${report.version}, ${label} work breakdown, ${report.aiModel?.trim() || "AI model"}`,
+    `${APP_NAME_LINK} v${report.version}, ${label} work breakdown, ${text(report.aiModel ?? "") || "AI model"}`,
     "<!-- merge-mentor-prd-breakdown -->",
     ""
   );
