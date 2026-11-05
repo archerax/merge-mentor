@@ -151,12 +151,14 @@ describe("prdBreakdown.server", () => {
       expect(isPrdRunActive(RUN_ID)).toBe(true);
       // A breakdown is not the review, so the review is not reported as running.
       expect(isPrdReviewActive(RUN_ID)).toBe(false);
+      // Let the run finish before the test ends, so it cannot outlive its temp directory.
       gate.resolve();
+      await collectFrames(streamRun(first.runId, 0) as ReadableStream<Uint8Array>);
     });
 
     it("refuses to break a document down while its review is still running", async () => {
       const gate = deferred();
-      startOrAttach({
+      const { runId: reviewRunId } = startOrAttach({
         kind: "prd",
         targetKey: "prd:prd:review-in-progress",
         label: "PRD · Checkout.docx",
@@ -170,6 +172,7 @@ describe("prdBreakdown.server", () => {
       expect(((await response.json()) as { error: string }).error).toContain("still running");
       expect(runPrdBreakdown).not.toHaveBeenCalled();
       gate.resolve();
+      await collectFrames(streamRun(reviewRunId, 0) as ReadableStream<Uint8Array>);
     });
 
     it("shows engine validation errors as plain sentences", async () => {

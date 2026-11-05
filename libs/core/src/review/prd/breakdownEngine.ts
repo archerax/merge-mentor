@@ -401,7 +401,13 @@ class PrdBreakdownRun {
           : "document.docx";
       const sha256 = typeof report.source.sha256 === "string" ? report.source.sha256 : undefined;
       return { verdict, documentType, fileName, ...(sha256 ? { sha256 } : {}) };
-    } catch {
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") return undefined;
+      // A review report that exists but cannot be read must not pass for "no review".
+      this.output.error(
+        `⚠️ The review report of this run could not be read (${error instanceof Error ? error.message : String(error)}), so its verdict and document type are not known. Treating the document as a ${this.options.documentType ?? "prd"}.`
+      );
       return undefined;
     }
   }
@@ -557,8 +563,10 @@ class PrdBreakdownRun {
     const reportMarkdown = await this.runPhase("report", "Saving breakdown", async () => {
       const markdown = renderPrdBreakdownMarkdown(report);
       await this.fs.mkdir(path.dirname(paths.breakdownMarkdown), { recursive: true });
-      await this.fs.writeFile(paths.breakdownMarkdown, markdown, "utf-8");
+      // JSON first: the Markdown is what the Reports page lists, so it only
+      // appears once the structured breakdown it describes is in place.
       await this.fs.writeFile(paths.breakdownJson, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+      await this.fs.writeFile(paths.breakdownMarkdown, markdown, "utf-8");
       this.output.log(`📄 Work breakdown saved to: ${paths.breakdownMarkdown}\n`);
       return markdown;
     });
@@ -617,7 +625,7 @@ class PrdBreakdownRun {
       this.addUsage(response.tokenUsage);
       const json = parseAIJson(response);
       const parsed = PrdBreakdownExtractResultSchema.safeParse(json);
-      if (!parsed.success || !hasKeys(json, ["epics", "openQuestions"])) {
+      if (!parsed.success || !hasKeys(json, ["epics"])) {
         throw new MergeMentorError("the AI response for this part could not be read");
       }
 
@@ -702,6 +710,7 @@ class PrdBreakdownRun {
         pbis: feature.pbis.map((pbi) => ({
           id: pbi.id,
           title: pbi.title,
+          description: pbi.description,
           sectionId: pbi.sectionId,
         })),
       })),
@@ -847,12 +856,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Whether an AI response carries every expected key, with `epics` as an array. */
+/**
+ * Whether an AI response carries every expected key. The result schemas treat a
+ * missing field as empty, which would turn an empty or malformed answer (`{}`)
+ * into a successful pass with nothing in it; an explicit `null` or empty list
+ * is still a legitimate "none".
+ */
 function hasKeys(json: unknown, keys: readonly string[]): boolean {
   if (!isRecord(json)) return false;
-  return keys.every((key) =>
-    key === "epics" || key === "openQuestions" ? Array.isArray(json[key]) : json[key] !== undefined
-  );
+  return keys.every((key) => json[key] !== undefined);
 }
 
 /** `[P3]`, `p3 ` and `P3` all name PBI P3. */
@@ -863,25 +875,55 @@ function normaliseId(id: string): string {
     .toUpperCase();
 }
 
-/** Reads a stored `document.json`, checking the parts the breakdown relies on. */
+/** Whether `value` is an array whose items all satisfy `check`. */
+function isArrayOf(value: unknown, check: (item: Record<string, unknown>) => boolean): boolean {
+  return Array.isArray(value) && value.every((item) => isRecord(item) && check(item));
+}
+
+function isStringArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/**
+ * Reads a stored `document.json`, checking the parts the breakdown relies on,
+ * so a damaged or hand-edited file fails with a clear message rather than a
+ * TypeError somewhere later.
+ */
 function parseStoredDocument(raw: string): {
   document: DocxDocument;
   chunks: readonly DocumentChunk[];
 } {
+  const unreadable = new ValidationError(
+    "runId",
+    "the stored document is not in a readable format"
+  );
   const value: unknown = JSON.parse(raw);
-  if (!isRecord(value) || !isRecord(value.document) || !Array.isArray(value.chunks)) {
-    throw new ValidationError("runId", "the stored document is not in a readable format");
-  }
-  const { document } = value;
-  if (!Array.isArray(document.sections) || !Array.isArray(document.images)) {
-    throw new ValidationError("runId", "the stored document is not in a readable format");
-  }
+  if (!isRecord(value) || !isRecord(value.document)) throw unreadable;
+  const { document, chunks } = value;
+  const sectionsOk = isArrayOf(
+    document.sections,
+    (section) =>
+      typeof section.id === "string" &&
+      typeof section.level === "number" &&
+      isStringArray(section.headingPath) &&
+      isStringArray(section.childIds) &&
+      Array.isArray(section.blocks)
+  );
+  const chunksOk = isArrayOf(
+    chunks,
+    (chunk) =>
+      typeof chunk.id === "string" &&
+      typeof chunk.text === "string" &&
+      isStringArray(chunk.sectionIds) &&
+      isStringArray(chunk.headingPath)
+  );
+  if (!sectionsOk || !chunksOk || !Array.isArray(document.images)) throw unreadable;
   return {
     document: {
       ...(document as unknown as DocxDocument),
-      warnings: Array.isArray(document.warnings) ? (document.warnings as string[]) : [],
+      warnings: isStringArray(document.warnings) ? (document.warnings as string[]) : [],
     },
-    chunks: value.chunks as DocumentChunk[],
+    chunks: chunks as DocumentChunk[],
   };
 }
 
@@ -896,7 +938,13 @@ function groundQuote(
   sectionId: string,
   quote: string
 ): { sectionId: string; paragraphId?: string; quoteVerified: boolean } {
-  const found = index.locate(quote, chunk.sectionIds) ?? index.locate(quote, null);
+  // The prompt asks for the source section, so look there first: a phrase that
+  // also appears in an earlier section of the chunk must not be credited to it.
+  const cited = sectionId.trim().replace(/^\[|\]$/g, "");
+  const found =
+    (chunk.sectionIds.includes(cited) ? index.locate(quote, [cited]) : undefined) ??
+    index.locate(quote, chunk.sectionIds) ??
+    index.locate(quote, null);
   if (found) {
     return {
       sectionId: found.sectionId,
@@ -904,7 +952,6 @@ function groundQuote(
       quoteVerified: true,
     };
   }
-  const cited = sectionId.trim().replace(/^\[|\]$/g, "");
   return {
     sectionId: chunk.sectionIds.includes(cited) ? cited : (chunk.sectionIds[0] ?? ""),
     quoteVerified: false,

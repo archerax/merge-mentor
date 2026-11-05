@@ -197,11 +197,13 @@ AI providers can keep their own copy of a conversation. For `prd` runs Merge Men
 To delete a run, either:
 
 - Open the dashboard (`merge-mentor ui`), go to the **Reports** page and use **Delete run** on the report. This removes the report, the copy of the document, the extracted text and images, the AI transcripts and, for a review started from the dashboard, its live log together.
-- Or delete the files yourself: the two report files and the run folder listed above, for example:
+- Or delete the files yourself: the report files (the review and any work breakdown) and the run folder listed above, for example:
 
   ```bash
-  rm .mergementor/reports/prd-<run-id>-review-report.md \
-     .mergementor/reports/prd-<run-id>-review-report.json
+  rm -f .mergementor/reports/prd-<run-id>-review-report.md \
+        .mergementor/reports/prd-<run-id>-review-report.json \
+        .mergementor/reports/prd-<run-id>-breakdown.md \
+        .mergementor/reports/prd-<run-id>-breakdown.json
   rm -r .mergementor/prd/<run-id>
   ```
 

@@ -158,7 +158,8 @@ describe("renderPrdBreakdownMarkdown", () => {
               dependsOn: [],
               sectionId: "s1",
               headingPath: ["# Section", "<b>x</b>"],
-              quote: "Line one\n<img src=x>\n# not a heading",
+              quote:
+                "Line one\n<img src=x>\n# not a heading\n![pixel](https://tracker.example/p.png)\n~~~\n[click](https://phish.example)",
               quoteVerified: true,
             },
           ],
@@ -169,7 +170,7 @@ describe("renderPrdBreakdownMarkdown", () => {
       report({
         epics: first ? [hostile] : [],
         summary: "Summary\n## Epic 9: Fake summary",
-        notes: ["# Note\n---"],
+        notes: ["# Note\n---", "~~~\n# fenced", "[link](https://example.com)"],
         openQuestions: [{ question: "## Q?", headingPath: [] }],
       })
     );
@@ -191,6 +192,12 @@ describe("renderPrdBreakdownMarkdown", () => {
     expect(markdown).not.toContain("<b>");
     expect(markdown).not.toContain("<!-- hidden -->");
     expect(markdown).toContain("> Line one\n> &lt;img src=x>\n> # not a heading");
+    // Tilde fences cannot open, and links and images are plain text.
+    expect(markdown.split("\n").some((line) => /^(?:~{3,}|`{3,})/.test(line))).toBe(false);
+    expect(markdown).not.toContain("![pixel]");
+    expect(markdown).not.toContain("[click]");
+    expect(markdown).toContain("!\\[pixel\\](https://tracker.example/p.png)");
+    expect(markdown).toContain("\\[click\\](https://phish.example)");
   });
 
   it("lists open questions, uncovered sections and notes", () => {

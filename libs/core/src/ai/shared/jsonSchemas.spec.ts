@@ -100,7 +100,33 @@ describe("jsonSchemas", () => {
         "sectionId",
         "quote",
       ]);
-      expect(getStrictJsonSchema("prd-breakdown-organize")).toBeDefined();
+
+      const organize = getStrictJsonSchema("prd-breakdown-organize") as {
+        required: string[];
+        additionalProperties: boolean;
+        properties: {
+          epics: {
+            items: {
+              required: string[];
+              additionalProperties: boolean;
+              properties: { features: { items: { required: string[] } } };
+            };
+          };
+          dependencies: { items: { required: string[] } };
+        };
+      };
+      expect(organize.required).toEqual(["summary", "epics", "dependencies", "gaps"]);
+      expect(organize.additionalProperties).toBe(false);
+      const organizeEpic = organize.properties.epics.items;
+      expect(organizeEpic.additionalProperties).toBe(false);
+      expect(organizeEpic.required).toEqual(["title", "goal", "rationale", "epicIds", "features"]);
+      expect(organizeEpic.properties.features.items.required).toEqual([
+        "title",
+        "description",
+        "featureIds",
+        "pbiIds",
+      ]);
+      expect(organize.properties.dependencies.items.required).toEqual(["pbiId", "dependsOn"]);
     });
 
     it("requires an image id on every image finding in strict mode", () => {

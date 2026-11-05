@@ -137,6 +137,8 @@ export interface PrdBreakdownCandidateEpic {
       /** Extracted PBI id (`P1`, `P2`, ...). */
       readonly id: string;
       readonly title: string;
+      /** What the PBI delivers, in a sentence or two (may be empty). */
+      readonly description: string;
       /** Section the PBI came from. */
       readonly sectionId: string;
     }[];
@@ -152,6 +154,14 @@ export interface PrdBreakdownOrganizePromptInput {
   readonly epics: readonly PrdBreakdownCandidateEpic[];
 }
 
+/** Longest description listed per PBI in the ordering prompt. */
+const MAX_LISTED_DESCRIPTION = 160;
+
+function truncate(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
 function renderCandidates(epics: readonly PrdBreakdownCandidateEpic[]): string {
   if (epics.length === 0) return "- (none)";
   return epics
@@ -159,7 +169,10 @@ function renderCandidates(epics: readonly PrdBreakdownCandidateEpic[]): string {
       const features = epic.features
         .map((feature) => {
           const pbis = feature.pbis
-            .map((pbi) => `      - ${pbi.id}: ${pbi.title} [${pbi.sectionId}]`)
+            .map(
+              (pbi) =>
+                `      - ${pbi.id}: ${pbi.title} [${pbi.sectionId}]${pbi.description ? ` - ${truncate(pbi.description, MAX_LISTED_DESCRIPTION)}` : ""}`
+            )
             .join("\n");
           return `    - ${feature.id}: ${feature.title}${feature.description ? ` - ${feature.description}` : ""}\n${pbis || "      - (no items)"}`;
         })
@@ -189,7 +202,7 @@ ${wrapUntrustedContent(
 
 # WHAT TO DO
 
-1. **Merge duplicates.** The same epic or feature may have been proposed from several portions under similar titles. Combine them: list every extracted id you merged in \`epicIds\` / \`featureIds\`. Do not merge PBIs; keep each one separate unless two describe exactly the same work, in which case keep only one.
+1. **Merge duplicates.** The same epic or feature may have been proposed from several portions under similar titles. Combine them: list every extracted id you merged in \`epicIds\` / \`featureIds\`. Do not merge or drop PBIs: keep each one separate, even if two look alike. A person will decide whether they are duplicates.
 2. **Group.** Put every PBI under the feature where it belongs, and every feature under the epic where it belongs. You may rename, regroup or split features and epics when that makes the backlog clearer, but every PBI id must appear in exactly one feature's \`pbiIds\`. Do not leave a PBI out, and do not use an id that was not listed.
 3. **Order.** Epics, features and PBIs are listed in the order they should be built. Order by:
    - Dependencies first: anything that others need (foundations, data, core flows, access and security setup) comes before what depends on it.

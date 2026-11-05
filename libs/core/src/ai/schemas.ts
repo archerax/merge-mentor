@@ -215,11 +215,11 @@ const BreakdownTextSchema = z.preprocess(
   z.coerce.string()
 );
 
-/** A string list where a missing value or `null` means "none". */
-const TextListSchema = z.preprocess(
-  (value) => (value === null || value === undefined ? [] : value),
-  z.array(BreakdownTextSchema)
-);
+/** A list where a missing value or `null` means "none" (`.default([])` alone rejects `null`). */
+const BreakdownListSchema = <T extends z.ZodType>(item: T) =>
+  z.preprocess((value) => (value === null || value === undefined ? [] : value), z.array(item));
+
+const TextListSchema = BreakdownListSchema(BreakdownTextSchema);
 
 /** One product backlog item proposed from a chunk of the document. */
 const PrdBreakdownPbiSchema = z.object({
@@ -233,13 +233,13 @@ const PrdBreakdownPbiSchema = z.object({
 const PrdBreakdownFeatureSchema = z.object({
   title: BreakdownTextSchema,
   description: BreakdownTextSchema,
-  pbis: z.array(PrdBreakdownPbiSchema).default([]),
+  pbis: BreakdownListSchema(PrdBreakdownPbiSchema),
 });
 
 const PrdBreakdownEpicSchema = z.object({
   title: BreakdownTextSchema,
   goal: BreakdownTextSchema,
-  features: z.array(PrdBreakdownFeatureSchema).default([]),
+  features: BreakdownListSchema(PrdBreakdownFeatureSchema),
 });
 
 /** A question the document leaves open, found while breaking it down. */
@@ -251,45 +251,39 @@ const PrdBreakdownQuestionSchema = z.object({
 
 /** Result of extracting work items from one chunk of a document (one AI call per chunk). */
 export const PrdBreakdownExtractResultSchema = z.object({
-  epics: z.array(PrdBreakdownEpicSchema).default([]),
-  openQuestions: z.array(PrdBreakdownQuestionSchema).default([]),
+  epics: BreakdownListSchema(PrdBreakdownEpicSchema),
+  openQuestions: BreakdownListSchema(PrdBreakdownQuestionSchema),
 });
 
 /** Result of ordering and grouping all extracted work items (one AI call per run). */
 export const PrdBreakdownOrganizeResultSchema = z.object({
   summary: BreakdownTextSchema,
-  epics: z
-    .array(
-      z.object({
-        title: BreakdownTextSchema,
-        goal: BreakdownTextSchema,
-        /** Why this epic sits where it does in the delivery order. */
-        rationale: BreakdownTextSchema,
-        /** Extracted epic ids merged into this epic. */
-        epicIds: TextListSchema,
-        features: z
-          .array(
-            z.object({
-              title: BreakdownTextSchema,
-              description: BreakdownTextSchema,
-              /** Extracted feature ids merged into this feature. */
-              featureIds: TextListSchema,
-              /** Extracted PBI ids in build order. */
-              pbiIds: TextListSchema,
-            })
-          )
-          .default([]),
-      })
-    )
-    .default([]),
-  dependencies: z
-    .array(
-      z.object({
-        pbiId: BreakdownTextSchema,
-        dependsOn: TextListSchema,
-      })
-    )
-    .default([]),
+  epics: BreakdownListSchema(
+    z.object({
+      title: BreakdownTextSchema,
+      goal: BreakdownTextSchema,
+      /** Why this epic sits where it does in the delivery order. */
+      rationale: BreakdownTextSchema,
+      /** Extracted epic ids merged into this epic. */
+      epicIds: TextListSchema,
+      features: BreakdownListSchema(
+        z.object({
+          title: BreakdownTextSchema,
+          description: BreakdownTextSchema,
+          /** Extracted feature ids merged into this feature. */
+          featureIds: TextListSchema,
+          /** Extracted PBI ids in build order. */
+          pbiIds: TextListSchema,
+        })
+      ),
+    })
+  ),
+  dependencies: BreakdownListSchema(
+    z.object({
+      pbiId: BreakdownTextSchema,
+      dependsOn: TextListSchema,
+    })
+  ),
   /** Cross-cutting gaps that the PRD does not answer. */
   gaps: TextListSchema,
 });

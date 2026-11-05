@@ -135,11 +135,19 @@ export function countBreakdown(epics: readonly PrdBreakdownEpic[]): PrdBreakdown
 }
 
 function blockquote(quote: string): string {
-  return quote
-    .replace(/</g, "&lt;")
+  return escapeInline(quote)
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
+}
+
+/**
+ * Escapes what could open raw HTML or a link or image anywhere in a line. An
+ * image would make the reader's browser fetch an address chosen by whoever
+ * wrote the document.
+ */
+function escapeInline(value: string): string {
+  return value.replace(/</g, "&lt;").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
 
 /**
@@ -149,8 +157,8 @@ function blockquote(quote: string): string {
  * start of the line or anywhere in it is escaped.
  */
 function text(value: string): string {
-  const flat = value.replace(/\s+/g, " ").trim().replace(/</g, "&lt;");
-  return /^(?:[#>*+\-|]|\d+[.)]|={2,}|`{3})/.test(flat) ? `\\${flat}` : flat;
+  const flat = escapeInline(value.replace(/\s+/g, " ").trim());
+  return /^(?:[#>*+\-|~]|\d+[.)]|={2,}|`{3})/.test(flat) ? `\\${flat}` : flat;
 }
 
 function where(headingPath: readonly string[]): string {

@@ -97,6 +97,25 @@ const EXTRACT_GOALS = {
   ],
 };
 
+/** An ordering answer that uses null for every list the model had nothing for. */
+const ORGANIZE_NULLS = {
+  summary: null,
+  epics: [
+    {
+      title: "Guest checkout",
+      goal: null,
+      rationale: null,
+      epicIds: null,
+      features: [
+        { title: "Guest payment", description: null, featureIds: null, pbiIds: ["P1", "P2"] },
+        { title: "Receipts", description: null, featureIds: null, pbiIds: ["P3", "P4"] },
+      ],
+    },
+  ],
+  dependencies: null,
+  gaps: null,
+};
+
 const EXTRACT_SCOPE = {
   epics: [
     {
@@ -295,11 +314,84 @@ describe("runPrdBreakdown", () => {
     expect(epic?.features[0]?.title).toBe("Guest payment");
     expect(epic?.features[0]?.pbis[0]).toMatchObject({
       description: "",
-      acceptanceCriteria: ["", "A guest pays."].filter(Boolean),
+      acceptanceCriteria: ["A guest pays."],
       quoteVerified: true,
     });
     expect(result.report.summary).toBe("");
     expect(result.reportMarkdown).not.toContain("null");
+  });
+
+  it("keeps the work items of a part whose lists are null or whose open questions are missing", async () => {
+    const client = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-breakdown-extract" && prompt.includes("Goals [s2]")) {
+        // No openQuestions at all.
+        return jsonResponse({ epics: EXTRACT_GOALS.epics });
+      }
+      if (opts?.promptType === "prd-breakdown-extract" && prompt.includes("Scope [s3]")) {
+        return jsonResponse({
+          epics: [{ title: "Receipts", goal: "", features: null }, ...EXTRACT_SCOPE.epics],
+          openQuestions: null,
+        });
+      }
+      if (opts?.promptType === "prd-breakdown-extract") {
+        return jsonResponse({ epics: null, openQuestions: null });
+      }
+      return jsonResponse({ ...JSON.parse(JSON.stringify(ORGANIZE_NULLS)) });
+    });
+    const result = await runPrdBreakdown(options(), { aiClient: client, clock: CLOCK });
+    // Nothing was lost to a failed part, and null lists in the ordering answer mean "none".
+    expect(result.report.complete).toBe(true);
+    expect(result.report.ordered).toBe(true);
+    expect(result.report.counts.pbis).toBe(4);
+    expect(result.report.notes.join(" ")).not.toContain("AI request failed");
+  });
+
+  it("credits a quote to the section the model cited when the phrase appears in two", async () => {
+    const docx = await buildDocx({
+      body: [
+        heading(1, "Overview"),
+        para("Guests can pay by card at checkout."),
+        heading(1, "Details"),
+        para("Guests can pay by card at checkout, with a receipt by email."),
+      ].join(""),
+    });
+    await writeFile(docxPath, docx);
+    const client = createFakeAIClient((prompt, opts) => {
+      if (opts?.promptType === "prd-breakdown-extract") {
+        return jsonResponse({
+          epics: [
+            {
+              title: "Payments",
+              goal: "",
+              features: [
+                {
+                  title: "Card",
+                  description: "",
+                  pbis: [
+                    {
+                      title: "Guest can pay by card",
+                      description: "",
+                      acceptanceCriteria: [],
+                      sectionId: "s2",
+                      quote: "Guests can pay by card at checkout",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          openQuestions: [],
+        });
+      }
+      return jsonResponse({ nope: true });
+    });
+    const result = await runPrdBreakdown(options({ chunkOptions: { minChars: 100_000 } }), {
+      aiClient: client,
+      clock: CLOCK,
+    });
+    // One chunk holds both sections; the phrase is in each, and the cited one wins.
+    const pbi = result.report.epics[0]?.features[0]?.pbis[0];
+    expect(pbi).toMatchObject({ sectionId: "s2", headingPath: ["Details"], quoteVerified: true });
   });
 
   it("grounds each PBI in the document and flags a quote that cannot be found", async () => {
@@ -685,6 +777,42 @@ describe("runPrdBreakdown", () => {
           aiClient: createFakeAIClient(defaultHandler),
         })
       ).rejects.toThrow(/stored document for run run-1 could not be read/);
+    });
+
+    it("rejects a stored document whose parts are not the shape the breakdown needs", async () => {
+      const paths = prdRunPaths(tempPath, "run-1");
+      await mkdir(paths.runDir, { recursive: true });
+      const sections = [{ id: "s1", level: 1, headingPath: ["A"], childIds: [], blocks: [] }];
+      const chunk = { id: "c1", text: "x", sectionIds: ["s1"], headingPath: ["A"] };
+      for (const stored of [
+        { document: { sections, images: [] }, chunks: [{ ...chunk, sectionIds: undefined }] },
+        { document: { sections: [{ id: "s1" }], images: [] }, chunks: [chunk] },
+        { document: { sections, images: undefined }, chunks: [chunk] },
+        { document: { sections, images: [] }, chunks: "none" },
+      ]) {
+        await writeFile(paths.documentJson, JSON.stringify(stored));
+        await expect(
+          runPrdBreakdown(options({ source: { fromRun: "run-1" } }), {
+            aiClient: createFakeAIClient(defaultHandler),
+          })
+        ).rejects.toThrow(/not in a readable format/);
+      }
+    });
+
+    it("says so when the review report exists but cannot be read", async () => {
+      await storeReview("ready", "frd");
+      const paths = prdRunPaths(tempPath, "run-1");
+      await writeFile(paths.reportJson, "{ truncated");
+      const output = createCapturingOutputWriter();
+      const result = await runPrdBreakdown(
+        options({ source: { fromRun: "run-1" }, output, documentType: "frd" }),
+        { aiClient: createFakeAIClient(defaultHandler), clock: CLOCK }
+      );
+      expect(result.report.review).toBeUndefined();
+      expect(result.report.documentType).toBe("frd");
+      expect(output.output.map((entry) => entry.data).join("\n")).toContain(
+        "The review report of this run could not be read"
+      );
     });
 
     it("rejects a stored document it cannot read", async () => {

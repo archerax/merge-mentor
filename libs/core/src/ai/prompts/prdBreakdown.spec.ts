@@ -60,7 +60,20 @@ describe("PRD breakdown prompts", () => {
               id: "F1",
               title: "Guest form",
               description: "Collects details.",
-              pbis: [{ id: "P1", title: "Guest can enter an address", sectionId: "s1" }],
+              pbis: [
+                {
+                  id: "P1",
+                  title: "Guest can enter an address",
+                  description: "As a guest I want to give an address.",
+                  sectionId: "s1",
+                },
+                {
+                  id: "P2",
+                  title: "Guest can pay",
+                  description: "x ".repeat(200),
+                  sectionId: "s1",
+                },
+              ],
             },
             { id: "F2", title: "Empty feature", description: "", pbis: [] },
           ],
@@ -74,7 +87,11 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("<untrusted-work-items>");
       expect(prompt).toContain("- E1: Guest checkout - Pay without an account.");
       expect(prompt).toContain("    - F1: Guest form - Collects details.");
-      expect(prompt).toContain("      - P1: Guest can enter an address [s1]");
+      expect(prompt).toContain(
+        "      - P1: Guest can enter an address [s1] - As a guest I want to give an address."
+      );
+      // Long descriptions are cut so the listing stays small.
+      expect(prompt).toMatch(/- P2: Guest can pay \[s1\] - (?:x ){70,}x…\n/);
       expect(prompt).toContain("- (no items)");
       expect(prompt).toContain("- s1: Goals");
     });
@@ -82,6 +99,8 @@ describe("PRD breakdown prompts", () => {
     it("asks for merging, a dependency-first delivery order and earlier-only dependencies", () => {
       const prompt = buildPrdBreakdownOrganizePrompt(base);
       expect(prompt).toContain("Merge duplicates");
+      expect(prompt).toContain("Do not merge or drop PBIs");
+      expect(prompt).not.toContain("keep only one");
       expect(prompt).toContain("Dependencies first");
       expect(prompt).toContain("exactly one feature's `pbiIds`");
       expect(prompt).toContain("**earlier** in your order");
