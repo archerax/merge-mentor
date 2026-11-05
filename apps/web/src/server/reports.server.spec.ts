@@ -119,7 +119,9 @@ describe("reports.server", () => {
           execute: () => finished,
         });
 
-        await expect(removePrdRun("web-20261023120000-11223344")).rejects.toThrow(/still running/);
+        await expect(removePrdRun("web-20261023120000-11223344")).rejects.toThrow(
+          /review or work breakdown of this document is still running/
+        );
         expect(mockDeletePrdRun).not.toHaveBeenCalled();
 
         finish();

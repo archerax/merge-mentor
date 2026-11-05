@@ -99,7 +99,7 @@ async function executePrdBreakdown(
   initLogger(config.tempPath);
   emit.send({ type: "status", message: "Starting the work breakdown..." });
 
-  const { aiProvider, client } = createAiClient(config);
+  const { aiProvider, client } = createAiClient(config, { untrustedInput: true });
   let result: Awaited<ReturnType<typeof runPrdBreakdown>>;
   try {
     result = await runPrdBreakdown(

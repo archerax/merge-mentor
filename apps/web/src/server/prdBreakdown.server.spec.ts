@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@merge-mentor/core/ai/providerFactory.js", () => ({
   createAIProvider: vi.fn(() => ({})),
 }));
+const { createAIProvider } = await import("@merge-mentor/core/ai/providerFactory.js");
 
 const runPrdBreakdown = vi.fn();
 vi.mock("@merge-mentor/core/review/prd/breakdownEngine.js", () => ({ runPrdBreakdown }));
@@ -120,6 +121,17 @@ describe("prdBreakdown.server", () => {
           tempPath: tempDir,
         }),
         expect.anything()
+      );
+    });
+
+    it("gives the model no tools to write files or run commands", async () => {
+      const response = await handlePrdBreakdownStart(request({ prdRunId: RUN_ID }));
+      const { runId } = (await response.json()) as { runId: string };
+      await collectFrames(streamRun(runId, 0) as ReadableStream<Uint8Array>);
+
+      expect(createAIProvider).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ enableWriteTools: false, enableShellTools: false })
       );
     });
 

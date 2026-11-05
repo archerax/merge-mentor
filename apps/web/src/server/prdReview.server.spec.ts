@@ -148,6 +148,17 @@ describe("prdReview.server", () => {
       );
     });
 
+    it("gives the model no tools to write files or run commands", async () => {
+      const response = await handlePrdUpload(uploadRequest(new Uint8Array(docx)));
+      const { runId } = (await response.json()) as { runId: string };
+      await collectFrames(streamRun(runId, 0) as ReadableStream<Uint8Array>);
+
+      expect(createAIProvider).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ enableWriteTools: false, enableShellTools: false })
+      );
+    });
+
     it("persists the options but never the file in the run manifest", async () => {
       const response = await handlePrdUpload(uploadRequest(new Uint8Array(docx)));
       const { runId } = (await response.json()) as { runId: string };

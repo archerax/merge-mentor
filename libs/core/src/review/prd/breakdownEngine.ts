@@ -336,7 +336,7 @@ class PrdBreakdownRun {
       throw new ValidationError("runId", "must contain only letters, digits, '-' and '_'");
     }
     const paths = prdRunPaths(this.options.tempPath ?? "./.mergementor", runId);
-    let stored: { document: DocxDocument; chunks: readonly DocumentChunk[] };
+    let stored: ReturnType<typeof parseStoredDocument>;
     try {
       stored = parseStoredDocument(await this.fs.readFile(paths.documentJson, "utf-8"));
     } catch (error) {
@@ -366,7 +366,9 @@ class PrdBreakdownRun {
       runId,
       paths,
       fileName: review?.fileName ?? "document.docx",
-      documentType: review?.documentType ?? this.options.documentType ?? "prd",
+      // The review knows best; then the type stored with the run; then the caller's.
+      documentType:
+        review?.documentType ?? stored.documentType ?? this.options.documentType ?? "prd",
       document: stored.document,
       chunks: stored.chunks,
       ...(review?.sha256 ? { sha256: review.sha256 } : {}),
@@ -456,7 +458,7 @@ class PrdBreakdownRun {
       await this.fs.writeFileBuffer(paths.sourceDocx, buffer);
       await this.fs.writeFile(
         paths.documentJson,
-        JSON.stringify({ document, chunks }, null, 2),
+        JSON.stringify({ document, chunks, documentType: options.documentType ?? "prd" }, null, 2),
         "utf-8"
       );
     } catch (error) {
@@ -892,6 +894,8 @@ function isStringArray(value: unknown): boolean {
 function parseStoredDocument(raw: string): {
   document: DocxDocument;
   chunks: readonly DocumentChunk[];
+  /** The type the run was made with; absent for runs stored before it was recorded. */
+  documentType?: PrdDocumentType;
 } {
   const unreadable = new ValidationError(
     "runId",
@@ -924,6 +928,9 @@ function parseStoredDocument(raw: string): {
       warnings: isStringArray(document.warnings) ? (document.warnings as string[]) : [],
     },
     chunks: chunks as DocumentChunk[],
+    ...(value.documentType === "prd" || value.documentType === "frd"
+      ? { documentType: value.documentType }
+      : {}),
   };
 }
 

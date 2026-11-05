@@ -60,7 +60,7 @@ export async function loadReport(name: string): Promise<ReportDocument | undefin
  * (its stored summary holds the report, and so quotes from the document).
  *
  * @throws {ValidationError} when `runId` is not a safe run id (so it can never
- *   name a path outside the PRD run directory), or its review is still running
+ *   name a path outside the PRD run directory), or a review or breakdown of it is still running
  */
 export async function removePrdRun(runId: unknown): Promise<void> {
   if (typeof runId !== "string" || !isSafePrdRunId(runId)) {
@@ -71,7 +71,7 @@ export async function removePrdRun(runId: unknown): Promise<void> {
   if (isPrdRunActive(runId)) {
     throw new ValidationError(
       "runId",
-      "this review is still running. Wait for it to finish, then delete it."
+      "a review or work breakdown of this document is still running. Wait for it to finish, then delete it."
     );
   }
   const tempPath = resolveTempPath();

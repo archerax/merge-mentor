@@ -272,7 +272,7 @@ class PrdReviewRun {
       await this.fs.writeFileBuffer(paths.sourceDocx, buffer);
       await this.fs.writeFile(
         paths.documentJson,
-        JSON.stringify({ document, chunks }, null, 2),
+        JSON.stringify({ document, chunks, documentType: options.documentType }, null, 2),
         "utf-8"
       );
       return await this.review({ createdAt, fileName, runId, paths, buffer, document, chunks });

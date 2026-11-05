@@ -7,6 +7,8 @@ import type { FileSystem } from "@merge-mentor/shared/ports/fileSystem.js";
 import type { OutputWriter } from "@merge-mentor/shared/ports/outputWriter.js";
 import type { ProcessRunner } from "@merge-mentor/shared/ports/processRunner.js";
 
+import type { PromptType } from "./shared/promptType.js";
+
 /** Combined result from fast review (single-pass file + cross-file analysis). */
 export interface FastReviewResult {
   /** Per-file review results split from the flat findings list. */
@@ -110,22 +112,7 @@ export interface ExecutePromptOptions {
    */
   readonly onSessionDiscardFailed?: (reason: string) => void;
   /** Hint for the type of review prompt being sent (avoids substring inference). */
-  readonly promptType?:
-    | "file-review"
-    | "cross-file-review"
-    | "batched-file-review"
-    | "fast-review"
-    | "build-analysis"
-    | "multi-agent-subagent"
-    | "multi-agent-synthesizer"
-    | "plan"
-    | "project"
-    | "prd-section"
-    | "prd-consistency"
-    | "prd-image"
-    | "prd-verify"
-    | "prd-breakdown-extract"
-    | "prd-breakdown-organize";
+  readonly promptType?: PromptType;
 }
 
 /** An image file attached to a prompt. */

@@ -646,9 +646,9 @@ describe("runPrdBreakdown", () => {
     ).toBe(true);
   });
 
-  async function storeReview(verdict: string, documentType = "prd"): Promise<void> {
+  async function storeReview(verdict: string, documentType: "prd" | "frd" = "prd"): Promise<void> {
     // Make the run's document, then add the review report a review would have written.
-    await runPrdBreakdown(options(), {
+    await runPrdBreakdown(options({ documentType }), {
       aiClient: createFakeAIClient(defaultHandler),
       clock: CLOCK,
     });
@@ -682,6 +682,29 @@ describe("runPrdBreakdown", () => {
       expect(result.report.counts.pbis).toBe(4);
       expect(result.reportMarkdown).toContain("not ready for development");
       expect(await exists(result.paths.breakdownMarkdown)).toBe(true);
+    });
+
+    it("keeps the type of a run made from a file when it has no review", async () => {
+      // A direct breakdown of an FRD stores the document with its type but writes no review.
+      await runPrdBreakdown(options({ documentType: "frd" }), {
+        aiClient: createFakeAIClient(defaultHandler),
+        clock: CLOCK,
+      });
+      expect(
+        JSON.parse(await readFile(prdRunPaths(tempPath, "run-1").documentJson, "utf-8"))
+      ).toMatchObject({ documentType: "frd" });
+
+      const client = createFakeAIClient(defaultHandler);
+      const again = await runPrdBreakdown(
+        // The caller's default type must not override the stored one.
+        options({ source: { fromRun: "run-1" }, documentType: "prd" }),
+        { aiClient: client, clock: CLOCK }
+      );
+      expect(again.report.documentType).toBe("frd");
+      expect(again.report.review).toBeUndefined();
+      expect(String(client.executePrompt.mock.calls[0]?.[0])).toContain(
+        "Functional Requirements Document"
+      );
     });
 
     it("refuses a document whose review found blockers unless forced", async () => {
