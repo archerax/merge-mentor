@@ -13,6 +13,8 @@ export type PromptType =
   | "prd-consistency"
   | "prd-image"
   | "prd-verify"
+  | "prd-breakdown-extract"
+  | "prd-breakdown-organize"
   | "unknown";
 
 /**

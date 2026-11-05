@@ -5,6 +5,8 @@ import {
   FILE_REVIEW_SCHEMA,
   getJsonSchema,
   getStrictJsonSchema,
+  PRD_BREAKDOWN_EXTRACT_SCHEMA,
+  PRD_BREAKDOWN_ORGANIZE_SCHEMA,
   PRD_CONSISTENCY_SCHEMA,
   PRD_SECTION_SCHEMA,
   PRD_IMAGE_SCHEMA,
@@ -65,6 +67,40 @@ describe("jsonSchemas", () => {
       expect(getJsonSchema("prd-consistency")).toBe(PRD_CONSISTENCY_SCHEMA);
       expect(getJsonSchema("prd-verify")).toBe(PRD_VERIFY_SCHEMA);
       expect(getJsonSchema("prd-image")).toBe(PRD_IMAGE_SCHEMA);
+    });
+
+    it("returns the work breakdown schemas for the breakdown prompt types", () => {
+      expect(getJsonSchema("prd-breakdown-extract")).toBe(PRD_BREAKDOWN_EXTRACT_SCHEMA);
+      expect(getJsonSchema("prd-breakdown-organize")).toBe(PRD_BREAKDOWN_ORGANIZE_SCHEMA);
+    });
+
+    it("requires every breakdown field in strict mode so blank values stay blankable", () => {
+      const strict = getStrictJsonSchema("prd-breakdown-extract") as {
+        required: string[];
+        properties: {
+          epics: {
+            items: {
+              required: string[];
+              properties: {
+                features: {
+                  items: { properties: { pbis: { items: { required: string[] } } } };
+                };
+              };
+            };
+          };
+        };
+      };
+      expect(strict.required).toEqual(["epics", "openQuestions"]);
+      const epic = strict.properties.epics.items;
+      expect(epic.required).toEqual(["title", "goal", "features"]);
+      expect(epic.properties.features.items.properties.pbis.items.required).toEqual([
+        "title",
+        "description",
+        "acceptanceCriteria",
+        "sectionId",
+        "quote",
+      ]);
+      expect(getStrictJsonSchema("prd-breakdown-organize")).toBeDefined();
     });
 
     it("requires an image id on every image finding in strict mode", () => {

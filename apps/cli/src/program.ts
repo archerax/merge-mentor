@@ -16,6 +16,7 @@ import { executeFixCommand } from "./commands/fix.js";
 import { executePBIReview } from "./commands/pbi.js";
 import { executePlan } from "./commands/plan.js";
 import { executePrdReview } from "./commands/prd.js";
+import { executePrdBreakdown } from "./commands/prdBreakdown.js";
 import { executeProjectReview } from "./commands/project.js";
 import { executeReplyCommand } from "./commands/reply.js";
 import { executeReposCommand } from "./commands/repos.js";
@@ -47,6 +48,7 @@ import type {
   FixOptions,
   PBIOptions,
   PlanOptions,
+  PrdBreakdownOptions,
   PrdOptions,
   ProjectOptions,
   ReplyOptions,
@@ -792,6 +794,43 @@ program
   .action(async (file: string, options: PrdOptions) => {
     try {
       await executePrdReview(file, options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// PRD / FRD work breakdown command
+program
+  .command("prd-breakdown [file]")
+  .description(
+    "Break a PRD or FRD Word document (.docx) down into epics, features and PBIs in delivery order"
+  )
+  .optionsGroup("General Options")
+  .option(
+    "--from-review <run-id>",
+    "Break down the document of an earlier `prd` review instead of a file"
+  )
+  .option("--type <type>", "Document type of a file: prd or frd", "prd")
+  .option("--force", "Break the document down even when its review found blockers", false)
+  .option(
+    "--temp-path <path>",
+    "Base path for reports and run data (default ./.mergementor). Env: MM_TEMP_PATH"
+  )
+  .optionsGroup("AI Provider Configuration")
+  .option("--provider <provider>", "AI provider (copilot-sdk, opencode-sdk). Env: MM_AI_PROVIDER")
+  .option("--copilot-token <token>", "Copilot GitHub token. Env: MM_COPILOT_TOKEN")
+  .option("--ai-timeout <ms>", "Timeout in ms for all AI providers. Env: MM_AI_TIMEOUT", parseInt)
+  .option("--ai-model <model>", "Model name for the active AI provider. Env: MM_AI_MODEL")
+  .option(
+    "--ai-base-url <url>",
+    "OpenAI-compatible API base URL for AI providers that support BYOK. Env: MM_AI_BASE_URL"
+  )
+  .option("--ai-api-key <key>", "API key for AI providers that support BYOK. Env: MM_AI_API_KEY")
+  .action(async (file: string | undefined, options: PrdBreakdownOptions) => {
+    try {
+      await executePrdBreakdown(file, options);
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);

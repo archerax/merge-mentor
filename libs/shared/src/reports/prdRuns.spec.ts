@@ -33,6 +33,8 @@ describe("prdRuns", () => {
         transcriptsDir: path.join("/tmp/mm", "prd", "run-1", "transcripts"),
         reportMarkdown: path.join("/tmp/mm", "reports", "prd-run-1-review-report.md"),
         reportJson: path.join("/tmp/mm", "reports", "prd-run-1-review-report.json"),
+        breakdownMarkdown: path.join("/tmp/mm", "reports", "prd-run-1-breakdown.md"),
+        breakdownJson: path.join("/tmp/mm", "reports", "prd-run-1-breakdown.json"),
       });
       expect(classifyReport(path.basename(paths.reportMarkdown))).toBe("prd");
     });
@@ -46,6 +48,12 @@ describe("prdRuns", () => {
     it("extracts the run id from Markdown and JSON report names", () => {
       expect(prdRunIdFromReportName("prd-run-1-review-report.md")).toBe("run-1");
       expect(prdRunIdFromReportName("prd-run-1-review-report.json")).toBe("run-1");
+    });
+
+    it("extracts the run id from work breakdown names", () => {
+      expect(prdRunIdFromReportName("prd-run-1-breakdown.md")).toBe("run-1");
+      expect(prdRunIdFromReportName("prd-run-1-breakdown.json")).toBe("run-1");
+      expect(classifyReport("prd-run-1-breakdown.md")).toBe("prd");
     });
 
     it("returns undefined for other reports and unsafe ids", () => {
@@ -77,12 +85,16 @@ describe("prdRuns", () => {
         await writeFile(path.join(paths.transcriptsDir, "transcript-sdk-1.txt"), "doc text");
         await writeFile(paths.reportMarkdown, "# Report");
         await writeFile(paths.reportJson, "{}");
+        await writeFile(paths.breakdownMarkdown, "# Breakdown");
+        await writeFile(paths.breakdownJson, "{}");
       }
 
       await deletePrdRun("run-1", { tempPath });
 
       expect(await readdir(path.join(tempPath, "prd"))).toEqual(["run-2"]);
       expect((await readdir(path.join(tempPath, "reports"))).toSorted()).toEqual([
+        "prd-run-2-breakdown.json",
+        "prd-run-2-breakdown.md",
         "prd-run-2-review-report.json",
         "prd-run-2-review-report.md",
       ]);

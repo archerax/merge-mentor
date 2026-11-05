@@ -19,6 +19,7 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as ApiPbiStreamRouteImport } from './routes/api/pbi/stream'
+import { Route as ApiPrdBreakdownRouteImport } from './routes/api/prd/breakdown'
 import { Route as ApiPrdStreamRouteImport } from './routes/api/prd/stream'
 import { Route as ApiProjectStreamRouteImport } from './routes/api/project/stream'
 import { Route as ApiReviewPostRouteImport } from './routes/api/review/post'
@@ -75,6 +76,11 @@ const ApiPbiStreamRoute = ApiPbiStreamRouteImport.update({
   path: '/api/pbi/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPrdBreakdownRoute = ApiPrdBreakdownRouteImport.update({
+  id: '/api/prd/breakdown',
+  path: '/api/prd/breakdown',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPrdStreamRoute = ApiPrdStreamRouteImport.update({
   id: '/api/prd/stream',
   path: '/api/prd/stream',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
   '/api/review/post': typeof ApiReviewPostRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
     | '/api/review/post'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   StatsRoute: typeof StatsRoute
   ApiPbiStreamRoute: typeof ApiPbiStreamRoute
+  ApiPrdBreakdownRoute: typeof ApiPrdBreakdownRoute
   ApiPrdStreamRoute: typeof ApiPrdStreamRoute
   ApiProjectStreamRoute: typeof ApiProjectStreamRoute
   ApiReviewPostRoute: typeof ApiReviewPostRoute
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPbiStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/prd/breakdown': {
+      id: '/api/prd/breakdown'
+      path: '/api/prd/breakdown'
+      fullPath: '/api/prd/breakdown'
+      preLoaderRoute: typeof ApiPrdBreakdownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/prd/stream': {
       id: '/api/prd/stream'
       path: '/api/prd/stream'
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   StatsRoute: StatsRoute,
   ApiPbiStreamRoute: ApiPbiStreamRoute,
+  ApiPrdBreakdownRoute: ApiPrdBreakdownRoute,
   ApiPrdStreamRoute: ApiPrdStreamRoute,
   ApiProjectStreamRoute: ApiProjectStreamRoute,
   ApiReviewPostRoute: ApiReviewPostRoute,
@@ -355,13 +376,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

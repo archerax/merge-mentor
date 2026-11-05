@@ -17,7 +17,7 @@
  * defences, and the AI client passed in must be created without write or
  * shell tools (the provider defaults).
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import { MergeMentorError, ValidationError } from "@merge-mentor/shared/errors/index.js";
@@ -68,6 +68,7 @@ import {
   verdictLabel,
 } from "./prdReport.js";
 import { PrdVerifier } from "./prdVerifier.js";
+import { createRunId, type PrdDocumentSource, sourceFileName } from "./runNaming.js";
 import { type ChunkOptions, chunkDocument } from "./sectionChunker.js";
 import type {
   DocumentChunk,
@@ -82,9 +83,7 @@ import type {
 export type { PrdReviewReport } from "./prdReport.js";
 
 /** The document to review: a file on disk, or bytes already in memory (an upload). */
-export type PrdReviewSource =
-  | { readonly path: string }
-  | { readonly buffer: Buffer; readonly fileName: string };
+export type PrdReviewSource = PrdDocumentSource;
 
 /** Options for {@link runPrdReview}. */
 export interface PrdReviewOptions {
@@ -1047,29 +1046,6 @@ function hasResponseKeys(json: unknown, keys: readonly string[]): boolean {
   return keys.every((key) =>
     key === "findings" ? Array.isArray(record[key]) : record[key] !== undefined
   );
-}
-
-function sourceFileName(source: PrdReviewSource): string {
-  const name = path.basename("path" in source ? source.path : source.fileName);
-  return name.length > 0 ? name : "document.docx";
-}
-
-/** `20261023-142530-checkout-prd-a1b2c3`: sortable, readable and unique. */
-function createRunId(date: Date, fileName: string): string {
-  const stamp = date
-    .toISOString()
-    .replace(/\.\d{3}Z$/, "")
-    .replace(/[-:]/g, "")
-    .replace("T", "-");
-  const slug =
-    fileName
-      .replace(/\.docx$/i, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40)
-      .replace(/-+$/, "") || "document";
-  return `${stamp}-${slug}-${randomBytes(3).toString("hex")}`;
 }
 
 function chunkLabel(chunk: DocumentChunk, total: number): string {

@@ -123,7 +123,9 @@ export interface ExecutePromptOptions {
     | "prd-section"
     | "prd-consistency"
     | "prd-image"
-    | "prd-verify";
+    | "prd-verify"
+    | "prd-breakdown-extract"
+    | "prd-breakdown-organize";
 }
 
 /** An image file attached to a prompt. */

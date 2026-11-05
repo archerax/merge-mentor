@@ -206,3 +206,84 @@ export const PrdVerifierResultSchema = z.object({
     )
     .default([]),
 });
+
+// PRD work breakdown (epics, features and PBIs)
+
+/** A string list where a missing value or `null` means "none". */
+const TextListSchema = z.preprocess(
+  (value) => (value === null || value === undefined ? [] : value),
+  z.array(z.coerce.string())
+);
+
+/** One product backlog item proposed from a chunk of the document. */
+const PrdBreakdownPbiSchema = z.object({
+  title: z.coerce.string().default(""),
+  description: z.coerce.string().default(""),
+  acceptanceCriteria: TextListSchema,
+  sectionId: z.coerce.string().default(""),
+  quote: z.coerce.string().default(""),
+});
+
+const PrdBreakdownFeatureSchema = z.object({
+  title: z.coerce.string().default(""),
+  description: z.coerce.string().default(""),
+  pbis: z.array(PrdBreakdownPbiSchema).default([]),
+});
+
+const PrdBreakdownEpicSchema = z.object({
+  title: z.coerce.string().default(""),
+  goal: z.coerce.string().default(""),
+  features: z.array(PrdBreakdownFeatureSchema).default([]),
+});
+
+/** A question the document leaves open, found while breaking it down. */
+const PrdBreakdownQuestionSchema = z.object({
+  question: z.coerce.string().default(""),
+  sectionId: z.coerce.string().default(""),
+  quote: z.coerce.string().default(""),
+});
+
+/** Result of extracting work items from one chunk of a document (one AI call per chunk). */
+export const PrdBreakdownExtractResultSchema = z.object({
+  epics: z.array(PrdBreakdownEpicSchema).default([]),
+  openQuestions: z.array(PrdBreakdownQuestionSchema).default([]),
+});
+
+/** Result of ordering and grouping all extracted work items (one AI call per run). */
+export const PrdBreakdownOrganizeResultSchema = z.object({
+  summary: z.coerce.string().default(""),
+  epics: z
+    .array(
+      z.object({
+        title: z.coerce.string().default(""),
+        goal: z.coerce.string().default(""),
+        /** Why this epic sits where it does in the delivery order. */
+        rationale: z.coerce.string().default(""),
+        /** Extracted epic ids merged into this epic. */
+        epicIds: TextListSchema,
+        features: z
+          .array(
+            z.object({
+              title: z.coerce.string().default(""),
+              description: z.coerce.string().default(""),
+              /** Extracted feature ids merged into this feature. */
+              featureIds: TextListSchema,
+              /** Extracted PBI ids in build order. */
+              pbiIds: TextListSchema,
+            })
+          )
+          .default([]),
+      })
+    )
+    .default([]),
+  dependencies: z
+    .array(
+      z.object({
+        pbiId: z.coerce.string().default(""),
+        dependsOn: TextListSchema,
+      })
+    )
+    .default([]),
+  /** Cross-cutting gaps that the PRD does not answer. */
+  gaps: TextListSchema,
+});

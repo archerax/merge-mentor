@@ -5,6 +5,7 @@
  * engine or `node:fs` into the client bundle.
  */
 
+import type { PrdBreakdownReport } from "@merge-mentor/core/review/prd/breakdownReport.js";
 import type { PrdReviewReport } from "@merge-mentor/core/review/prd/prdReport.js";
 
 /** Endpoint that accepts an upload (POST) and streams a run (GET). */
@@ -48,5 +49,29 @@ export interface PrdReviewSummary {
   /** The structured report. */
   readonly report: PrdReviewReport;
   /** The rendered Markdown report. */
+  readonly reportMarkdown: string;
+}
+
+/** Endpoint that starts a work breakdown (POST) and streams its run (GET). */
+export const PRD_BREAKDOWN_ENDPOINT = "/api/prd/breakdown";
+
+/** Input of a work breakdown run, persisted in the run manifest. */
+export interface PrdBreakdownRunInput {
+  readonly mode: "breakdown";
+  /** Id of the stored PRD run (the review) to break down. */
+  readonly prdRunId: string;
+  /** Break the document down even when its review found blockers. */
+  readonly force: boolean;
+}
+
+/** Final summary of a completed work breakdown. */
+export interface PrdBreakdownSummary {
+  /** Id of the PRD run on disk (shared with the review it was made from). */
+  readonly prdRunId: string;
+  /** File name of the Markdown breakdown on the Reports page. */
+  readonly reportName: string;
+  /** The structured breakdown. */
+  readonly report: PrdBreakdownReport;
+  /** The rendered Markdown breakdown, for download and copy. */
   readonly reportMarkdown: string;
 }

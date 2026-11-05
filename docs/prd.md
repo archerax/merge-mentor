@@ -117,6 +117,48 @@ The images that are sent are first saved in the run's folder (`.mergementor/prd/
 
 ---
 
+## Work Breakdown
+
+Once a document is ready, `prd-breakdown` turns it into a first draft of a backlog: **epics**, **features** and **product backlog items (PBIs)**, listed in the order they should be built.
+
+```bash
+# Break down a Word file directly
+merge-mentor prd-breakdown checkout-redesign.docx
+
+# Break down a document that `prd` already reviewed (no need to read the file again)
+merge-mentor prd-breakdown --from-review 20261023-142530-checkout-redesign-a1b2c3
+
+# Break down a document whose review found blockers
+merge-mentor prd-breakdown --from-review 20261023-142530-checkout-redesign-a1b2c3 --force
+```
+
+Give it either a file or `--from-review <run-id>` (the run id is printed when a review finishes, and is part of the report's file name), not both. `--type prd|frd` sets the document type of a file; a reviewed document keeps the type of its review. The AI provider options are the same as for `prd`. A review that found blockers is refused unless you pass `--force`, because a breakdown built on a document with gaps would carry the gaps into the backlog.
+
+### How the order is worked out
+
+1. Each part of the document is read on its own and proposes epics, features and PBIs, using only what the document says.
+2. A final step merges duplicates (the same epic is often described in several places), groups the items and puts epics, features and PBIs in a logical order: what others depend on first, then the value delivered, then risk. It also records which PBIs must wait for others.
+3. Every PBI is checked against the document: its quote must be found in the text, and its dependencies must name real PBIs that come earlier in the order. Items the ordering step missed are kept under **Needs placement** rather than dropped.
+
+### The Breakdown
+
+The Markdown file contains:
+
+- **Counts and a short summary** of the suggested delivery order, followed by a numbered outline.
+- **Epics, features and PBIs**, numbered by position (`1`, `1.1`, `1.1.1`). Each PBI has a description, acceptance criteria as a checklist, the PBIs it depends on, and the text of the document it comes from. A PBI whose quote cannot be found in the document is marked.
+- **Open questions** the document leaves unanswered.
+- **Not covered**: sections that have text but produced no work items, parts that could not be read, and any dependencies that were left out because they were invalid.
+
+If the ordering step cannot run, the items keep the order of the document and the breakdown says so. The breakdown is an automated first draft: check it, reorder it and refine it with your team before planning work from it.
+
+### Web Dashboard
+
+On the **PRD / FRD Review** page, a finished review offers **Break down into work items**. The result is a read-only tree of epics, features and PBIs (open an item to see its criteria, dependencies and source text). **Download Markdown** saves the file for further processing, **Copy Markdown** copies it, and the **Reports** page lists it with a download button too. If the review found blockers, the button asks you to fix them first, or to break down anyway.
+
+The breakdown is saved as `.mergementor/reports/prd-<run-id>-breakdown.md` (and `.json`) next to the review report. It uses the same run folder, so **Delete run** removes the review, the breakdown and the stored document together.
+
+---
+
 ## Confidentiality
 
 The `prd` command follows the same local-only approach as every other Merge Mentor command:
@@ -135,6 +177,8 @@ Each review is a separate run with its own run id (for example `20261023-142530-
 | ------------------------------------------------------ | --------------------------------------------------------- |
 | `.mergementor/reports/prd-<run-id>-review-report.md`   | The report (shown on the dashboard's **Reports** page)    |
 | `.mergementor/reports/prd-<run-id>-review-report.json` | The same report as structured data                        |
+| `.mergementor/reports/prd-<run-id>-breakdown.md`       | The [work breakdown](#work-breakdown), once one is made   |
+| `.mergementor/reports/prd-<run-id>-breakdown.json`     | The same breakdown as structured data                     |
 | `.mergementor/prd/<run-id>/source.docx`                | A copy of the document that was reviewed                  |
 | `.mergementor/prd/<run-id>/document.json`              | The text extracted from the document, split into sections |
 | `.mergementor/prd/<run-id>/images/`                    | Images sent for review (only with `--include-images`)     |
