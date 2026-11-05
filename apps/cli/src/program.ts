@@ -644,6 +644,10 @@ program
   .option("--host <host>", "Bind the dashboard server to a specific host (e.g. 0.0.0.0)")
   .option("--open", "Open the dashboard in the default browser")
   .option("--no-open", "Do not open the dashboard in the default browser")
+  .option(
+    "--no-token",
+    "Disable the per-launch access token (loopback hosts only; any local process can then use the dashboard)"
+  )
   .action(async (options: UiOptions) => {
     try {
       await executeUiCommand(options);

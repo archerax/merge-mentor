@@ -162,6 +162,40 @@ describe("ui command", () => {
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
+  it("passes a non-empty token and a tokenized URL by default", async () => {
+    const child = spawnChild();
+
+    const commandPromise = executeUiCommand({});
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1));
+    const env = vi.mocked(spawn).mock.calls[0]?.[2]?.env as Record<string, string>;
+    expect(env.MM_UI_TOKEN).toMatch(/.+/);
+    child.emit("exit", 0);
+    await commandPromise;
+  });
+
+  it("disables the token with --no-token, even if MM_UI_TOKEN is inherited", async () => {
+    const child = spawnChild();
+    vi.stubEnv("MM_UI_TOKEN", "inherited");
+    try {
+      const parsePromise = program.parseAsync(["node", "test", "ui", "--no-token", "--no-open"]);
+      await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1));
+      const env = vi.mocked(spawn).mock.calls[0]?.[2]?.env as Record<string, string>;
+      expect(env.MM_UI_TOKEN).toBe("");
+      child.emit("exit", 0);
+      await parsePromise;
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses --no-token on a non-loopback host", async () => {
+    await expect(executeUiCommand({ token: false, host: "0.0.0.0" })).rejects.toThrow(
+      "--no-token is only allowed"
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("rejects a non-numeric port without spawning the server", async () => {
     await expect(executeUiCommand({ port: Number.NaN })).rejects.toThrow("Port must be an integer");
     expect(spawn).not.toHaveBeenCalled();

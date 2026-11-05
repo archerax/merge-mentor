@@ -15,8 +15,8 @@ export const DEFAULT_UI_PORT = 3000;
 /**
  * Default host for the dashboard server.
  *
- * Binding to loopback keeps the unauthenticated dashboard reachable only from
- * the local machine. Pass `--host` to opt in to a broader bind (e.g. `0.0.0.0`
+ * Binding to loopback keeps the dashboard reachable only from the local
+ * machine. Pass `--host` to opt in to a broader bind (e.g. `0.0.0.0`
  * inside a container).
  */
 export const DEFAULT_UI_HOST = "127.0.0.1";
@@ -129,9 +129,10 @@ function openBrowser(url: string): void {
  * dev server or the web app's runtime dependencies. Keeps running until the
  * server exits (or the user presses Ctrl+C).
  *
- * @param options - UI command options (`port`, `host`, `open`)
+ * @param options - UI command options (`port`, `host`, `open`, `token`)
  * @returns Resolves once the dashboard server process has exited
- * @throws If the prebuilt dashboard cannot be found or the process fails to start
+ * @throws If the prebuilt dashboard cannot be found, `--no-token` is combined with a
+ *   non-loopback host, or the process fails to start
  */
 export async function executeUiCommand(options: UiOptions): Promise<void> {
   const output = consoleOutputWriter;
@@ -146,11 +147,28 @@ export async function executeUiCommand(options: UiOptions): Promise<void> {
     );
   }
 
-  const token = randomBytes(24).toString("base64url");
-  const url = `http://${host}:${port}/?token=${token}`;
-  output.log(
-    `\n🖥️  Starting merge-mentor dashboard. Open this URL (it contains a one-time access token):\n   ${url}\n`
-  );
+  const tokenDisabled = options.token === false;
+  if (tokenDisabled && !isLoopbackHost(host)) {
+    throw new Error(
+      `--no-token is only allowed when the dashboard is bound to a loopback host (got "${host}"). ` +
+        "Remove --no-token or bind to 127.0.0.1."
+    );
+  }
+
+  // An empty MM_UI_TOKEN disables the guard's token check, and also overrides any
+  // value inherited from the parent environment.
+  const token = tokenDisabled ? "" : randomBytes(24).toString("base64url");
+  const url = tokenDisabled ? `http://${host}:${port}/` : `http://${host}:${port}/?token=${token}`;
+  if (tokenDisabled) {
+    output.log(
+      `\n⚠️  Access token disabled (--no-token). Any local process or user that can reach ${host}:${port} can use the dashboard and your credentials.\n`
+    );
+    output.log(`🖥️  Starting merge-mentor dashboard:\n   ${url}\n`);
+  } else {
+    output.log(
+      `\n🖥️  Starting merge-mentor dashboard. Open this URL (it contains a one-time access token):\n   ${url}\n`
+    );
+  }
 
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const child = spawn(process.execPath, [entry], {

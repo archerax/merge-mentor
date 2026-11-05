@@ -32,12 +32,13 @@ layer of access control in front of it.
 
 ## Options
 
-| Option          | Description                                                                          |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `--port <port>` | Port for the dashboard server. Must be an integer from 1 to 65535. Default: `3000`.  |
-| `--host <host>` | Bind the dashboard server to a specific host (e.g. `0.0.0.0`). Default: `127.0.0.1`. |
-| `--open`        | Open the dashboard in the default browser once it is ready. Default behavior.        |
-| `--no-open`     | Do not open the dashboard in the default browser.                                    |
+| Option          | Description                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| `--port <port>` | Port for the dashboard server. Must be an integer from 1 to 65535. Default: `3000`.                    |
+| `--host <host>` | Bind the dashboard server to a specific host (e.g. `0.0.0.0`). Default: `127.0.0.1`.                   |
+| `--open`        | Open the dashboard in the default browser once it is ready. Default behavior.                          |
+| `--no-open`     | Do not open the dashboard in the default browser.                                                      |
+| `--no-token`    | Disable the per-launch access token. Loopback hosts only. See [Access protection](#access-protection). |
 
 The browser is not opened when stdout is not an interactive terminal (for
 example in CI) or when the server is bound to a non-loopback host.
@@ -56,6 +57,12 @@ web page you happen to visit could send it:
 - Each launch generates a random access token. Open the URL printed at startup
   (it ends in `?token=...`); the token is exchanged for a `SameSite=Strict`
   cookie and removed from the address bar. Requests without it get 403.
+
+If you are the only user of the machine and find the token inconvenient, pass
+`--no-token`. The host and same-origin checks stay on, but any other local
+process or user that can reach the port can then use the dashboard with your
+credentials. `--no-token` is refused when `--host` is not a loopback address,
+and it overrides any `MM_UI_TOKEN` set in your environment.
 
 ---
 

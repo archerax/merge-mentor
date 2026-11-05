@@ -472,6 +472,11 @@ export interface UiOptions {
   host?: string;
   /** Open the dashboard in the default browser once it is ready. Default: `true`. */
   open?: boolean;
+  /**
+   * Require the per-launch access token. Default: `true`. `--no-token` sets this to `false`
+   * and is only allowed on loopback hosts.
+   */
+  token?: boolean;
 }
 
 /** Result of a successful `eval` command execution. */

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work items** shows the backlog as a read-only tree of epics, features and
   PBIs, with live progress, and **Download Markdown** saves the file for
   further refinement. The Reports page can download a saved breakdown too.
+- **`ui --no-token`**: turns off the per-launch access token so you can open the
+  dashboard at a plain `http://127.0.0.1:<port>/` address. The host and
+  same-origin checks stay on. It is refused when `--host` is not a loopback
+  address, and it overrides any `MM_UI_TOKEN` in your environment.
 
 ## [4.3.0] - 2026-10-25
 
