@@ -63,14 +63,14 @@
     "CHANGELOG.md"
   ],
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.26",
+    "@github/copilot-sdk": "^1.0.28",
     "@octokit/rest": "^22.0.1",
-    "@opencode-ai/sdk": "^1.19.3",
+    "@opencode-ai/sdk": "^1.19.5",
     "azure-devops-node-api": "^17.0.1",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
-    "dotenv": "^18.0.8",
-    "isomorphic-git": "^1.44.3",
+    "dotenv": "^18.0.9",
+    "isomorphic-git": "^1.44.10",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
     "picomatch": "^4.0.7",
@@ -81,18 +81,18 @@
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^24.19.2",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "cross-env": "^10.1.0",
     "esbuild": "^0.28.2",
     "husky": "^9.1.7",
-    "knip": "^6.42.1",
+    "knip": "^6.44.1",
     "oxfmt": "^0.74.0",
-    "oxlint": "^1.89.0",
+    "oxlint": "^1.91.0",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.14.1",
     "typescript": "^6.0.3",
     "vite": "8.3.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6"
 }
