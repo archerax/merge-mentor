@@ -27,6 +27,7 @@ import {
   type PrdReviewSummary,
 } from "../server/prd.types.js";
 import { MarkdownReport } from "./MarkdownReport.js";
+import { PrdBreakdownPanel } from "./PrdBreakdownPanel.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
 import { ProgressTimeline } from "./review/ProgressTimeline.js";
@@ -63,6 +64,10 @@ interface PrdReviewRunnerProps {
   readonly runId?: string;
   /** Called with the new run id so the page can persist it in the URL. */
   readonly onRunCreated?: (runId: string) => void;
+  /** Work breakdown run id from the URL, re-attached on mount to resume it. */
+  readonly breakdownRunId?: string;
+  /** Called with the breakdown's run id so the page can persist it in the URL. */
+  readonly onBreakdownRunCreated?: (runId: string) => void;
 }
 
 /**
@@ -71,7 +76,12 @@ interface PrdReviewRunnerProps {
  * Shares the streaming hook and progress/live/log panels with the PBI runner;
  * the request body is the raw file instead of JSON.
  */
-export function PrdReviewRunner({ runId, onRunCreated }: PrdReviewRunnerProps) {
+export function PrdReviewRunner({
+  runId,
+  onRunCreated,
+  breakdownRunId,
+  onBreakdownRunCreated,
+}: PrdReviewRunnerProps) {
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<PrdDocumentTypeInput>("prd");
   const [includeImages, setIncludeImages] = useState(false);
@@ -219,6 +229,15 @@ export function PrdReviewRunner({ runId, onRunCreated }: PrdReviewRunnerProps) {
       <LiveThinking live={live} running={running} />
 
       {summary && <PrdReviewResult summary={summary} />}
+
+      {summary && !running && (
+        <PrdBreakdownPanel
+          key={summary.prdRunId}
+          review={summary}
+          breakdownRunId={breakdownRunId}
+          onBreakdownRunCreated={onBreakdownRunCreated}
+        />
+      )}
 
       {!running && <TechnicalLog entries={entries} />}
     </Stack>

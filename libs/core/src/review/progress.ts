@@ -22,7 +22,8 @@
  * Not every pipeline emits every phase (for example the fast strategy folds
  * cross-file analysis into `file-review`, and work item reviews use
  * `ai-review` instead of the file-centric phases; the PRD / FRD document
- * review adds `consistency` for its whole-document pass).
+ * review adds `consistency` for its whole-document pass, and the work
+ * breakdown adds `organize` for putting the work items in order).
  */
 export type ReviewPhaseId =
   | "resolve"
@@ -32,6 +33,7 @@ export type ReviewPhaseId =
   | "cross-file"
   | "ai-review"
   | "consistency"
+  | "organize"
   | "images"
   | "verify"
   | "post"

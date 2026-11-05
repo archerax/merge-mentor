@@ -59,6 +59,8 @@ function createResult(overrides: { complete?: boolean } = {}): PrdReviewResult {
       transcriptsDir: `${TEMP_PATH}/prd/${runId}/transcripts`,
       reportMarkdown: `${TEMP_PATH}/reports/prd-${runId}-review-report.md`,
       reportJson: `${TEMP_PATH}/reports/prd-${runId}-review-report.json`,
+      breakdownMarkdown: `${TEMP_PATH}/reports/prd-${runId}-breakdown.md`,
+      breakdownJson: `${TEMP_PATH}/reports/prd-${runId}-breakdown.json`,
     },
   };
 }

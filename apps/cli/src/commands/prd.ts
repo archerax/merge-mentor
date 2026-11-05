@@ -113,7 +113,12 @@ export async function executePrdReview(
   return result;
 }
 
-async function assertReadableFile(
+/**
+ * Checks that `filePath` is a readable file within the `.docx` size limit.
+ *
+ * @throws {ValidationError} when it is missing, not a file, unreadable or too large
+ */
+export async function assertReadableFile(
   filePath: string,
   displayPath: string,
   fileSystem: Pick<FileSystem, "stat">

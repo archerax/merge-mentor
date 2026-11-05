@@ -16,12 +16,14 @@ import {
   TextInput,
 } from "@mantine/core";
 import type { ReportDocument, ReportKind } from "@merge-mentor/shared/reports/index.js";
+import { isPrdBreakdownReportName } from "@merge-mentor/shared/reports/prdReportNames.js";
 import { IconTrash } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { DownloadMarkdownButton } from "../components/review/DownloadMarkdownButton.js";
 import { deletePrdReport, getReport, getReports } from "../server/reports.functions.js";
 import type { ReportListItem } from "../server/reports.server.js";
 
@@ -188,18 +190,26 @@ function ReportsView({
                         This review keeps a copy of the uploaded document in{" "}
                         <Code>.mergementor</Code>.
                       </Text>
-                      <Button
-                        color="red"
-                        variant="light"
-                        size="xs"
-                        leftSection={<IconTrash size={14} />}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setPendingDelete(selectedItem);
-                        }}
-                      >
-                        Delete run
-                      </Button>
+                      <Group gap="xs">
+                        {isPrdBreakdownReportName(selected.name) && (
+                          <DownloadMarkdownButton
+                            text={selected.content}
+                            fileName={selected.name}
+                          />
+                        )}
+                        <Button
+                          color="red"
+                          variant="light"
+                          size="xs"
+                          leftSection={<IconTrash size={14} />}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setPendingDelete(selectedItem);
+                          }}
+                        >
+                          Delete run
+                        </Button>
+                      </Group>
                     </Group>
                   )}
                   <MarkdownReport content={selected.content} />
@@ -222,9 +232,9 @@ function ReportsView({
       >
         <Stack gap="md">
           <Text size="sm">
-            This permanently deletes the report for <b>{pendingDelete?.title}</b>, the stored copy
-            of the uploaded document, the data and images extracted from it, and the AI transcripts
-            of the review. This cannot be undone.
+            This permanently deletes the report for <b>{pendingDelete?.title}</b>, any work
+            breakdown made from the same document, the stored copy of the uploaded document, the
+            data and images extracted from it, and the AI transcripts. This cannot be undone.
           </Text>
           {deleteError && (
             <Alert color="red" title="Could not delete">

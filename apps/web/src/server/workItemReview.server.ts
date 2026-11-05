@@ -114,9 +114,13 @@ function createAdapter(target: WorkItemTarget): PlatformAdapter {
 
 /**
  * Creates the AI provider client for a resolved configuration. Shared with the
- * PRD review, which has no platform target.
+ * PRD review, which has no platform target. Pass `untrustedInput` when the
+ * prompts contain text from an uploaded document.
  */
-export function createAiClient(config: Config): {
+export function createAiClient(
+  config: Config,
+  options: { readonly untrustedInput?: boolean } = {}
+): {
   readonly aiProvider: AIProviderType;
   readonly client: ReturnType<typeof createAIProvider>;
 } {
@@ -128,6 +132,9 @@ export function createAiClient(config: Config): {
     aiBaseUrl: config.aiBaseUrl,
     aiApiKey: config.aiApiKey,
     tempPath: config.tempPath,
+    // Text from an uploaded document is untrusted: the model gets no tools that
+    // could write files or run commands, whatever the provider's defaults are.
+    ...(options.untrustedInput ? { enableWriteTools: false, enableShellTools: false } : {}),
   });
 
   return { aiProvider, client };

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **PRD / FRD work breakdown**: `merge-mentor prd-breakdown` turns a requirements
+  document into an ordered backlog of epics, features and product backlog items
+  (PBIs), each with acceptance criteria, dependencies on earlier items and a
+  quote from the document it is based on. It also lists open questions and the
+  sections of the document that produced no work items. Give it a Word file,
+  or `--from-review <run-id>` to reuse a document that `prd` already reviewed
+  (a review that found blockers needs `--force`). The result is saved as
+  Markdown and JSON next to the review report, and is removed with the run.
+- **Work breakdown in the web UI**: after a PRD / FRD review, **Break down into
+  work items** shows the backlog as a read-only tree of epics, features and
+  PBIs, with live progress, and **Download Markdown** saves the file for
+  further refinement. The Reports page can download a saved breakdown too.
+
 ## [4.3.0] - 2026-10-25
 
 Shows which account AI requests will run under, so company data is not sent

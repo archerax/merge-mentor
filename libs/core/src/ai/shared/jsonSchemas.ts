@@ -414,6 +414,113 @@ export const PRD_VERIFY_SCHEMA = {
   required: ["verdicts"],
 } as const;
 
+const PRD_BREAKDOWN_PBI_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string", description: "Short outcome-focused title" },
+    description: { type: "string", description: "What the item delivers and for whom" },
+    acceptanceCriteria: {
+      type: "array",
+      items: { type: "string" },
+      description: "Testable criteria taken from the document",
+    },
+    sectionId: { type: "string", description: "Section id the item comes from, e.g. s2.1" },
+    quote: { type: "string", description: "Exact text copied from the document" },
+  },
+  required: ["title", "description", "acceptanceCriteria", "sectionId", "quote"],
+} as const;
+
+/** JSON schema for the PRD work breakdown extraction pass structured output. */
+export const PRD_BREAKDOWN_EXTRACT_SCHEMA = {
+  type: "object",
+  properties: {
+    epics: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          goal: { type: "string", description: "The outcome this epic achieves" },
+          features: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                pbis: { type: "array", items: PRD_BREAKDOWN_PBI_SCHEMA },
+              },
+              required: ["title", "description", "pbis"],
+            },
+          },
+        },
+        required: ["title", "goal", "features"],
+      },
+    },
+    openQuestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "What the document does not answer" },
+          sectionId: { type: "string" },
+          quote: { type: "string", description: "Exact text copied from the document" },
+        },
+        required: ["question", "sectionId", "quote"],
+      },
+    },
+  },
+  required: ["epics", "openQuestions"],
+} as const;
+
+/** JSON schema for the PRD work breakdown ordering pass structured output. */
+export const PRD_BREAKDOWN_ORGANIZE_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "Plain-language delivery order overview" },
+    epics: {
+      type: "array",
+      description: "Epics in delivery order",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          goal: { type: "string" },
+          rationale: { type: "string", description: "Why this epic is in this position" },
+          epicIds: { type: "array", items: { type: "string" } },
+          features: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                featureIds: { type: "array", items: { type: "string" } },
+                pbiIds: { type: "array", items: { type: "string" } },
+              },
+              required: ["title", "description", "featureIds", "pbiIds"],
+            },
+          },
+        },
+        required: ["title", "goal", "rationale", "epicIds", "features"],
+      },
+    },
+    dependencies: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          pbiId: { type: "string" },
+          dependsOn: { type: "array", items: { type: "string" } },
+        },
+        required: ["pbiId", "dependsOn"],
+      },
+    },
+    gaps: { type: "array", items: { type: "string" } },
+  },
+  required: ["summary", "epics", "dependencies", "gaps"],
+} as const;
+
 /**
  * Returns the structured JSON schema corresponding to the prompt type,
  * or undefined if structured schema output is not used for that prompt type.
@@ -441,6 +548,10 @@ export function getJsonSchema(promptType: PromptType): Record<string, unknown> |
       return PRD_IMAGE_SCHEMA as unknown as Record<string, unknown>;
     case "prd-verify":
       return PRD_VERIFY_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-breakdown-extract":
+      return PRD_BREAKDOWN_EXTRACT_SCHEMA as unknown as Record<string, unknown>;
+    case "prd-breakdown-organize":
+      return PRD_BREAKDOWN_ORGANIZE_SCHEMA as unknown as Record<string, unknown>;
     default:
       return undefined;
   }

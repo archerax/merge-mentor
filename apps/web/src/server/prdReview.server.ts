@@ -206,7 +206,7 @@ async function executePrdReview(
     message: `Starting ${DOCUMENT_TYPE_LABELS[upload.documentType]} review of ${upload.fileName}...`,
   });
 
-  const { aiProvider, client } = createAiClient(config);
+  const { aiProvider, client } = createAiClient(config, { untrustedInput: true });
   const result = await runPrdReview(
     {
       source: { buffer: upload.buffer, fileName: upload.fileName },

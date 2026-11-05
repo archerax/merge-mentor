@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { ValidationError } from "../errors/index.js";
 import { type FileSystem, nodeFs } from "../ports/index.js";
+import { BREAKDOWN_SUFFIX, REPORT_PREFIX, REPORT_SUFFIX } from "./prdReportNames.js";
 
 /**
  * On-disk layout of a PRD / FRD review run.
@@ -12,6 +13,8 @@ import { type FileSystem, nodeFs } from "../ports/index.js";
  * ```
  * <tempPath>/reports/prd-<runId>-review-report.md    (listed on the Reports page, kind "prd")
  * <tempPath>/reports/prd-<runId>-review-report.json  (structured report)
+ * <tempPath>/reports/prd-<runId>-breakdown.md        (work breakdown, once one has been made)
+ * <tempPath>/reports/prd-<runId>-breakdown.json      (structured work breakdown)
  * <tempPath>/prd/<runId>/source.docx                 (copy of the reviewed document)
  * <tempPath>/prd/<runId>/document.json               (extracted document model and chunks)
  * <tempPath>/prd/<runId>/images/                     (images extracted for --include-images)
@@ -36,10 +39,12 @@ export interface PrdRunPaths {
   readonly reportMarkdown: string;
   /** Structured JSON report. */
   readonly reportJson: string;
+  /** Markdown work breakdown (epics, features and PBIs), written by `prd-breakdown`. */
+  readonly breakdownMarkdown: string;
+  /** Structured JSON work breakdown. */
+  readonly breakdownJson: string;
 }
 
-const REPORT_PREFIX = "prd-";
-const REPORT_SUFFIX = "-review-report";
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /**
@@ -59,6 +64,11 @@ export function prdRunPaths(tempPath: string, runId: string): PrdRunPaths {
   assertSafeRunId(runId);
   const runDir = path.join(tempPath, "prd", runId);
   const reportBase = path.join(tempPath, "reports", `${REPORT_PREFIX}${runId}${REPORT_SUFFIX}`);
+  const breakdownBase = path.join(
+    tempPath,
+    "reports",
+    `${REPORT_PREFIX}${runId}${BREAKDOWN_SUFFIX}`
+  );
   return {
     runDir,
     sourceDocx: path.join(runDir, "source.docx"),
@@ -67,24 +77,26 @@ export function prdRunPaths(tempPath: string, runId: string): PrdRunPaths {
     transcriptsDir: path.join(runDir, "transcripts"),
     reportMarkdown: `${reportBase}.md`,
     reportJson: `${reportBase}.json`,
+    breakdownMarkdown: `${breakdownBase}.md`,
+    breakdownJson: `${breakdownBase}.json`,
   };
 }
 
 /**
  * Extracts the run id from a PRD report file name
- * (`prd-<runId>-review-report.md` or `.json`).
+ * (`prd-<runId>-review-report.md` or `prd-<runId>-breakdown.md`, or `.json`).
  *
  * @returns The run id, or `undefined` when the name is not a PRD report
  */
 export function prdRunIdFromReportName(name: string): string | undefined {
-  const match = /^prd-(.+)-review-report\.(?:md|json)$/.exec(name);
+  const match = /^prd-(.+)-(?:review-report|breakdown)\.(?:md|json)$/.exec(name);
   const runId = match?.[1];
   return runId !== undefined && isSafePrdRunId(runId) ? runId : undefined;
 }
 
 /**
- * Deletes everything a PRD review run produced: the Markdown and JSON reports,
- * the copy of the source `.docx`, the extracted data and images, and the AI
+ * Deletes everything a PRD review run produced: the Markdown and JSON reports
+ * and work breakdown, the copy of the source `.docx`, the extracted data and images, and the AI
  * request transcripts. Missing files are
  * ignored, so deleting a partially written run is safe.
  *
@@ -98,6 +110,8 @@ export async function deletePrdRun(
   const paths = prdRunPaths(options.tempPath ?? path.join(process.cwd(), ".mergementor"), runId);
   await fs.rm(paths.reportMarkdown, { force: true });
   await fs.rm(paths.reportJson, { force: true });
+  await fs.rm(paths.breakdownMarkdown, { force: true });
+  await fs.rm(paths.breakdownJson, { force: true });
   await fs.rm(paths.runDir, { recursive: true, force: true });
 }
 

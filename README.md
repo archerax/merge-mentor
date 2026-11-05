@@ -71,6 +71,7 @@ Merge Mentor offers a set of subcommands to support reviews, plan checks, and au
 - **[pbi](./docs/pbi.md)**: Reviews a Product Backlog Item / User Story / Issue for backlog quality.
 - **[project](./docs/project.md)**: Reviews a project or feature plan hierarchy against planning guidelines.
 - **[prd](./docs/prd.md)**: Reviews a PRD or FRD Word document (`.docx`) for gaps, ambiguity and testability before development starts.
+- **[prd-breakdown](./docs/prd.md#work-breakdown)**: Breaks a PRD or FRD Word document down into epics, features and PBIs in a logical delivery order, as a Markdown file you can refine.
 - **[plan](./docs/plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[stats](./docs/stats.md)**: Reports how many PRs Merge Mentor has reviewed and how many comments it has posted, queried live from your repository.
 - **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive reviews.

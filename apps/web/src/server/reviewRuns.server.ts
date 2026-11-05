@@ -300,6 +300,20 @@ export function isPrdRunActive(prdRunId: string): boolean {
   return false;
 }
 
+/**
+ * Returns whether the PRD *review* recorded under `prdRunId` is still
+ * executing. A work breakdown of the same run does not count: it only reads
+ * what the review wrote, and must wait for the review to finish.
+ */
+export function isPrdReviewActive(prdRunId: string): boolean {
+  for (const run of active.values()) {
+    if (run.kind !== "prd" || run.status !== "running") continue;
+    const input = run.input as { prdRunId?: unknown; mode?: unknown } | null;
+    if (input?.prdRunId === prdRunId && input.mode !== "breakdown") return true;
+  }
+  return false;
+}
+
 /** Returns whether a run exists in memory or on disk. */
 export function hasRun(runId: string): boolean {
   return (

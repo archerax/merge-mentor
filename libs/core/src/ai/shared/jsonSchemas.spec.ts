@@ -5,6 +5,8 @@ import {
   FILE_REVIEW_SCHEMA,
   getJsonSchema,
   getStrictJsonSchema,
+  PRD_BREAKDOWN_EXTRACT_SCHEMA,
+  PRD_BREAKDOWN_ORGANIZE_SCHEMA,
   PRD_CONSISTENCY_SCHEMA,
   PRD_SECTION_SCHEMA,
   PRD_IMAGE_SCHEMA,
@@ -65,6 +67,66 @@ describe("jsonSchemas", () => {
       expect(getJsonSchema("prd-consistency")).toBe(PRD_CONSISTENCY_SCHEMA);
       expect(getJsonSchema("prd-verify")).toBe(PRD_VERIFY_SCHEMA);
       expect(getJsonSchema("prd-image")).toBe(PRD_IMAGE_SCHEMA);
+    });
+
+    it("returns the work breakdown schemas for the breakdown prompt types", () => {
+      expect(getJsonSchema("prd-breakdown-extract")).toBe(PRD_BREAKDOWN_EXTRACT_SCHEMA);
+      expect(getJsonSchema("prd-breakdown-organize")).toBe(PRD_BREAKDOWN_ORGANIZE_SCHEMA);
+    });
+
+    it("requires every breakdown field in strict mode so blank values stay blankable", () => {
+      const strict = getStrictJsonSchema("prd-breakdown-extract") as {
+        required: string[];
+        properties: {
+          epics: {
+            items: {
+              required: string[];
+              properties: {
+                features: {
+                  items: { properties: { pbis: { items: { required: string[] } } } };
+                };
+              };
+            };
+          };
+        };
+      };
+      expect(strict.required).toEqual(["epics", "openQuestions"]);
+      const epic = strict.properties.epics.items;
+      expect(epic.required).toEqual(["title", "goal", "features"]);
+      expect(epic.properties.features.items.properties.pbis.items.required).toEqual([
+        "title",
+        "description",
+        "acceptanceCriteria",
+        "sectionId",
+        "quote",
+      ]);
+
+      const organize = getStrictJsonSchema("prd-breakdown-organize") as {
+        required: string[];
+        additionalProperties: boolean;
+        properties: {
+          epics: {
+            items: {
+              required: string[];
+              additionalProperties: boolean;
+              properties: { features: { items: { required: string[] } } };
+            };
+          };
+          dependencies: { items: { required: string[] } };
+        };
+      };
+      expect(organize.required).toEqual(["summary", "epics", "dependencies", "gaps"]);
+      expect(organize.additionalProperties).toBe(false);
+      const organizeEpic = organize.properties.epics.items;
+      expect(organizeEpic.additionalProperties).toBe(false);
+      expect(organizeEpic.required).toEqual(["title", "goal", "rationale", "epicIds", "features"]);
+      expect(organizeEpic.properties.features.items.required).toEqual([
+        "title",
+        "description",
+        "featureIds",
+        "pbiIds",
+      ]);
+      expect(organize.properties.dependencies.items.required).toEqual(["pbiId", "dependsOn"]);
     });
 
     it("requires an image id on every image finding in strict mode", () => {
