@@ -36,6 +36,18 @@ describe("PrdBreakdownPanel", () => {
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>.*Break down into work items/);
   });
 
+  it("does not offer a second breakdown while resuming one from the URL", () => {
+    const html = renderHtml(
+      <PrdBreakdownPanel
+        review={review("needs-work")}
+        breakdownRunId="web-20261023120000-aabbccdd"
+      />
+    );
+
+    expect(html).not.toContain("Break it down into work items");
+    expect(html).not.toContain("Break down into work items");
+  });
+
   it("asks for confirmation before breaking down a document with blockers", () => {
     const html = renderHtml(<PrdBreakdownPanel review={review("not-ready")} />);
 

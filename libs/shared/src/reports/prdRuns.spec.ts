@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ValidationError } from "../errors/index.js";
+import { isPrdBreakdownReportName } from "./prdReportNames.js";
 import { deletePrdRun, isSafePrdRunId, prdRunIdFromReportName, prdRunPaths } from "./prdRuns.js";
 import { classifyReport } from "./reportReader.js";
 
@@ -59,6 +60,19 @@ describe("prdRuns", () => {
     it("returns undefined for other reports and unsafe ids", () => {
       expect(prdRunIdFromReportName("pbi-7-review-report.md")).toBeUndefined();
       expect(prdRunIdFromReportName("prd-a.b-review-report.md")).toBeUndefined();
+    });
+  });
+
+  describe("isPrdBreakdownReportName", () => {
+    it("recognises work breakdown Markdown files only", () => {
+      expect(isPrdBreakdownReportName("prd-run-1-breakdown.md")).toBe(true);
+      expect(
+        isPrdBreakdownReportName(path.basename(prdRunPaths("/tmp/mm", "run-1").breakdownMarkdown))
+      ).toBe(true);
+      expect(isPrdBreakdownReportName("prd-run-1-breakdown.json")).toBe(false);
+      expect(isPrdBreakdownReportName("prd-run-1-review-report.md")).toBe(false);
+      expect(isPrdBreakdownReportName("prd--breakdown.md")).toBe(false);
+      expect(isPrdBreakdownReportName("pbi-1-breakdown.md")).toBe(false);
     });
   });
 

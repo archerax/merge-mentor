@@ -16,6 +16,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import type { ReportDocument, ReportKind } from "@merge-mentor/shared/reports/index.js";
+import { isPrdBreakdownReportName } from "@merge-mentor/shared/reports/prdReportNames.js";
 import { IconTrash } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -50,11 +51,6 @@ const KIND_COLORS: Record<ReportKind, string> = {
   stage: "orange",
   report: "gray",
 };
-
-/** A work breakdown of a PRD / FRD run (`prd-<run-id>-breakdown.md`). */
-function isPrdBreakdownReport(name: string): boolean {
-  return /^prd-.+-breakdown\.md$/.test(name);
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -195,7 +191,7 @@ function ReportsView({
                         <Code>.mergementor</Code>.
                       </Text>
                       <Group gap="xs">
-                        {isPrdBreakdownReport(selected.name) && (
+                        {isPrdBreakdownReportName(selected.name) && (
                           <DownloadMarkdownButton
                             text={selected.content}
                             fileName={selected.name}

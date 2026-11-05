@@ -39,7 +39,16 @@ export function PrdBreakdownPanel({
     });
 
   const blocked = review.report.readiness.verdict === "not-ready";
-  const started = running || summary !== null || error !== null || phases.length > 0;
+  // A run id from the URL is a breakdown already made or under way, even before
+  // the stream attaches: the start card must not offer a second, paid one.
+  const started =
+    breakdownRunId !== undefined ||
+    running ||
+    summary !== null ||
+    error !== null ||
+    phases.length > 0;
+  // A run id left in the URL by another document must not show its backlog here.
+  const shown = summary?.prdRunId === review.prdRunId ? summary : null;
 
   async function start(force: boolean) {
     const input: PrdBreakdownRunInput = { mode: "breakdown", prdRunId: review.prdRunId, force };
@@ -118,7 +127,7 @@ export function PrdBreakdownPanel({
 
       <LiveThinking live={live} running={running} />
 
-      {summary && <PrdBreakdownResult summary={summary} />}
+      {shown && <PrdBreakdownResult summary={shown} />}
     </Stack>
   );
 }

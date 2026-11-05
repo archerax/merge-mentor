@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { ValidationError } from "../errors/index.js";
 import { type FileSystem, nodeFs } from "../ports/index.js";
+import { BREAKDOWN_SUFFIX, REPORT_PREFIX, REPORT_SUFFIX } from "./prdReportNames.js";
 
 /**
  * On-disk layout of a PRD / FRD review run.
@@ -44,9 +45,6 @@ export interface PrdRunPaths {
   readonly breakdownJson: string;
 }
 
-const REPORT_PREFIX = "prd-";
-const REPORT_SUFFIX = "-review-report";
-const BREAKDOWN_SUFFIX = "-breakdown";
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /**

@@ -1,6 +1,41 @@
 import { Button } from "@mantine/core";
 import { IconDownload } from "@tabler/icons-react";
 
+/** Browser pieces {@link saveMarkdownFile} uses, replaceable in tests. */
+interface SaveEnvironment {
+  readonly createObjectURL: (blob: Blob) => string;
+  readonly revokeObjectURL: (url: string) => void;
+  readonly createLink: () => HTMLAnchorElement;
+  readonly schedule: (callback: () => void) => void;
+}
+
+const BROWSER: SaveEnvironment = {
+  createObjectURL: (blob) => URL.createObjectURL(blob),
+  revokeObjectURL: (url) => URL.revokeObjectURL(url),
+  createLink: () => document.createElement("a"),
+  schedule: (callback) => {
+    setTimeout(callback, 1000);
+  },
+};
+
+/**
+ * Saves Markdown text as a `.md` file through the browser's download. The
+ * object URL is released a moment later, not straight after the click, because
+ * a browser may still be reading the blob when the click returns.
+ */
+export function saveMarkdownFile(
+  text: string,
+  fileName: string,
+  env: SaveEnvironment = BROWSER
+): void {
+  const url = env.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+  const link = env.createLink();
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  env.schedule(() => env.revokeObjectURL(url));
+}
+
 interface DownloadMarkdownButtonProps {
   /** The Markdown to save. */
   readonly text: string;
@@ -19,19 +54,13 @@ export function DownloadMarkdownButton({
   fileName,
   label = "Download Markdown",
 }: DownloadMarkdownButtonProps) {
-  function download(): void {
-    const url = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
   return (
-    <Button variant="default" size="xs" onClick={download} leftSection={<IconDownload size={14} />}>
+    <Button
+      variant="default"
+      size="xs"
+      onClick={() => saveMarkdownFile(text, fileName)}
+      leftSection={<IconDownload size={14} />}
+    >
       {label}
     </Button>
   );
