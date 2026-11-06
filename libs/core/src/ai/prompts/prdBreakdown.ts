@@ -22,17 +22,14 @@ const WORK_ITEM_GUIDE = `- **Epic**: a large outcome or capability that users or
 - **PBI** (product backlog item): one small, deliverable piece of work with a single clear outcome, small enough for one team to finish within a sprint. Split anything bigger, but do not split so far that a piece stops being valuable on its own.`;
 
 const GOOD_PBI_GUIDE = `A good PBI:
-- stands alone: it could be released without another PBI;
 - says what is needed, not how to build it, so the team can choose the approach (leave out technology, schema and design choices unless the document requires them);
-- delivers something a user or the business would notice;
-- is clear enough for a team to estimate: when scope or rules are unclear, still describe what is known and put the gap in \`openQuestions\` instead of guessing;
-- fits in one sprint;
+- delivers something a user or the business would notice, or is a foundation that other items need;
 - has acceptance criteria that can be checked.`;
 
 const PBI_WRITING_GUIDE = `- \`title\`: short and outcome-focused, in plain language (for example "Guest can enter a shipping address").
 - \`description\`: one or two sentences saying what is delivered and for whom. Use "As a <user>, I want <goal>, so that <benefit>" only when the document makes the user and the benefit clear.
-- \`acceptanceCriteria\`: two to six checks that someone who did not write the item could verify. Take them from what the document says; do not invent rules, numbers or behaviour.
-- A PBI must deliver something a user or the business could notice and that could be released without another PBI. A rule, default, fallback, validation, limit or edge case that only qualifies another behaviour (for example "use UTC when the user has no timezone") is **not** a PBI: write it as an acceptance criterion on the PBI for the behaviour it qualifies. If the item could not be demonstrated or released without another PBI, it is a criterion, not a PBI. Only make such a rule its own PBI when it is a substantial capability in itself.
+- \`acceptanceCriteria\`: two to six checks that someone who did not write the item could verify, plus any qualifying rules folded in from the document (see below). Take them from what the document says; do not invent rules, numbers or behaviour.
+- A rule, default, fallback, validation, limit or edge case that only qualifies another behaviour (for example "use UTC when the user has no timezone") is **not** a PBI: write it as an acceptance criterion on the PBI for the behaviour it qualifies. Keep it as its own PBI only when it is a substantial capability in itself, or when other items depend on it (for example a foundation, data or access setup item). Being unable to ship before another item exists does not make something a criterion; only a rule that merely qualifies another behaviour does.
 - Do not invent requirements. When the document leaves something open that the team would need to know, add it to \`openQuestions\` instead of guessing.
 - Items the document marks as out of scope or as future work are not work items.
 - Requirements about security, performance, accessibility or compliance become their own PBIs, or acceptance criteria on the PBI they affect, when the document states them.`;

@@ -39,6 +39,7 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("is **not** a PBI");
       expect(prompt).toContain("acceptance criterion on the PBI");
       expect(prompt).toContain("substantial capability in itself");
+      expect(prompt).toContain("other items depend on it");
     });
 
     it("warns against splitting PBIs past the point where they stay valuable", () => {
@@ -49,10 +50,8 @@ describe("PRD breakdown prompts", () => {
     it("describes what a good PBI looks like", () => {
       const prompt = buildPrdBreakdownExtractPrompt(base);
       expect(prompt).toContain("# WHAT A GOOD PBI LOOKS LIKE");
-      expect(prompt).toContain("could be released without another PBI");
+      expect(prompt).toContain("or is a foundation that other items need");
       expect(prompt).toContain("not how to build it");
-      expect(prompt).toContain("clear enough for a team to estimate");
-      expect(prompt).toContain("fits in one sprint");
       expect(prompt).toContain("can be checked");
     });
 
