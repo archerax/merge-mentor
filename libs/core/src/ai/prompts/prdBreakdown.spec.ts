@@ -38,6 +38,11 @@ describe("PRD breakdown prompts", () => {
       const prompt = buildPrdBreakdownExtractPrompt(base);
       expect(prompt).toContain("is **not** a PBI");
       expect(prompt).toContain("acceptance criterion on the PBI");
+      expect(prompt).toContain("substantial capability in itself");
+    });
+
+    it("warns against splitting PBIs past the point where they stay valuable", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
       expect(prompt).toContain("stops being valuable on its own");
     });
 
