@@ -40,6 +40,7 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("acceptance criterion on the PBI");
       expect(prompt).toContain("substantial capability in itself");
       expect(prompt).toContain("other items depend on it");
+      expect(prompt).toContain("not described in this portion, keep the rule as its own PBI");
     });
 
     it("warns against splitting PBIs past the point where they stay valuable", () => {
