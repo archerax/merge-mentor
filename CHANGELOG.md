@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-06
+
+Breaks a reviewed PRD / FRD down into a ready-to-refine backlog.
+
 ### Added
 
 - **PRD / FRD work breakdown**: `merge-mentor prd-breakdown` turns a requirements
