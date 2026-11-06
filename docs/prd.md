@@ -20,6 +20,9 @@ merge-mentor prd payments-frd.docx --type frd
 
 # Use a specific model
 merge-mentor prd checkout-redesign.docx --ai-model claude-sonnet-4.6
+
+# After editing the document, review it again and see what changed
+merge-mentor prd checkout-redesign.docx --against latest
 ```
 
 When the review finishes, the command prints the readiness verdict, the number of issues at each severity, and where the report was saved. Open the Markdown report in any editor, or launch the dashboard with `merge-mentor ui` and open it from the **Reports** page.
@@ -30,12 +33,13 @@ When the review finishes, the command prints the readiness verdict, the number o
 
 ### General Options
 
-| Option               | Description                                                                                  | Env Variable   | Default          |
-| -------------------- | -------------------------------------------------------------------------------------------- | -------------- | ---------------- |
-| `<file>`             | Path to the Word document (`.docx`) to review                                                | -              | -                |
-| `--type <type>`      | Document type, which picks the review checklist: `prd` or `frd`                              | -              | `prd`            |
-| `--include-images`   | Also review images in the document (see [Images](#images))                                   | -              | `false`          |
-| `--temp-path <path>` | Base folder for reports and run data (see [Where files are stored](#where-files-are-stored)) | `MM_TEMP_PATH` | `./.mergementor` |
+| Option               | Description                                                                                                                   | Env Variable   | Default          |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `<file>`             | Path to the Word document (`.docx`) to review                                                                                 | -              | -                |
+| `--type <type>`      | Document type, which picks the review checklist: `prd` or `frd`                                                               | -              | `prd`            |
+| `--against <run-id>` | Compare with an earlier review of this document: a run id, or `latest` (see [Re-reviewing](#re-reviewing-a-revised-document)) | -              | -                |
+| `--include-images`   | Also review images in the document (see [Images](#images))                                                                    | -              | `false`          |
+| `--temp-path <path>` | Base folder for reports and run data (see [Where files are stored](#where-files-are-stored))                                  | `MM_TEMP_PATH` | `./.mergementor` |
 
 ### AI Provider Configuration
 
@@ -97,6 +101,18 @@ Each report contains:
 Before the report is written, every finding is double-checked: findings whose quote cannot be found in the document, duplicates, and findings that do not hold up on a second look are removed.
 
 The review is an automated first pass. Use it alongside, not instead of, review by your team.
+
+## Re-reviewing a Revised Document
+
+After you fix the issues in your document, review it again with `--against`. Give the run id of the earlier review (printed when it finished, and part of the report's file name), or `latest` to use the newest earlier review of a file with the same name. Both reviews must use the same `--type`.
+
+The new report opens with **Changes since the previous review**:
+
+- the verdict before and after (for example _Not ready_ → _Needs work_);
+- how many issues are **resolved**, **still open** and **new**, with the resolved ones listed;
+- 🆕 on each new issue further down the report.
+
+An issue counts as the same one when it quotes (nearly) the same text and describes the same kind of problem, so rewording around it does not make it look new. If either review was partial, the report says that the numbers may be overstated. Each review is still a separate run with its own report; the earlier one is not changed.
 
 ## Supported Files
 

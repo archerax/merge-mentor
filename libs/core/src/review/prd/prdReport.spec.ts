@@ -190,3 +190,30 @@ describe("renderPrdReportMarkdown", () => {
     expect(markdown).toContain("### 1. Issue");
   });
 });
+
+describe("renderPrdReportMarkdown with a comparison", () => {
+  it("shows what changed and marks new findings", () => {
+    const markdown = renderPrdReportMarkdown(
+      report({
+        findings: [finding({ id: "f1" }), finding({ id: "f2", problem: "Brand new problem." })],
+        comparison: {
+          previousRunId: "run-0",
+          previousCreatedAt: "2026-10-01T00:00:00.000Z",
+          previousVerdict: "not-ready",
+          previousCounts: { Blocker: 1, Major: 0, Minor: 0 },
+          newFindingIds: ["f2"],
+          stillOpenFindingIds: ["f1"],
+          resolved: [finding({ id: "f9", severity: "Blocker", problem: "Old blocker. Fixed." })],
+          caveat: "Note: example.",
+        },
+      })
+    );
+    expect(markdown).toContain("## Changes since the previous review");
+    expect(markdown).toContain("| 1 | 1 | 1 |");
+    expect(markdown).toContain("🔴 Not ready for development → 🟠 Needs work before development");
+    expect(markdown).toContain("✅ (Blocker) Old blocker.");
+    expect(markdown).toContain("2. 🆕 Brand new problem.");
+    expect(markdown).toContain("> Note: example.");
+    expect(markdown).not.toContain("1. 🆕");
+  });
+});

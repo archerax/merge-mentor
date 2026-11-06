@@ -9,6 +9,7 @@ import { APP_NAME_LINK } from "@merge-mentor/shared/constants.js";
 
 import { PRD_RUBRICS, type PrdDocumentType } from "../../ai/prompts/prd.js";
 import type { TokenUsage } from "../../ai/types.js";
+import type { PrdReviewComparison } from "./prdDelta.js";
 import type { PrdFinding, PrdNotReviewedItem, PrdSeverity, PrdVerificationStats } from "./types.js";
 
 /** Overall readiness of the document for development. */
@@ -70,6 +71,8 @@ export interface PrdReviewReport {
   readonly aiProvider?: string;
   readonly aiModel?: string;
   readonly tokenUsage?: TokenUsage;
+  /** How this review differs from the earlier review it was compared with (`--against`). */
+  readonly comparison?: PrdReviewComparison;
   /** Merge Mentor version that produced the report. */
   readonly version: string;
 }
@@ -139,9 +142,9 @@ function sectionLabel(finding: PrdFinding): string {
   return finding.headingPath.length > 0 ? finding.headingPath.join(" › ") : "Document";
 }
 
-function renderFinding(finding: PrdFinding, index: number): string {
+function renderFinding(finding: PrdFinding, index: number, isNew: boolean): string {
   const lines = [
-    `### ${index}. ${firstSentence(finding.problem)}`,
+    `### ${index}. ${isNew ? "🆕 " : ""}${firstSentence(finding.problem)}`,
     "",
     `**Where:** ${sectionLabel(finding)} · **Topic:** ${finding.dimensionName}`,
     "",
@@ -163,6 +166,37 @@ function firstSentence(text: string): string {
   const match = /^(.+?[.!?])(\s|$)/.exec(flat);
   const sentence = match?.[1] ?? flat;
   return sentence.length > 120 ? `${sentence.slice(0, 117)}...` : sentence || "Issue";
+}
+
+function renderComparison(comparison: PrdReviewComparison, report: PrdReviewReport): string[] {
+  const before = comparison.previousVerdict;
+  const after = report.readiness.verdict;
+  const out = [
+    "## Changes since the previous review",
+    "",
+    `Compared with review \`${comparison.previousRunId}\` (${comparison.previousCreatedAt.slice(0, 10)}).`,
+    "",
+    before === after
+      ? `Verdict unchanged: ${verdictLabel(after)}`
+      : `Verdict: ${verdictLabel(before)} → ${verdictLabel(after)}`,
+    "",
+    "| Resolved | Still open | New |",
+    "| --- | --- | --- |",
+    `| ${comparison.resolved.length} | ${comparison.stillOpenFindingIds.length} | ${comparison.newFindingIds.length} |`,
+    "",
+  ];
+  if (comparison.caveat) out.push(`> ${comparison.caveat}`, "");
+  if (comparison.resolved.length > 0) {
+    out.push("**Resolved since the previous review:**", "");
+    for (const finding of comparison.resolved) {
+      out.push(`- ✅ (${finding.severity}) ${firstSentence(finding.problem)}`);
+    }
+    out.push("");
+  }
+  if (comparison.newFindingIds.length > 0) {
+    out.push("New issues are marked 🆕 below.", "");
+  }
+  return out;
 }
 
 function documentTypeName(type: PrdDocumentType): string {
@@ -189,6 +223,9 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
     ""
   );
 
+  if (report.comparison) out.push(...renderComparison(report.comparison, report), "");
+
+  const newIds = new Set(report.comparison?.newFindingIds ?? []);
   let number = 0;
   for (const severity of SEVERITY_ORDER) {
     const findings = report.findings.filter((finding) => finding.severity === severity);
@@ -196,7 +233,7 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
     out.push(`## ${SEVERITY_HEADINGS[severity]}`, "");
     for (const finding of findings) {
       number += 1;
-      out.push(renderFinding(finding, number), "");
+      out.push(renderFinding(finding, number, newIds.has(finding.id)), "");
     }
   }
   if (report.findings.length === 0) {

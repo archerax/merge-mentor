@@ -180,6 +180,8 @@ export interface PrdOptions {
   type?: string;
   /** Review embedded images. Default: `false` (images are listed as not reviewed). */
   includeImages?: boolean;
+  /** Earlier review to compare with: a run id, or `latest` for the newest review of this file. */
+  against?: string;
   /** AI provider ('copilot-sdk' or 'opencode-sdk'). Env: `MM_AI_PROVIDER`. */
   provider?: string;
   /** Copilot GitHub token. Env: `MM_COPILOT_TOKEN`. */

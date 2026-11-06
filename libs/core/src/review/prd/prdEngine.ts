@@ -58,6 +58,7 @@ import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../p
 import { parseAIJson } from "./aiJson.js";
 import { parseDocx, readDocxFile, readDocxImageData } from "./docxParser.js";
 import { type DocxValidationOptions, formatMb } from "./docxValidator.js";
+import { compareReviews } from "./prdDelta.js";
 import {
   fallbackReadinessSummary,
   type PrdImageReviewSummary,
@@ -113,6 +114,11 @@ export interface PrdReviewOptions {
   readonly chunkOptions?: ChunkOptions;
   /** Overrides for the `.docx` size and zip guards. */
   readonly validation?: DocxValidationOptions;
+  /**
+   * An earlier review of the same document to compare against. The report then
+   * lists what was resolved, what is still open and what is new.
+   */
+  readonly previousReport?: PrdReviewReport;
   /** Run id to use instead of a generated one (letters, digits, `-`, `_`). */
   readonly runId?: string;
   /** Output writer for progress messages (default: consoleOutputWriter). */
@@ -427,6 +433,9 @@ class PrdReviewRun {
       ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
       ...(options.aiModel ? { aiModel: options.aiModel } : {}),
       ...(this.tokenUsage ? { tokenUsage: this.tokenUsage } : {}),
+      ...(options.previousReport
+        ? { comparison: compareReviews(options.previousReport, findings, complete) }
+        : {}),
       version: packageJson.version,
     };
 
@@ -937,6 +946,12 @@ class PrdReviewRun {
     this.output.log(
       `\nBlockers: ${counts.Blocker} · Major: ${counts.Major} · Minor: ${counts.Minor} · Not reviewed: ${report.notReviewed.length}`
     );
+    if (report.comparison) {
+      const { comparison } = report;
+      this.output.log(
+        `\nSince ${comparison.previousRunId}: ${comparison.resolved.length} resolved · ${comparison.stillOpenFindingIds.length} still open · ${comparison.newFindingIds.length} new`
+      );
+    }
     this.output.log(`${"=".repeat(60)}\n`);
   }
 }

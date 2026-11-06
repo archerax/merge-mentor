@@ -773,6 +773,10 @@ program
   .optionsGroup("General Options")
   .option("--type <type>", "Document type: prd or frd", "prd")
   .option(
+    "--against <run-id>",
+    "Compare with an earlier review of this document (a run id, or `latest`) and show what was resolved, is still open or is new"
+  )
+  .option(
     "--include-images",
     "Also review images in the document (needs an AI model that accepts images); without it, images are listed as not reviewed",
     false

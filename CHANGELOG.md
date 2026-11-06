@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **PRD / FRD re-review**: `merge-mentor prd <file> --against <run-id>` (or
+  `--against latest` for the newest earlier review of the same file name)
+  compares the new review with an earlier one. The report opens with what
+  changed: the verdict before and after, and how many issues are resolved,
+  still open or new. Resolved issues are listed, and new ones are marked.
+  Issues are matched by the text they quote, so rewording around an issue does
+  not make it look new. The comparison says when a partial review may overstate
+  what was resolved.
+
 ## [4.4.0] - 2026-11-06
 
 Breaks a reviewed PRD / FRD down into a ready-to-refine backlog.

@@ -6,6 +6,8 @@ import { createAIProvider } from "@merge-mentor/core/ai/providerFactory.js";
 import type { AIProviderType } from "@merge-mentor/core/ai/types.js";
 import { formatMb, MAX_DOCX_BYTES } from "@merge-mentor/core/review/prd/docxValidator.js";
 import { type PrdReviewResult, runPrdReview } from "@merge-mentor/core/review/prd/prdEngine.js";
+import { loadPreviousReview } from "@merge-mentor/core/review/prd/previousReview.js";
+import { sourceFileName } from "@merge-mentor/core/review/prd/runNaming.js";
 import { ValidationError } from "@merge-mentor/shared/errors/index.js";
 import {
   consoleOutputWriter,
@@ -25,6 +27,8 @@ export interface PrdCommandDeps {
   readonly output?: OutputWriter;
   /** Filesystem used for the up-front file checks. Defaults to `nodeFs`. */
   readonly fileSystem?: Pick<FileSystem, "stat">;
+  /** Filesystem used to load an earlier review for `--against`. Defaults to `nodeFs`. */
+  readonly reportFileSystem?: Pick<FileSystem, "readFile" | "readdir">;
 }
 
 /**
@@ -96,9 +100,23 @@ export async function executePrdReview(
     enableShellTools: false,
   });
 
+  const previousReport = options.against
+    ? await loadPreviousReview(
+        config.tempPath,
+        options.against,
+        sourceFileName({ path: filePath }),
+        documentType,
+        deps.reportFileSystem ?? nodeFs
+      )
+    : undefined;
+  if (previousReport) {
+    output.log(`🔁 Comparing with the earlier review ${previousReport.runId}.`);
+  }
+
   const result = await runPrdReview(
     {
       source: { path: filePath },
+      ...(previousReport ? { previousReport } : {}),
       documentType,
       includeImages: options.includeImages ?? false,
       tempPath: config.tempPath,
