@@ -126,6 +126,10 @@ The new report opens with **Changes since the previous review**:
 
 An issue counts as the same one when it quotes (nearly) the same text and describes the same kind of problem, so rewording around it does not make it look new. If either review was partial, the report says that the numbers may be overstated. Each review is still a separate run with its own report; the earlier one is not changed.
 
+### In the dashboard
+
+On the **PRD / FRD Review** page, after a review finishes, choose the updated `.docx` and leave **Compare with the previous review** ticked. The result shows the resolved, still open and new counts, and the full report starts with the same comparison. Tick **Add the findings to a Word copy as comments** to get a **Download Word copy with comments** button on the result. The copy is kept with the run and removed when you delete it.
+
 ## Supported Files
 
 - Word documents in `.docx` format, up to **20 MB**. Larger files are rejected before anything is read.

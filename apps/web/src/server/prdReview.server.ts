@@ -22,8 +22,12 @@ import {
   validateDocxBuffer,
 } from "@merge-mentor/core/review/prd/docxValidator.js";
 import { runPrdReview } from "@merge-mentor/core/review/prd/prdEngine.js";
+import type { PrdReviewReport } from "@merge-mentor/core/review/prd/prdReport.js";
+import { loadPreviousReview } from "@merge-mentor/core/review/prd/previousReview.js";
 import { ConfigurationError, ValidationError } from "@merge-mentor/shared/errors/index.js";
 import { initLogger } from "@merge-mentor/shared/logger.js";
+import { nodeFs } from "@merge-mentor/shared/ports/index.js";
+import { isSafePrdRunId } from "@merge-mentor/shared/reports/index.js";
 
 import { refreshEnv, resolveTempPath } from "./env.server.js";
 import {
@@ -47,6 +51,9 @@ interface PrdUpload {
   readonly fileName: string;
   readonly documentType: PrdDocumentTypeInput;
   readonly includeImages: boolean;
+  /** Run id of an earlier review to compare with. */
+  readonly againstRunId?: string;
+  readonly annotate: boolean;
 }
 
 /** Longest display file name kept from an upload. */
@@ -94,6 +101,8 @@ export function sanitizeUploadFileName(raw: string | null | undefined): string {
 export function parseUploadOptions(headers: Headers): {
   readonly documentType: PrdDocumentTypeInput;
   readonly includeImages: boolean;
+  readonly annotate: boolean;
+  readonly againstRunId?: string;
 } {
   const documentType = headers.get(PRD_UPLOAD_HEADERS.documentType)?.trim().toLowerCase();
   if (documentType !== "prd" && documentType !== "frd") {
@@ -101,7 +110,12 @@ export function parseUploadOptions(headers: Headers): {
   }
   const includeImages =
     headers.get(PRD_UPLOAD_HEADERS.includeImages)?.trim().toLowerCase() === "true";
-  return { documentType, includeImages };
+  const annotate = headers.get(PRD_UPLOAD_HEADERS.annotate)?.trim().toLowerCase() === "true";
+  const againstRunId = headers.get(PRD_UPLOAD_HEADERS.against)?.trim();
+  if (againstRunId && !isSafePrdRunId(againstRunId)) {
+    throw new ValidationError("against", "is not a valid review id");
+  }
+  return { documentType, includeImages, annotate, ...(againstRunId ? { againstRunId } : {}) };
 }
 
 /**
@@ -170,14 +184,25 @@ function resolvePrdConfig(): Config {
  *
  * @throws {ValidationError} when the bytes are not an acceptable `.docx`
  */
-function startPrdReview(upload: PrdUpload): { runId: string; attached: boolean } {
+async function startPrdReview(upload: PrdUpload): Promise<{ runId: string; attached: boolean }> {
   validateDocxBuffer(upload.buffer);
   const fileName = sanitizeUploadFileName(upload.fileName);
   const config = resolvePrdConfig();
+  const previousReport = upload.againstRunId
+    ? await loadPreviousReview(
+        config.tempPath,
+        upload.againstRunId,
+        fileName,
+        upload.documentType,
+        nodeFs
+      )
+    : undefined;
   const digest = createHash("sha256").update(upload.buffer).digest("hex").slice(0, 16);
   const input: PrdReviewRunInput = {
     documentType: upload.documentType,
     includeImages: upload.includeImages,
+    annotate: upload.annotate,
+    ...(upload.againstRunId ? { againstRunId: upload.againstRunId } : {}),
     fileName,
     sizeBytes: upload.buffer.length,
     prdRunId: `web-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`,
@@ -185,11 +210,11 @@ function startPrdReview(upload: PrdUpload): { runId: string; attached: boolean }
 
   return startOrAttach({
     kind: "prd",
-    targetKey: `prd:${upload.documentType}:${digest}:images=${upload.includeImages}`,
+    targetKey: `prd:${upload.documentType}:${digest}:images=${upload.includeImages}:annotate=${upload.annotate}:against=${upload.againstRunId ?? ""}`,
     label: `${DOCUMENT_TYPE_LABELS[upload.documentType]} · ${fileName}`,
     input,
     execute: (emitter) =>
-      executePrdReview({ ...upload, fileName }, config, emitter, input.prdRunId),
+      executePrdReview({ ...upload, fileName }, config, emitter, input.prdRunId, previousReport),
   });
 }
 
@@ -198,7 +223,8 @@ async function executePrdReview(
   upload: PrdUpload,
   config: Config,
   emit: SseEmitter,
-  prdRunId?: string
+  prdRunId?: string,
+  previousReport?: PrdReviewReport
 ): Promise<void> {
   initLogger(config.tempPath);
   emit.send({
@@ -212,6 +238,8 @@ async function executePrdReview(
       source: { buffer: upload.buffer, fileName: upload.fileName },
       documentType: upload.documentType,
       includeImages: upload.includeImages,
+      annotate: upload.annotate,
+      ...(previousReport ? { previousReport } : {}),
       runId: prdRunId,
       tempPath: config.tempPath,
       aiProvider,
@@ -228,6 +256,9 @@ async function executePrdReview(
     reportName: path.basename(result.paths.reportMarkdown),
     report: result.report,
     reportMarkdown: result.reportMarkdown,
+    ...(result.annotation?.written
+      ? { annotation: { placed: result.annotation.placed, unplaced: result.annotation.unplaced } }
+      : {}),
   };
   emit.send({ type: "result", summary });
 }
@@ -255,7 +286,7 @@ export async function handlePrdUpload(request: Request): Promise<Response> {
 
   try {
     const fileName = request.headers.get(PRD_UPLOAD_HEADERS.fileName) ?? "";
-    return Response.json(startPrdReview({ buffer, fileName, ...options }));
+    return Response.json(await startPrdReview({ buffer, fileName, ...options }));
   } catch (error) {
     return Response.json({ error: plainMessage(error) }, { status: 400 });
   }

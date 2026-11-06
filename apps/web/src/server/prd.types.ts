@@ -19,7 +19,14 @@ export const PRD_UPLOAD_HEADERS = {
   includeImages: "x-mm-include-images",
   /** The original file name, URI-encoded. Display only; never used in a path. */
   fileName: "x-mm-file-name",
+  /** Run id of an earlier review to compare with (optional). */
+  against: "x-mm-against",
+  /** `true` to also produce a copy of the document with the findings as Word comments. */
+  annotate: "x-mm-annotate",
 } as const;
+
+/** Endpoint that downloads the annotated copy of a review (`?run=<prdRunId>`). */
+export const PRD_ANNOTATED_ENDPOINT = "/api/prd/annotated";
 
 /** Document types the reviewer has a rubric for. */
 export type PrdDocumentTypeInput = "prd" | "frd";
@@ -28,6 +35,10 @@ export type PrdDocumentTypeInput = "prd" | "frd";
 export interface PrdReviewRunInput {
   readonly documentType: PrdDocumentTypeInput;
   readonly includeImages: boolean;
+  /** Run id of the earlier review this one is compared with. */
+  readonly againstRunId?: string;
+  /** Whether a copy with the findings as Word comments is produced. */
+  readonly annotate?: boolean;
   /** Sanitised display name of the uploaded file. */
   readonly fileName: string;
   /** Size of the uploaded file in bytes. */
@@ -50,6 +61,8 @@ export interface PrdReviewSummary {
   readonly report: PrdReviewReport;
   /** The rendered Markdown report. */
   readonly reportMarkdown: string;
+  /** Set when an annotated copy was requested: how many findings became Word comments. */
+  readonly annotation?: { readonly placed: number; readonly unplaced: number };
 }
 
 /** Endpoint that starts a work breakdown (POST) and streams its run (GET). */

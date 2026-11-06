@@ -20,6 +20,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
+  PRD_ANNOTATED_ENDPOINT,
   PRD_STREAM_ENDPOINT,
   PRD_UPLOAD_HEADERS,
   type PrdDocumentTypeInput,
@@ -85,6 +86,9 @@ export function PrdReviewRunner({
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<PrdDocumentTypeInput>("prd");
   const [includeImages, setIncludeImages] = useState(false);
+  const [annotate, setAnnotate] = useState(false);
+  // Off until the user has chosen to compare; defaults to on once a review has finished.
+  const [compareChoice, setCompareChoice] = useState<boolean | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -103,6 +107,9 @@ export function PrdReviewRunner({
   } = useReviewStream<PrdReviewSummary>({ endpoint: PRD_STREAM_ENDPOINT, runId, onRunCreated });
 
   const reviewing = (runInput as PrdReviewRunInput | null) ?? null;
+  // A finished review of the same kind of document can be compared with the next version.
+  const previous = summary && summary.report.documentType === documentType ? summary : null;
+  const compare = previous !== null && (compareChoice ?? true);
 
   async function handleRun() {
     const problem = checkPickedFile(file);
@@ -114,6 +121,8 @@ export function PrdReviewRunner({
     const input: PrdReviewRunInput = {
       documentType,
       includeImages,
+      annotate,
+      ...(compare && previous ? { againstRunId: previous.prdRunId } : {}),
       fileName: file.name,
       sizeBytes: file.size,
     };
@@ -123,6 +132,8 @@ export function PrdReviewRunner({
         "Content-Type": "application/octet-stream",
         [PRD_UPLOAD_HEADERS.documentType]: documentType,
         [PRD_UPLOAD_HEADERS.includeImages]: String(includeImages),
+        [PRD_UPLOAD_HEADERS.annotate]: String(annotate),
+        ...(compare && previous ? { [PRD_UPLOAD_HEADERS.against]: previous.prdRunId } : {}),
         [PRD_UPLOAD_HEADERS.fileName]: encodeURIComponent(file.name),
       },
     });
@@ -175,6 +186,24 @@ export function PrdReviewRunner({
             onChange={(event) => setIncludeImages(event.currentTarget.checked)}
             disabled={running}
           />
+
+          <Checkbox
+            label="Add the findings to a Word copy as comments"
+            description="Off by default. After the review you can download a copy of the document with each finding as a Word comment on the paragraph it quotes. Your original file is not changed."
+            checked={annotate}
+            onChange={(event) => setAnnotate(event.currentTarget.checked)}
+            disabled={running}
+          />
+
+          {previous && (
+            <Checkbox
+              label="Compare with the previous review"
+              description={`Choose the updated version of ${previous.report.source.fileName} above to see what was resolved, what is still open and what is new since the review you just ran.`}
+              checked={compare}
+              onChange={(event) => setCompareChoice(event.currentTarget.checked)}
+              disabled={running}
+            />
+          )}
 
           <Alert
             variant="light"
@@ -285,6 +314,18 @@ export function PrdReviewResult({ summary }: { readonly summary: PrdReviewSummar
             >
               Open in Reports
             </Button>
+            {summary.annotation && summary.annotation.placed > 0 && (
+              <Button
+                component="a"
+                href={`${PRD_ANNOTATED_ENDPOINT}?run=${encodeURIComponent(summary.prdRunId)}`}
+                download
+                variant="default"
+                size="xs"
+                title={`${summary.annotation.placed} finding(s) as Word comments${summary.annotation.unplaced > 0 ? `; ${summary.annotation.unplaced} could not be placed and are only in the report` : ""}`}
+              >
+                Download Word copy with comments
+              </Button>
+            )}
             <CopyReportButton text={summary.reportMarkdown} />
           </Group>
         </Group>
@@ -304,6 +345,23 @@ export function PrdReviewResult({ summary }: { readonly summary: PrdReviewSummar
             </Badge>
           )}
         </Group>
+
+        {report.comparison && (
+          <Group gap="xs">
+            <Text size="sm" c="dimmed">
+              Since the previous review:
+            </Text>
+            <Badge color="green" variant="light">
+              {report.comparison.resolved.length} resolved
+            </Badge>
+            <Badge color="gray" variant="light">
+              {report.comparison.stillOpenFindingIds.length} still open
+            </Badge>
+            <Badge color="blue" variant="light">
+              {report.comparison.newFindingIds.length} new
+            </Badge>
+          </Group>
+        )}
 
         {report.imageReview && !report.imageReview.supported && (
           <Alert variant="light" color="yellow" title="Images were not reviewed">

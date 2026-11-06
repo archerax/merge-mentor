@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Re-review and Word copy in the web UI**: on the **PRD / FRD Review** page,
+  once a review has finished, **Compare with the previous review** (on by
+  default) makes the next upload a re-review that shows how many issues are
+  resolved, still open or new. **Add the findings to a Word copy as comments**
+  produces a **Download Word copy with comments** button on the result.
 - **Findings as Word comments**: `merge-mentor prd <file> --annotate` also saves
   a copy of the document, next to the original as `<name>-reviewed.docx`, with
   each finding as a Word comment on the paragraph it quotes (severity, the

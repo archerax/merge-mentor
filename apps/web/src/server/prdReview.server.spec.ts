@@ -171,6 +171,7 @@ describe("prdReview.server", () => {
       expect(manifest.input).toEqual({
         documentType: "prd",
         includeImages: false,
+        annotate: false,
         fileName: "Checkout PRD.docx",
         sizeBytes: docx.length,
         prdRunId: expect.stringMatching(/^web-\d{14}-[0-9a-f]{8}$/),
@@ -287,7 +288,31 @@ describe("prdReview.server", () => {
         [PRD_UPLOAD_HEADERS.documentType]: "FRD",
         [PRD_UPLOAD_HEADERS.includeImages]: "true",
       });
-      expect(parseUploadOptions(headers)).toEqual({ documentType: "frd", includeImages: true });
+      expect(parseUploadOptions(headers)).toEqual({
+        documentType: "frd",
+        includeImages: true,
+        annotate: false,
+      });
+    });
+
+    it("reads the annotate opt-in and the review to compare with", () => {
+      const headers = new Headers({
+        [PRD_UPLOAD_HEADERS.documentType]: "prd",
+        [PRD_UPLOAD_HEADERS.annotate]: "true",
+        [PRD_UPLOAD_HEADERS.against]: " web-20261106-abc123 ",
+      });
+      expect(parseUploadOptions(headers)).toMatchObject({
+        annotate: true,
+        againstRunId: "web-20261106-abc123",
+      });
+    });
+
+    it("rejects an unsafe review id to compare with", () => {
+      const headers = new Headers({
+        [PRD_UPLOAD_HEADERS.documentType]: "prd",
+        [PRD_UPLOAD_HEADERS.against]: "../../etc",
+      });
+      expect(() => parseUploadOptions(headers)).toThrow(/against/);
     });
 
     it("defaults images to off", () => {

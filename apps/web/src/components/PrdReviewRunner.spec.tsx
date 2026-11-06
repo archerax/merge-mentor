@@ -89,6 +89,44 @@ describe("PrdReviewResult", () => {
     expect(html).not.toContain("partly reviewed");
   });
 
+  it("offers the Word copy download only when findings became comments", () => {
+    const withCopy = renderHtml(
+      <PrdReviewResult summary={{ ...buildSummary(), annotation: { placed: 2, unplaced: 1 } }} />
+    );
+    expect(withCopy).toContain("Download Word copy with comments");
+    expect(withCopy).toContain('href="/api/prd/annotated?run=');
+
+    const none = renderHtml(
+      <PrdReviewResult summary={{ ...buildSummary(), annotation: { placed: 0, unplaced: 2 } }} />
+    );
+    expect(none).not.toContain("Download Word copy");
+    expect(renderHtml(<PrdReviewResult summary={buildSummary()} />)).not.toContain(
+      "Download Word copy"
+    );
+  });
+
+  it("shows what changed since the previous review", () => {
+    const html = renderHtml(
+      <PrdReviewResult
+        summary={buildSummary({
+          comparison: {
+            previousRunId: "old",
+            previousCreatedAt: "2026-10-01T00:00:00.000Z",
+            previousVerdict: "not-ready",
+            previousCounts: { Blocker: 1, Major: 0, Minor: 0 },
+            newFindingIds: ["f2"],
+            stillOpenFindingIds: ["f1", "f3"],
+            resolved: [],
+          },
+        })}
+      />
+    );
+    expect(html).toContain("Since the previous review:");
+    expect(html).toContain("0 resolved");
+    expect(html).toContain("2 still open");
+    expect(html).toContain("1 new");
+  });
+
   it("flags a partly reviewed document", () => {
     const html = renderHtml(
       <PrdReviewResult

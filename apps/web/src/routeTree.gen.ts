@@ -19,6 +19,7 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as ApiPbiStreamRouteImport } from './routes/api/pbi/stream'
+import { Route as ApiPrdAnnotatedRouteImport } from './routes/api/prd/annotated'
 import { Route as ApiPrdBreakdownRouteImport } from './routes/api/prd/breakdown'
 import { Route as ApiPrdStreamRouteImport } from './routes/api/prd/stream'
 import { Route as ApiProjectStreamRouteImport } from './routes/api/project/stream'
@@ -76,6 +77,11 @@ const ApiPbiStreamRoute = ApiPbiStreamRouteImport.update({
   path: '/api/pbi/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPrdAnnotatedRoute = ApiPrdAnnotatedRouteImport.update({
+  id: '/api/prd/annotated',
+  path: '/api/prd/annotated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPrdBreakdownRoute = ApiPrdBreakdownRouteImport.update({
   id: '/api/prd/breakdown',
   path: '/api/prd/breakdown',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/annotated': typeof ApiPrdAnnotatedRoute
   '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/annotated': typeof ApiPrdAnnotatedRoute
   '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/stats': typeof StatsRoute
   '/api/pbi/stream': typeof ApiPbiStreamRoute
+  '/api/prd/annotated': typeof ApiPrdAnnotatedRoute
   '/api/prd/breakdown': typeof ApiPrdBreakdownRoute
   '/api/prd/stream': typeof ApiPrdStreamRoute
   '/api/project/stream': typeof ApiProjectStreamRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/annotated'
     | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/annotated'
     | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/stats'
     | '/api/pbi/stream'
+    | '/api/prd/annotated'
     | '/api/prd/breakdown'
     | '/api/prd/stream'
     | '/api/project/stream'
@@ -230,6 +242,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   StatsRoute: typeof StatsRoute
   ApiPbiStreamRoute: typeof ApiPbiStreamRoute
+  ApiPrdAnnotatedRoute: typeof ApiPrdAnnotatedRoute
   ApiPrdBreakdownRoute: typeof ApiPrdBreakdownRoute
   ApiPrdStreamRoute: typeof ApiPrdStreamRoute
   ApiProjectStreamRoute: typeof ApiProjectStreamRoute
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPbiStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/prd/annotated': {
+      id: '/api/prd/annotated'
+      path: '/api/prd/annotated'
+      fullPath: '/api/prd/annotated'
+      preLoaderRoute: typeof ApiPrdAnnotatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/prd/breakdown': {
       id: '/api/prd/breakdown'
       path: '/api/prd/breakdown'
@@ -366,6 +386,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   StatsRoute: StatsRoute,
   ApiPbiStreamRoute: ApiPbiStreamRoute,
+  ApiPrdAnnotatedRoute: ApiPrdAnnotatedRoute,
   ApiPrdBreakdownRoute: ApiPrdBreakdownRoute,
   ApiPrdStreamRoute: ApiPrdStreamRoute,
   ApiProjectStreamRoute: ApiProjectStreamRoute,
