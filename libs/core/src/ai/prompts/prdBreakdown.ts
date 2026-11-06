@@ -21,6 +21,14 @@ const WORK_ITEM_GUIDE = `- **Epic**: a large outcome or capability that users or
 - **Feature**: a distinct capability inside an epic that could be demonstrated or released on its own (for example "Guest details form").
 - **PBI** (product backlog item): one small, deliverable piece of work with a single clear outcome, small enough for one team to finish within a sprint. Split anything bigger, but do not split so far that a piece stops being valuable on its own.`;
 
+const GOOD_PBI_GUIDE = `A good PBI:
+- stands alone: it could be released without another PBI;
+- says what is needed, not how to build it, so the team can choose the approach (leave out technology, schema and design choices unless the document requires them);
+- delivers something a user or the business would notice;
+- is clear enough for a team to estimate: when scope or rules are unclear, still describe what is known and put the gap in \`openQuestions\` instead of guessing;
+- fits in one sprint;
+- has acceptance criteria that can be checked.`;
+
 const PBI_WRITING_GUIDE = `- \`title\`: short and outcome-focused, in plain language (for example "Guest can enter a shipping address").
 - \`description\`: one or two sentences saying what is delivered and for whom. Use "As a <user>, I want <goal>, so that <benefit>" only when the document makes the user and the benefit clear.
 - \`acceptanceCriteria\`: two to six checks that someone who did not write the item could verify. Take them from what the document says; do not invent rules, numbers or behaviour.
@@ -76,6 +84,10 @@ ${WORK_ITEM_GUIDE}
 Group the PBIs you find under features, and the features under epics. Give every epic a \`goal\` (the outcome it achieves). Use a short, descriptive title that the same epic or feature would get in another portion of the document, so duplicates can be merged later.
 
 If this portion contains nothing to build (for example an introduction, a glossary or a list of references), return empty lists.
+
+# WHAT A GOOD PBI LOOKS LIKE
+
+${GOOD_PBI_GUIDE}
 
 # HOW TO WRITE PBIS
 

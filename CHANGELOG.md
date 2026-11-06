@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   another behaviour (for example "use UTC when the user has no timezone") are now
   written as acceptance criteria on that behaviour's PBI instead of becoming
   PBIs of their own.
+- **PRD / FRD work breakdown**: the prompt now describes what a good PBI looks
+  like (stands alone, says what rather than how, visible value, clear enough to
+  estimate, fits a sprint, checkable criteria), in line with how PBIs are
+  reviewed.
 
 ## [4.3.0] - 2026-10-25
 

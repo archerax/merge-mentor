@@ -41,6 +41,16 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("stops being valuable on its own");
     });
 
+    it("describes what a good PBI looks like", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
+      expect(prompt).toContain("# WHAT A GOOD PBI LOOKS LIKE");
+      expect(prompt).toContain("could be released without another PBI");
+      expect(prompt).toContain("not how to build it");
+      expect(prompt).toContain("clear enough for a team to estimate");
+      expect(prompt).toContain("fits in one sprint");
+      expect(prompt).toContain("can be checked");
+    });
+
     it("names the document type and mentions a split section", () => {
       const frd = buildPrdBreakdownExtractPrompt({
         ...base,
