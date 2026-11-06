@@ -14,7 +14,7 @@ const CODE_REVIEW_JARGON = /\b(refactor|code review|pull request|diff|merge requ
 
 describe("PRD prompts", () => {
   describe("rubrics", () => {
-    it("has four PRD dimensions and three FRD dimensions with unique ids", () => {
+    it("has four PRD dimensions and eight FRD dimensions with unique ids", () => {
       expect(PRD_RUBRICS.prd.dimensions.map((d) => d.id)).toEqual([
         "problem-users-goals",
         "scope",
@@ -25,8 +25,13 @@ describe("PRD prompts", () => {
         "requirement-quality",
         "acceptance-criteria",
         "edge-cases",
+        "business-rules",
+        "data-and-interfaces",
+        "roles-and-access",
+        "quality-attributes",
+        "traceability",
       ]);
-      expect(new Set(PRD_DIMENSION_IDS).size).toBe(7);
+      expect(new Set(PRD_DIMENSION_IDS).size).toBe(12);
     });
   });
 
@@ -62,6 +67,18 @@ describe("PRD prompts", () => {
       expect(frd).not.toContain("`non-functional`");
     });
 
+    it("adds a requirement-by-requirement check and a gap-friendly tone for FRDs only", () => {
+      const prd = buildPrdSectionPrompt(base);
+      expect(prd).not.toContain("REQUIREMENT-BY-REQUIREMENT CHECK");
+      expect(prd).not.toContain("something that is missing is a real problem");
+
+      const frd = buildPrdSectionPrompt({ ...base, documentType: "frd" });
+      expect(frd).toContain("REQUIREMENT-BY-REQUIREMENT CHECK");
+      expect(frd).toContain("something that is missing is a real problem");
+      expect(frd).toContain("`business-rules`");
+      expect(frd).toContain("`traceability`");
+    });
+
     it("asks for exact quotes, a summary and key statements in plain language", () => {
       const prompt = buildPrdSectionPrompt(base);
       expect(prompt).toContain("copied **exactly**");
@@ -71,7 +88,10 @@ describe("PRD prompts", () => {
     });
 
     it("notes when a chunk is one part of a split section", () => {
-      const prompt = buildPrdSectionPrompt({ ...base, part: { index: 2, total: 4 } });
+      const prompt = buildPrdSectionPrompt({
+        ...base,
+        part: { index: 2, total: 4 },
+      });
       expect(prompt).toContain("part 2 of 4 of a long section");
       expect(buildPrdSectionPrompt(base)).not.toContain("of a long section");
     });

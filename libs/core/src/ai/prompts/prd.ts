@@ -71,27 +71,79 @@ const FRD_DIMENSIONS = [
     id: "requirement-quality",
     name: "Requirement quality",
     checks: [
-      "Does each requirement describe one thing (not several bundled together)?",
-      "Can each requirement be tested, and is it worded without ambiguity?",
-      "Does each requirement have a unique identifier that others can refer to?",
+      'Does each requirement describe one thing? Look for several behaviours bundled into one statement ("and", "or", "as well as", several "shall" or "must").',
+      'Can each requirement be tested? Flag vague wording such as "appropriate", "as needed", "quickly", "user-friendly", "etc.", "and so on", "where possible", "TBD".',
+      'Does each requirement say who or what does it (the actor or system) and when (the trigger)? Flag passive statements with no actor, such as "the data is validated".',
+      "Does each requirement have a unique identifier that others can refer to? Flag requirements with no identifier, and identifiers that are repeated or skipped.",
+      "Is the same thing called by different names, or does one term mean different things in different requirements?",
     ],
   },
   {
     id: "acceptance-criteria",
     name: "Acceptance criteria",
     checks: [
-      "Does each requirement have acceptance criteria?",
-      "Are the criteria measurable and verifiable by someone who did not write them?",
-      "Do the criteria cover the whole requirement, not just the main path?",
+      "Does each requirement have acceptance criteria? A requirement with none is a finding in its own right, even when the requirement itself reads well.",
+      'Are the criteria measurable and verifiable by someone who did not write them? Flag criteria such as "works correctly" or "is displayed properly".',
+      "Do the criteria cover the whole requirement, including failure and boundary cases, not just the main path?",
+      "Do the criteria state the expected result (what the user sees or what changes), not only the action taken?",
     ],
   },
   {
     id: "edge-cases",
     name: "Edge cases and error handling",
     checks: [
-      "What happens when input is missing, invalid, duplicated or too large?",
-      "Are validation rules (formats, limits, required fields) stated?",
-      "What should the user see, and what should happen, when something fails or times out?",
+      "What happens when input is missing, invalid, duplicated, too long or too large? Is it stated?",
+      "Are validation rules (formats, limits, required fields, allowed values) stated?",
+      "What should the user see, and what should happen to the data, when something fails, times out or is cancelled halfway?",
+      "What happens with empty states, no results, concurrent changes by two users, and repeated submissions?",
+    ],
+  },
+  {
+    id: "business-rules",
+    name: "Business rules and logic",
+    checks: [
+      "Are calculations, formulas, thresholds, rounding and units spelled out, with an example where the rule is not obvious?",
+      'Are conditions and decisions complete? Look for an "if" with no "otherwise", overlapping conditions, and rules that do not say which one wins.',
+      "Are statuses and the allowed changes between them defined (who or what can move an item from one status to another, and what happens then)?",
+      "Are defaults, time zones, dates and retention or expiry rules stated where they matter?",
+    ],
+  },
+  {
+    id: "data-and-interfaces",
+    name: "Data and interfaces",
+    checks: [
+      "Are the data items named, with type, format, length, whether they are required, and where the value comes from?",
+      "For each screen, message, report, file or integration: are its inputs, outputs and fields listed, rather than described only in general terms?",
+      "For integrations with other systems: are the trigger, the data exchanged, the expected response, and what happens when the other system is unavailable described?",
+      "Is it clear what happens to data over its life: created, changed, archived, deleted, and who owns it?",
+    ],
+  },
+  {
+    id: "roles-and-access",
+    name: "Roles and access",
+    checks: [
+      "Is it stated which user roles can do each function, and which cannot?",
+      "Are the roles themselves defined, and used consistently throughout the document?",
+      "Are rules about who may see or change sensitive or personal data stated, and is it clear what is recorded for audit?",
+    ],
+  },
+  {
+    id: "quality-attributes",
+    name: "Quality attributes",
+    checks: [
+      "Are performance expectations given as numbers (response times, volumes, peak load) wherever users would notice slowness?",
+      "Are security, privacy, availability, accessibility and compliance needs stated, or explicitly marked as not applicable?",
+      "Are notifications, logging, reporting and audit needs covered where the functions imply them?",
+    ],
+  },
+  {
+    id: "traceability",
+    name: "Traceability and dependencies",
+    checks: [
+      "Can each requirement be traced to a business need, goal or parent requirement (for example in a PRD)?",
+      "Are references to other requirements, sections or documents specific and do they point to something that exists?",
+      "Are dependencies on other functions, teams or systems, and assumptions that a requirement relies on, written down?",
+      "Is anything described in the overview or the goals that no requirement delivers, or any requirement that serves no stated goal?",
     ],
   },
 ] as const satisfies readonly PrdDimension[];
@@ -100,8 +152,14 @@ const FRD_DIMENSIONS = [
 export const PRD_RUBRICS: Readonly<
   Record<PrdDocumentType, { readonly label: string; readonly dimensions: readonly PrdDimension[] }>
 > = {
-  prd: { label: "Product Requirements Document (PRD)", dimensions: PRD_DIMENSIONS },
-  frd: { label: "Functional Requirements Document (FRD)", dimensions: FRD_DIMENSIONS },
+  prd: {
+    label: "Product Requirements Document (PRD)",
+    dimensions: PRD_DIMENSIONS,
+  },
+  frd: {
+    label: "Functional Requirements Document (FRD)",
+    dimensions: FRD_DIMENSIONS,
+  },
 };
 
 /** Every dimension id across both rubrics. */
@@ -114,13 +172,41 @@ const SEVERITY_GUIDE = `- **Blocker**: development cannot sensibly start, or the
 - **Major**: likely to cause rework, delays or disagreement later; should be fixed before development starts.
 - **Minor**: a clarity or wording improvement that is worth making but does not block anyone.`;
 
-const TONE_GUIDE = `- Write for a product owner or business analyst, not a developer. Use plain, friendly, specific language and short sentences.
+const BASE_TONE_GUIDE = `- Write for a product owner or business analyst, not a developer. Use plain, friendly, specific language and short sentences.
 - Do not use software-development or code-review jargon.
 - Explain why the issue matters (what could go wrong for the team or the users).
 - Make the suggestion concrete: where possible, propose replacement wording the author could paste in.
 - Do not invent facts about the product. When information is missing, say so and ask the author in \`authorQuestion\`.
 - Report real problems only. Do not pad the list; an empty list is a valid answer.`;
 
+const FRD_TONE_GUIDE = `- Write for a product owner or business analyst, not a developer. Use plain, friendly, specific language and short sentences.
+- Do not use software-development or code-review jargon.
+- Explain why the issue matters (what could go wrong for the team or the users).
+- Make the suggestion concrete: where possible, propose replacement wording the author could paste in.
+- Do not invent facts about the product. When information is missing, say so and ask the author in \`authorQuestion\`.
+- Report real problems only, and do not pad the list. But in a functional requirements document, something that is missing is a real problem: a requirement with no acceptance criteria, no identifier, no error handling, no stated actor or no stated role is a finding even when the requirement reads well. Report these one by one against the requirement concerned (quote that requirement), and do not return an empty list for a portion that has requirements with such gaps.
+- If many requirements share the same gap, report each of the clearest examples (up to about 10 per portion) rather than a single general remark, and say in \`problem\` that other requirements have the same gap.`;
+
+function toneGuide(documentType: PrdDocumentType): string {
+  return documentType === "frd" ? FRD_TONE_GUIDE : BASE_TONE_GUIDE;
+}
+
+/**
+ * Requirement-by-requirement checklist for FRD section passes. Gives the
+ * reviewer a concrete procedure so that gaps are reported, not skimmed over.
+ */
+const FRD_COVERAGE_STEP = `# REQUIREMENT-BY-REQUIREMENT CHECK
+
+Go through every requirement in this portion one at a time (a requirement is a "shall", "must", "should" or "will" statement, a numbered or identified item, or a row in a requirements table). For each one, ask:
+1. Does it have a unique identifier?
+2. Does it say who or what acts, and what triggers it?
+3. Is it a single, testable statement without vague words?
+4. Does it have acceptance criteria that say what the expected result is?
+5. Does it say what happens when input is invalid or something fails?
+6. Is it clear which roles may use it, and which data it uses?
+
+Every "no" is a candidate finding. Quote the requirement itself, name the missing item in \`problem\`, and propose wording or a question for the author. Then check the rubric below for problems that go beyond a single requirement.
+`;
 const QUOTE_GUIDE = `- Every finding must include a \`quote\`: text copied **exactly**, character for character, from the document, so the reader can find it. Keep it short (one sentence or phrase) and from a single paragraph.
 - Do not include the \`[p12]\`, \`[s2.1]\` or \`[t1]\` markers in the quote, and do not paraphrase, shorten with "..." or fix typos.
 - Lines starting with \`[existing comment ...]\` are reviewer comments already on the document. Use them as context, but never quote them. Do not repeat a point a comment already raises unless the text still has the problem.
@@ -185,7 +271,7 @@ The text below is the document content. Each paragraph starts with its id (\`[p1
 
 ${wrapUntrustedContent("untrusted-document", `${titleLine(input.documentTitle)}${input.chunkText}`)}
 
-# WHAT TO CHECK
+${input.documentType === "frd" ? `${FRD_COVERAGE_STEP}\n` : ""}# WHAT TO CHECK
 
 ${rubricText(input.documentType)}
 
@@ -195,7 +281,7 @@ ${SEVERITY_GUIDE}
 
 # HOW TO WRITE FINDINGS
 
-${TONE_GUIDE}
+${toneGuide(input.documentType)}
 ${QUOTE_GUIDE}
 - \`sectionId\` must be one of: ${input.sectionIds.map((id) => `"${id}"`).join(", ")}. Use the section the quote comes from.
 - \`dimension\` must be one of: ${dimensionIdList(input.documentType)}.
@@ -308,7 +394,7 @@ ${SEVERITY_GUIDE}
 
 # HOW TO WRITE FINDINGS
 
-${TONE_GUIDE}
+${BASE_TONE_GUIDE}
 - Every finding must include a \`quote\` copied **exactly** from one of the key statements above (or a heading from the outline, without its id), so the reader can find it. Do not paraphrase.
 - \`sectionId\` is the section the quote comes from. For a contradiction, quote one side and name the other section in \`problem\`.
 - \`dimension\` must be one of: ${dimensionIdList(input.documentType)}.
@@ -398,7 +484,7 @@ ${SEVERITY_GUIDE}
 
 # HOW TO WRITE FINDINGS
 
-${TONE_GUIDE}
+${BASE_TONE_GUIDE}
 - \`imageId\` must be the id of the image the finding is about, one of: ${input.images.map((image) => `"${image.id}"`).join(", ")}.
 - \`sectionId\` is the section of that image.
 - \`quote\`: copy **exactly** a short sentence from the document text next to the image that the finding relates to (no id markers, no paraphrasing), or the image's alt text. Use an empty string when there is no related text.

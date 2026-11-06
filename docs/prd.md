@@ -67,9 +67,16 @@ The document is split into its sections (using its headings) and each section is
 
 **FRD** (`--type frd`)
 
-1. **Requirement quality**: is each requirement single, testable, unambiguous and uniquely identified?
-2. **Acceptance criteria**: can each requirement be measured and verified?
-3. **Edge cases and error handling**: what happens on invalid input, failures and other unhappy paths?
+1. **Requirement quality**: is each requirement single, testable, unambiguous, free of vague words, clear about who acts, and uniquely identified?
+2. **Acceptance criteria**: does each requirement have criteria that can be measured and verified, including failure and boundary cases?
+3. **Edge cases and error handling**: what happens on invalid input, failures, empty states and repeated or concurrent actions?
+4. **Business rules and logic**: are calculations, conditions, statuses and defaults complete and unambiguous?
+5. **Data and interfaces**: are fields, formats, screens, reports and integrations described in enough detail to build?
+6. **Roles and access**: which roles can do what, and who can see or change sensitive data?
+7. **Quality attributes**: performance, security, availability, accessibility and audit needs.
+8. **Traceability and dependencies**: can requirements be traced to goals, do references resolve, and are dependencies and assumptions written down?
+
+For an FRD, the reviewer also goes through each requirement one by one, so a requirement with no acceptance criteria, identifier or error handling is reported against that requirement.
 
 Tracked changes are reviewed as if accepted (insertions kept, deletions dropped). Existing Word comments are read as context but are not repeated as findings.
 
