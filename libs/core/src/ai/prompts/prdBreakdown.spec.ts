@@ -34,6 +34,13 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("copied **exactly**");
     });
 
+    it("tells the model to fold qualifying rules into acceptance criteria", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
+      expect(prompt).toContain("is **not** a PBI");
+      expect(prompt).toContain("acceptance criterion on the PBI");
+      expect(prompt).toContain("stops being valuable on its own");
+    });
+
     it("names the document type and mentions a split section", () => {
       const frd = buildPrdBreakdownExtractPrompt({
         ...base,

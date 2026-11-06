@@ -19,11 +19,12 @@ import { buildSecurityPreamble, wrapUntrustedContent } from "./securityPreamble.
 
 const WORK_ITEM_GUIDE = `- **Epic**: a large outcome or capability that users or the business get (for example "Guest checkout"). A typical document yields 2 to 8 epics. Group by outcome, not by technical layer, unless the document itself is technical.
 - **Feature**: a distinct capability inside an epic that could be demonstrated or released on its own (for example "Guest details form").
-- **PBI** (product backlog item): one small, deliverable piece of work with a single clear outcome, small enough for one team to finish within a sprint. Split anything bigger.`;
+- **PBI** (product backlog item): one small, deliverable piece of work with a single clear outcome, small enough for one team to finish within a sprint. Split anything bigger, but do not split so far that a piece stops being valuable on its own.`;
 
 const PBI_WRITING_GUIDE = `- \`title\`: short and outcome-focused, in plain language (for example "Guest can enter a shipping address").
 - \`description\`: one or two sentences saying what is delivered and for whom. Use "As a <user>, I want <goal>, so that <benefit>" only when the document makes the user and the benefit clear.
 - \`acceptanceCriteria\`: two to six checks that someone who did not write the item could verify. Take them from what the document says; do not invent rules, numbers or behaviour.
+- A PBI must deliver something a user or the business could notice and that could be released without another PBI. A rule, default, fallback, validation, limit or edge case that only qualifies another behaviour (for example "use UTC when the user has no timezone") is **not** a PBI: write it as an acceptance criterion on the PBI for the behaviour it qualifies. If the item could not be demonstrated or released without another PBI, it is a criterion, not a PBI. Only make such a rule its own PBI when it is a substantial capability in itself.
 - Do not invent requirements. When the document leaves something open that the team would need to know, add it to \`openQuestions\` instead of guessing.
 - Items the document marks as out of scope or as future work are not work items.
 - Requirements about security, performance, accessibility or compliance become their own PBIs, or acceptance criteria on the PBI they affect, when the document states them.`;

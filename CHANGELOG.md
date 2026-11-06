@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PBIs, with live progress, and **Download Markdown** saves the file for
   further refinement. The Reports page can download a saved breakdown too.
 
+### Changed
+
+- **PRD / FRD work breakdown**: rules, defaults and fallbacks that only qualify
+  another behaviour (for example "use UTC when the user has no timezone") are now
+  written as acceptance criteria on that behaviour's PBI instead of becoming
+  PBIs of their own.
+
 ## [4.3.0] - 2026-10-25
 
 Shows which account AI requests will run under, so company data is not sent
