@@ -55,6 +55,7 @@ function createResult(overrides: { complete?: boolean } = {}): PrdReviewResult {
       runDir: `${TEMP_PATH}/prd/${runId}`,
       sourceDocx: `${TEMP_PATH}/prd/${runId}/source.docx`,
       documentJson: `${TEMP_PATH}/prd/${runId}/document.json`,
+      annotatedDocx: `${TEMP_PATH}/prd/${runId}/annotated.docx`,
       imagesDir: `${TEMP_PATH}/prd/${runId}/images`,
       transcriptsDir: `${TEMP_PATH}/prd/${runId}/transcripts`,
       reportMarkdown: `${TEMP_PATH}/reports/prd-${runId}-review-report.md`,
@@ -90,6 +91,20 @@ describe("parsePrdDocumentType", () => {
     expect(() => parsePrdDocumentType("brd")).toThrow('"brd" is not a document type');
   });
 });
+
+function annotated(placed: number, written = true): PrdReviewResult {
+  return { ...createResult(), annotation: { placed, unplaced: 1, written } };
+}
+
+function copyFs(existing: string[]) {
+  return {
+    access: vi.fn(async (file: string) => {
+      if (!existing.includes(file)) throw new Error("ENOENT");
+    }),
+    readFileBuffer: vi.fn(async () => Buffer.from("annotated")),
+    writeFileBuffer: vi.fn(async () => undefined),
+  };
+}
 
 describe("executePrdReview", () => {
   beforeEach(() => {
@@ -218,6 +233,105 @@ describe("executePrdReview", () => {
     expect(output.output.map((entry) => entry.data).join("\n")).toContain(
       '--include-images was set, but images were not reviewed: the model "x" does not accept images.'
     );
+  });
+
+  it("loads the earlier review for --against and passes it to the engine", async () => {
+    const previous = {
+      kind: "prd",
+      schemaVersion: 1,
+      runId: "run-old",
+      documentType: "prd",
+      source: { fileName: "a.docx" },
+      findings: [],
+    };
+    const reportFileSystem = {
+      readFile: vi.fn(async () => JSON.stringify(previous)),
+      readdir: vi.fn(),
+    };
+    const output = createCapturingOutputWriter();
+
+    await executePrdReview(
+      "docs/a.docx",
+      { against: "run-old" },
+      { output, fileSystem: fakeFs({ size: 10 }), reportFileSystem }
+    );
+
+    expect(runPrdReview).toHaveBeenCalledWith(
+      expect.objectContaining({ previousReport: expect.objectContaining({ runId: "run-old" }) }),
+      expect.anything()
+    );
+    expect(output.output.map((entry) => entry.data).join("\n")).toContain(
+      "Comparing with the earlier review run-old"
+    );
+  });
+
+  it("fails before reviewing when the --against review does not exist", async () => {
+    const reportFileSystem = {
+      readFile: vi.fn(async () => {
+        throw new Error("ENOENT");
+      }),
+      readdir: vi.fn(),
+    };
+
+    await expect(
+      executePrdReview(
+        "a.docx",
+        { against: "missing" },
+        { fileSystem: fakeFs({ size: 10 }), reportFileSystem }
+      )
+    ).rejects.toThrow('no review with run id "missing" was found');
+    expect(runPrdReview).not.toHaveBeenCalled();
+  });
+
+  describe("--annotate", () => {
+    it("saves the annotated copy next to the original", async () => {
+      vi.mocked(runPrdReview).mockResolvedValue(annotated(2));
+      const copyFileSystem = copyFs([]);
+      const output = createCapturingOutputWriter();
+
+      await executePrdReview(
+        "docs/a.docx",
+        { annotate: true },
+        { output, fileSystem: fakeFs({ size: 10 }), copyFileSystem }
+      );
+
+      const target = path.resolve("docs/a-reviewed.docx");
+      expect(copyFileSystem.writeFileBuffer).toHaveBeenCalledWith(target, Buffer.from("annotated"));
+      const text = output.output.map((entry) => entry.data).join("\n");
+      expect(text).toContain(`Annotated copy:    ${target}`);
+      expect(text).toContain("2 findings as Word comments; 1 could not be placed");
+    });
+
+    it("never overwrites an existing file", async () => {
+      vi.mocked(runPrdReview).mockResolvedValue(annotated(1));
+      const copyFileSystem = copyFs([path.resolve("docs/a-reviewed.docx")]);
+
+      await executePrdReview(
+        "docs/a.docx",
+        { annotate: true },
+        { fileSystem: fakeFs({ size: 10 }), copyFileSystem }
+      );
+
+      expect(copyFileSystem.writeFileBuffer).toHaveBeenCalledWith(
+        path.resolve("docs/a-reviewed-2.docx"),
+        expect.anything()
+      );
+    });
+
+    it("writes nothing when no finding could be placed", async () => {
+      vi.mocked(runPrdReview).mockResolvedValue(annotated(0));
+      const copyFileSystem = copyFs([]);
+      const output = createCapturingOutputWriter();
+
+      await executePrdReview(
+        "docs/a.docx",
+        { annotate: true },
+        { output, fileSystem: fakeFs({ size: 10 }), copyFileSystem }
+      );
+
+      expect(copyFileSystem.writeFileBuffer).not.toHaveBeenCalled();
+      expect(output.output.map((entry) => entry.data).join("\n")).toContain("not written");
+    });
   });
 
   it("rejects an invalid --type before doing any work", async () => {

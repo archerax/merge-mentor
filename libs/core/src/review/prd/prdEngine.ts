@@ -56,6 +56,7 @@ import type {
 import { runWithConcurrency } from "../batching.js";
 import type { ProgressStatus, ReviewPhaseId, ReviewProgressCallback } from "../progress.js";
 import { parseAIJson } from "./aiJson.js";
+import { annotateDocx } from "./docxAnnotator.js";
 import { parseDocx, readDocxFile, readDocxImageData } from "./docxParser.js";
 import { type DocxValidationOptions, formatMb } from "./docxValidator.js";
 import { compareReviews } from "./prdDelta.js";
@@ -119,6 +120,11 @@ export interface PrdReviewOptions {
    * lists what was resolved, what is still open and what is new.
    */
   readonly previousReport?: PrdReviewReport;
+  /**
+   * Also write a copy of the document with the findings as Word comments
+   * (`annotated.docx` in the run folder).
+   */
+  readonly annotate?: boolean;
   /** Run id to use instead of a generated one (letters, digits, `-`, `_`). */
   readonly runId?: string;
   /** Output writer for progress messages (default: consoleOutputWriter). */
@@ -163,6 +169,13 @@ export interface PrdReviewResult {
   readonly reportMarkdown: string;
   /** Where the run's files were written. */
   readonly paths: PrdRunPaths;
+  /** Set when `annotate` was requested: how many findings became Word comments. */
+  readonly annotation?: {
+    readonly placed: number;
+    readonly unplaced: number;
+    /** False when the annotated copy could not be written (the review itself succeeded). */
+    readonly written: boolean;
+  };
 }
 
 const DEFAULT_CONCURRENCY = 3;
@@ -448,8 +461,32 @@ class PrdReviewRun {
       return markdown;
     });
 
+    const annotation = options.annotate
+      ? await this.writeAnnotatedCopy(buffer, report, paths)
+      : undefined;
+
     this.displaySummary(report);
-    return { runId, report, reportMarkdown, paths };
+    return { runId, report, reportMarkdown, paths, ...(annotation ? { annotation } : {}) };
+  }
+
+  /** Writes the document copy with the findings as Word comments; never fails the review. */
+  private async writeAnnotatedCopy(
+    buffer: Buffer,
+    report: PrdReviewReport,
+    paths: PrdRunPaths
+  ): Promise<NonNullable<PrdReviewResult["annotation"]>> {
+    try {
+      const result = await annotateDocx(buffer, report.findings, {
+        date: new Date(report.createdAt),
+      });
+      await this.fs.writeFileBuffer(paths.annotatedDocx, result.buffer);
+      return { placed: result.placed.length, unplaced: result.unplaced.length, written: true };
+    } catch (error) {
+      this.output.error(
+        `⚠️ The annotated copy could not be written: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return { placed: 0, unplaced: report.findings.length, written: false };
+    }
   }
 
   // -------------------------------------------------------------------------

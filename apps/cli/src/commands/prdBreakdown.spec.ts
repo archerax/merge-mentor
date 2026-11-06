@@ -54,6 +54,7 @@ function createResult(
       runDir: `${TEMP_PATH}/prd/${RUN_ID}`,
       sourceDocx: `${TEMP_PATH}/prd/${RUN_ID}/source.docx`,
       documentJson: `${TEMP_PATH}/prd/${RUN_ID}/document.json`,
+      annotatedDocx: `${TEMP_PATH}/prd/${RUN_ID}/annotated.docx`,
       imagesDir: `${TEMP_PATH}/prd/${RUN_ID}/images`,
       transcriptsDir: `${TEMP_PATH}/prd/${RUN_ID}/transcripts`,
       reportMarkdown: `${TEMP_PATH}/reports/prd-${RUN_ID}-review-report.md`,

@@ -17,6 +17,7 @@ import { BREAKDOWN_SUFFIX, REPORT_PREFIX, REPORT_SUFFIX } from "./prdReportNames
  * <tempPath>/reports/prd-<runId>-breakdown.json      (structured work breakdown)
  * <tempPath>/prd/<runId>/source.docx                 (copy of the reviewed document)
  * <tempPath>/prd/<runId>/document.json               (extracted document model and chunks)
+ * <tempPath>/prd/<runId>/annotated.docx              (copy with the findings as Word comments, with --annotate)
  * <tempPath>/prd/<runId>/images/                     (images extracted for --include-images)
  * <tempPath>/prd/<runId>/transcripts/                (AI request transcripts for this run)
  * ```
@@ -28,6 +29,8 @@ export interface PrdRunPaths {
   readonly sourceDocx: string;
   /** Extracted document model and chunks, as JSON. */
   readonly documentJson: string;
+  /** Copy of the document with the findings as Word comments (`--annotate`). */
+  readonly annotatedDocx: string;
   /** Images extracted for image review (`--include-images`). */
   readonly imagesDir: string;
   /**
@@ -73,6 +76,7 @@ export function prdRunPaths(tempPath: string, runId: string): PrdRunPaths {
     runDir,
     sourceDocx: path.join(runDir, "source.docx"),
     documentJson: path.join(runDir, "document.json"),
+    annotatedDocx: path.join(runDir, "annotated.docx"),
     imagesDir: path.join(runDir, "images"),
     transcriptsDir: path.join(runDir, "transcripts"),
     reportMarkdown: `${reportBase}.md`,

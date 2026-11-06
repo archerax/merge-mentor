@@ -777,6 +777,11 @@ program
     "Compare with an earlier review of this document (a run id, or `latest`) and show what was resolved, is still open or is new"
   )
   .option(
+    "--annotate",
+    "Also save a copy of the document with each finding as a Word comment, next to the original",
+    false
+  )
+  .option(
     "--include-images",
     "Also review images in the document (needs an AI model that accepts images); without it, images are listed as not reviewed",
     false

@@ -33,13 +33,14 @@ When the review finishes, the command prints the readiness verdict, the number o
 
 ### General Options
 
-| Option               | Description                                                                                                                   | Env Variable   | Default          |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------- |
-| `<file>`             | Path to the Word document (`.docx`) to review                                                                                 | -              | -                |
-| `--type <type>`      | Document type, which picks the review checklist: `prd` or `frd`                                                               | -              | `prd`            |
-| `--against <run-id>` | Compare with an earlier review of this document: a run id, or `latest` (see [Re-reviewing](#re-reviewing-a-revised-document)) | -              | -                |
-| `--include-images`   | Also review images in the document (see [Images](#images))                                                                    | -              | `false`          |
-| `--temp-path <path>` | Base folder for reports and run data (see [Where files are stored](#where-files-are-stored))                                  | `MM_TEMP_PATH` | `./.mergementor` |
+| Option               | Description                                                                                                                        | Env Variable   | Default          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `<file>`             | Path to the Word document (`.docx`) to review                                                                                      | -              | -                |
+| `--type <type>`      | Document type, which picks the review checklist: `prd` or `frd`                                                                    | -              | `prd`            |
+| `--against <run-id>` | Compare with an earlier review of this document: a run id, or `latest` (see [Re-reviewing](#re-reviewing-a-revised-document))      | -              | -                |
+| `--annotate`         | Also save a copy of the document with each finding as a Word comment (see [Findings as Word comments](#findings-as-word-comments)) | -              | `false`          |
+| `--include-images`   | Also review images in the document (see [Images](#images))                                                                         | -              | `false`          |
+| `--temp-path <path>` | Base folder for reports and run data (see [Where files are stored](#where-files-are-stored))                                       | `MM_TEMP_PATH` | `./.mergementor` |
 
 ### AI Provider Configuration
 
@@ -101,6 +102,17 @@ Each report contains:
 Before the report is written, every finding is double-checked: findings whose quote cannot be found in the document, duplicates, and findings that do not hold up on a second look are removed.
 
 The review is an automated first pass. Use it alongside, not instead of, review by your team.
+
+## Findings as Word Comments
+
+With `--annotate`, the review also saves a copy of your document next to the original, named `<name>-reviewed.docx` (`-reviewed-2`, and so on, if that file already exists; nothing is ever overwritten). Open it in Word and each finding appears as a comment from **Merge Mentor** on the paragraph that contains the quoted text, with the severity, the problem, the suggestion and any question for you. Resolve the comments as you fix things.
+
+- The original document is never changed.
+- Comments are attached to the whole paragraph, not just the quoted words, and the comment text repeats what the report says.
+- A finding whose quoted text cannot be found in a single paragraph (for example text inside a text box, or spanning paragraphs) has no comment. It is still in the report, and the command prints how many were left out.
+- Existing comments in your document are kept.
+- Combine it with `--against` to annotate only the issues that are still open or new.
+- A copy is also kept with the run, in `.mergementor/prd/<run-id>/annotated.docx`, and removed with the run.
 
 ## Re-reviewing a Revised Document
 

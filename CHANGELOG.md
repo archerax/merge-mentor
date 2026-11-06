@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Findings as Word comments**: `merge-mentor prd <file> --annotate` also saves
+  a copy of the document, next to the original as `<name>-reviewed.docx`, with
+  each finding as a Word comment on the paragraph it quotes (severity, the
+  problem, a suggestion and any question). The original file is never changed
+  and an existing `-reviewed` file is never overwritten. Findings whose text
+  cannot be found in a paragraph stay in the report only, and the command says
+  how many.
 - **PRD / FRD re-review**: `merge-mentor prd <file> --against <run-id>` (or
   `--against latest` for the newest earlier review of the same file name)
   compares the new review with an earlier one. The report opens with what

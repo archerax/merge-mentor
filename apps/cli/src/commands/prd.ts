@@ -29,6 +29,8 @@ export interface PrdCommandDeps {
   readonly fileSystem?: Pick<FileSystem, "stat">;
   /** Filesystem used to load an earlier review for `--against`. Defaults to `nodeFs`. */
   readonly reportFileSystem?: Pick<FileSystem, "readFile" | "readdir">;
+  /** Filesystem used to save the annotated copy. Defaults to `nodeFs`. */
+  readonly copyFileSystem?: Pick<FileSystem, "access" | "readFileBuffer" | "writeFileBuffer">;
 }
 
 /**
@@ -119,6 +121,7 @@ export async function executePrdReview(
       ...(previousReport ? { previousReport } : {}),
       documentType,
       includeImages: options.includeImages ?? false,
+      annotate: options.annotate ?? false,
       tempPath: config.tempPath,
       aiProvider,
       aiModel: config.aiModel,
@@ -127,7 +130,8 @@ export async function executePrdReview(
     { aiClient }
   );
 
-  displayRunSummary(result, output);
+  const annotatedCopy = await saveAnnotatedCopy(result, filePath, deps);
+  displayRunSummary(result, output, annotatedCopy);
   return result;
 }
 
@@ -166,8 +170,42 @@ export async function assertReadableFile(
   }
 }
 
+/**
+ * Copies the annotated document next to the original as `<name>-reviewed.docx`
+ * (`-reviewed-2`, ... when that exists), never overwriting an existing file.
+ *
+ * @returns The path of the copy, or undefined when none was made
+ */
+async function saveAnnotatedCopy(
+  result: PrdReviewResult,
+  originalPath: string,
+  deps: PrdCommandDeps
+): Promise<string | undefined> {
+  if (!result.annotation?.written || result.annotation.placed === 0) return undefined;
+  const fileSystem = deps.copyFileSystem ?? nodeFs;
+  const { dir, name } = path.parse(originalPath);
+  for (let attempt = 1; attempt <= 99; attempt += 1) {
+    const suffix = attempt === 1 ? "" : `-${attempt}`;
+    const target = path.join(dir, `${name}-reviewed${suffix}.docx`);
+    try {
+      await fileSystem.access(target);
+    } catch {
+      await fileSystem.writeFileBuffer(
+        target,
+        await fileSystem.readFileBuffer(result.paths.annotatedDocx)
+      );
+      return target;
+    }
+  }
+  return undefined;
+}
+
 /** Prints where the run's files are and how to remove them. */
-function displayRunSummary(result: PrdReviewResult, output: OutputWriter): void {
+function displayRunSummary(
+  result: PrdReviewResult,
+  output: OutputWriter,
+  annotatedCopy: string | undefined
+): void {
   const { report, paths } = result;
   if (report.imageReview && !report.imageReview.supported) {
     output.log(
@@ -187,6 +225,15 @@ function displayRunSummary(result: PrdReviewResult, output: OutputWriter): void 
   output.log("📁 Saved on this computer only:");
   output.log(`   Report (Markdown): ${paths.reportMarkdown}`);
   output.log(`   Report (JSON):     ${paths.reportJson}`);
+  if (annotatedCopy && result.annotation) {
+    const { placed, unplaced } = result.annotation;
+    output.log(`   Annotated copy:    ${annotatedCopy}`);
+    output.log(
+      `                      (${placed} finding${placed === 1 ? "" : "s"} as Word comments${unplaced > 0 ? `; ${unplaced} could not be placed, see the report` : ""})`
+    );
+  } else if (result.annotation) {
+    output.log("   Annotated copy:    not written (no finding could be placed in the document)");
+  }
   output.log(`   Run data:          ${paths.runDir}`);
   output.log("                      (document copy, extracted text, images, AI transcripts)");
   output.log(
