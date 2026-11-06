@@ -21,6 +21,9 @@ Breaks a reviewed PRD / FRD down into a ready-to-refine backlog.
   or `--from-review <run-id>` to reuse a document that `prd` already reviewed
   (a review that found blockers needs `--force`). The result is saved as
   Markdown and JSON next to the review report, and is removed with the run.
+  Work items are written to stand alone and be checkable: rules, defaults and
+  fallbacks that only qualify another behaviour become acceptance criteria on
+  that item instead of items of their own.
 - **Work breakdown in the web UI**: after a PRD / FRD review, **Break down into
   work items** shows the backlog as a read-only tree of epics, features and
   PBIs, with live progress, and **Download Markdown** saves the file for

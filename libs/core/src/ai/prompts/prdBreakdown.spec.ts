@@ -34,6 +34,28 @@ describe("PRD breakdown prompts", () => {
       expect(prompt).toContain("copied **exactly**");
     });
 
+    it("tells the model to fold qualifying rules into acceptance criteria", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
+      expect(prompt).toContain("is **not** a PBI");
+      expect(prompt).toContain("acceptance criterion on the PBI");
+      expect(prompt).toContain("substantial capability in itself");
+      expect(prompt).toContain("other items depend on it");
+      expect(prompt).toContain("not described in this portion, keep the rule as its own PBI");
+    });
+
+    it("warns against splitting PBIs past the point where they stay valuable", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
+      expect(prompt).toContain("stops being valuable on its own");
+    });
+
+    it("describes what a good PBI looks like", () => {
+      const prompt = buildPrdBreakdownExtractPrompt(base);
+      expect(prompt).toContain("# WHAT A GOOD PBI LOOKS LIKE");
+      expect(prompt).toContain("or is a foundation that other items need");
+      expect(prompt).toContain("not how to build it");
+      expect(prompt).toContain("can be checked");
+    });
+
     it("names the document type and mentions a split section", () => {
       const frd = buildPrdBreakdownExtractPrompt({
         ...base,
