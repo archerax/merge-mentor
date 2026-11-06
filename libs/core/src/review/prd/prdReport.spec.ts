@@ -217,3 +217,73 @@ describe("renderPrdReportMarkdown with a comparison", () => {
     expect(markdown).not.toContain("1. 🆕");
   });
 });
+
+function many(count: number, overrides: Partial<PrdFinding> = {}): PrdFinding[] {
+  return Array.from({ length: count }, (_unused, index) =>
+    finding({ id: `f${index + 1}`, problem: `Problem number ${index + 1}.`, ...overrides })
+  );
+}
+
+describe("renderPrdReportMarkdown summaries", () => {
+  it("adds a Fix these first list for longer reports, blockers before majors", () => {
+    const findings = [
+      ...many(4, { severity: "Major" }),
+      finding({ id: "fb", severity: "Blocker", problem: "Nothing defines done." }),
+      ...many(2, { severity: "Minor" }),
+    ];
+    const markdown = renderPrdReportMarkdown(report({ findings }));
+    const section = markdown.split("## Fix these first")[1]?.split("\n## ")[0] ?? "";
+    expect(section).toContain("- **Blocker** · Scope › Payments: Nothing defines done.");
+    expect(section.indexOf("Blocker")).toBeLessThan(section.indexOf("Major"));
+    expect(section.match(/^- \*\*/gm)).toHaveLength(5);
+    expect(section).not.toContain("…and");
+  });
+
+  it("says how many more blocker or major issues there are beyond the shortlist", () => {
+    const markdown = renderPrdReportMarkdown(report({ findings: many(8, { severity: "Major" }) }));
+    const section = markdown.split("## Fix these first")[1]?.split("\n## ")[0] ?? "";
+    expect(section.match(/^- \*\*/gm)).toHaveLength(5);
+    expect(section).toContain("…and 3 more blocker or major issues below.");
+  });
+
+  it("leaves out Fix these first for short reports", () => {
+    expect(renderPrdReportMarkdown(report({ findings: many(3) }))).not.toContain("Fix these first");
+  });
+
+  it("shows the weakest sections first when issues span several sections", () => {
+    const findings = [
+      finding({ id: "f1", severity: "Minor", headingPath: ["Intro"] }),
+      finding({ id: "f2", severity: "Blocker", headingPath: ["Payments"] }),
+    ];
+    const markdown = renderPrdReportMarkdown(report({ findings }));
+    expect(markdown).toContain("## Where the issues are");
+    expect(markdown.indexOf("| Payments | 1 | 0 | 0 |")).toBeLessThan(
+      markdown.indexOf("| Intro | 0 | 0 | 1 |")
+    );
+  });
+
+  it("omits the section table when all issues are in one section", () => {
+    expect(renderPrdReportMarkdown(report({ findings: many(2) }))).not.toContain(
+      "Where the issues are"
+    );
+  });
+
+  it("collects each distinct question once", () => {
+    const findings = [
+      finding({ id: "f1", authorQuestion: "Which cards?" }),
+      finding({ id: "f2", authorQuestion: "which cards?" }),
+      finding({ id: "f3", authorQuestion: "Who approves refunds?", headingPath: ["Refunds"] }),
+      finding({ id: "f4", authorQuestion: undefined }),
+    ];
+    const markdown = renderPrdReportMarkdown(report({ findings }));
+    const section = markdown.split("## Questions to answer")[1]?.split("\n## ")[0] ?? "";
+    expect(section.match(/^- /gm)).toHaveLength(2);
+    expect(section).toContain("- Who approves refunds? _(Refunds)_");
+  });
+
+  it("omits the questions section when there are none", () => {
+    expect(
+      renderPrdReportMarkdown(report({ findings: [finding({ authorQuestion: undefined })] }))
+    ).not.toContain("Questions to answer");
+  });
+});

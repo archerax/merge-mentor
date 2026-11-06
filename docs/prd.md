@@ -97,6 +97,8 @@ Each report contains:
 
   Every finding quotes the exact text it is about, explains the problem in plain language, suggests an improvement and, where useful, asks you a question.
 
+- **A shortlist and overview** for longer reports: **Fix these first** lists the blockers and then the most important major issues, and **Where the issues are** shows which sections have the most issues.
+- **Questions to answer**: every question the review has for the author, once each, in one list you can take to stakeholders.
 - **A "Not reviewed" list**: anything the review did not cover, so you know where to look yourself. This includes images that were not reviewed (with the reason), sections the AI could not review, parts beyond the review limit for very long documents, and content the reader could not extract.
 
 Before the report is written, every finding is double-checked: findings whose quote cannot be found in the document, duplicates, and findings that do not hold up on a second look are removed.

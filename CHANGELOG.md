@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Easier-to-act-on PRD / FRD reports**: a report with more than a handful of
+  issues now opens with **Fix these first** (the blockers, then the most
+  important major issues), **Where the issues are** (a table of the weakest
+  sections) and ends its findings with **Questions to answer**, every question
+  for the author collected in one place without repeats. The result on the
+  web page also has **Download Markdown**, to share the report.
 - **Re-review and Word copy in the web UI**: on the **PRD / FRD Review** page,
   once a review has finished, **Compare with the previous review** (on by
   default) makes the next upload a re-review that shows how many issues are

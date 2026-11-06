@@ -30,6 +30,7 @@ import {
 import { MarkdownReport } from "./MarkdownReport.js";
 import { PrdBreakdownPanel } from "./PrdBreakdownPanel.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
+import { DownloadMarkdownButton } from "./review/DownloadMarkdownButton.js";
 import { LiveThinking } from "./review/LiveThinking.js";
 import { ProgressTimeline } from "./review/ProgressTimeline.js";
 import { TechnicalLog } from "./review/TechnicalLog.js";
@@ -326,6 +327,7 @@ export function PrdReviewResult({ summary }: { readonly summary: PrdReviewSummar
                 Download Word copy with comments
               </Button>
             )}
+            <DownloadMarkdownButton text={summary.reportMarkdown} fileName={summary.reportName} />
             <CopyReportButton text={summary.reportMarkdown} />
           </Group>
         </Group>

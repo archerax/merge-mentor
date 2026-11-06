@@ -168,6 +168,81 @@ function firstSentence(text: string): string {
   return sentence.length > 120 ? `${sentence.slice(0, 117)}...` : sentence || "Issue";
 }
 
+/** Findings listed in "Fix these first": all blockers, then majors, up to this many. */
+const FIX_FIRST_LIMIT = 5;
+/** Reports with at most this many findings are short enough not to need a shortlist. */
+const FIX_FIRST_MIN_FINDINGS = 6;
+/** Sections shown in the readiness table. */
+const SECTION_READINESS_LIMIT = 10;
+
+/** A short, prioritised list of what to fix before anything else. */
+function renderFixFirst(findings: readonly PrdFinding[]): string[] {
+  if (findings.length < FIX_FIRST_MIN_FINDINGS) return [];
+  const blockers = findings.filter((finding) => finding.severity === "Blocker");
+  const majors = findings.filter((finding) => finding.severity === "Major");
+  const picked = [...blockers, ...majors].slice(0, Math.max(FIX_FIRST_LIMIT, blockers.length));
+  if (picked.length === 0) return [];
+  const rest = blockers.length + majors.length - picked.length;
+  return [
+    "## Fix these first",
+    "",
+    ...picked.map(
+      (finding) =>
+        `- **${finding.severity}** · ${sectionLabel(finding)}: ${firstSentence(finding.problem)}`
+    ),
+    ...(rest > 0
+      ? [`- …and ${rest} more blocker or major issue${rest === 1 ? "" : "s"} below.`]
+      : []),
+    "",
+  ];
+}
+
+function rowWeight(row: Record<PrdSeverity, number>): number {
+  return row.Blocker * 100 + row.Major * 10 + row.Minor;
+}
+
+/** Where the issues are, so the author can see the weakest sections at a glance. */
+function renderSectionReadiness(findings: readonly PrdFinding[]): string[] {
+  const rows = new Map<string, Record<PrdSeverity, number>>();
+  for (const finding of findings) {
+    const label = sectionLabel(finding);
+    const row = rows.get(label) ?? { Blocker: 0, Major: 0, Minor: 0 };
+    row[finding.severity] += 1;
+    rows.set(label, row);
+  }
+  if (rows.size < 2) return [];
+  const sorted = [...rows].toSorted((a, b) => rowWeight(b[1]) - rowWeight(a[1]));
+  const shown = sorted.slice(0, SECTION_READINESS_LIMIT);
+  return [
+    "## Where the issues are",
+    "",
+    "| Section | Blockers | Major | Minor |",
+    "| --- | --- | --- | --- |",
+    ...shown.map(
+      ([label, row]) =>
+        `| ${label.replace(/\|/g, "\\|")} | ${row.Blocker} | ${row.Major} | ${row.Minor} |`
+    ),
+    ...(sorted.length > shown.length
+      ? [``, `…and ${sorted.length - shown.length} more section(s) with issues.`]
+      : []),
+    "",
+  ];
+}
+
+/** Every question for the author in one place, ready to take to stakeholders. */
+function renderQuestions(findings: readonly PrdFinding[]): string[] {
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const finding of findings) {
+    const question = finding.authorQuestion?.trim();
+    if (!question || seen.has(question.toLowerCase())) continue;
+    seen.add(question.toLowerCase());
+    items.push(`- ${question} _(${sectionLabel(finding)})_`);
+  }
+  if (items.length === 0) return [];
+  return ["## Questions to answer", "", ...items, ""];
+}
+
 function renderComparison(comparison: PrdReviewComparison, report: PrdReviewReport): string[] {
   const before = comparison.previousVerdict;
   const after = report.readiness.verdict;
@@ -224,6 +299,8 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
   );
 
   if (report.comparison) out.push(...renderComparison(report.comparison, report), "");
+  out.push(...renderFixFirst(report.findings));
+  out.push(...renderSectionReadiness(report.findings));
 
   const newIds = new Set(report.comparison?.newFindingIds ?? []);
   let number = 0;
@@ -239,6 +316,8 @@ export function renderPrdReportMarkdown(report: PrdReviewReport): string {
   if (report.findings.length === 0) {
     out.push("No issues were found in the reviewed text.", "");
   }
+
+  out.push(...renderQuestions(report.findings));
 
   out.push("## Not reviewed", "");
   if (report.notReviewed.length === 0) {
