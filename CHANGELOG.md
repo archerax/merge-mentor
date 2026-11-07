@@ -46,6 +46,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not make it look new. The comparison says when a partial review may overstate
   what was resolved.
 
+### Changed
+
+- **Web UI AI status bar**: the footer's "AI requests run as" status now
+  refreshes itself when you come back to the browser tab (if it is more than
+  30 seconds old), so a sign-in or token change made elsewhere shows up without
+  pressing refresh. The refresh button still forces a fresh check.
+- **Web UI Reports page**: deleting a PRD review run takes its reports out of
+  the list straight away; if the delete fails they come back and the error is
+  shown as before. Reports you have already opened are shown from memory when
+  you switch back to them, and the page no longer resets your search when a
+  link selects a different report.
+- **Web UI Outcomes page**: while a scan runs, only the outcomes are re-read
+  (every 2 seconds, and not while the browser tab is in the background), instead
+  of reloading the whole page's data. A scan that cannot be started now shows an
+  error instead of failing silently.
+- **Web UI Configuration page**: saving now refreshes the data on the other
+  pages (stats, outcomes, the AI status) as well, so they reflect the new
+  settings the next time you look at them. A save that cannot reach the server
+  now shows an error instead of failing silently; the saved and invalid-value
+  messages are unchanged.
+- **Web UI Audit Log, Configuration and Stats pages**: the Audit Log and
+  Configuration pages reuse data loaded less than 30 seconds ago (including
+  data loaded when you hover a link) instead of requesting it again, and these
+  two pages refresh their data when you come back to the browser tab. The Stats
+  page keeps its numbers until you change the window.
+- **Web UI review runs**: the number of review runs is limited to 10 in the web
+  UI. If a run's original input cannot be loaded when reopening it from its
+  link, the page now says why comments cannot be posted.
+- **Web UI review runs**: opening a review run from its link starts showing its
+  progress straight away instead of first waiting for the run's details, which
+  are only needed to post comments.
+- **Web UI remembers your choices**: the Audit Log's severity filter and
+  search, the Reports page's search and last selected report, and the PRD /
+  FRD Review options (document type and Word copy with comments)
+  now survive switching pages and reloading, for as long as the browser tab is
+  open. "Include images" always starts off, because it sends the document's
+  images to your AI provider. The PR, PBI and project review forms (link, strategy, review runs) now
+  also survive a reload; the "post comments" switch always starts off after a
+  reload. The Configuration page also remembers its open tab, alongside "show
+  advanced settings". The picked document and unsaved configuration changes are never
+  stored. A link to a specific report still opens that report.
+- **Web UI Stats page**: switching between the 7, 30 and 90 day windows keeps
+  the current numbers on screen, dimmed and marked as loading, until the new
+  window's numbers arrive, instead of waiting on a blank page.
+- **Web UI loading and error screens**: the Stats, Outcomes, Reports, Audit Log
+  and Configuration pages show a placeholder shaped like the page while their
+  data loads. When a page throws while loading, every route now shows the same
+  error message with a **Try again** button that reloads its data; pages that
+  explain their own failures (Outcomes) keep their inline message.
+
 ## [4.4.0] - 2026-11-06
 
 Breaks a reviewed PRD / FRD down into a ready-to-refine backlog.

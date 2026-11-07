@@ -14,46 +14,32 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 
-import { saveConfig } from "../server/config.functions.js";
+import { saveConfigMutation } from "../queries/config.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
+import { useConfigActiveTab, useConfigShowAdvanced } from "../stores/configView.js";
 import { isFieldVisible } from "./configVisibility.js";
+import { describeRouteError } from "./RouteError.js";
 
 interface ConfigViewerProps {
   readonly view: ConfigView;
 }
 
-type SaveStatus = "idle" | "saving" | "saved";
-
-const ADVANCED_STORAGE_KEY = "merge-mentor:config:show-advanced";
+const NO_ERRORS: readonly ConfigFieldError[] = [];
 
 export function ConfigViewer({ view }: ConfigViewerProps) {
-  const router = useRouter();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [cleared, setCleared] = useState<readonly string[]>([]);
-  const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
-  const [status, setStatus] = useState<SaveStatus>("idle");
-  const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    try {
-      setShowAdvanced(window.localStorage.getItem(ADVANCED_STORAGE_KEY) === "true");
-    } catch {
-      // Storage can be unavailable (private mode, blocked site data); default to hidden.
-    }
-  }, []);
-
-  function toggleAdvanced(next: boolean) {
-    setShowAdvanced(next);
-    try {
-      window.localStorage.setItem(ADVANCED_STORAGE_KEY, String(next));
-    } catch {
-      // The preference simply won't persist.
-    }
-  }
+  const saveMutation = useMutation(saveConfigMutation);
+  const saving = saveMutation.isPending;
+  const saved = saveMutation.data?.ok === true;
+  const errors: readonly ConfigFieldError[] =
+    saveMutation.data?.ok === false ? saveMutation.data.errors : NO_ERRORS;
+  const saveError = saveMutation.error !== null ? describeRouteError(saveMutation.error) : null;
+  const { activeTab, setActiveTab } = useConfigActiveTab();
+  const { showAdvanced, setShowAdvanced } = useConfigShowAdvanced();
 
   // A cleared platform means "use the default", so no platform is assumed and both groups show.
   const draftPlatform = draft.MM_PLATFORM;
@@ -86,10 +72,8 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     ? activeTab
     : (sections[0]?.title ?? null);
 
-  // Keep state in step with the displayed tab when the active one is filtered out.
-  useEffect(() => {
-    if (currentTab !== activeTab) setActiveTab(currentTab);
-  }, [currentTab, activeTab]);
+  // The stored tab stays the user's preference: when it is filtered out (say,
+  // an advanced tab while "show advanced" is off) only the display falls back.
 
   const labels = new Map(
     view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
@@ -108,8 +92,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       return next;
     });
     setCleared((previous) => previous.filter((item) => item !== envVar));
-    setErrors([]);
-    setStatus("idle");
+    if (!saveMutation.isPending) saveMutation.reset();
   }
 
   function toggleClear(envVar: string) {
@@ -121,37 +104,28 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     setCleared((previous) =>
       previous.includes(envVar) ? previous.filter((item) => item !== envVar) : [...previous, envVar]
     );
-    setErrors([]);
-    setStatus("idle");
+    if (!saveMutation.isPending) saveMutation.reset();
   }
 
-  async function save() {
-    setStatus("saving");
-    setErrors([]);
-
+  function save() {
     const edits = [
       ...Object.entries(draft).map(([envVar, value]) => ({ envVar, value })),
       ...cleared.map((envVar) => ({ envVar, value: "" })),
     ];
 
-    const result = await saveConfig({ data: { edits } });
-    if (!result.ok) {
-      setErrors(result.errors);
-      setStatus("idle");
-      return;
-    }
-
-    setDraft({});
-    setCleared([]);
-    setStatus("saved");
-    await router.invalidate();
+    saveMutation.mutate(edits, {
+      onSuccess: (result) => {
+        if (!result.ok) return;
+        setDraft({});
+        setCleared([]);
+      },
+    });
   }
 
   function reset() {
     setDraft({});
     setCleared([]);
-    setErrors([]);
-    setStatus("idle");
+    saveMutation.reset();
   }
 
   return (
@@ -180,7 +154,13 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Alert>
       )}
 
-      {status === "saved" && (
+      {saveError !== null && (
+        <Alert title="Configuration could not be saved" color="red">
+          {saveError}
+        </Alert>
+      )}
+
+      {saved && (
         <Alert title="Configuration saved" color="green">
           Your changes were written to the project <Code>.env</Code> file.
         </Alert>
@@ -195,7 +175,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         <Switch
           label="Show advanced settings"
           checked={showAdvanced}
-          onChange={(event) => toggleAdvanced(event.currentTarget.checked)}
+          onChange={(event) => setShowAdvanced(event.currentTarget.checked)}
         />
       </Group>
 
@@ -270,10 +250,10 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
               : "No unsaved changes"}
           </Text>
           <Group>
-            <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
+            <Button variant="default" onClick={reset} disabled={!dirty || saving}>
               Discard changes
             </Button>
-            <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
+            <Button onClick={save} loading={saving} disabled={!dirty}>
               Save changes
             </Button>
           </Group>

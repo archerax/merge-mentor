@@ -2,9 +2,14 @@ import { MantineProvider } from "@mantine/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AiStatus } from "../server/aiStatus.types.js";
+
 vi.mock("../server/aiStatus.functions.js", () => ({ getAiStatus: vi.fn() }));
 
-const { AiStatusIndicator, describeAiStatus } = await import("./AiStatusBar.js");
+const { AiStatusBar, AiStatusIndicator, describeAiStatus } = await import("./AiStatusBar.js");
+const { aiStatusQuery } = await import("../queries/aiStatus.js");
+const { createTestQueryClient, renderWithQuery } =
+  await import("../test/renderWithQuery.test-helper.js");
 
 const render = (ui: React.ReactNode) =>
   renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
@@ -79,5 +84,22 @@ describe("AiStatusIndicator", () => {
       <AiStatusIndicator status={{ kind: "byok", endpoint: "e", hasApiKey: false }} />
     );
     expect(html).toContain("BYOK");
+  });
+});
+
+describe("AiStatusBar", () => {
+  it("shows the placeholder before the status query has data", () => {
+    const { html } = renderWithQuery(<AiStatusBar />);
+    expect(html).toContain("Checking AI account");
+    expect(html).toContain("Refresh AI account status");
+  });
+
+  it("renders the cached status from the query client", () => {
+    const queryClient = createTestQueryClient();
+    const status: AiStatus = { kind: "copilot", login: "octocat", usesConfiguredToken: false };
+    queryClient.setQueryData(aiStatusQuery.queryKey, status);
+    const { html } = renderWithQuery(<AiStatusBar />, queryClient);
+    expect(html).toContain("Copilot: octocat");
+    expect(html).not.toContain("Checking AI account");
   });
 });

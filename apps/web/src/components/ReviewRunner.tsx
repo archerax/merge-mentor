@@ -23,6 +23,7 @@ import { getReviewCacheStatus } from "../server/review.functions.js";
 import {
   type PendingCommentView,
   type ReviewCacheStatus,
+  MAX_REVIEW_RUNS,
   REVIEW_STRATEGY_OPTIONS,
   type ReviewFindingView,
   type ReviewStreamInput,
@@ -78,6 +79,7 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
     error,
     elapsedMs,
     runInput,
+    runInputError,
   } = useReviewStream<ReviewSummary>({ endpoint: "/api/review/stream", runId, onRunCreated });
 
   const targetInput = (runInput as ReviewStreamInput | null) ?? null;
@@ -167,6 +169,7 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
             description="Runs the review several times and merges the findings. Overrides the configured default."
             placeholder="Use configured default"
             min={1}
+            max={MAX_REVIEW_RUNS}
             allowDecimal={false}
             allowNegative={false}
             value={runs ?? ""}
@@ -215,6 +218,12 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
       {(error ?? formError) && (
         <Alert title="Review failed" color="red">
           {error ?? formError}
+        </Alert>
+      )}
+
+      {runInputError && (
+        <Alert title="Posting comments is unavailable" color="yellow">
+          {runInputError}
         </Alert>
       )}
 

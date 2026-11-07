@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_REVIEW_RUNS } from "./review.types.js";
+
 vi.mock("@merge-mentor/platforms/github.js", () => ({
   GitHubAdapter: class {
     getProjectIdentifier() {
@@ -302,6 +304,13 @@ describe("review.server", () => {
     it("rejects a non-positive or fractional runs override", () => {
       expect(() => startPRReview({ pr: 7, runs: 0 })).toThrow(/positive integer/);
       expect(() => startPRReview({ pr: 7, runs: 1.5 })).toThrow(/positive integer/);
+    });
+
+    it("caps the runs override at MAX_REVIEW_RUNS", () => {
+      expect(() => startPRReview({ pr: 7, runs: MAX_REVIEW_RUNS + 1 })).toThrow(
+        new RegExp(`at most ${MAX_REVIEW_RUNS}`)
+      );
+      expect(() => startPRReview({ pr: 7, runs: MAX_REVIEW_RUNS })).not.toThrow();
     });
 
     it("starts a distinct run when the write mode differs", async () => {

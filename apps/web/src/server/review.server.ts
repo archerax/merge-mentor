@@ -32,14 +32,15 @@ import {
   recordPostedFingerprints,
   reviewScope,
 } from "./postedComments.server.js";
-import type {
-  PendingCommentView,
-  PostCommentsInput,
-  PostCommentsResult,
-  ReviewCacheStatus,
-  ReviewFindingView,
-  ReviewStreamInput,
-  ReviewSummary,
+import {
+  MAX_REVIEW_RUNS,
+  type PendingCommentView,
+  type PostCommentsInput,
+  type PostCommentsResult,
+  type ReviewCacheStatus,
+  type ReviewFindingView,
+  type ReviewStreamInput,
+  type ReviewSummary,
 } from "./review.types.js";
 import { startOrAttach } from "./reviewRuns.server.js";
 import type { SseEmitter } from "./sse.server.js";
@@ -85,8 +86,8 @@ function resolveTarget(input: ReviewStreamInput): ReviewTarget {
   }
 
   if (input.runs !== undefined) {
-    if (!Number.isInteger(input.runs) || input.runs <= 0) {
-      throw new Error("Review runs must be a positive integer.");
+    if (!Number.isInteger(input.runs) || input.runs <= 0 || input.runs > MAX_REVIEW_RUNS) {
+      throw new Error(`Review runs must be a positive integer of at most ${MAX_REVIEW_RUNS}.`);
     }
     overrides.reviewRuns = input.runs;
   }
