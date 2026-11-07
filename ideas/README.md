@@ -13,6 +13,6 @@ custom rules. It respects the repository's `AGENTS.md` instead.
 | [sarif-output-plan.md](./sarif-output-plan.md)                                               | Proposed               |                                                                                    |
 | [cost-and-usage-reporting-plan.md](./cost-and-usage-reporting-plan.md)                       | Proposed               |                                                                                    |
 | [prd-document-handling-plan.md](./prd-document-handling-plan.md)                             | Proposed               |                                                                                    |
-| [outcome-tracking-plan.md](./outcome-tracking-plan.md)                                       | Proposed (earlier)     | Shares the history pipeline with repo intelligence                                 |
+| [outcome-tracking-plan.md](./outcome-tracking-plan.md)                                       | Proposed (revised)     | Display-only: 12-month scan, JSON cache, CLI + dashboard. No learning yet          |
 | [repo-intelligence-and-team-coaching-plan.md](./repo-intelligence-and-team-coaching-plan.md) | Proposed (earlier)     | Generated `AGENTS.md` rules conflict with the decision above; see note in the plan |
 | [dashboard-review-history-plan.md](./dashboard-review-history-plan.md)                       | Proposed               | Depends on outcome tracking                                                        |
