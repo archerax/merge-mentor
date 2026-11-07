@@ -176,11 +176,10 @@ One file: `{tempPath}/outcomes/outcomes.json`, written atomically.
 whenever `updatedAt` changes. A PR whose comments were last scanned while still
 open is rescanned once after it closes.
 
-Why `updatedAt` is a safe key: on GitHub, resolving a thread or adding a comment
-bumps the PR's update time. This must be **verified on both platforms** before
-relying on it, because if resolving a thread does not bump `updatedAt` the cache
-would hide changes. If it does not, fall back to a short TTL for recently closed
-PRs (for example, rescan anything closed within the last 14 days).
+Why `updatedAt` is a usable key: on GitHub, adding a comment bumps the PR's
+update time, but it is not confirmed that resolving a thread does on either
+platform. So the cache also rescans any PR closed within the last ~14 days
+regardless of `updatedAt`, which catches late resolutions.
 
 Other rules:
 
@@ -294,19 +293,25 @@ and the "N PRs left out" warning match what `stats` does.
 - Fixed vs dismissed classification (see below).
 - Links to the coaching and repo-intelligence plans.
 
+## Decisions Made
+
+- **Outcome split:** resolved vs left open only. Revisit fixed/dismissed (Azure
+  `wontFix`/`byDesign`, or a diff of the flagged lines) once real data shows it
+  is worth the cost.
+- **Cache safety:** always rescan PRs closed within the last ~14 days, and trust
+  the cache for older closed PRs. This holds even if resolving a thread does
+  bump `updatedAt`, so late resolutions are not missed. Still worth a quick
+  manual check on both platforms to see whether the window can shrink.
+- **Dashboard scan:** show the cached results immediately with a "last scanned"
+  time; a button starts a rescan with a progress counter. The CLI and dashboard
+  share the same `outcomes.json`.
+- **Severity:** parse it from the comment body only. No change to the posted
+  comment format. Comments where it cannot be parsed show as `unknown`. If the
+  comment template changes, the parser and its tests must change with it.
+
 ## Open Decisions
 
-- **Is "resolved" enough?** A resolved thread can mean "fixed" or "ignored by
-  clicking resolve". Splitting it later could use: a code change near the
-  flagged line (accurate, costly), or a reply from a human saying "won't fix"
-  (cheap, incomplete), or Azure's `wontFix`/`byDesign` statuses (free on Azure
-  only). Decide after seeing real data.
-- **Does resolving a thread bump the PR's `updatedAt` on each platform?** Needs a
-  quick manual check before the cache rule is final.
-- **Default window of 12 months vs repo size.** For very large repos the default
-  scan may be slow; consider a lower default `--limit` with a clear warning.
+- **Default window vs repo size.** For very large repos the 12-month scan may be
+  slow; consider a lower default `--limit` with a clear warning.
 - **Should `stats` and `outcomes` merge** into one command/page once outcomes
   settles? Keep separate for now to avoid destabilising `stats`.
-- **Severity from the comment body** is fragile if the comment template
-  changes. Consider adding severity to the `finding-id` marker going forward
-  (old comments would still show `unknown`).
