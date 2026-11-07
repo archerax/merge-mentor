@@ -62,6 +62,7 @@ describe("startOutcomesMutation", () => {
     await new MutationObserver(queryClient, startOutcomesMutation).mutate(false);
 
     expect(queryClient.getQueryData(outcomesQuery.queryKey)).toEqual(running);
+    expect(queryClient.getQueryState(outcomesQuery.queryKey)?.isInvalidated).toBe(false);
   });
 
   it("keeps the cached outcomes when the request fails", async () => {
@@ -73,6 +74,7 @@ describe("startOutcomesMutation", () => {
     await expect(observer.mutate(false)).rejects.toThrow("offline");
 
     expect(queryClient.getQueryData(outcomesQuery.queryKey)).toEqual(idle);
+    expect(queryClient.getQueryState(outcomesQuery.queryKey)?.isInvalidated).toBe(true);
     expect(observer.getCurrentResult().error?.message).toBe("offline");
   });
 });

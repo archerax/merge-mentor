@@ -68,8 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   messages are unchanged.
 - **Web UI Audit Log, Configuration and Stats pages**: the Audit Log and
   Configuration pages reuse data loaded less than 30 seconds ago (including
-  data loaded when you hover a link) instead of requesting it again, and all
-  three pages refresh their data when you come back to the browser tab.
+  data loaded when you hover a link) instead of requesting it again, and these
+  two pages refresh their data when you come back to the browser tab. The Stats
+  page keeps its numbers until you change the window.
 - **Web UI review runs**: the number of review runs is limited to 10 in the web
   UI. If a run's original input cannot be loaded when reopening it from its
   link, the page now says why comments cannot be posted.

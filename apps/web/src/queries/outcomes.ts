@@ -24,7 +24,7 @@ export const outcomesQuery = queryOptions({
 /**
  * Starts a background scan (`refresh` rescans everything). The returned scan
  * state goes straight into the cache, so polling starts at once, and the
- * outcomes are then re-read.
+ * outcomes are then re-read. A refused start leaves the cache alone.
  */
 export const startOutcomesMutation = mutationOptions({
   mutationFn: (refresh: boolean) => startOutcomes({ data: { refresh } }),
@@ -32,6 +32,10 @@ export const startOutcomesMutation = mutationOptions({
     // A failed start (`ok: false`) must not replace the scan view that is on screen.
     if (result.ok) client.setQueryData(outcomesQuery.queryKey, result);
   },
-  onSettled: (_result, _error, _refresh, _onMutateResult, { client }) =>
-    client.invalidateQueries({ queryKey: outcomesQuery.queryKey }),
+  // Re-read after an accepted start, or when the request failed and the server's
+  // state is unknown. A refused start changed nothing, so the cached view stays.
+  onSettled: (result, error, _refresh, _onMutateResult, { client }) =>
+    result?.ok === false && error === null
+      ? undefined
+      : client.invalidateQueries({ queryKey: outcomesQuery.queryKey }),
 });

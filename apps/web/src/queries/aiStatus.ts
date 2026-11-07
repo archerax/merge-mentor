@@ -33,6 +33,8 @@ export const aiStatusQuery = queryOptions({
 export const refreshAiStatusMutation = mutationOptions({
   mutationKey: [...aiStatusKeys.all, "refresh"] as const,
   mutationFn: () => fetchAiStatus(true),
+  // An initial non-forced fetch still in flight must not land after, and overwrite, the forced result.
+  onMutate: (_variables, { client }) => client.cancelQueries({ queryKey: aiStatusQuery.queryKey }),
   onSuccess: (status, _variables, _onMutateResult, { client }) => {
     client.setQueryData(aiStatusQuery.queryKey, status);
   },

@@ -14,6 +14,11 @@ describe("auditQuery", () => {
     ]);
   });
 
+  it("re-reads the log on a later visit instead of trusting a long-lived cache", () => {
+    expect(auditQuery.staleTime).toBeLessThanOrEqual(5000);
+    expect(auditQuery.staleTime).toBeGreaterThan(0);
+  });
+
   it("propagates a failed load so the route error screen shows it", async () => {
     getAuditEvents.mockRejectedValue(new Error("audit unavailable"));
     await expect(createTestQueryClient().fetchQuery(auditQuery)).rejects.toThrow(

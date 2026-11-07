@@ -61,6 +61,28 @@ describe("refreshAiStatusMutation", () => {
     });
   });
 
+  it("is not overwritten by an initial fetch that was still in flight", async () => {
+    const queryClient = createTestQueryClient();
+    const initialCall: { finish?: (status: AiStatus) => void } = {};
+    getAiStatus.mockImplementationOnce(
+      () =>
+        new Promise<AiStatus>((resolve) => {
+          initialCall.finish = resolve;
+        })
+    );
+    const initial = queryClient.fetchQuery(aiStatusQuery).catch(() => null);
+    getAiStatus.mockResolvedValueOnce({ kind: "other-provider", provider: "forced" });
+
+    await new MutationObserver(queryClient, refreshAiStatusMutation).mutate();
+    initialCall.finish?.({ kind: "copilot-error", message: "late" });
+    await initial;
+
+    expect(queryClient.getQueryData(aiStatusQuery.queryKey)).toEqual({
+      kind: "other-provider",
+      provider: "forced",
+    });
+  });
+
   it("stores a copilot-error status when the re-check fails", async () => {
     const queryClient = createTestQueryClient();
     getAiStatus.mockImplementation(async () => {

@@ -21,6 +21,16 @@ interface PersistedStoreOptions<TState, TPersisted> {
    * so edited or stale data can never break the page.
    */
   readonly sanitize: (persisted: unknown) => Partial<TPersisted>;
+  /**
+   * Fields saved elsewhere before this store existed. `read` must not change
+   * storage; it returns `null` when there is nothing to carry over. They apply
+   * under the store's own payload, which is then written, and only after that
+   * write is `discard` called, so the old value is never lost part-way.
+   */
+  readonly legacy?: {
+    readonly read: () => Partial<TPersisted> | null;
+    readonly discard: () => void;
+  };
 }
 
 /** Hydrators of stores created before the app finished hydrating. */
@@ -61,6 +71,7 @@ export function createPersistedStore<TState extends object, TPersisted>(
 ) {
   const area = options.area ?? "session";
   let hydrated = false;
+  let legacyConsumed = false;
 
   const storage: StateStorage = {
     getItem: (name) => {
@@ -101,10 +112,22 @@ export function createPersistedStore<TState extends object, TPersisted>(
         hydrated = true;
         return {};
       },
-      merge: (persisted, current) => ({ ...current, ...options.sanitize(persisted) }),
+      merge: (persisted, current) => {
+        const legacy = options.legacy?.read() ?? null;
+        legacyConsumed = legacy !== null;
+        return { ...current, ...legacy, ...options.sanitize(persisted) };
+      },
       // Runs after success and after failure (such as unparseable JSON), which leaves the defaults.
       onRehydrateStorage: () => () => {
         hydrated = true;
+        if (legacyConsumed) {
+          legacyConsumed = false;
+          // A payload-less hydration writes nothing by itself: save the merged
+          // state, then drop the old key. Skipped if the write did not land.
+          store.setState({} as Partial<TState>);
+          if (storage.getItem(`${STORAGE_PREFIX}${options.name}`) !== null)
+            options.legacy?.discard();
+        }
       },
     })
   );

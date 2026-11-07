@@ -15,7 +15,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { saveConfigMutation } from "../queries/config.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
@@ -72,10 +72,8 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     ? activeTab
     : (sections[0]?.title ?? null);
 
-  // Keep state in step with the displayed tab when the active one is filtered out.
-  useEffect(() => {
-    if (currentTab !== activeTab) setActiveTab(currentTab);
-  }, [currentTab, activeTab, setActiveTab]);
+  // The stored tab stays the user's preference: when it is filtered out (say,
+  // an advanced tab while "show advanced" is off) only the display falls back.
 
   const labels = new Map(
     view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))

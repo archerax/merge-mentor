@@ -24,16 +24,22 @@ function sanitizeConfigView(persisted: unknown): Partial<PersistedConfigView> {
 /** Where "show advanced" was kept before this store existed. */
 const LEGACY_SHOW_ADVANCED_KEY = "merge-mentor:config:show-advanced";
 
-/** Carries over a "show advanced" choice saved under the old key. */
-function legacyShowAdvanced(): Partial<PersistedConfigView> {
+/** Reads a "show advanced" choice saved under the old key, without removing it. */
+function readLegacyShowAdvanced(): Partial<PersistedConfigView> | null {
   try {
     const legacy = window.localStorage.getItem(LEGACY_SHOW_ADVANCED_KEY);
-    if (legacy === null) return {};
-    // Read once: a stale "true" must not resurrect after the user turns it off.
-    window.localStorage.removeItem(LEGACY_SHOW_ADVANCED_KEY);
-    return legacy === "true" ? { showAdvanced: true } : {};
+    return legacy === null ? null : { showAdvanced: legacy === "true" };
   } catch {
-    return {};
+    return null;
+  }
+}
+
+/** Removes the old key once the choice is saved in the store's own payload. */
+function discardLegacyShowAdvanced(): void {
+  try {
+    window.localStorage.removeItem(LEGACY_SHOW_ADVANCED_KEY);
+  } catch {
+    // Nothing to remove.
   }
 }
 
@@ -54,7 +60,8 @@ export const useConfigViewStore = createPersistedStore<ConfigViewState, Persiste
     version: 1,
     area: "local",
     partialize: ({ activeTab, showAdvanced }) => ({ activeTab, showAdvanced }),
-    sanitize: (persisted) => ({ ...legacyShowAdvanced(), ...sanitizeConfigView(persisted) }),
+    sanitize: sanitizeConfigView,
+    legacy: { read: readLegacyShowAdvanced, discard: discardLegacyShowAdvanced },
   }
 );
 

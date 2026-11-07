@@ -170,7 +170,16 @@ describe("persisted stores", () => {
     hydrate();
 
     expect(config.getState().showAdvanced).toBe(true);
+    expect(local.read("merge-mentor:config-view")).toEqual({
+      state: { activeTab: null, showAdvanced: true },
+      version: 1,
+    });
     expect(local.items.has("merge-mentor:config:show-advanced")).toBe(false);
+
+    vi.resetModules();
+    const second = await loadStores();
+    second.hydrate();
+    expect(second.config.getState().showAdvanced).toBe(true);
   });
 
   it("does not bring back a legacy 'show advanced' choice after it was turned off", async () => {
@@ -280,12 +289,13 @@ describe("persisted stores", () => {
     });
   });
 
-  it("falls back to defaults for data saved by another version", async () => {
-    session.write("merge-mentor:audit-filters", { severity: "error", query: "old" }, 0);
-    const { hydrate, audit } = await loadStores();
+  it("falls back to empty forms for review forms saved by another version", async () => {
+    session.write("merge-mentor:review-forms", { forms: { pr: { input: "old" } } }, 0);
+    const { hydrate, reviewForms } = await loadStores();
     hydrate();
 
-    expect(audit.getState()).toMatchObject({ severity: "all", query: "" });
+    expect(reviewForms.getState().forms.pr.input).toBe("");
+    expect(session.read("merge-mentor:review-forms")).toMatchObject({ version: 1 });
   });
 
   it("drops a saved report pick that names no report", async () => {

@@ -73,7 +73,8 @@ function StatsPage() {
   const { days } = Route.useSearch();
   // `useQuery` rather than `useSuspenseQuery`: suspense would ignore placeholder
   // data and blank the page on every window change. A failed load is shown
-  // inline (with a retry) so the numbers already on screen survive it.
+  // inline (with a retry). The numbers survive a failed background refetch of a
+  // loaded window, but not a failed window switch: the new key has no data.
   const {
     data: result,
     error: loadError,

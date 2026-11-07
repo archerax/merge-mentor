@@ -167,7 +167,15 @@ function ReportsPage() {
             <Card padding="lg">
               {detail.isError && selected === null ? (
                 <Alert color="red" title="Could not load this report">
-                  {describeRouteError(detail.error)}
+                  {describeRouteError(detail.error)}{" "}
+                  <Button
+                    variant="light"
+                    color="red"
+                    size="compact-xs"
+                    onClick={() => void detail.refetch()}
+                  >
+                    Try again
+                  </Button>
                 </Alert>
               ) : loadingName !== null ? (
                 <Stack gap="sm">
