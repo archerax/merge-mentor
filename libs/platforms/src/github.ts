@@ -5,6 +5,7 @@ import type {
   ExistingComment,
   ListPullRequestsOptions,
   FileStatus,
+  InlineCommentInput,
   PBIDetails,
   PlatformAdapter,
   PRDetails,
@@ -872,6 +873,81 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister, BotThr
       );
       throw error;
     }
+  }
+
+  /**
+   * Posts inline comments as one pull request review (`event: COMMENT`), so
+   * reviewers get a single notification. All-or-nothing: GitHub rejects the whole
+   * review with a 422 when any comment targets a line outside the diff, in which
+   * case this resolves `false` and posts nothing so the caller can fall back to
+   * posting each comment on its own.
+   * @param prNumber - The PR number
+   * @param comments - The inline comments to post together
+   * @returns `true` when posted, `false` when GitHub rejected the batch's content
+   */
+  async postInlineCommentBatch(
+    prNumber: number,
+    comments: readonly InlineCommentInput[]
+  ): Promise<boolean> {
+    this.logger.debug({ prNumber, count: comments.length }, "Posting inline comments as a review");
+
+    try {
+      const headSha = await this.getPinnedHeadSha(prNumber);
+
+      await withWriteRateLimitHandling(() =>
+        this.octokit.pulls.createReview({
+          owner: this.owner,
+          repo: this.repo,
+          pull_number: prNumber,
+          commit_id: headSha,
+          event: "COMMENT",
+          comments: comments.map((comment) => ({
+            path: comment.path,
+            line: comment.line,
+            body: comment.body,
+            side: "RIGHT" as const,
+            ...(comment.startLine !== undefined && comment.startLine !== comment.line
+              ? { start_line: comment.startLine, start_side: "RIGHT" as const }
+              : {}),
+          })),
+        })
+      );
+    } catch (error) {
+      if ((error as { status?: number }).status === 422) {
+        this.logger.warn(
+          { prNumber, count: comments.length, error: (error as Error).message },
+          "GitHub rejected the review batch; falling back to individual comments"
+        );
+        return false;
+      }
+      this.logger.error(
+        { prNumber, count: comments.length, error: (error as Error).message },
+        "Failed to post inline comments as a review"
+      );
+      for (const comment of comments) {
+        this.auditLogger.logInlineCommentPost(
+          prNumber,
+          comment.path,
+          comment.line,
+          "github",
+          "failure",
+          (error as Error).message
+        );
+      }
+      throw error;
+    }
+
+    this.logger.info({ prNumber, count: comments.length }, "Inline comments posted as a review");
+    for (const comment of comments) {
+      this.auditLogger.logInlineCommentPost(
+        prNumber,
+        comment.path,
+        comment.line,
+        "github",
+        "success"
+      );
+    }
+    return true;
   }
 
   /**

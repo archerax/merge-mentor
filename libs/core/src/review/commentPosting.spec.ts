@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { commentFingerprint, postPlannedComments, type PendingComment } from "./commentPosting.js";
 
 /** Minimal adapter exposing only the posting methods under test. */
-function createPostingAdapter(
-  overrides: Partial<
-    Pick<PlatformAdapter, "postInlineComment" | "postGeneralComment" | "postPBIComment">
-  > = {}
-): Pick<PlatformAdapter, "postInlineComment" | "postGeneralComment" | "postPBIComment"> {
+type PostingAdapter = Pick<
+  PlatformAdapter,
+  "postInlineComment" | "postGeneralComment" | "postPBIComment" | "postInlineCommentBatch"
+>;
+
+function createPostingAdapter(overrides: Partial<PostingAdapter> = {}): PostingAdapter {
   return {
     postInlineComment: vi.fn().mockResolvedValue(undefined),
     postGeneralComment: vi.fn().mockResolvedValue(undefined),
@@ -114,6 +115,105 @@ describe("postPlannedComments", () => {
     expect(result.commentsCreated).toBe(1);
     expect(result.commentsSkipped).toBe(1);
     expect(result.postedFingerprints).toEqual([commentFingerprint(second)]);
+  });
+});
+
+describe("postPlannedComments batching", () => {
+  const first: PendingComment = { path: "a.ts", line: 1, body: "one" };
+  const second: PendingComment = { path: "b.ts", line: 4, startLine: 2, body: "two" };
+  const general: PendingComment = { body: "overall" };
+  const target = { kind: "pr", prNumber: 7 } as const;
+
+  it("posts the inline comments as one review and the rest individually", async () => {
+    const postInlineCommentBatch = vi.fn().mockResolvedValue(true);
+    const adapter = createPostingAdapter({ postInlineCommentBatch });
+
+    const result = await postPlannedComments(adapter as PlatformAdapter, target, [
+      first,
+      general,
+      second,
+    ]);
+
+    expect(postInlineCommentBatch).toHaveBeenCalledTimes(1);
+    expect(postInlineCommentBatch).toHaveBeenCalledWith(7, [
+      { path: "a.ts", line: 1, body: "one" },
+      { path: "b.ts", line: 4, startLine: 2, body: "two" },
+    ]);
+    expect(adapter.postInlineComment).not.toHaveBeenCalled();
+    expect(adapter.postGeneralComment).toHaveBeenCalledWith(7, "overall");
+    expect(result.commentsCreated).toBe(3);
+    expect(result.commentErrors).toEqual([]);
+    expect(result.postedFingerprints).toHaveLength(3);
+  });
+
+  it("posts each comment on its own when the platform rejects the batch", async () => {
+    const postInlineCommentBatch = vi.fn().mockResolvedValue(false);
+    const postInlineComment = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("line not in diff"))
+      .mockResolvedValueOnce(undefined);
+    const adapter = createPostingAdapter({ postInlineCommentBatch, postInlineComment });
+
+    const result = await postPlannedComments(adapter as PlatformAdapter, target, [first, second]);
+
+    expect(postInlineComment).toHaveBeenCalledTimes(2);
+    expect(result.commentsCreated).toBe(1);
+    expect(result.commentErrors).toEqual(["Failed to post comment: line not in diff"]);
+    expect(result.postedFingerprints).toEqual([commentFingerprint(second)]);
+  });
+
+  it("fails every comment in the batch, without falling back, on a hard error", async () => {
+    const postInlineCommentBatch = vi.fn().mockRejectedValue(new Error("network down"));
+    const adapter = createPostingAdapter({ postInlineCommentBatch });
+
+    const result = await postPlannedComments(adapter as PlatformAdapter, target, [
+      first,
+      second,
+      general,
+    ]);
+
+    expect(adapter.postInlineComment).not.toHaveBeenCalled();
+    expect(result.commentErrors).toEqual([
+      "Failed to post comment: network down",
+      "Failed to post comment: network down",
+    ]);
+    expect(result.postedFingerprints).toEqual([commentFingerprint(general)]);
+    expect(result.commentsCreated).toBe(1);
+  });
+
+  it("leaves out comments already posted", async () => {
+    const postInlineCommentBatch = vi.fn().mockResolvedValue(true);
+    const adapter = createPostingAdapter({ postInlineCommentBatch });
+    const third: PendingComment = { path: "c.ts", line: 9, body: "three" };
+
+    const result = await postPlannedComments(
+      adapter as PlatformAdapter,
+      target,
+      [first, second, third],
+      {
+        postedFingerprints: new Set([commentFingerprint(first)]),
+      }
+    );
+
+    expect(postInlineCommentBatch).toHaveBeenCalledWith(7, [
+      { path: "b.ts", line: 4, startLine: 2, body: "two" },
+      { path: "c.ts", line: 9, body: "three" },
+    ]);
+    expect(result.commentsCreated).toBe(2);
+    expect(result.commentsSkipped).toBe(1);
+  });
+
+  it("does not batch work item comments", async () => {
+    const postInlineCommentBatch = vi.fn().mockResolvedValue(true);
+    const adapter = createPostingAdapter({ postInlineCommentBatch });
+
+    await postPlannedComments(adapter as PlatformAdapter, { kind: "pbi", id: "5" }, [
+      { path: "a.ts", line: 1, body: "x" },
+      { path: "b.ts", line: 2, body: "y" },
+    ]);
+
+    expect(postInlineCommentBatch).not.toHaveBeenCalled();
+    expect(adapter.postPBIComment).toHaveBeenCalledTimes(2);
   });
 });
 

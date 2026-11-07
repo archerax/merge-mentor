@@ -43,6 +43,7 @@ import {
   usePostComments,
 } from "./review/usePostComments.js";
 import { useReviewStream } from "./review/useReviewStream.js";
+import { RunErrorAlert } from "./RunErrorAlert.js";
 
 interface ReviewRunnerProps {
   /** Run id from the URL, re-attached on mount to resume a run. */
@@ -216,9 +217,7 @@ export function ReviewRunner({ runId, onRunCreated }: ReviewRunnerProps) {
       </Card>
 
       {(error ?? formError) && (
-        <Alert title="Review failed" color="red">
-          {error ?? formError}
-        </Alert>
+        <RunErrorAlert title="Review failed" message={(error ?? formError) as string} />
       )}
 
       {runInputError && (

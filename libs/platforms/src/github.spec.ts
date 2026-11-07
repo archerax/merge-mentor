@@ -13,6 +13,7 @@ const mockOctokitInstance = {
     listFiles: vi.fn(),
     listReviewComments: vi.fn(),
     createReviewComment: vi.fn(),
+    createReview: vi.fn(),
     createReplyForReviewComment: vi.fn(),
     getReviewComment: vi.fn(),
   },
@@ -781,6 +782,89 @@ describe("GitHubAdapter", () => {
           start_side: "RIGHT",
         })
       );
+    });
+  });
+
+  describe("postInlineCommentBatch", () => {
+    const comments = [
+      { path: "a.ts", line: 3, body: "one" },
+      { path: "b.ts", line: 12, startLine: 10, body: "two" },
+      { path: "c.ts", line: 7, startLine: 7, body: "three" },
+    ];
+
+    it("posts every comment as one review", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({ data: { head: { sha: "abc123" } } });
+      mockOctokitInstance.pulls.createReview.mockResolvedValue({});
+
+      const posted = await adapter.postInlineCommentBatch(123, comments);
+
+      expect(posted).toBe(true);
+      expect(mockOctokitInstance.pulls.createReview).toHaveBeenCalledTimes(1);
+      expect(mockOctokitInstance.pulls.createReview).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 123,
+        commit_id: "abc123",
+        event: "COMMENT",
+        comments: [
+          { path: "a.ts", line: 3, body: "one", side: "RIGHT" },
+          {
+            path: "b.ts",
+            line: 12,
+            body: "two",
+            side: "RIGHT",
+            start_line: 10,
+            start_side: "RIGHT",
+          },
+          // A range that starts and ends on the same line is a single-line comment.
+          { path: "c.ts", line: 7, body: "three", side: "RIGHT" },
+        ],
+      });
+      expect(mockOctokitInstance.pulls.createReviewComment).not.toHaveBeenCalled();
+    });
+
+    it("attaches the review to the SHA captured at review start", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValueOnce({
+        data: {
+          number: 7,
+          title: "t",
+          body: "",
+          state: "open",
+          draft: false,
+          user: { login: "u" },
+          head: { sha: "sha-1", ref: "f", repo: { full_name: "test-owner/test-repo" } },
+          base: { sha: "base", ref: "main" },
+        },
+      });
+      mockOctokitInstance.pulls.createReview.mockResolvedValue({});
+
+      await adapter.getPRDetails(7);
+      await adapter.postInlineCommentBatch(7, comments);
+
+      expect(mockOctokitInstance.pulls.createReview.mock.calls[0]?.[0]?.commit_id).toBe("sha-1");
+    });
+
+    it("resolves false, posting nothing, when GitHub rejects the review with a 422", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({ data: { head: { sha: "abc123" } } });
+      mockOctokitInstance.pulls.createReview.mockRejectedValue(
+        Object.assign(new Error("Line could not be resolved"), { status: 422 })
+      );
+
+      expect(await adapter.postInlineCommentBatch(123, comments)).toBe(false);
+    });
+
+    it("rethrows any other failure", async () => {
+      const adapter = new GitHubAdapter(createTestConfig());
+      mockOctokitInstance.pulls.get.mockResolvedValue({ data: { head: { sha: "abc123" } } });
+      mockOctokitInstance.pulls.createReview.mockRejectedValue(
+        Object.assign(new Error("Bad gateway"), { status: 502 })
+      );
+
+      await expect(adapter.postInlineCommentBatch(123, comments)).rejects.toThrow("Bad gateway");
+      expect(mockOctokitInstance.pulls.createReview).toHaveBeenCalledTimes(1);
     });
   });
 

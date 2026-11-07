@@ -35,6 +35,7 @@ import { LiveThinking } from "./review/LiveThinking.js";
 import { ProgressTimeline } from "./review/ProgressTimeline.js";
 import { TechnicalLog } from "./review/TechnicalLog.js";
 import { useReviewStream } from "./review/useReviewStream.js";
+import { RunErrorAlert } from "./RunErrorAlert.js";
 
 /** Formats a byte count as KB/MB for plain-language messages. */
 export function formatFileSize(bytes: number): string {
@@ -242,9 +243,10 @@ export function PrdReviewRunner({
       )}
 
       {(error ?? formError) && (
-        <Alert title="The review could not be completed" color="red">
-          {error ?? formError}
-        </Alert>
+        <RunErrorAlert
+          title="The review could not be completed"
+          message={(error ?? formError) as string}
+        />
       )}
 
       <ProgressTimeline

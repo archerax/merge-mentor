@@ -13,11 +13,13 @@ import {
 } from "@mantine/core";
 import {
   IconBolt,
+  IconChartBar,
   IconFileDescription,
   IconFileText,
   IconGitPullRequest,
   IconHistory,
   IconListDetails,
+  IconListCheck,
   IconSettings,
   IconShieldCheck,
   IconSitemap,
@@ -68,6 +70,22 @@ const FEATURES: readonly Feature[] = [
       "Upload a PRD or FRD Word document and get a plain-language review of gaps, ambiguity, and untestable requirements.",
     to: "/prd",
     action: "Review a document",
+  },
+  {
+    icon: IconChartBar,
+    title: "Stats",
+    description:
+      "See how many pull requests Merge Mentor has reviewed and how many comments it has posted, live from your repository.",
+    to: "/stats",
+    action: "View stats",
+  },
+  {
+    icon: IconListCheck,
+    title: "Outcomes",
+    description:
+      "See what became of the review threads Merge Mentor started over the last 12 months: resolved, or left open.",
+    to: "/outcomes",
+    action: "View outcomes",
   },
   {
     icon: IconFileText,
@@ -126,11 +144,12 @@ function Home() {
             </Badge>
           </Group>
           <Title order={1} className="mm-gradient-text">
-            Review pull requests and backlogs with confidence
+            Review code, backlogs and requirements with confidence
           </Title>
           <Text size="lg" c="dimmed">
-            A self-hosted workspace for running Merge Mentor reviews, streaming results live, and
-            inspecting the reports, audit trail, and configuration produced along the way.
+            A self-hosted workspace for reviewing pull requests, backlog items, project plans and
+            requirements documents, streaming results live, and inspecting the reports, audit trail,
+            and configuration produced along the way.
           </Text>
           <Group>
             <Button component={Link} to="/review" size="md" leftSection={<IconBolt size={18} />}>

@@ -167,6 +167,7 @@ function createMockPlatform(): PlatformAdapter {
     getExistingBotComments: vi.fn(),
     getUnresolvedCommentThreads: vi.fn(),
     postInlineComment: vi.fn(),
+    postInlineCommentBatch: vi.fn(),
     postGeneralComment: vi.fn(),
     getLinkedPBIIds: vi.fn(),
     getPBIDetails: vi.fn(),
@@ -228,6 +229,43 @@ function createPRFile(overrides: Partial<PRFile> = {}): PRFile {
     sha: "abc123def456",
     ...overrides,
   };
+}
+
+/** The batch-posting mock on a platform built by {@link createMockPlatform}. */
+function batchMock(platform: PlatformAdapter) {
+  return vi.mocked(
+    platform.postInlineCommentBatch as NonNullable<PlatformAdapter["postInlineCommentBatch"]>
+  );
+}
+
+function highFinding(line: number, message: string) {
+  return {
+    line,
+    severity: "high" as const,
+    category: "bug" as const,
+    message,
+    suggestion: "Fix it",
+    isPreExisting: false,
+  };
+}
+
+/** Sets up a PR whose review produces two inline findings on `test.ts`. */
+function mockTwoInlineFindings(platform: PlatformAdapter): void {
+  vi.mocked(platform.getPRDetails).mockResolvedValue(createPRDetails());
+  vi.mocked(platform.getPRFiles).mockResolvedValue([createPRFile()]);
+  vi.mocked(platform.getExistingBotComments).mockResolvedValue([]);
+  mockExecutePrompt.mockResolvedValue({ raw: "{}", parsed: {} });
+  mockParseBatchedFileReview.mockReturnValue([
+    {
+      filename: "test.ts",
+      findings: [highFinding(2, "First bug"), highFinding(3, "Second bug")],
+    },
+  ]);
+  mockParseCrossFileReview.mockReturnValue({
+    overallAssessment: "Needs fixes",
+    findings: [],
+    recommendations: [],
+  });
 }
 
 describe("ReviewEngine", () => {
@@ -1966,6 +2004,68 @@ describe("ReviewEngine", () => {
       expect(result).toBeDefined();
       expect(result.commentErrors.length).toBeGreaterThan(0);
       expect(result.commentErrors[0]).toContain("API rate limit exceeded");
+    });
+
+    describe("inline comment batching", () => {
+      it("posts the inline findings as one review", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          dryRun: false,
+        });
+        mockTwoInlineFindings(mockPlatform);
+        batchMock(mockPlatform).mockResolvedValue(true);
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockPlatform.postInlineCommentBatch).toHaveBeenCalledTimes(1);
+        expect(batchMock(mockPlatform)).toHaveBeenCalledWith(123, [
+          expect.objectContaining({ path: "test.ts", body: expect.stringContaining("First bug") }),
+          expect.objectContaining({ path: "test.ts", body: expect.stringContaining("Second bug") }),
+        ]);
+        expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
+        expect(result.commentErrors).toEqual([]);
+        expect(result.commentsCreated).toBeGreaterThanOrEqual(2);
+      });
+
+      it("posts findings one by one when the platform rejects the batch", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          dryRun: false,
+        });
+        mockTwoInlineFindings(mockPlatform);
+        batchMock(mockPlatform).mockResolvedValue(false);
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockPlatform.postInlineComment).toHaveBeenCalledTimes(2);
+        expect(result.commentErrors).toEqual([]);
+      });
+
+      it("reports every finding in the batch as failed on a hard error", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          dryRun: false,
+        });
+        mockTwoInlineFindings(mockPlatform);
+        batchMock(mockPlatform).mockRejectedValue(new Error("boom"));
+
+        const result = await engine.reviewPR(123);
+
+        expect(mockPlatform.postInlineComment).not.toHaveBeenCalled();
+        expect(result.commentErrors.filter((e) => e.includes("boom"))).toHaveLength(2);
+      });
+
+      it("does not batch in a dry run", async () => {
+        const engine = new ReviewEngine(mockPlatform, "[Bot]", "copilot-sdk", {
+          verbose: false,
+          dryRun: true,
+        });
+        mockTwoInlineFindings(mockPlatform);
+
+        await engine.reviewPR(123);
+
+        expect(mockPlatform.postInlineCommentBatch).not.toHaveBeenCalled();
+      });
     });
 
     describe("verifyPbi orchestration", () => {

@@ -95,6 +95,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data loads. When a page throws while loading, every route now shows the same
   error message with a **Try again** button that reloads its data; pages that
   explain their own failures (Outcomes) keep their inline message.
+- **Web dashboard home page**: the headline and introduction now cover
+  requirements documents and project plans as well as pull requests, and the
+  home page has cards for **Stats** and **Outcomes**.
+- **Web dashboard run errors**: a failed review now scrolls into view instead of
+  appearing below the fold, and an error caused by a missing setting links to
+  the **Configuration** page, on the PR, PBI, project and PRD review pages.
+- **One review instead of many notifications (GitHub)**: when a review posts more
+  than one inline comment, they now go up together as a single pull request
+  review, so the author gets one notification instead of one per finding. This
+  applies to `review --write` and to posting planned comments from the web
+  dashboard. If GitHub rejects
+  the batch (for example one comment sits on a line outside the diff), Merge
+  Mentor falls back to posting each comment on its own, so one bad comment does
+  not lose the rest. Azure DevOps is unchanged.
 
 ## [4.4.0] - 2026-11-06
 
