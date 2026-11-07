@@ -12,19 +12,17 @@ import {
   Text,
 } from "@mantine/core";
 import type { OutcomeCounts, OutcomeStats } from "@merge-mentor/core/review/outcomes/types.js";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { PageHeader } from "../components/PageHeader.js";
-import { getOutcomes, startOutcomes } from "../server/outcomes.functions.js";
+import { outcomesQuery, startOutcomesMutation } from "../queries/outcomes.js";
 
 export const Route = createFileRoute("/outcomes")({
-  staleTime: 0,
-  loader: () => getOutcomes(),
+  loader: ({ context }) => context.queryClient.ensureQueryData(outcomesQuery),
   component: OutcomesPage,
 });
-
-const POLL_MS = 2000;
 
 function percent(rate: number | null): string {
   return rate === null ? "n/a" : `${Math.round(rate * 100)}%`;
@@ -110,27 +108,11 @@ function Results({ stats }: { stats: OutcomeStats }) {
 }
 
 function OutcomesPage() {
-  const result = Route.useLoaderData();
-  const router = useRouter();
+  // Polls by itself while a scan is running (see outcomesQuery).
+  const { data: result } = useSuspenseQuery(outcomesQuery);
+  const start = useMutation(startOutcomesMutation);
   const [refresh, setRefresh] = useState(false);
-  const [starting, setStarting] = useState(false);
   const running = result.ok && result.view.scan.running;
-
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => void router.invalidate(), POLL_MS);
-    return () => clearInterval(timer);
-  }, [running, router]);
-
-  const start = async () => {
-    setStarting(true);
-    try {
-      await startOutcomes({ data: { refresh } });
-      await router.invalidate();
-    } finally {
-      setStarting(false);
-    }
-  };
 
   const view = result.ok ? result.view : undefined;
   const scan = view?.scan;
@@ -155,8 +137,8 @@ function OutcomesPage() {
               disabled={running}
             />
             <Button
-              onClick={() => void start()}
-              loading={starting || running}
+              onClick={() => start.mutate(refresh)}
+              loading={start.isPending || running}
               disabled={!result.ok}
             >
               {view?.cached ? "Rescan" : "Scan last 12 months"}
@@ -169,6 +151,12 @@ function OutcomesPage() {
         <Alert title="Could not load outcomes" color="red">
           {result.error} Check the <Link to="/config">configuration</Link> for the platform token
           and repository.
+        </Alert>
+      )}
+
+      {start.error && (
+        <Alert title="Could not start the scan" color="red">
+          {start.error.message}
         </Alert>
       )}
 

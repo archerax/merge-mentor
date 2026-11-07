@@ -52,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshes itself when you come back to the browser tab (if it is more than
   30 seconds old), so a sign-in or token change made elsewhere shows up without
   pressing refresh. The refresh button still forces a fresh check.
+- **Web UI Reports page**: deleting a PRD review run takes its reports out of
+  the list straight away; if the delete fails they come back and the error is
+  shown as before. Reports you have already opened are shown from memory when
+  you switch back to them, and the page no longer resets your search when a
+  link selects a different report.
+- **Web UI Outcomes page**: while a scan runs, only the outcomes are re-read
+  (every 2 seconds, and not while the browser tab is in the background), instead
+  of reloading the whole page's data. A scan that cannot be started now shows an
+  error instead of failing silently.
 
 ## [4.4.0] - 2026-11-06
 

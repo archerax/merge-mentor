@@ -15,16 +15,22 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import type { ReportDocument, ReportKind } from "@merge-mentor/shared/reports/index.js";
+import type { ReportKind } from "@merge-mentor/shared/reports/index.js";
 import { isPrdBreakdownReportName } from "@merge-mentor/shared/reports/prdReportNames.js";
 import { IconTrash } from "@tabler/icons-react";
+import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { DownloadMarkdownButton } from "../components/review/DownloadMarkdownButton.js";
-import { deletePrdReport, getReport, getReports } from "../server/reports.functions.js";
+import {
+  deletePrdRunMutation,
+  initialReportName,
+  reportQuery,
+  reportsQuery,
+} from "../queries/reports.js";
 import type { ReportListItem } from "../server/reports.server.js";
 
 export const Route = createFileRoute("/reports")({
@@ -33,11 +39,10 @@ export const Route = createFileRoute("/reports")({
       typeof search.report === "string" && search.report.length > 0 ? search.report : undefined,
   }),
   loaderDeps: ({ search }) => ({ report: search.report }),
-  loader: async ({ deps }) => {
-    const reports: ReportListItem[] = await getReports();
-    const initial = reports.find((item) => item.name === deps.report) ?? reports[0];
-    const report = initial ? await getReport({ data: { name: initial.name } }) : null;
-    return { reports, report };
+  loader: async ({ deps, context }) => {
+    const reports = await context.queryClient.ensureQueryData(reportsQuery);
+    const initial = initialReportName(reports, deps.report);
+    if (initial !== null) await context.queryClient.ensureQueryData(reportQuery(initial));
   },
   component: ReportsPage,
 });
@@ -57,31 +62,32 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function ReportsPage() {
-  const { reports, report } = Route.useLoaderData();
-  // The view keeps the list and selection in local state, so a new loader result
-  // (e.g. a changed `report` search parameter) must start it afresh.
-  return (
-    <ReportsView key={report?.name ?? "none"} loadedReports={reports} initialReport={report} />
-  );
+/** A report the user clicked, remembered against the `report` search parameter it was picked under. */
+interface ReportPick {
+  readonly search: string | undefined;
+  readonly name: string | null;
 }
 
-function ReportsView({
-  loadedReports,
-  initialReport,
-}: {
-  readonly loadedReports: readonly ReportListItem[];
-  readonly initialReport: ReportDocument | null;
-}) {
-  const [reports, setReports] = useState<readonly ReportListItem[]>(loadedReports);
-  const [selected, setSelected] = useState<ReportDocument | null>(initialReport);
-  const [loadingName, setLoadingName] = useState<string | null>(null);
+function ReportsPage() {
+  const { report: requested } = Route.useSearch();
+  const { data: reports } = useSuspenseQuery(reportsQuery);
+  // A click wins until the URL asks for a different report.
+  const [pick, setPick] = useState<ReportPick | null>(null);
+  const selectedName =
+    pick !== null && pick.search === requested ? pick.name : initialReportName(reports, requested);
+  const selectReport = (name: string | null) => setPick({ search: requested, name });
+
+  const detail = useQuery({ ...reportQuery(selectedName ?? ""), enabled: selectedName !== null });
+  const selected = selectedName === null ? null : (detail.data ?? null);
+  const loadingName = selectedName !== null && detail.isLoading ? selectedName : null;
+
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ReportListItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteRun = useMutation(deletePrdRunMutation);
+  const deleting = deleteRun.isPending;
+  const deleteError = deleteRun.error?.message ?? null;
 
-  const selectedItem = reports.find((report) => report.name === selected?.name);
+  const selectedItem = reports.find((item) => item.name === selected?.name);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -95,31 +101,17 @@ function ReportsView({
     );
   }, [query, reports]);
 
-  async function select(name: string) {
-    setLoadingName(name);
-    try {
-      const document = await getReport({ data: { name } });
-      setSelected(document);
-    } finally {
-      setLoadingName(null);
-    }
-  }
-
-  async function confirmDelete() {
+  function confirmDelete() {
     const target = pendingDelete;
     if (!target?.prdRunId) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await deletePrdReport({ data: { runId: target.prdRunId } });
-      setReports((previous) => previous.filter((report) => report.prdRunId !== target.prdRunId));
-      if (selected?.name === target.name) setSelected(null);
-      setPendingDelete(null);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setDeleting(false);
-    }
+    // Read before the optimistic update takes the run's reports out of the list.
+    const showingDeletedRun = selectedItem?.prdRunId === target.prdRunId;
+    deleteRun.mutate(target.prdRunId, {
+      onSuccess: () => {
+        if (showingDeletedRun) selectReport(null);
+        setPendingDelete(null);
+      },
+    });
   }
 
   return (
@@ -158,7 +150,7 @@ function ReportsView({
                       report={report}
                       active={selected?.name === report.name && loadingName === null}
                       loading={loadingName === report.name}
-                      onSelect={() => select(report.name)}
+                      onSelect={() => selectReport(report.name)}
                     />
                   ))}
                   {filtered.length === 0 && (
@@ -203,7 +195,7 @@ function ReportsView({
                           size="xs"
                           leftSection={<IconTrash size={14} />}
                           onClick={() => {
-                            setDeleteError(null);
+                            deleteRun.reset();
                             setPendingDelete(selectedItem);
                           }}
                         >
