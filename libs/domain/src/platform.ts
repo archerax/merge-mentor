@@ -273,6 +273,18 @@ export interface CommentAction {
   readonly body?: string;
 }
 
+/** An inline PR comment to post as part of a batch. */
+export interface InlineCommentInput {
+  /** File path the comment attaches to. */
+  readonly path: string;
+  /** Line number the comment attaches to. */
+  readonly line: number;
+  /** Start line of the range for a multi-line comment. */
+  readonly startLine?: number;
+  /** Comment body (markdown). */
+  readonly body: string;
+}
+
 /** Repository information for context loading. */
 export interface RepoInfo {
   /** Repository owner, or Azure DevOps organization. */
@@ -378,6 +390,25 @@ export interface PlatformAdapter {
     body: string,
     startLine?: number
   ): Promise<void>;
+
+  /**
+   * Posts several inline comments together as a single review, so reviewers get
+   * one notification instead of one per comment. Optional: platforms that cannot
+   * batch leave it out and callers post each comment with {@link postInlineComment}.
+   *
+   * The batch is all-or-nothing. Resolves `true` once every comment is posted.
+   * Resolves `false`, having posted nothing, when the platform rejects the batch
+   * because of its content (for example one comment on a line outside the diff),
+   * so the caller can fall back to posting each comment on its own. Any other
+   * failure rejects, and may have posted nothing or everything, so callers must
+   * not retry it.
+   * @param prNumber - The PR number
+   * @param comments - The inline comments to post together
+   */
+  postInlineCommentBatch?(
+    prNumber: number,
+    comments: readonly InlineCommentInput[]
+  ): Promise<boolean>;
 
   /**
    * Posts a general comment on the PR.

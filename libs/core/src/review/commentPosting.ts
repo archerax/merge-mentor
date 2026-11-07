@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
 import type { PlatformAdapter } from "@merge-mentor/domain/platform.js";
 import { createChildLogger } from "@merge-mentor/shared/logger.js";
 
+import { postInlineBatch } from "./inlineBatch.js";
+
 /**
  * A comment produced by a dry-run review that the UI is asking to post.
  *
@@ -134,7 +136,41 @@ export async function postPlannedComments(
   const commentErrors: string[] = [];
   const postedFingerprints: string[] = [];
 
+  // On a PR, post the inline comments together as one review where possible.
+  const batched = new Set<PendingComment>();
+  if (target.kind === "pr") {
+    const inline = comments.filter(
+      (comment) => comment.path && comment.line && !alreadyPosted.has(commentFingerprint(comment))
+    );
+    const outcome = await postInlineBatch(
+      adapter,
+      target.prNumber,
+      inline.map((comment) => ({
+        path: comment.path as string,
+        line: comment.line as number,
+        ...(comment.startLine !== undefined ? { startLine: comment.startLine } : {}),
+        body: comment.body,
+      }))
+    );
+    if (outcome.status !== "fallback") {
+      for (const comment of inline) {
+        batched.add(comment);
+        if (outcome.status === "posted") {
+          commentsCreated++;
+          postedFingerprints.push(commentFingerprint(comment));
+        } else {
+          logger.error(
+            { target, path: comment.path, line: comment.line, error: outcome.error.message },
+            "Planned comment failed to post"
+          );
+          commentErrors.push(`Failed to post comment: ${outcome.error.message}`);
+        }
+      }
+    }
+  }
+
   for (const comment of comments) {
+    if (batched.has(comment)) continue;
     const fingerprint = commentFingerprint(comment);
     if (alreadyPosted.has(fingerprint)) {
       commentsSkipped++;

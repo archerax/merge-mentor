@@ -107,6 +107,7 @@ import { CommentManager } from "./commentManager.js";
 import { DiffStorage } from "./diffStorage.js";
 import { FindingAggregator } from "./findingAggregator.js";
 import { createGitClient } from "./gitClients/factory.js";
+import { postInlineBatch } from "./inlineBatch.js";
 import { LineNumberValidator } from "./lineNumberValidator.js";
 import { MultiAgentOrchestrator } from "./multiAgent/orchestrator.js";
 import { PbiVerifier } from "./pbiVerifier.js";
@@ -2166,7 +2167,37 @@ export class ReviewEngine {
     const commentErrors: string[] = [];
 
     if (!this.options.dryRun) {
+      // Post the inline comments together as one review where possible, so the
+      // PR author gets one notification instead of one per finding.
+      const inline = actions.filter(
+        (action) => action.type === "create" && action.body && action.path && action.line
+      );
+      const outcome = await postInlineBatch(
+        this.platform,
+        prNumber,
+        inline.map((action) => ({
+          path: action.path as string,
+          line: action.line as number,
+          ...(action.startLine !== undefined ? { startLine: action.startLine } : {}),
+          body: action.body as string,
+        }))
+      );
+      const batched = outcome.status === "fallback" ? new Set<CommentAction>() : new Set(inline);
+      if (outcome.status === "posted") {
+        commentsCreated += inline.length;
+        this.logger.info({ prNumber, count: inline.length }, "Inline comments created as a review");
+      } else if (outcome.status === "failed") {
+        const errorMsg = `Failed to create comment: ${outcome.error.message}`;
+        this.logger.error(
+          { prNumber, count: inline.length, error: outcome.error.message },
+          "Inline comment batch failed"
+        );
+        this.log(`Warning: ${errorMsg}`);
+        for (let i = 0; i < inline.length; i++) commentErrors.push(errorMsg);
+      }
+
       for (const action of actions) {
+        if (batched.has(action)) continue;
         try {
           await this.executeAction(prNumber, action);
           if (action.type === "create") commentsCreated++;
