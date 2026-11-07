@@ -23,10 +23,10 @@ import {
   PRD_ANNOTATED_ENDPOINT,
   PRD_STREAM_ENDPOINT,
   PRD_UPLOAD_HEADERS,
-  type PrdDocumentTypeInput,
   type PrdReviewRunInput,
   type PrdReviewSummary,
 } from "../server/prd.types.js";
+import { usePrdOptions } from "../stores/prdOptions.js";
 import { MarkdownReport } from "./MarkdownReport.js";
 import { PrdBreakdownPanel } from "./PrdBreakdownPanel.js";
 import { CopyReportButton } from "./review/CopyReportButton.js";
@@ -85,9 +85,8 @@ export function PrdReviewRunner({
   onBreakdownRunCreated,
 }: PrdReviewRunnerProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [documentType, setDocumentType] = useState<PrdDocumentTypeInput>("prd");
-  const [includeImages, setIncludeImages] = useState(false);
-  const [annotate, setAnnotate] = useState(false);
+  const { documentType, includeImages, annotate, setDocumentType, setIncludeImages, setAnnotate } =
+    usePrdOptions();
   // Off until the user has chosen to compare; defaults to on once a review has finished.
   const [compareChoice, setCompareChoice] = useState<boolean | null>(null);
   const [formError, setFormError] = useState<string | null>(null);

@@ -1,13 +1,11 @@
-import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ConfigFieldView, ConfigView } from "../server/config.types.js";
+import { renderWithQuery } from "../test/renderWithQuery.test-helper.js";
 import { ConfigViewer } from "./ConfigViewer.js";
 
-vi.mock("@tanstack/react-router", () => ({ useRouter: () => ({ invalidate: vi.fn() }) }));
-vi.mock("../server/config.functions.js", () => ({ saveConfig: vi.fn() }));
+vi.mock("../server/config.functions.js", () => ({ getConfig: vi.fn(), saveConfig: vi.fn() }));
 
 function field(overrides: Partial<ConfigFieldView> & { envVar: string }): ConfigFieldView {
   return {
@@ -27,7 +25,7 @@ function view(sections: ConfigView["sections"]): ConfigView {
 }
 
 function renderHtml(ui: ReactNode): string {
-  return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
+  return renderWithQuery(ui).html;
 }
 
 function platformView(platform: string): ConfigView {

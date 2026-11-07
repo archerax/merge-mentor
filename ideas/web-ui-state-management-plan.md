@@ -1,5 +1,15 @@
 # Feature Plan: Web UI State Management (TanStack Query and Zustand)
 
+> **Status: implemented.** All phases (0–3) have landed. The conventions are
+> documented in [`apps/web/README.md`](../apps/web/README.md). Differences from
+> this plan: the configuration page's tab and "show advanced" use
+> `localStorage` (not `sessionStorage`), as "show advanced" did before; the PRD
+> runner's include-images option is not persisted because it sends data to the
+> AI provider; the SSR integration (`@tanstack/react-router-ssr-query`) provides
+> `QueryClientProvider`, so `__root.tsx` does not add one; the stats page reads
+> its query with `useQuery` (suspense ignores `placeholderData`) and its loader
+> only waits on entry, not on window changes.
+
 ## Overview
 
 The web UI (`apps/web`) uses Zustand in one place (`stores/reviewForms.ts`, which

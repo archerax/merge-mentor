@@ -1,13 +1,12 @@
-import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { ReviewSummary } from "../server/review.types.js";
+import { renderWithQuery } from "../test/renderWithQuery.test-helper.js";
 import { ReviewResult } from "./ReviewRunner.js";
 
 function renderHtml(ui: ReactNode): string {
-  return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
+  return renderWithQuery(ui).html;
 }
 
 function occurrences(haystack: string, needle: string): number {

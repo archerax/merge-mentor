@@ -33,9 +33,19 @@ import {
   IconSitemap,
   IconSun,
 } from "@tabler/icons-react";
-import { HeadContent, Link, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Link,
+  Scripts,
+  createRootRouteWithContext,
+  useLocation,
+} from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { AiStatusBar } from "../components/AiStatusBar.js";
+import { QueryDevtools } from "../components/QueryDevtools.js";
+import type { RouterContext } from "../router.js";
+import { hydratePersistedStores } from "../stores/persisted.js";
 import { theme } from "../theme.js";
 
 import appCss from "../styles.css?url";
@@ -62,7 +72,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "/config", label: "Configuration", icon: IconSettings },
 ];
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -85,6 +95,11 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  // Saved UI state is applied after hydration so the first render matches the server HTML.
+  useEffect(() => {
+    hydratePersistedStores();
+  }, []);
+
   return (
     <html lang="en" {...mantineHtmlProps}>
       <head>
@@ -95,6 +110,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <MantineProvider theme={theme} defaultColorScheme="auto">
           <AppFrame>{children}</AppFrame>
         </MantineProvider>
+        <QueryDevtools />
         <Scripts />
       </body>
     </html>

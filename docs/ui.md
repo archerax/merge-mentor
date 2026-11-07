@@ -61,4 +61,4 @@ web page you happen to visit could send it:
 
 ## Troubleshooting
 
-If the command reports that the web dashboard is not bundled, the install is missing its prebuilt assets. From a repository checkout, run `pnpm build` to build and bundle the dashboard. For local development of the dashboard itself, run `pnpm --filter @merge-mentor/web dev`.
+If the command reports that the web dashboard is not bundled, the install is missing its prebuilt assets. From a repository checkout, run `pnpm build` to build and bundle the dashboard. For local development of the dashboard itself, run `pnpm --filter @merge-mentor/web dev`; see [`apps/web/README.md`](../apps/web/README.md) for its conventions.

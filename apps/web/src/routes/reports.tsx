@@ -15,17 +15,26 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import type { ReportDocument, ReportKind } from "@merge-mentor/shared/reports/index.js";
+import type { ReportKind } from "@merge-mentor/shared/reports/index.js";
 import { isPrdBreakdownReportName } from "@merge-mentor/shared/reports/prdReportNames.js";
 import { IconTrash } from "@tabler/icons-react";
+import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { DownloadMarkdownButton } from "../components/review/DownloadMarkdownButton.js";
-import { deletePrdReport, getReport, getReports } from "../server/reports.functions.js";
+import { describeRouteError } from "../components/RouteError.js";
+import {
+  deletePrdRunMutation,
+  reportQuery,
+  reportsQuery,
+  selectedReportName,
+} from "../queries/reports.js";
 import type { ReportListItem } from "../server/reports.server.js";
+import { useReportPick, useReportsQuery, useReportsViewStore } from "../stores/reportsView.js";
 
 export const Route = createFileRoute("/reports")({
   validateSearch: (search: Record<string, unknown>): { report?: string } => ({
@@ -33,12 +42,13 @@ export const Route = createFileRoute("/reports")({
       typeof search.report === "string" && search.report.length > 0 ? search.report : undefined,
   }),
   loaderDeps: ({ search }) => ({ report: search.report }),
-  loader: async ({ deps }) => {
-    const reports: ReportListItem[] = await getReports();
-    const initial = reports.find((item) => item.name === deps.report) ?? reports[0];
-    const report = initial ? await getReport({ data: { name: initial.name } }) : null;
-    return { reports, report };
+  loader: async ({ deps, context }) => {
+    const reports = await context.queryClient.ensureQueryData(reportsQuery);
+    // The saved pick is only known in the browser; on the server this is the default.
+    const initial = selectedReportName(reports, deps.report, useReportsViewStore.getState().pick);
+    if (initial !== null) await context.queryClient.ensureQueryData(reportQuery(initial));
   },
+  pendingComponent: () => <PageSkeleton rows={6} />,
   component: ReportsPage,
 });
 
@@ -58,30 +68,26 @@ function formatBytes(bytes: number): string {
 }
 
 function ReportsPage() {
-  const { reports, report } = Route.useLoaderData();
-  // The view keeps the list and selection in local state, so a new loader result
-  // (e.g. a changed `report` search parameter) must start it afresh.
-  return (
-    <ReportsView key={report?.name ?? "none"} loadedReports={reports} initialReport={report} />
-  );
-}
+  const { report: requested } = Route.useSearch();
+  const { data: reports } = useSuspenseQuery(reportsQuery);
+  // The remembered pick wins until the URL asks for a different report, or its report is gone.
+  const { pick, setPick } = useReportPick();
+  const selectedName = selectedReportName(reports, requested, pick);
+  // Clearing the selection forgets the pick, so the next visit shows the default report again.
+  const selectReport = (name: string | null) =>
+    setPick(name === null ? null : { search: requested, name });
 
-function ReportsView({
-  loadedReports,
-  initialReport,
-}: {
-  readonly loadedReports: readonly ReportListItem[];
-  readonly initialReport: ReportDocument | null;
-}) {
-  const [reports, setReports] = useState<readonly ReportListItem[]>(loadedReports);
-  const [selected, setSelected] = useState<ReportDocument | null>(initialReport);
-  const [loadingName, setLoadingName] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const detail = useQuery({ ...reportQuery(selectedName ?? ""), enabled: selectedName !== null });
+  const selected = selectedName === null ? null : (detail.data ?? null);
+  const loadingName = selectedName !== null && detail.isLoading ? selectedName : null;
+
+  const { query, setQuery } = useReportsQuery();
   const [pendingDelete, setPendingDelete] = useState<ReportListItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteRun = useMutation(deletePrdRunMutation);
+  const deleting = deleteRun.isPending;
+  const deleteError = deleteRun.error?.message ?? null;
 
-  const selectedItem = reports.find((report) => report.name === selected?.name);
+  const selectedItem = reports.find((item) => item.name === selected?.name);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -95,31 +101,17 @@ function ReportsView({
     );
   }, [query, reports]);
 
-  async function select(name: string) {
-    setLoadingName(name);
-    try {
-      const document = await getReport({ data: { name } });
-      setSelected(document);
-    } finally {
-      setLoadingName(null);
-    }
-  }
-
-  async function confirmDelete() {
+  function confirmDelete() {
     const target = pendingDelete;
     if (!target?.prdRunId) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await deletePrdReport({ data: { runId: target.prdRunId } });
-      setReports((previous) => previous.filter((report) => report.prdRunId !== target.prdRunId));
-      if (selected?.name === target.name) setSelected(null);
-      setPendingDelete(null);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setDeleting(false);
-    }
+    // Read before the optimistic update takes the run's reports out of the list.
+    const showingDeletedRun = selectedItem?.prdRunId === target.prdRunId;
+    deleteRun.mutate(target.prdRunId, {
+      onSuccess: () => {
+        if (showingDeletedRun) selectReport(null);
+        setPendingDelete(null);
+      },
+    });
   }
 
   return (
@@ -158,7 +150,7 @@ function ReportsView({
                       report={report}
                       active={selected?.name === report.name && loadingName === null}
                       loading={loadingName === report.name}
-                      onSelect={() => select(report.name)}
+                      onSelect={() => selectReport(report.name)}
                     />
                   ))}
                   {filtered.length === 0 && (
@@ -173,7 +165,19 @@ function ReportsView({
 
           <Grid.Col span={{ base: 12, md: 8 }}>
             <Card padding="lg">
-              {loadingName !== null ? (
+              {detail.isError && selected === null ? (
+                <Alert color="red" title="Could not load this report">
+                  {describeRouteError(detail.error)}{" "}
+                  <Button
+                    variant="light"
+                    color="red"
+                    size="compact-xs"
+                    onClick={() => void detail.refetch()}
+                  >
+                    Try again
+                  </Button>
+                </Alert>
+              ) : loadingName !== null ? (
                 <Stack gap="sm">
                   <Skeleton height={28} width="40%" />
                   <Skeleton height={14} />
@@ -203,7 +207,7 @@ function ReportsView({
                           size="xs"
                           leftSection={<IconTrash size={14} />}
                           onClick={() => {
-                            setDeleteError(null);
+                            deleteRun.reset();
                             setPendingDelete(selectedItem);
                           }}
                         >

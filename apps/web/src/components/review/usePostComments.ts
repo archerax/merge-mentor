@@ -1,5 +1,7 @@
+import { useMutation, useMutationState } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { postCommentsMutation, type PostCommentsVariables } from "../../queries/reviewRuns.js";
 import type {
   PendingCommentView,
   PostCommentsInput,
@@ -7,7 +9,7 @@ import type {
 } from "../../server/review.types.js";
 
 /** Target fields carried over from the original stream input. */
-export type PostTarget = Omit<PostCommentsInput, "kind" | "comments">;
+export type PostTarget = PostCommentsVariables["target"];
 
 /** Selection and posting state for a set of planned dry-run comments. */
 export interface PostCommentsController {
@@ -51,10 +53,20 @@ export function usePostComments(
 ): PostCommentsController {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [sessionPosted, setSessionPosted] = useState<ReadonlySet<string>>(new Set());
-  const [postingFingerprints, setPostingFingerprints] = useState<ReadonlySet<string>>(new Set());
-  const [result, setResult] = useState<PostCommentsResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<ReadonlyMap<string, string>>(new Map());
+  // Batch posts report their result and error at the top; single-comment posts
+  // report next to the comment, and several can be in flight at once.
+  const batch = useMutation(postCommentsMutation);
+  const single = useMutation(postCommentsMutation);
+  const postingFingerprints = useMutationState({
+    filters: { mutationKey: postCommentsMutation.mutationKey, status: "pending" },
+    select: (mutation) =>
+      (mutation.state.variables as PostCommentsVariables | undefined)?.comments ?? [],
+  });
+  const posting = useMemo(
+    () => new Set(postingFingerprints.flat().map((comment) => comment.fingerprint)),
+    [postingFingerprints]
+  );
 
   const posted = useMemo(() => {
     const fingerprints = new Set(sessionPosted);
@@ -70,7 +82,7 @@ export function usePostComments(
   );
 
   const pendingKey = pending.map((comment) => comment.fingerprint).join("\n");
-  const busy = postingFingerprints.size > 0;
+  const busy = posting.size > 0;
 
   useEffect(() => {
     setSelected(new Set(pending.map((comment) => comment.fingerprint)));
@@ -101,47 +113,39 @@ export function usePostComments(
     });
   }
 
-  async function postComments(subset: readonly PendingCommentView[]): Promise<void> {
+  function markPosted(postedResult: PostCommentsResult): void {
+    setSessionPosted((previous) => {
+      const next = new Set(previous);
+      for (const fingerprint of postedResult.postedFingerprints) next.add(fingerprint);
+      return next;
+    });
+  }
+
+  function postComments(subset: readonly PendingCommentView[]): void {
     if (target === null || subset.length === 0) return;
-    const fingerprints = subset.map((comment) => comment.fingerprint);
-    setPostingFingerprints((previous) => new Set([...previous, ...fingerprints]));
-    setError(null);
-    if (subset.length === 1) clearRowError(subset[0].fingerprint);
-    try {
-      const response = await fetch("/api/review/post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          ...target,
-          comments: subset,
-        } satisfies PostCommentsInput),
-      });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? `Failed to post comments (HTTP ${response.status}).`);
-      }
-      const postedResult = (await response.json()) as PostCommentsResult;
-      if (subset.length > 1) setResult(postedResult);
-      setSessionPosted((previous) => {
-        const next = new Set(previous);
-        for (const fingerprint of postedResult.postedFingerprints) next.add(fingerprint);
-        return next;
-      });
-      if (subset.length === 1 && postedResult.commentErrors.length > 0) {
-        setRowError(subset[0].fingerprint, postedResult.commentErrors.join(" "));
-      }
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : String(caught);
-      if (subset.length === 1) setRowError(subset[0].fingerprint, message);
-      else setError(message);
-    } finally {
-      setPostingFingerprints((previous) => {
-        const next = new Set(previous);
-        for (const fingerprint of fingerprints) next.delete(fingerprint);
-        return next;
-      });
+    const variables: PostCommentsVariables = { kind, target, comments: subset };
+    if (batch.isError) batch.reset();
+
+    if (subset.length > 1) {
+      batch.mutate(variables, { onSuccess: markPosted });
+      return;
     }
+
+    // `mutateAsync` settles per call, so each row hears about its own post even
+    // when several are in flight (per-call `mutate` callbacks only fire for the latest).
+    const [comment] = subset;
+    clearRowError(comment.fingerprint);
+    single.mutateAsync(variables).then(
+      (postedResult) => {
+        markPosted(postedResult);
+        if (postedResult.commentErrors.length > 0) {
+          setRowError(comment.fingerprint, postedResult.commentErrors.join(" "));
+        }
+      },
+      (caught: unknown) => {
+        setRowError(comment.fingerprint, caught instanceof Error ? caught.message : String(caught));
+      }
+    );
   }
 
   return {
@@ -150,16 +154,16 @@ export function usePostComments(
     allSelected,
     busy,
     targetReady: target !== null,
-    result,
-    error,
+    result: batch.data ?? null,
+    error: batch.error?.message ?? null,
     isPosted: (fingerprint) => posted.has(fingerprint),
     isSelected: (fingerprint) => selected.has(fingerprint),
-    isPosting: (fingerprint) => postingFingerprints.has(fingerprint),
+    isPosting: (fingerprint) => posting.has(fingerprint),
     rowError: (fingerprint) => rowErrors.get(fingerprint),
     toggle,
     selectAll: () => setSelected(new Set(pending.map((comment) => comment.fingerprint))),
     clearSelection: () => setSelected(new Set()),
-    postOne: (comment) => void postComments([comment]),
-    postSelected: () => void postComments(selectedPending),
+    postOne: (comment) => postComments([comment]),
+    postSelected: () => postComments(selectedPending),
   };
 }
