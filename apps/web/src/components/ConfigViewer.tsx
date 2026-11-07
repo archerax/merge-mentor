@@ -94,7 +94,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       return next;
     });
     setCleared((previous) => previous.filter((item) => item !== envVar));
-    saveMutation.reset();
+    if (!saveMutation.isPending) saveMutation.reset();
   }
 
   function toggleClear(envVar: string) {
@@ -106,7 +106,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     setCleared((previous) =>
       previous.includes(envVar) ? previous.filter((item) => item !== envVar) : [...previous, envVar]
     );
-    saveMutation.reset();
+    if (!saveMutation.isPending) saveMutation.reset();
   }
 
   function save() {

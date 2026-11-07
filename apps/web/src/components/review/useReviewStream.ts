@@ -455,7 +455,7 @@ export function useReviewStream<TResult = ReviewSummary>(
   const runInput = startedHere ? startedRun.input : runInputOf(lookup.data);
   // Why the input is unknown (so posting is unavailable) when the lookup failed.
   const runInputError =
-    startedHere || lookup.error === null
+    startedHere || runInput !== null || lookup.error === null
       ? null
       : `The run's original input could not be loaded, so comments cannot be posted: ${lookup.error.message}`;
 

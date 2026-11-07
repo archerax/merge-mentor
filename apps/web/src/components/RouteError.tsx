@@ -18,16 +18,16 @@ export function describeRouteError(error: unknown): string {
  */
 export function RouteError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
-  const queryErrorResetBoundary = useQueryErrorResetBoundary();
+  const { reset: resetQueries } = useQueryErrorResetBoundary();
 
   // Clear the query error boundary as soon as the error is shown, as the
   // TanStack Router + Query guidance recommends, so a retry starts fresh.
   useEffect(() => {
-    queryErrorResetBoundary.reset();
-  }, [queryErrorResetBoundary]);
+    resetQueries();
+  }, [resetQueries]);
 
   function retry() {
-    queryErrorResetBoundary.reset();
+    resetQueries();
     reset();
     void router.invalidate();
   }

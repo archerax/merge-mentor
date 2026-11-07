@@ -12,7 +12,8 @@ pnpm --filter @merge-mentor/web build      # production build into apps/web/.out
 pnpm --filter @merge-mentor/web typecheck  # regenerates routeTree.gen.ts, then tsc
 ```
 
-From the repository root, `pnpm check` runs everything CI runs.
+From the repository root, `pnpm check` runs the typecheck, lint, build and test
+steps of CI (CI also runs the coverage gate, `pnpm audit` and the CLI smoke tests).
 `tsr generate` (part of `typecheck`) rewrites `src/routeTree.gen.ts` without its
 TanStack Start block, and `pnpm build` puts it back; commit the built version.
 

@@ -13,4 +13,11 @@ describe("auditQuery", () => {
       { id: "event-1" },
     ]);
   });
+
+  it("propagates a failed load so the route error screen shows it", async () => {
+    getAuditEvents.mockRejectedValue(new Error("audit unavailable"));
+    await expect(createTestQueryClient().fetchQuery(auditQuery)).rejects.toThrow(
+      "audit unavailable"
+    );
+  });
 });
