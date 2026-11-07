@@ -35,7 +35,9 @@ so they are not in the production bundle.
 
 **Server data lives in TanStack Query. UI and form state lives in Zustand.
 Never copy query results into a store** (or into `useState`): read them from the
-query wherever they are needed.
+query wherever they are needed. One exception remains: `ReviewRunner` still
+fetches the review cache status in a `useEffect` and keeps it in `useState`;
+it is not yet migrated to a query.
 
 ### Queries (`src/queries/<domain>.ts`)
 

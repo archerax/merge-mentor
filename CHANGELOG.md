@@ -87,8 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window's numbers arrive, instead of waiting on a blank page.
 - **Web UI loading and error screens**: the Stats, Outcomes, Reports, Audit Log
   and Configuration pages show a placeholder shaped like the page while their
-  data loads. When a page cannot load, every page now shows the same error
-  message with a **Try again** button that reloads its data.
+  data loads. When a page throws while loading, every route now shows the same
+  error message with a **Try again** button that reloads its data; pages that
+  explain their own failures (Outcomes) keep their inline message.
 
 ## [4.4.0] - 2026-11-06
 

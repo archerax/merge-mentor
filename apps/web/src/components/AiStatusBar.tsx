@@ -109,7 +109,7 @@ export function AiStatusIndicator({ status }: { readonly status: AiStatus | unde
 /** Footer bar showing which AI account (or BYOK endpoint) requests will use. */
 export function AiStatusBar() {
   const queryClient = useQueryClient();
-  const { data: status, isFetching } = useQuery(aiStatusQuery);
+  const { data: status } = useQuery(aiStatusQuery);
   const refresh = useMutation({ mutationFn: () => refreshAiStatus(queryClient) });
 
   return (
@@ -123,7 +123,7 @@ export function AiStatusBar() {
           variant="subtle"
           size="sm"
           aria-label="Refresh AI account status"
-          loading={isFetching || refresh.isPending}
+          loading={refresh.isPending}
           onClick={() => refresh.mutate()}
         >
           <IconRefresh size={14} />
