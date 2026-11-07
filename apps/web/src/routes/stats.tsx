@@ -1,17 +1,21 @@
 import {
   Alert,
   Code,
+  Group,
+  Loader,
   Paper,
   SegmentedControl,
   SimpleGrid,
+  Skeleton,
   Stack,
   Table,
   Text,
 } from "@mantine/core";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { statsQuery } from "../queries/stats.js";
 import type { LiveStatsResult } from "../server/stats.functions.js";
 
@@ -23,7 +27,14 @@ export const Route = createFileRoute("/stats")({
     days: WINDOWS.find((days) => days === Number(search.days)) ?? DEFAULT_DAYS,
   }),
   loaderDeps: ({ search }) => ({ days: search.days }),
-  loader: ({ deps, context }) => context.queryClient.ensureQueryData(statsQuery(deps.days)),
+  loader: async ({ deps, context, cause }) => {
+    const stats = context.queryClient.prefetchQuery(statsQuery(deps.days));
+    // Entering the page (and SSR) waits for the data. Switching the window on the
+    // page does not: the page keeps showing the previous window until the new one
+    // arrives, instead of a pending screen.
+    if (cause !== "stay") await stats;
+  },
+  pendingComponent: () => <PageSkeleton tiles={3} rows={4} />,
   component: StatsPage,
 });
 
@@ -45,9 +56,24 @@ function StatTile({ label, value, hint }: { label: string; value: number; hint?:
   );
 }
 
+/** Shown beside the window picker while the chosen window loads. */
+function UpdatingIndicator({ days }: { days: number }) {
+  return (
+    <Group gap={6} wrap="nowrap" role="status" aria-live="polite">
+      <Loader size="xs" />
+      <Text size="sm" c="dimmed">
+        Loading {days}d
+      </Text>
+    </Group>
+  );
+}
+
 function StatsPage() {
   const { days } = Route.useSearch();
-  const { data: result } = useSuspenseQuery(statsQuery(days));
+  // `useQuery` rather than `useSuspenseQuery`: suspense would ignore placeholder
+  // data and blank the page on every window change. Errors still reach the
+  // route's error boundary.
+  const { data: result, isPlaceholderData } = useQuery({ ...statsQuery(days), throwOnError: true });
   const navigate = useNavigate({ from: "/stats" });
 
   return (
@@ -61,21 +87,33 @@ function StatsPage() {
           </>
         }
         actions={
-          <SegmentedControl
-            value={String(days)}
-            onChange={(value) => void navigate({ search: { days: Number(value) } })}
-            data={WINDOWS.map((window) => ({ label: `${window}d`, value: String(window) }))}
-          />
+          <Group gap="sm" wrap="nowrap">
+            {isPlaceholderData && <UpdatingIndicator days={days} />}
+            <SegmentedControl
+              value={String(days)}
+              onChange={(value) => void navigate({ search: { days: Number(value) } })}
+              data={WINDOWS.map((window) => ({ label: `${window}d`, value: String(window) }))}
+            />
+          </Group>
         }
       />
 
-      {!result.ok ? (
+      {result === undefined ? (
+        <Skeleton h={160} />
+      ) : !result.ok ? (
         <Alert title="Could not load live stats" color="red">
           {result.error} Check the <Link to="/config">configuration</Link> for the platform token
           and repository.
         </Alert>
       ) : (
-        <LiveStats stats={result.stats} days={days} />
+        // The previous window's totals, dimmed, until the chosen window arrives.
+        <Stack
+          gap="lg"
+          aria-busy={isPlaceholderData}
+          style={{ opacity: isPlaceholderData ? 0.6 : 1, transition: "opacity 150ms" }}
+        >
+          <LiveStats stats={result.stats} days={days} updating={isPlaceholderData} />
+        </Stack>
       )}
     </Stack>
   );
@@ -84,14 +122,19 @@ function StatsPage() {
 function LiveStats({
   stats,
   days,
+  updating,
 }: {
   stats: Extract<LiveStatsResult, { ok: true }>["stats"];
   days: number;
+  updating: boolean;
 }) {
   return (
     <>
       <Text size="sm" c="dimmed">
-        <Code>{stats.project}</Code> on {stats.platform}, PRs from the last {days} days.
+        <Code>{stats.project}</Code> on {stats.platform},{" "}
+        {updating
+          ? `previous window shown while the last ${days} days load.`
+          : `PRs from the last ${days} days.`}
       </Text>
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>

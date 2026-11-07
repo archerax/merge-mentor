@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LiveStatsResult } from "../server/stats.functions.js";
@@ -18,5 +19,9 @@ describe("statsQuery", () => {
     });
     expect(getLiveStats).toHaveBeenCalledWith({ data: { days: 7 } });
     expect(statsQuery(7).queryKey).not.toEqual(statsQuery(30).queryKey);
+  });
+
+  it("keeps the previous window's data on screen while another window loads", () => {
+    expect(statsQuery(90).placeholderData).toBe(keepPreviousData);
   });
 });

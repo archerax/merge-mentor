@@ -43,6 +43,7 @@ import {
 import { useEffect } from "react";
 
 import { AiStatusBar } from "../components/AiStatusBar.js";
+import { QueryDevtools } from "../components/QueryDevtools.js";
 import type { RouterContext } from "../router.js";
 import { hydratePersistedStores } from "../stores/persisted.js";
 import { theme } from "../theme.js";
@@ -109,6 +110,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <MantineProvider theme={theme} defaultColorScheme="auto">
           <AppFrame>{children}</AppFrame>
         </MantineProvider>
+        <QueryDevtools />
         <Scripts />
       </body>
     </html>

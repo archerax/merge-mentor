@@ -4,10 +4,12 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { AuditLogTable } from "../components/AuditLogTable.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { auditQuery } from "../queries/audit.js";
 
 export const Route = createFileRoute("/audit")({
   loader: ({ context }) => context.queryClient.ensureQueryData(auditQuery),
+  pendingComponent: () => <PageSkeleton rows={8} />,
   component: AuditLogPage,
 });
 

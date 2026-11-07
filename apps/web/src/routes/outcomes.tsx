@@ -17,10 +17,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { outcomesQuery, startOutcomesMutation } from "../queries/outcomes.js";
 
 export const Route = createFileRoute("/outcomes")({
   loader: ({ context }) => context.queryClient.ensureQueryData(outcomesQuery),
+  pendingComponent: () => <PageSkeleton tiles={4} rows={4} />,
   component: OutcomesPage,
 });
 

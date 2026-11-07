@@ -82,6 +82,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reload. The Configuration page also remembers its open tab, alongside "show
   advanced settings". The picked document and unsaved configuration changes are never
   stored. A link to a specific report still opens that report.
+- **Web UI Stats page**: switching between the 7, 30 and 90 day windows keeps
+  the current numbers on screen, dimmed and marked as loading, until the new
+  window's numbers arrive, instead of waiting on a blank page.
+- **Web UI loading and error screens**: the Stats, Outcomes, Reports, Audit Log
+  and Configuration pages show a placeholder shaped like the page while their
+  data loads. When a page cannot load, every page now shows the same error
+  message with a **Try again** button that reloads its data.
 
 ## [4.4.0] - 2026-11-06
 

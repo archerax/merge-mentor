@@ -4,10 +4,12 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { ConfigViewer } from "../components/ConfigViewer.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { configQuery } from "../queries/config.js";
 
 export const Route = createFileRoute("/config")({
   loader: ({ context }) => context.queryClient.ensureQueryData(configQuery),
+  pendingComponent: () => <PageSkeleton rows={8} />,
   component: ConfigPage,
 });
 

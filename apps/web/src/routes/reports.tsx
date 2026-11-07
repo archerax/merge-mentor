@@ -24,6 +24,7 @@ import { useMemo, useState } from "react";
 
 import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
 import { DownloadMarkdownButton } from "../components/review/DownloadMarkdownButton.js";
 import {
   deletePrdRunMutation,
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/reports")({
     const initial = initialReportName(reports, deps.report);
     if (initial !== null) await context.queryClient.ensureQueryData(reportQuery(initial));
   },
+  pendingComponent: () => <PageSkeleton rows={6} />,
   component: ReportsPage,
 });
 

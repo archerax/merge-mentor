@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 
+import { RouteError } from "./components/RouteError.js";
 import { routeTree } from "./routeTree.gen.js";
 
 /** Context every route receives; loaders use `context.queryClient.ensureQueryData(...)`. */
@@ -31,6 +32,8 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
+    // One error screen for every route, with a retry that also resets failed queries.
+    defaultErrorComponent: RouteError,
   });
 
   setupRouterSsrQueryIntegration({ router, queryClient });
