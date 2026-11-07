@@ -19,7 +19,7 @@ jobs:
     name: Review pull request
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
