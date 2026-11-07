@@ -40,9 +40,11 @@ import {
   createRootRouteWithContext,
   useLocation,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { AiStatusBar } from "../components/AiStatusBar.js";
 import type { RouterContext } from "../router.js";
+import { hydratePersistedStores } from "../stores/persisted.js";
 import { theme } from "../theme.js";
 
 import appCss from "../styles.css?url";
@@ -92,6 +94,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  // Saved UI state is applied after hydration so the first render matches the server HTML.
+  useEffect(() => {
+    hydratePersistedStores();
+  }, []);
+
   return (
     <html lang="en" {...mantineHtmlProps}>
       <head>

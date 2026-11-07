@@ -19,13 +19,12 @@ import { useEffect, useState } from "react";
 
 import { saveConfigMutation } from "../queries/config.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
+import { useConfigActiveTab, useConfigShowAdvanced } from "../stores/configView.js";
 import { isFieldVisible } from "./configVisibility.js";
 
 interface ConfigViewerProps {
   readonly view: ConfigView;
 }
-
-const ADVANCED_STORAGE_KEY = "merge-mentor:config:show-advanced";
 
 const NO_ERRORS: readonly ConfigFieldError[] = [];
 
@@ -38,25 +37,8 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const errors: readonly ConfigFieldError[] =
     saveMutation.data?.ok === false ? saveMutation.data.errors : NO_ERRORS;
   const saveError = saveMutation.error?.message ?? null;
-  const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    try {
-      setShowAdvanced(window.localStorage.getItem(ADVANCED_STORAGE_KEY) === "true");
-    } catch {
-      // Storage can be unavailable (private mode, blocked site data); default to hidden.
-    }
-  }, []);
-
-  function toggleAdvanced(next: boolean) {
-    setShowAdvanced(next);
-    try {
-      window.localStorage.setItem(ADVANCED_STORAGE_KEY, String(next));
-    } catch {
-      // The preference simply won't persist.
-    }
-  }
+  const { activeTab, setActiveTab } = useConfigActiveTab();
+  const { showAdvanced, setShowAdvanced } = useConfigShowAdvanced();
 
   // A cleared platform means "use the default", so no platform is assumed and both groups show.
   const draftPlatform = draft.MM_PLATFORM;
@@ -92,7 +74,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   // Keep state in step with the displayed tab when the active one is filtered out.
   useEffect(() => {
     if (currentTab !== activeTab) setActiveTab(currentTab);
-  }, [currentTab, activeTab]);
+  }, [currentTab, activeTab, setActiveTab]);
 
   const labels = new Map(
     view.sections.flatMap((section) => section.fields.map((field) => [field.envVar, field.label]))
@@ -194,7 +176,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         <Switch
           label="Show advanced settings"
           checked={showAdvanced}
-          onChange={(event) => toggleAdvanced(event.currentTarget.checked)}
+          onChange={(event) => setShowAdvanced(event.currentTarget.checked)}
         />
       </Group>
 

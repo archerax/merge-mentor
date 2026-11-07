@@ -32,6 +32,7 @@ import {
   reportsQuery,
 } from "../queries/reports.js";
 import type { ReportListItem } from "../server/reports.server.js";
+import { useReportPick, useReportsQuery } from "../stores/reportsView.js";
 
 export const Route = createFileRoute("/reports")({
   validateSearch: (search: Record<string, unknown>): { report?: string } => ({
@@ -62,26 +63,24 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-/** A report the user clicked, remembered against the `report` search parameter it was picked under. */
-interface ReportPick {
-  readonly search: string | undefined;
-  readonly name: string | null;
-}
-
 function ReportsPage() {
   const { report: requested } = Route.useSearch();
   const { data: reports } = useSuspenseQuery(reportsQuery);
-  // A click wins until the URL asks for a different report.
-  const [pick, setPick] = useState<ReportPick | null>(null);
+  // The remembered pick wins until the URL asks for a different report, or its report is gone.
+  const { pick, setPick } = useReportPick();
   const selectedName =
-    pick !== null && pick.search === requested ? pick.name : initialReportName(reports, requested);
+    pick !== null &&
+    pick.search === requested &&
+    (pick.name === null || reports.some((item) => item.name === pick.name))
+      ? pick.name
+      : initialReportName(reports, requested);
   const selectReport = (name: string | null) => setPick({ search: requested, name });
 
   const detail = useQuery({ ...reportQuery(selectedName ?? ""), enabled: selectedName !== null });
   const selected = selectedName === null ? null : (detail.data ?? null);
   const loadingName = selectedName !== null && detail.isLoading ? selectedName : null;
 
-  const [query, setQuery] = useState("");
+  const { query, setQuery } = useReportsQuery();
   const [pendingDelete, setPendingDelete] = useState<ReportListItem | null>(null);
   const deleteRun = useMutation(deletePrdRunMutation);
   const deleting = deleteRun.isPending;

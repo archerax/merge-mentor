@@ -1,6 +1,8 @@
 import { Badge, Group, SegmentedControl, Stack, Table, Text, TextInput } from "@mantine/core";
 import type { AuditLogEntry, AuditLogSeverity } from "@merge-mentor/shared/audit/index.js";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+
+import { type SeverityFilter, useAuditFilters } from "../stores/auditFilters.js";
 
 const SEVERITY_COLORS: Record<AuditLogSeverity, string> = {
   info: "blue",
@@ -8,15 +10,12 @@ const SEVERITY_COLORS: Record<AuditLogSeverity, string> = {
   error: "red",
 };
 
-type SeverityFilter = "all" | AuditLogSeverity;
-
 interface AuditLogTableProps {
   readonly entries: readonly AuditLogEntry[];
 }
 
 export function AuditLogTable({ entries }: AuditLogTableProps) {
-  const [severity, setSeverity] = useState<SeverityFilter>("all");
-  const [query, setQuery] = useState("");
+  const { severity, query, setSeverity, setQuery } = useAuditFilters();
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
