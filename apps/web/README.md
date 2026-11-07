@@ -93,13 +93,18 @@ it is not yet migrated to a query.
   well-formed fields.
 - Stores skip hydration and start from their defaults, so the server HTML and
   the first client render match. `__root.tsx` calls `hydratePersistedStores()`
-  after hydration to apply saved values.
+  after hydration to apply saved values. Saved values therefore appear one
+  render after hydration; that is a deliberate trade for never causing a
+  hydration mismatch.
 - Expose selector hooks (`useReportsQuery()`, `useReportPick()`) so components
   re-render only for the slice they use.
 - Never persist files or their contents, tokens or keys, or anything that acts
   on the user's behalf (the review forms' `write` switch is never saved and
-  always starts off). Keep persisted state small, and bump `version` when its
-  shape changes.
+  always starts off). The same goes for options that send data to the AI
+  provider (the PRD runner's "include images"); the Word-copy option, strategy
+  and review runs (capped at `MAX_REVIEW_RUNS`) only change local output or AI
+  cost, so they are saved. Keep persisted state small, and bump `version` when
+  its shape changes.
 
 ## Tests
 

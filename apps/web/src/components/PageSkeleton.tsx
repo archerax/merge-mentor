@@ -15,7 +15,13 @@ interface PageSkeletonProps {
  */
 export function PageSkeleton({ tiles = 0, rows = 6 }: PageSkeletonProps) {
   return (
-    <Stack gap="lg" aria-busy="true" aria-label="Loading page" data-testid="page-skeleton">
+    <Stack
+      gap="lg"
+      role="status"
+      aria-busy="true"
+      aria-label="Loading page"
+      data-testid="page-skeleton"
+    >
       <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
         <Stack gap="xs" flex={1}>
           <Skeleton h={4} w={44} radius="xl" mb={4} />
@@ -29,7 +35,7 @@ export function PageSkeleton({ tiles = 0, rows = 6 }: PageSkeletonProps) {
       {tiles > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} data-testid="page-skeleton-tiles">
           {Array.from({ length: tiles }, (_, index) => (
-            <Paper key={index} withBorder radius="md" p="md">
+            <Paper key={index} withBorder radius="md" p="md" data-testid="page-skeleton-tile">
               <Skeleton h={12} w="50%" mb="sm" />
               <Skeleton h={32} w="40%" />
             </Paper>

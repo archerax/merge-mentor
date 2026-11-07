@@ -21,6 +21,7 @@ import { saveConfigMutation } from "../queries/config.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
 import { useConfigActiveTab, useConfigShowAdvanced } from "../stores/configView.js";
 import { isFieldVisible } from "./configVisibility.js";
+import { describeRouteError } from "./RouteError.js";
 
 interface ConfigViewerProps {
   readonly view: ConfigView;
@@ -36,7 +37,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
   const saved = saveMutation.data?.ok === true;
   const errors: readonly ConfigFieldError[] =
     saveMutation.data?.ok === false ? saveMutation.data.errors : NO_ERRORS;
-  const saveError = saveMutation.error?.message ?? null;
+  const saveError = saveMutation.error !== null ? describeRouteError(saveMutation.error) : null;
   const { activeTab, setActiveTab } = useConfigActiveTab();
   const { showAdvanced, setShowAdvanced } = useConfigShowAdvanced();
 

@@ -1,3 +1,4 @@
+import { MutationObserver } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AiStatus } from "../server/aiStatus.types.js";
@@ -5,7 +6,7 @@ import type { AiStatus } from "../server/aiStatus.types.js";
 const getAiStatus = vi.fn<(args: { data: { force: boolean } }) => Promise<AiStatus>>();
 vi.mock("../server/aiStatus.functions.js", () => ({ getAiStatus }));
 
-const { aiStatusQuery, refreshAiStatus } = await import("./aiStatus.js");
+const { aiStatusQuery, refreshAiStatusMutation } = await import("./aiStatus.js");
 const { createTestQueryClient } = await import("../test/renderWithQuery.test-helper.js");
 
 describe("aiStatusQuery", () => {
@@ -20,6 +21,14 @@ describe("aiStatusQuery", () => {
     expect(getAiStatus).toHaveBeenCalledWith({ data: { force: false } });
   });
 
+  it("reports a non-Error failure as text", async () => {
+    getAiStatus.mockImplementation(async () => {
+      throw "plain string";
+    });
+    const status = await createTestQueryClient().fetchQuery(aiStatusQuery);
+    expect(status).toEqual({ kind: "copilot-error", message: "plain string" });
+  });
+
   it("turns a failed call into a copilot-error status instead of a query error", async () => {
     getAiStatus.mockImplementation(async () => {
       throw new Error("server down");
@@ -31,7 +40,7 @@ describe("aiStatusQuery", () => {
   });
 });
 
-describe("refreshAiStatus", () => {
+describe("refreshAiStatusMutation", () => {
   beforeEach(() => {
     getAiStatus.mockReset();
   });
@@ -42,7 +51,7 @@ describe("refreshAiStatus", () => {
     queryClient.setQueryData(aiStatusQuery.queryKey, stale);
     getAiStatus.mockResolvedValue({ kind: "byok", endpoint: "https://e", hasApiKey: true });
 
-    await refreshAiStatus(queryClient);
+    await new MutationObserver(queryClient, refreshAiStatusMutation).mutate();
 
     expect(getAiStatus).toHaveBeenCalledWith({ data: { force: true } });
     expect(queryClient.getQueryData(aiStatusQuery.queryKey)).toEqual({
@@ -57,7 +66,7 @@ describe("refreshAiStatus", () => {
     getAiStatus.mockImplementation(async () => {
       throw new Error("boom");
     });
-    await refreshAiStatus(queryClient);
+    await new MutationObserver(queryClient, refreshAiStatusMutation).mutate();
     expect(queryClient.getQueryData(aiStatusQuery.queryKey)).toEqual({
       kind: "copilot-error",
       message: "boom",

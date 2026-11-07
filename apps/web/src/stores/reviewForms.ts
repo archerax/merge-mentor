@@ -1,10 +1,17 @@
-import { REVIEW_STRATEGY_OPTIONS, type ReviewStrategyInput } from "../server/review.types.js";
+import {
+  MAX_REVIEW_RUNS,
+  REVIEW_STRATEGY_OPTIONS,
+  type ReviewStrategyInput,
+} from "../server/review.types.js";
 import { asRecord, createPersistedStore } from "./persisted.js";
 
-/** Identifies each review runner whose inputs should survive navigation. */
-export type ReviewRunnerKey = "pr" | "pbi" | "project";
+/** Every review runner whose inputs should survive navigation; the compiler keeps this complete. */
+const RUNNER_KEY_SET = { pr: true, pbi: true, project: true } as const;
 
-const RUNNER_KEYS: readonly ReviewRunnerKey[] = ["pr", "pbi", "project"];
+/** Identifies each review runner whose inputs should survive navigation. */
+export type ReviewRunnerKey = keyof typeof RUNNER_KEY_SET;
+
+const RUNNER_KEYS = Object.keys(RUNNER_KEY_SET) as ReviewRunnerKey[];
 
 /** The editable form state for a single review runner. */
 interface ReviewFormState {
@@ -36,7 +43,9 @@ function isStrategy(value: unknown): value is ReviewStrategyInput {
 }
 
 function isRuns(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 1;
+  return (
+    typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_REVIEW_RUNS
+  );
 }
 
 function sanitizeForm(value: unknown): Partial<PersistedReviewForm> {
@@ -58,7 +67,7 @@ function sanitizeForms(persisted: unknown): Record<ReviewRunnerKey, ReviewFormSt
     pr: { ...EMPTY_FORM, ...sanitizeForm(forms?.pr) },
     pbi: { ...EMPTY_FORM, ...sanitizeForm(forms?.pbi) },
     project: { ...EMPTY_FORM, ...sanitizeForm(forms?.project) },
-  };
+  } satisfies Record<ReviewRunnerKey, ReviewFormState>;
 }
 
 /**

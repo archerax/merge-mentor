@@ -26,14 +26,15 @@ import { MarkdownReport } from "../components/MarkdownReport.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { PageSkeleton } from "../components/PageSkeleton.js";
 import { DownloadMarkdownButton } from "../components/review/DownloadMarkdownButton.js";
+import { describeRouteError } from "../components/RouteError.js";
 import {
   deletePrdRunMutation,
-  initialReportName,
   reportQuery,
   reportsQuery,
+  selectedReportName,
 } from "../queries/reports.js";
 import type { ReportListItem } from "../server/reports.server.js";
-import { useReportPick, useReportsQuery } from "../stores/reportsView.js";
+import { useReportPick, useReportsQuery, useReportsViewStore } from "../stores/reportsView.js";
 
 export const Route = createFileRoute("/reports")({
   validateSearch: (search: Record<string, unknown>): { report?: string } => ({
@@ -43,7 +44,8 @@ export const Route = createFileRoute("/reports")({
   loaderDeps: ({ search }) => ({ report: search.report }),
   loader: async ({ deps, context }) => {
     const reports = await context.queryClient.ensureQueryData(reportsQuery);
-    const initial = initialReportName(reports, deps.report);
+    // The saved pick is only known in the browser; on the server this is the default.
+    const initial = selectedReportName(reports, deps.report, useReportsViewStore.getState().pick);
     if (initial !== null) await context.queryClient.ensureQueryData(reportQuery(initial));
   },
   pendingComponent: () => <PageSkeleton rows={6} />,
@@ -70,13 +72,10 @@ function ReportsPage() {
   const { data: reports } = useSuspenseQuery(reportsQuery);
   // The remembered pick wins until the URL asks for a different report, or its report is gone.
   const { pick, setPick } = useReportPick();
-  const selectedName =
-    pick !== null &&
-    pick.search === requested &&
-    (pick.name === null || reports.some((item) => item.name === pick.name))
-      ? pick.name
-      : initialReportName(reports, requested);
-  const selectReport = (name: string | null) => setPick({ search: requested, name });
+  const selectedName = selectedReportName(reports, requested, pick);
+  // Clearing the selection forgets the pick, so the next visit shows the default report again.
+  const selectReport = (name: string | null) =>
+    setPick(name === null ? null : { search: requested, name });
 
   const detail = useQuery({ ...reportQuery(selectedName ?? ""), enabled: selectedName !== null });
   const selected = selectedName === null ? null : (detail.data ?? null);
@@ -166,7 +165,11 @@ function ReportsPage() {
 
           <Grid.Col span={{ base: 12, md: 8 }}>
             <Card padding="lg">
-              {loadingName !== null ? (
+              {detail.isError && selected === null ? (
+                <Alert color="red" title="Could not load this report">
+                  {describeRouteError(detail.error)}
+                </Alert>
+              ) : loadingName !== null ? (
                 <Stack gap="sm">
                   <Skeleton height={28} width="40%" />
                   <Skeleton height={14} />

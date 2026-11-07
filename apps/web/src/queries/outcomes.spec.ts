@@ -54,6 +54,16 @@ describe("startOutcomesMutation", () => {
     expect(queryClient.getQueryState(outcomesQuery.queryKey)?.isInvalidated).toBe(true);
   });
 
+  it("keeps the cached outcomes when the server refuses to start the scan", async () => {
+    startOutcomes.mockResolvedValue({ ok: false, error: "no token" });
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(outcomesQuery.queryKey, running);
+
+    await new MutationObserver(queryClient, startOutcomesMutation).mutate(false);
+
+    expect(queryClient.getQueryData(outcomesQuery.queryKey)).toEqual(running);
+  });
+
   it("keeps the cached outcomes when the request fails", async () => {
     startOutcomes.mockRejectedValue(new Error("offline"));
     const queryClient = createTestQueryClient();

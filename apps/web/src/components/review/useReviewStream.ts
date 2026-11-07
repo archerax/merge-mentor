@@ -73,6 +73,8 @@ interface ReviewStreamState<TResult> {
   readonly elapsedMs: number;
   /** Original input of the current run, recovered from the manifest on resume. */
   readonly runInput: unknown | null;
+  /** Set when the input of a resumed run could not be loaded, so posting comments is unavailable. */
+  readonly runInputError: string | null;
 }
 
 /**
@@ -439,13 +441,23 @@ export function useReviewStream<TResult = ReviewSummary>(
 
   // A run started here already knows its input; any other run (one resumed from
   // the URL) recovers it from the run's manifest, for post-comments on resume.
+  // A start still waiting for its run id only counts for the run on screen, so a
+  // pending or failed start never claims a different run from the URL.
   const startedHere =
-    startedRun !== null && (startedRun.runId === null || startedRun.runId === runId);
+    startedRun !== null &&
+    (runId === undefined ||
+      startedRun.runId === runId ||
+      (startedRun.runId === null && status === "running"));
   const lookup = useQuery({
     ...runQuery(runId ?? ""),
     enabled: runId !== undefined && runId !== "" && !startedHere,
   });
   const runInput = startedHere ? startedRun.input : runInputOf(lookup.data);
+  // Why the input is unknown (so posting is unavailable) when the lookup failed.
+  const runInputError =
+    startedHere || lookup.error === null
+      ? null
+      : `The run's original input could not be loaded, so comments cannot be posted: ${lookup.error.message}`;
 
   // Resume on mount when the URL carries a run id.
   useEffect(() => {
@@ -521,6 +533,7 @@ export function useReviewStream<TResult = ReviewSummary>(
     startedAt,
     elapsedMs,
     runInput,
+    runInputError,
     running: status === "running",
     run,
     stop,

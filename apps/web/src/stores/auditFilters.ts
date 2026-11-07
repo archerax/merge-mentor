@@ -5,7 +5,16 @@ import { asRecord, createPersistedStore } from "./persisted.js";
 /** The audit log's severity filter: one severity, or every event. */
 export type SeverityFilter = "all" | AuditLogSeverity;
 
-const SEVERITY_FILTERS: readonly SeverityFilter[] = ["all", "info", "warn", "error"];
+/** Every audit severity; the compiler fails here when `AuditLogSeverity` gains or loses one. */
+const SEVERITY_SET = { info: true, warn: true, error: true } satisfies Record<
+  AuditLogSeverity,
+  true
+>;
+
+const SEVERITY_FILTERS: readonly SeverityFilter[] = [
+  "all",
+  ...(Object.keys(SEVERITY_SET) as AuditLogSeverity[]),
+];
 
 interface AuditFiltersState {
   readonly severity: SeverityFilter;

@@ -9,7 +9,7 @@ const getReport = vi.fn<(args: { data: { name: string } }) => Promise<unknown>>(
 const deletePrdReport = vi.fn<(args: { data: { runId: string } }) => Promise<{ deleted: true }>>();
 vi.mock("../server/reports.functions.js", () => ({ getReports, getReport, deletePrdReport }));
 
-const { deletePrdRunMutation, initialReportName, reportQuery, reportsQuery } =
+const { deletePrdRunMutation, reportQuery, reportsQuery, selectedReportName } =
   await import("./reports.js");
 const { createTestQueryClient } = await import("../test/renderWithQuery.test-helper.js");
 
@@ -53,18 +53,32 @@ describe("reportsQuery and reportQuery", () => {
   });
 });
 
-describe("initialReportName", () => {
+describe("selectedReportName", () => {
   it("prefers the report named in the URL", () => {
-    expect(initialReportName(list, "prd-run-1-breakdown.md")).toBe("prd-run-1-breakdown.md");
+    expect(selectedReportName(list, "prd-run-1-breakdown.md", null)).toBe("prd-run-1-breakdown.md");
   });
 
   it("falls back to the newest report when the URL names none or an unknown one", () => {
-    expect(initialReportName(list, undefined)).toBe("review-1.md");
-    expect(initialReportName(list, "gone.md")).toBe("review-1.md");
+    expect(selectedReportName(list, undefined, null)).toBe("review-1.md");
+    expect(selectedReportName(list, "gone.md", null)).toBe("review-1.md");
   });
 
   it("is null when there are no reports", () => {
-    expect(initialReportName([], "gone.md")).toBeNull();
+    expect(selectedReportName([], "gone.md", null)).toBeNull();
+  });
+
+  it("keeps a remembered pick made under the same URL", () => {
+    const pick = { search: undefined, name: otherPrd.name };
+    expect(selectedReportName(list, undefined, pick)).toBe(otherPrd.name);
+  });
+
+  it("ignores a pick made under another URL or whose report is gone", () => {
+    expect(
+      selectedReportName(list, "review-1.md", { search: undefined, name: otherPrd.name })
+    ).toBe("review-1.md");
+    expect(selectedReportName(list, undefined, { search: undefined, name: "gone.md" })).toBe(
+      "review-1.md"
+    );
   });
 });
 

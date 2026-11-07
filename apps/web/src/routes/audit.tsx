@@ -8,7 +8,11 @@ import { PageSkeleton } from "../components/PageSkeleton.js";
 import { auditQuery } from "../queries/audit.js";
 
 export const Route = createFileRoute("/audit")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(auditQuery),
+  // Waits for the data without returning it: the page reads the query cache, and
+  // returning it would serialise the payload a second time as loader data.
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(auditQuery);
+  },
   pendingComponent: () => <PageSkeleton rows={8} />,
   component: AuditLogPage,
 });

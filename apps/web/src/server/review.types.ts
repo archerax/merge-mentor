@@ -45,6 +45,9 @@ export interface PostCommentsInput {
   readonly comments: readonly PendingComment[];
 }
 
+/** Most aggregated review runs the web UI accepts; each run is a full AI pass. */
+export const MAX_REVIEW_RUNS = 10;
+
 /** Review execution strategy selectable from the web UI. */
 export const REVIEW_STRATEGY_OPTIONS = ["fast", "deep", "multi-agent"] as const;
 

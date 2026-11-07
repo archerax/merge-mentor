@@ -10,6 +10,7 @@ function count(html: string, needle: string): number {
 describe("PageSkeleton", () => {
   it("marks itself as loading for assistive technology", () => {
     const { html } = renderWithQuery(<PageSkeleton />);
+    expect(html).toContain('role="status"');
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('aria-label="Loading page"');
   });
@@ -23,6 +24,7 @@ describe("PageSkeleton", () => {
   it("renders the requested number of tiles and rows", () => {
     const { html } = renderWithQuery(<PageSkeleton tiles={3} rows={2} />);
     expect(html).toContain('data-testid="page-skeleton-tiles"');
+    expect(count(html, 'data-testid="page-skeleton-tile"')).toBe(3);
     expect(count(html, 'data-testid="page-skeleton-row"')).toBe(2);
   });
 });

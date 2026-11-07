@@ -95,7 +95,12 @@ export function createPersistedStore<TState extends object, TPersisted>(
       partialize: options.partialize,
       skipHydration: true,
       // Data from another version is not trusted: start from the defaults.
-      migrate: () => ({}),
+      // Writes are opened first so the persist middleware replaces the stale
+      // payload instead of leaving it to be discarded again on every load.
+      migrate: () => {
+        hydrated = true;
+        return {};
+      },
       merge: (persisted, current) => ({ ...current, ...options.sanitize(persisted) }),
       // Runs after success and after failure (such as unparseable JSON), which leaves the defaults.
       onRehydrateStorage: () => () => {

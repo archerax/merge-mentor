@@ -80,7 +80,6 @@ describe("persisted stores", () => {
     first.reports.getState().setQuery("checkout");
     first.reports.getState().setPick({ search: undefined, name: "review-1.md" });
     first.prd.getState().setDocumentType("frd");
-    first.prd.getState().setIncludeImages(true);
     first.prd.getState().setAnnotate(true);
 
     vi.resetModules();
@@ -94,8 +93,56 @@ describe("persisted stores", () => {
     });
     expect(second.prd.getState()).toMatchObject({
       documentType: "frd",
-      includeImages: true,
       annotate: true,
+    });
+  });
+
+  it("never saves what acts on the user's behalf or sends data to the AI provider", async () => {
+    const stores = await loadStores();
+    stores.hydrate();
+    stores.reviewForms.getState().setInput("pr", "#7");
+    stores.reviewForms.getState().setWrite("pr", true);
+    stores.reviewForms.getState().setStrategy("pr", "deep");
+    stores.prd.getState().setIncludeImages(true);
+    stores.prd.getState().setAnnotate(true);
+
+    const forms = (session.read("merge-mentor:review-forms") as { state: { forms: object } }).state
+      .forms as Record<string, Record<string, unknown>>;
+    expect(forms.pr).toEqual({ input: "#7", strategy: "deep", runs: null });
+    expect(forms.pr).not.toHaveProperty("write");
+    const prd = (session.read("merge-mentor:prd-options") as { state: Record<string, unknown> })
+      .state;
+    expect(prd).toEqual({ documentType: "prd", annotate: true });
+    expect(prd).not.toHaveProperty("includeImages");
+
+    // A hand-edited payload cannot switch them on either.
+    session.write("merge-mentor:prd-options", { includeImages: true });
+    vi.resetModules();
+    const second = await loadStores();
+    second.hydrate();
+    expect(second.prd.getState().includeImages).toBe(false);
+  });
+
+  it("drops a saved review-runs count above the limit", async () => {
+    session.write("merge-mentor:review-forms", {
+      forms: { pr: { runs: 11 }, pbi: { runs: 10 } },
+    });
+    const stores = await loadStores();
+    stores.hydrate();
+
+    expect(stores.reviewForms.getState().forms.pr.runs).toBeNull();
+    expect(stores.reviewForms.getState().forms.pbi.runs).toBe(10);
+  });
+
+  it("replaces a payload saved by another version instead of leaving it behind", async () => {
+    session.write("merge-mentor:audit-filters", { severity: "error", query: "old" }, 0);
+    const { hydrate, audit } = await loadStores();
+    hydrate();
+
+    expect(audit.getState()).toMatchObject({ severity: "all", query: "" });
+    expect(session.read("merge-mentor:audit-filters")).toEqual({
+      state: { severity: "all", query: "" },
+      version: 1,
     });
   });
 
@@ -123,6 +170,19 @@ describe("persisted stores", () => {
     hydrate();
 
     expect(config.getState().showAdvanced).toBe(true);
+    expect(local.items.has("merge-mentor:config:show-advanced")).toBe(false);
+  });
+
+  it("does not bring back a legacy 'show advanced' choice after it was turned off", async () => {
+    local.setItem("merge-mentor:config:show-advanced", "true");
+    const first = await loadStores();
+    first.hydrate();
+    first.config.getState().setShowAdvanced(false);
+
+    vi.resetModules();
+    const second = await loadStores();
+    second.hydrate();
+    expect(second.config.getState().showAdvanced).toBe(false);
   });
 
   it("hydrates a store created after the app has hydrated straight away", async () => {
@@ -228,6 +288,17 @@ describe("persisted stores", () => {
     expect(audit.getState()).toMatchObject({ severity: "all", query: "" });
   });
 
+  it("drops a saved report pick that names no report", async () => {
+    session.write("merge-mentor:reports-view", {
+      query: "q",
+      pick: { search: "a.md", name: null },
+    });
+    const { hydrate, reports } = await loadStores();
+    hydrate();
+
+    expect(reports.getState()).toMatchObject({ query: "q", pick: null });
+  });
+
   it("keeps working when storage is unavailable", async () => {
     vi.stubGlobal("window", {
       get sessionStorage(): Storage {
@@ -243,6 +314,8 @@ describe("persisted stores", () => {
 
   it("works without a window, as during server rendering", async () => {
     vi.unstubAllGlobals();
+    vi.stubGlobal("window", undefined);
+    expect(typeof window).toBe("undefined");
     const { hydrate, reports } = await loadStores();
     hydrate();
     reports.getState().setQuery("server");

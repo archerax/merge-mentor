@@ -8,7 +8,11 @@ import { PageSkeleton } from "../components/PageSkeleton.js";
 import { configQuery } from "../queries/config.js";
 
 export const Route = createFileRoute("/config")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(configQuery),
+  // Waits for the data without returning it: the page reads the query cache, and
+  // returning it would serialise the payload a second time as loader data.
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(configQuery);
+  },
   pendingComponent: () => <PageSkeleton rows={8} />,
   component: ConfigPage,
 });

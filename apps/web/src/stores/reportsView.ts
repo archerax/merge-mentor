@@ -1,10 +1,5 @@
+import type { ReportPick } from "../queries/reports.js";
 import { asRecord, createPersistedStore } from "./persisted.js";
-
-/** A report the user clicked, remembered against the `report` search parameter it was picked under. */
-interface ReportPick {
-  readonly search: string | undefined;
-  readonly name: string | null;
-}
 
 interface ReportsViewState {
   readonly query: string;
@@ -15,13 +10,14 @@ interface ReportsViewState {
 
 type PersistedReportsView = Pick<ReportsViewState, "query" | "pick">;
 
+/** A saved pick is only used when it names a report; anything else means no pick. */
 function sanitizePick(value: unknown): ReportPick | null | undefined {
   if (value === null) return null;
   const record = asRecord(value);
   if (!record) return undefined;
   const { search, name } = record;
   if (search !== undefined && typeof search !== "string") return undefined;
-  if (name !== null && typeof name !== "string") return undefined;
+  if (typeof name !== "string") return undefined;
   return { search, name };
 }
 

@@ -73,7 +73,11 @@ function StatsPage() {
   // `useQuery` rather than `useSuspenseQuery`: suspense would ignore placeholder
   // data and blank the page on every window change. Errors still reach the
   // route's error boundary.
-  const { data: result, isPlaceholderData } = useQuery({ ...statsQuery(days), throwOnError: true });
+  const { data: result, isPlaceholderData } = useQuery({
+    ...statsQuery(days),
+    // Only a failed first load replaces the page; a failed refetch keeps the stats shown.
+    throwOnError: (_error, query) => query.state.data === undefined,
+  });
   const navigate = useNavigate({ from: "/stats" });
 
   return (

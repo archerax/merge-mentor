@@ -1,8 +1,8 @@
 import { ActionIcon, Badge, Group, Text, Tooltip } from "@mantine/core";
 import { IconKey, IconRefresh, IconUserCheck, IconAlertTriangle } from "@tabler/icons-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { aiStatusQuery, refreshAiStatus } from "../queries/aiStatus.js";
+import { aiStatusQuery, refreshAiStatusMutation } from "../queries/aiStatus.js";
 import type { AiStatus } from "../server/aiStatus.types.js";
 
 /** Presentation of an {@link AiStatus}: what is shown and how loudly. */
@@ -108,9 +108,8 @@ export function AiStatusIndicator({ status }: { readonly status: AiStatus | unde
 
 /** Footer bar showing which AI account (or BYOK endpoint) requests will use. */
 export function AiStatusBar() {
-  const queryClient = useQueryClient();
   const { data: status } = useQuery(aiStatusQuery);
-  const refresh = useMutation({ mutationFn: () => refreshAiStatus(queryClient) });
+  const refresh = useMutation(refreshAiStatusMutation);
 
   return (
     <Group h="100%" px="md" gap="xs" wrap="nowrap">

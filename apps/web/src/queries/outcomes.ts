@@ -29,7 +29,8 @@ export const outcomesQuery = queryOptions({
 export const startOutcomesMutation = mutationOptions({
   mutationFn: (refresh: boolean) => startOutcomes({ data: { refresh } }),
   onSuccess: (result, _refresh, _onMutateResult, { client }) => {
-    client.setQueryData(outcomesQuery.queryKey, result);
+    // A failed start (`ok: false`) must not replace the scan view that is on screen.
+    if (result.ok) client.setQueryData(outcomesQuery.queryKey, result);
   },
   onSettled: (_result, _error, _refresh, _onMutateResult, { client }) =>
     client.invalidateQueries({ queryKey: outcomesQuery.queryKey }),

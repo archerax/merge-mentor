@@ -105,6 +105,7 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
     error,
     elapsedMs,
     runInput,
+    runInputError,
   } = useReviewStream<TSummary>({ endpoint, runId, onRunCreated });
 
   const targetInput = (runInput as WorkItemInput | null) ?? null;
@@ -164,6 +165,12 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
       {(error ?? formError) && (
         <Alert title="Review failed" color="red">
           {error ?? formError}
+        </Alert>
+      )}
+
+      {runInputError && (
+        <Alert title="Posting comments is unavailable" color="yellow">
+          {runInputError}
         </Alert>
       )}
 

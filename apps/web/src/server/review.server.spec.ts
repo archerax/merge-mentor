@@ -302,6 +302,7 @@ describe("review.server", () => {
     it("rejects a non-positive or fractional runs override", () => {
       expect(() => startPRReview({ pr: 7, runs: 0 })).toThrow(/positive integer/);
       expect(() => startPRReview({ pr: 7, runs: 1.5 })).toThrow(/positive integer/);
+      expect(() => startPRReview({ pr: 7, runs: 11 })).toThrow(/at most 10/);
     });
 
     it("starts a distinct run when the write mode differs", async () => {

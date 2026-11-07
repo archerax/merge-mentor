@@ -1,4 +1,4 @@
-import { queryOptions, type QueryClient } from "@tanstack/react-query";
+import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
 import { getAiStatus } from "../server/aiStatus.functions.js";
 import type { AiStatus } from "../server/aiStatus.types.js";
@@ -16,7 +16,10 @@ async function fetchAiStatus(force: boolean): Promise<AiStatus> {
   try {
     return await getAiStatus({ data: { force } });
   } catch (error) {
-    return { kind: "copilot-error", message: (error as Error).message };
+    return {
+      kind: "copilot-error",
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -27,8 +30,10 @@ export const aiStatusQuery = queryOptions({
 });
 
 /** Re-checks the AI account, bypassing the server cache, and stores the result. */
-export async function refreshAiStatus(queryClient: QueryClient): Promise<AiStatus> {
-  const status = await fetchAiStatus(true);
-  queryClient.setQueryData(aiStatusQuery.queryKey, status);
-  return status;
-}
+export const refreshAiStatusMutation = mutationOptions({
+  mutationKey: [...aiStatusKeys.all, "refresh"] as const,
+  mutationFn: () => fetchAiStatus(true),
+  onSuccess: (status, _variables, _onMutateResult, { client }) => {
+    client.setQueryData(aiStatusQuery.queryKey, status);
+  },
+});

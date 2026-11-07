@@ -1,4 +1,4 @@
-import type { PrdDocumentTypeInput } from "../server/prd.types.js";
+import { PRD_DOCUMENT_TYPE_OPTIONS, type PrdDocumentTypeInput } from "../server/prd.types.js";
 import { asRecord, createPersistedStore } from "./persisted.js";
 
 interface PrdOptionsState {
@@ -10,24 +10,30 @@ interface PrdOptionsState {
   setAnnotate(annotate: boolean): void;
 }
 
-type PersistedPrdOptions = Pick<PrdOptionsState, "documentType" | "includeImages" | "annotate">;
+/**
+ * `includeImages` is deliberately not saved: it sends the document's images to
+ * the AI provider, so it starts off on every visit and must be chosen again.
+ */
+type PersistedPrdOptions = Pick<PrdOptionsState, "documentType" | "annotate">;
+
+function isDocumentType(value: unknown): value is PrdDocumentTypeInput {
+  return PRD_DOCUMENT_TYPE_OPTIONS.includes(value as PrdDocumentTypeInput);
+}
 
 /** Keeps the well-formed PRD runner options from storage. */
 function sanitizePrdOptions(persisted: unknown): Partial<PersistedPrdOptions> {
   const record = asRecord(persisted);
   if (!record) return {};
   return {
-    ...(record.documentType === "prd" || record.documentType === "frd"
-      ? { documentType: record.documentType }
-      : {}),
-    ...(typeof record.includeImages === "boolean" ? { includeImages: record.includeImages } : {}),
+    ...(isDocumentType(record.documentType) ? { documentType: record.documentType } : {}),
     ...(typeof record.annotate === "boolean" ? { annotate: record.annotate } : {}),
   };
 }
 
 /**
  * PRD review options, kept for the browser tab. The picked file is component
- * state and is never persisted.
+ * state and is never persisted, and neither is "include images" (it sends data
+ * to the AI provider).
  */
 export const usePrdOptionsStore = createPersistedStore<PrdOptionsState, PersistedPrdOptions>(
   (set) => ({
@@ -41,11 +47,7 @@ export const usePrdOptionsStore = createPersistedStore<PrdOptionsState, Persiste
   {
     name: "prd-options",
     version: 1,
-    partialize: ({ documentType, includeImages, annotate }) => ({
-      documentType,
-      includeImages,
-      annotate,
-    }),
+    partialize: ({ documentType, annotate }) => ({ documentType, annotate }),
     sanitize: sanitizePrdOptions,
   }
 );

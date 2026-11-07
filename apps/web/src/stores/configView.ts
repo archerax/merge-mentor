@@ -27,9 +27,11 @@ const LEGACY_SHOW_ADVANCED_KEY = "merge-mentor:config:show-advanced";
 /** Carries over a "show advanced" choice saved under the old key. */
 function legacyShowAdvanced(): Partial<PersistedConfigView> {
   try {
-    return window.localStorage.getItem(LEGACY_SHOW_ADVANCED_KEY) === "true"
-      ? { showAdvanced: true }
-      : {};
+    const legacy = window.localStorage.getItem(LEGACY_SHOW_ADVANCED_KEY);
+    if (legacy === null) return {};
+    // Read once: a stale "true" must not resurrect after the user turns it off.
+    window.localStorage.removeItem(LEGACY_SHOW_ADVANCED_KEY);
+    return legacy === "true" ? { showAdvanced: true } : {};
   } catch {
     return {};
   }

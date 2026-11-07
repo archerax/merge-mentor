@@ -70,14 +70,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Configuration pages reuse data loaded less than 30 seconds ago (including
   data loaded when you hover a link) instead of requesting it again, and all
   three pages refresh their data when you come back to the browser tab.
+- **Web UI review runs**: the number of review runs is limited to 10 in the web
+  UI. If a run's original input cannot be loaded when reopening it from its
+  link, the page now says why comments cannot be posted.
 - **Web UI review runs**: opening a review run from its link starts showing its
   progress straight away instead of first waiting for the run's details, which
   are only needed to post comments.
 - **Web UI remembers your choices**: the Audit Log's severity filter and
   search, the Reports page's search and last selected report, and the PRD /
-  FRD Review options (document type, include images, Word copy with comments)
+  FRD Review options (document type and Word copy with comments)
   now survive switching pages and reloading, for as long as the browser tab is
-  open. The PR, PBI and project review forms (link, strategy, review runs) now
+  open. "Include images" always starts off, because it sends the document's
+  images to your AI provider. The PR, PBI and project review forms (link, strategy, review runs) now
   also survive a reload; the "post comments" switch always starts off after a
   reload. The Configuration page also remembers its open tab, alongside "show
   advanced settings". The picked document and unsaved configuration changes are never

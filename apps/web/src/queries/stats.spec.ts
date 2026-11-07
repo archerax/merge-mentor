@@ -21,6 +21,10 @@ describe("statsQuery", () => {
     expect(statsQuery(7).queryKey).not.toEqual(statsQuery(30).queryKey);
   });
 
+  it("does not rescan the platform when the tab regains focus", () => {
+    expect(statsQuery(7).refetchOnWindowFocus).toBe(false);
+  });
+
   it("keeps the previous window's data on screen while another window loads", () => {
     expect(statsQuery(90).placeholderData).toBe(keepPreviousData);
   });

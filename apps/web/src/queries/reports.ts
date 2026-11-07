@@ -27,11 +27,38 @@ export function reportQuery(name: string) {
  * The report to show first: the one named in the URL when it is in the list,
  * otherwise the newest one, or `null` when there are no reports.
  */
-export function initialReportName(
+function initialReportName(
   reports: readonly ReportListItem[],
   requested: string | undefined
 ): string | null {
   return (reports.find((item) => item.name === requested) ?? reports[0])?.name ?? null;
+}
+
+/** A report the user clicked, remembered against the `report` search parameter it was picked under. */
+export interface ReportPick {
+  readonly search: string | undefined;
+  readonly name: string;
+}
+
+/**
+ * The report to show: the remembered pick while the URL still asks for what it
+ * was made under and the report still exists, otherwise the URL's report or
+ * the newest one. The route loader and the page both use this, so the loader
+ * prefetches what the page will show whenever it can know the pick.
+ */
+export function selectedReportName(
+  reports: readonly ReportListItem[],
+  requested: string | undefined,
+  pick: ReportPick | null
+): string | null {
+  if (
+    pick !== null &&
+    pick.search === requested &&
+    reports.some((item) => item.name === pick.name)
+  ) {
+    return pick.name;
+  }
+  return initialReportName(reports, requested);
 }
 
 /** What `onMutate` saved so a failed delete can put the list back. */

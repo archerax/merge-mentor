@@ -21,7 +21,11 @@ import { PageSkeleton } from "../components/PageSkeleton.js";
 import { outcomesQuery, startOutcomesMutation } from "../queries/outcomes.js";
 
 export const Route = createFileRoute("/outcomes")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(outcomesQuery),
+  // Waits for the data without returning it: the page reads the query cache, and
+  // returning it would serialise the payload a second time as loader data.
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(outcomesQuery);
+  },
   pendingComponent: () => <PageSkeleton tiles={4} rows={4} />,
   component: OutcomesPage,
 });
@@ -115,6 +119,8 @@ function OutcomesPage() {
   const start = useMutation(startOutcomesMutation);
   const [refresh, setRefresh] = useState(false);
   const running = result.ok && result.view.scan.running;
+  // A refused start comes back as a result, not a thrown error.
+  const startError = start.error?.message ?? (start.data?.ok === false ? start.data.error : null);
 
   const view = result.ok ? result.view : undefined;
   const scan = view?.scan;
@@ -156,9 +162,9 @@ function OutcomesPage() {
         </Alert>
       )}
 
-      {start.error && (
+      {startError && (
         <Alert title="Could not start the scan" color="red">
-          {start.error.message}
+          {startError}
         </Alert>
       )}
 
