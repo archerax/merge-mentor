@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not make it look new. The comparison says when a partial review may overstate
   what was resolved.
 
+### Changed
+
+- **Web UI AI status bar**: the footer's "AI requests run as" status now
+  refreshes itself when you come back to the browser tab (if it is more than
+  30 seconds old), so a sign-in or token change made elsewhere shows up without
+  pressing refresh. The refresh button still forces a fresh check.
+
 ## [4.4.0] - 2026-11-06
 
 Breaks a reviewed PRD / FRD down into a ready-to-refine backlog.

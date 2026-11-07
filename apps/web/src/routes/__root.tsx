@@ -33,9 +33,16 @@ import {
   IconSitemap,
   IconSun,
 } from "@tabler/icons-react";
-import { HeadContent, Link, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Link,
+  Scripts,
+  createRootRouteWithContext,
+  useLocation,
+} from "@tanstack/react-router";
 
 import { AiStatusBar } from "../components/AiStatusBar.js";
+import type { RouterContext } from "../router.js";
 import { theme } from "../theme.js";
 
 import appCss from "../styles.css?url";
@@ -62,7 +69,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "/config", label: "Configuration", icon: IconSettings },
 ];
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },

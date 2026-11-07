@@ -1,0 +1,66 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AiStatus } from "../server/aiStatus.types.js";
+
+const getAiStatus = vi.fn<(args: { data: { force: boolean } }) => Promise<AiStatus>>();
+vi.mock("../server/aiStatus.functions.js", () => ({ getAiStatus }));
+
+const { aiStatusQuery, refreshAiStatus } = await import("./aiStatus.js");
+const { createTestQueryClient } = await import("../test/renderWithQuery.test-helper.js");
+
+describe("aiStatusQuery", () => {
+  beforeEach(() => {
+    getAiStatus.mockReset();
+  });
+
+  it("loads the status without forcing a re-check", async () => {
+    getAiStatus.mockResolvedValue({ kind: "other-provider", provider: "opencode-sdk" });
+    const status = await createTestQueryClient().fetchQuery(aiStatusQuery);
+    expect(status).toEqual({ kind: "other-provider", provider: "opencode-sdk" });
+    expect(getAiStatus).toHaveBeenCalledWith({ data: { force: false } });
+  });
+
+  it("turns a failed call into a copilot-error status instead of a query error", async () => {
+    getAiStatus.mockImplementation(async () => {
+      throw new Error("server down");
+    });
+    const queryClient = createTestQueryClient();
+    const status = await queryClient.fetchQuery(aiStatusQuery);
+    expect(status).toEqual({ kind: "copilot-error", message: "server down" });
+    expect(queryClient.getQueryState(aiStatusQuery.queryKey)?.status).toBe("success");
+  });
+});
+
+describe("refreshAiStatus", () => {
+  beforeEach(() => {
+    getAiStatus.mockReset();
+  });
+
+  it("forces a re-check and replaces the cached status", async () => {
+    const queryClient = createTestQueryClient();
+    const stale: AiStatus = { kind: "copilot-error", message: "old" };
+    queryClient.setQueryData(aiStatusQuery.queryKey, stale);
+    getAiStatus.mockResolvedValue({ kind: "byok", endpoint: "https://e", hasApiKey: true });
+
+    await refreshAiStatus(queryClient);
+
+    expect(getAiStatus).toHaveBeenCalledWith({ data: { force: true } });
+    expect(queryClient.getQueryData(aiStatusQuery.queryKey)).toEqual({
+      kind: "byok",
+      endpoint: "https://e",
+      hasApiKey: true,
+    });
+  });
+
+  it("stores a copilot-error status when the re-check fails", async () => {
+    const queryClient = createTestQueryClient();
+    getAiStatus.mockImplementation(async () => {
+      throw new Error("boom");
+    });
+    await refreshAiStatus(queryClient);
+    expect(queryClient.getQueryData(aiStatusQuery.queryKey)).toEqual({
+      kind: "copilot-error",
+      message: "boom",
+    });
+  });
+});

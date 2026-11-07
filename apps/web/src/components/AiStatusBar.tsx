@@ -1,8 +1,8 @@
 import { ActionIcon, Badge, Group, Text, Tooltip } from "@mantine/core";
 import { IconKey, IconRefresh, IconUserCheck, IconAlertTriangle } from "@tabler/icons-react";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getAiStatus } from "../server/aiStatus.functions.js";
+import { aiStatusQuery, refreshAiStatus } from "../queries/aiStatus.js";
 import type { AiStatus } from "../server/aiStatus.types.js";
 
 /** Presentation of an {@link AiStatus}: what is shown and how loudly. */
@@ -108,23 +108,9 @@ export function AiStatusIndicator({ status }: { readonly status: AiStatus | unde
 
 /** Footer bar showing which AI account (or BYOK endpoint) requests will use. */
 export function AiStatusBar() {
-  const [status, setStatus] = useState<AiStatus | undefined>();
-  const [loading, setLoading] = useState(false);
-
-  const load = useCallback(async (force: boolean) => {
-    setLoading(true);
-    try {
-      setStatus(await getAiStatus({ data: { force } }));
-    } catch (error) {
-      setStatus({ kind: "copilot-error", message: (error as Error).message });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(false);
-  }, [load]);
+  const queryClient = useQueryClient();
+  const { data: status, isFetching } = useQuery(aiStatusQuery);
+  const refresh = useMutation({ mutationFn: () => refreshAiStatus(queryClient) });
 
   return (
     <Group h="100%" px="md" gap="xs" wrap="nowrap">
@@ -137,8 +123,8 @@ export function AiStatusBar() {
           variant="subtle"
           size="sm"
           aria-label="Refresh AI account status"
-          loading={loading}
-          onClick={() => void load(true)}
+          loading={isFetching || refresh.isPending}
+          onClick={() => refresh.mutate()}
         >
           <IconRefresh size={14} />
         </ActionIcon>
