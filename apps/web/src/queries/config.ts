@@ -16,8 +16,9 @@ export const configQuery = queryOptions({
 /**
  * Writes configuration edits to the project `.env` file. A save the server
  * accepts puts the returned configuration straight into the cache and marks
- * every other query stale, since every page's data depends on the settings;
- * the configuration itself is re-read once the save settles.
+ * every other query stale, since every page's data depends on the settings.
+ * The configuration is not re-read afterwards: the returned view is built after
+ * the write, and a failed re-read of a suspense query would replace the page.
  * Rejected values come back as `{ ok: false, errors }`, not as an error.
  */
 export const saveConfigMutation = mutationOptions({
@@ -31,6 +32,4 @@ export const saveConfigMutation = mutationOptions({
       predicate: (query) => query.queryKey[0] !== configKeys.all[0],
     });
   },
-  onSettled: (_result, _error, _edits, _onMutateResult, { client }) =>
-    client.invalidateQueries({ queryKey: configQuery.queryKey }),
 });

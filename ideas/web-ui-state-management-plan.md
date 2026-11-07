@@ -1,6 +1,6 @@
 # Feature Plan: Web UI State Management (TanStack Query and Zustand)
 
-> **Status: implemented.** All three phases have landed. The conventions are
+> **Status: implemented.** All phases (0–3) have landed. The conventions are
 > documented in [`apps/web/README.md`](../apps/web/README.md). Differences from
 > this plan: the configuration page's tab and "show advanced" use
 > `localStorage` (not `sessionStorage`), as "show advanced" did before; the PRD

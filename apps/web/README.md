@@ -56,6 +56,8 @@ it is not yet migrated to a query.
 - Route loaders call `context.queryClient.ensureQueryData(query)` so SSR and
   preload-on-intent fill the cache; the page then calls `useSuspenseQuery` with
   the same options.
+- `runQuery` fetches `/api/review/runs/:id` with a relative URL, so it is
+  client-only: use it from components, not from a loader or during SSR.
 - When the page should keep showing old data while new data loads (the stats
   window picker), give the query `placeholderData: keepPreviousData`, read it
   with `useQuery` (suspense ignores placeholder data), and only await the loader

@@ -47,7 +47,8 @@ describe("saveConfigMutation", () => {
 
     expect(saveConfig).toHaveBeenCalledWith({ data: { edits } });
     expect(queryClient.getQueryData(configQuery.queryKey)).toEqual(after);
-    expect(queryClient.getQueryState(configQuery.queryKey)?.isInvalidated).toBe(true);
+    // The returned view is authoritative, so the configuration is not re-read.
+    expect(queryClient.getQueryState(configQuery.queryKey)?.isInvalidated).toBe(false);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(true);
   });
 
@@ -61,7 +62,7 @@ describe("saveConfigMutation", () => {
 
     expect(observer.getCurrentResult().data?.errors).toEqual(errors);
     expect(queryClient.getQueryData(configQuery.queryKey)).toEqual(before);
-    expect(queryClient.getQueryState(configQuery.queryKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(configQuery.queryKey)?.isInvalidated).toBe(false);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });
 

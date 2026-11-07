@@ -1,5 +1,6 @@
 import {
   Alert,
+  Button,
   Code,
   Group,
   Loader,
@@ -71,13 +72,15 @@ function UpdatingIndicator({ days }: { days: number }) {
 function StatsPage() {
   const { days } = Route.useSearch();
   // `useQuery` rather than `useSuspenseQuery`: suspense would ignore placeholder
-  // data and blank the page on every window change. Errors still reach the
-  // route's error boundary.
-  const { data: result, isPlaceholderData } = useQuery({
-    ...statsQuery(days),
-    // Only a failed first load replaces the page; a failed refetch keeps the stats shown.
-    throwOnError: (_error, query) => query.state.data === undefined,
-  });
+  // data and blank the page on every window change. A failed load is shown
+  // inline (with a retry) so the numbers already on screen survive it.
+  const {
+    data: result,
+    error: loadError,
+    isError,
+    isPlaceholderData,
+    refetch,
+  } = useQuery(statsQuery(days));
   const navigate = useNavigate({ from: "/stats" });
 
   return (
@@ -102,8 +105,19 @@ function StatsPage() {
         }
       />
 
+      {isError && (
+        <Alert title="Could not load stats" color="red">
+          {loadError.message}{" "}
+          <Button variant="light" color="red" size="compact-xs" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </Alert>
+      )}
+
       {result === undefined ? (
-        <Skeleton h={160} />
+        isError ? null : (
+          <Skeleton h={160} />
+        )
       ) : !result.ok ? (
         <Alert title="Could not load live stats" color="red">
           {result.error} Check the <Link to="/config">configuration</Link> for the platform token

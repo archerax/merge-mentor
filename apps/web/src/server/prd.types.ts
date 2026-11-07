@@ -31,7 +31,6 @@ export const PRD_ANNOTATED_ENDPOINT = "/api/prd/annotated";
 /** Document types the reviewer has a rubric for. */
 export const PRD_DOCUMENT_TYPE_OPTIONS = ["prd", "frd"] as const;
 
-/** Document types the reviewer has a rubric for. */
 export type PrdDocumentTypeInput = (typeof PRD_DOCUMENT_TYPE_OPTIONS)[number];
 
 /** Options of an upload, persisted in the run manifest (never the file itself). */
