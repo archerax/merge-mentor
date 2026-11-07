@@ -86,7 +86,7 @@
     "esbuild": "^0.28.2",
     "husky": "^9.1.7",
     "knip": "^6.44.1",
-    "oxfmt": "^0.74.0",
+    "oxfmt": "^0.76.0",
     "oxlint": "^1.91.0",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.14.1",
