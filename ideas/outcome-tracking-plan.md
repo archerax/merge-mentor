@@ -1,5 +1,10 @@
 # Feature Plan: Outcome Tracking (Did the Mentor Help?)
 
+> **Status: implemented (display only).** See [`docs/outcomes.md`](../docs/outcomes.md) for how to
+> use it. Differences from this plan: open PRs are always rescanned; comments are inline review
+> threads only (PR-level summary comments have no resolved state); results are keyed on
+> `owner/repo`; GitHub resolution is read through GraphQL, not REST.
+
 ## Overview
 
 **Merge Mentor** posts findings and then stops. Nothing records whether a
@@ -23,16 +28,16 @@ custom rules of its own.
 
 ## Amendments From the Previous Version
 
-| Previous plan                                                    | Now                                                                                 |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Only merged PRs, `--since 6m`                                    | Every PR (open, merged, abandoned) updated in the last **12 months** by default     |
-| Produces `signal.json` that re-weights findings in the engine    | **Removed.** Display only; learning is a later, separately approved plan            |
-| Depends on new `listMergedPRs` / `getReviewThreads` methods      | Reuse the existing `PullRequestLister.listPullRequests` and extend thread reads     |
-| Per-PR state in `{tempPath}/outcomes/{pr}.json` (many files)     | One results file with a per-PR cache key, plus a schema version                     |
-| Markdown report is the main output                               | CLI table + JSON by default, plus a dashboard page                                  |
-| Shares a pipeline with the repo-intelligence plan                | Standalone. That plan can adopt this cache later                                    |
+| Previous plan                                                        | Now                                                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Only merged PRs, `--since 6m`                                        | Every PR (open, merged, abandoned) updated in the last **12 months** by default    |
+| Produces `signal.json` that re-weights findings in the engine        | **Removed.** Display only; learning is a later, separately approved plan           |
+| Depends on new `listMergedPRs` / `getReviewThreads` methods          | Reuse the existing `PullRequestLister.listPullRequests` and extend thread reads    |
+| Per-PR state in `{tempPath}/outcomes/{pr}.json` (many files)         | One results file with a per-PR cache key, plus a schema version                    |
+| Markdown report is the main output                                   | CLI table + JSON by default, plus a dashboard page                                 |
+| Shares a pipeline with the repo-intelligence plan                    | Standalone. That plan can adopt this cache later                                   |
 | `fixed` vs `dismissed` decided by diffing the file at the review SHA | Simpler heuristic first (see Outcome Model); full diff analysis stays an open item |
-| Paths like `src/review/...`                                      | Corrected to `libs/*` and `apps/*`                                                  |
+| Paths like `src/review/...`                                          | Corrected to `libs/*` and `apps/*`                                                 |
 
 ---
 
@@ -75,12 +80,12 @@ For each PR in the window:
 
 ### Outcome model
 
-| Outcome        | Definition                                                                          |
-| -------------- | ----------------------------------------------------------------------------------- |
-| `resolved`     | Thread resolved                                                                     |
-| `open-merged`  | PR merged with the thread still open                                                |
-| `open-closed`  | PR abandoned/closed unmerged with the thread open                                   |
-| `open`         | PR still open, thread unresolved (no outcome yet)                                   |
+| Outcome       | Definition                                        |
+| ------------- | ------------------------------------------------- |
+| `resolved`    | Thread resolved                                   |
+| `open-merged` | PR merged with the thread still open              |
+| `open-closed` | PR abandoned/closed unmerged with the thread open |
+| `open`        | PR still open, thread unresolved (no outcome yet) |
 
 `resolved` is deliberately **not** split into "fixed" vs "dismissed" in the first
 version. Telling them apart needs a diff of the flagged lines between the review
@@ -126,14 +131,14 @@ merge-mentor outcomes --json
 
 ### Options
 
-| Option                              | Description                                                   | Default           |
-| ----------------------------------- | ------------------------------------------------------------- | ----------------- |
-| `--since <date\|Nm\|Ny>`            | Window start: a date, or relative (`6m`, `12m`, `1y`)         | `12m`             |
-| `--limit <n>`                       | Maximum PRs to scan (warn when reached, as `stats` does)      | `1000`            |
-| `--pr <n>`                          | Score one PR (always rescans it)                              | -                 |
-| `--refresh`                         | Ignore cached entries and rescan                              | `false`           |
-| `--json`                            | Print the aggregate as JSON                                   | `false`           |
-| `--temp-path`, `--platform`, `--github-*`, `--azure-*` | Same as `stats`                            | same as `stats`   |
+| Option                                                 | Description                                              | Default         |
+| ------------------------------------------------------ | -------------------------------------------------------- | --------------- |
+| `--since <date\|Nm\|Ny>`                               | Window start: a date, or relative (`6m`, `12m`, `1y`)    | `12m`           |
+| `--limit <n>`                                          | Maximum PRs to scan (warn when reached, as `stats` does) | `1000`          |
+| `--pr <n>`                                             | Score one PR (always rescans it)                         | -               |
+| `--refresh`                                            | Ignore cached entries and rescan                         | `false`         |
+| `--json`                                               | Print the aggregate as JSON                              | `false`         |
+| `--temp-path`, `--platform`, `--github-*`, `--azure-*` | Same as `stats`                                          | same as `stats` |
 
 The command is **read-only against the platform**: it never posts, replies, or
 resolves. Unlike `review`, it does not need `--write` because there is nothing
@@ -218,14 +223,14 @@ New route `apps/web/src/routes/outcomes.tsx` with a server function in
 
 ## Internals
 
-| Location                                              | Responsibility                                                            |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| `libs/core/src/review/outcomes/scanner.ts`            | List PRs, apply cache rules, fetch comments with bounded concurrency      |
+| Location                                              | Responsibility                                                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| `libs/core/src/review/outcomes/scanner.ts`            | List PRs, apply cache rules, fetch comments with bounded concurrency       |
 | `libs/core/src/review/outcomes/classifier.ts`         | Comment + PR state to outcome; parse category (marker) and severity (body) |
-| `libs/core/src/review/outcomes/aggregate.ts`          | Totals, resolution rate, category/severity/month breakdowns               |
-| `libs/core/src/review/outcomes/cache.ts`              | Read/write/validate `outcomes.json` (version, repo scope, atomic write)   |
-| `apps/cli/src/commands/outcomes.ts`                   | Commander command, option parsing, console rendering                      |
-| `apps/web/src/routes/outcomes.tsx` + server functions | Dashboard page                                                            |
+| `libs/core/src/review/outcomes/aggregate.ts`          | Totals, resolution rate, category/severity/month breakdowns                |
+| `libs/core/src/review/outcomes/cache.ts`              | Read/write/validate `outcomes.json` (version, repo scope, atomic write)    |
+| `apps/cli/src/commands/outcomes.ts`                   | Commander command, option parsing, console rendering                       |
+| `apps/web/src/routes/outcomes.tsx` + server functions | Dashboard page                                                             |
 
 Reuse `collectLiveReviewStats`'s listing and concurrency approach rather than
 writing a second PR crawler; consider extracting the shared part.

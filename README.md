@@ -83,6 +83,7 @@ Merge Mentor offers subcommands that span requirements, planning, and pull reque
 - **[doctor](./docs/doctor.md)**: Troubleshoots and checks AI provider CLI installations and configuration.
 - **[repos](./docs/repos.md)**: Manages local cloned repositories used for context loading.
 - **[stats](./docs/stats.md)**: Reports how many PRs Merge Mentor has reviewed and how many comments it has posted, queried live from your repository.
+- **[outcomes](./docs/outcomes.md)**: Shows what became of the review threads Merge Mentor started over the last 12 months (resolved or left open), read-only, with results saved as a JSON cache.
 - **[ui](./docs/ui.md)**: Launches the local web dashboard for interactive use.
 
 For full configuration settings and options, refer to the **[Configuration Guide](./docs/configuration.md)**.

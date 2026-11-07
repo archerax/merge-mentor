@@ -147,6 +147,10 @@ export interface PullRequestSummary {
   readonly state: "open" | "closed";
   /** ISO timestamp of the PR's last update, or its creation when the platform has no update time. */
   readonly updatedAt: string;
+  /** Whether a closed PR was merged (completed on Azure DevOps) rather than abandoned. */
+  readonly merged?: boolean;
+  /** ISO timestamp of when the PR was merged or closed, when it has been. */
+  readonly closedAt?: string;
 }
 
 /** Options for {@link PullRequestLister.listPullRequests}. */
@@ -171,6 +175,34 @@ export interface PullRequestLister {
    * @param options - Optional lower bound on PR activity and the maximum number to return
    */
   listPullRequests(options: ListPullRequestsOptions): Promise<PullRequestSummary[]>;
+}
+
+/** The state of one inline review thread that Merge Mentor started. */
+export interface BotThreadState {
+  /** File path the thread is attached to. */
+  readonly path: string;
+  /** Line number the thread is attached to, when known. */
+  readonly line?: number;
+  /** Text of the thread's first (bot) comment. */
+  readonly body: string;
+  /** Whether the thread has been resolved. */
+  readonly isResolved: boolean;
+  /** ISO timestamp of when the bot comment was created, when known. */
+  readonly createdAt?: string;
+}
+
+/**
+ * Optional capability of remote platform adapters: reading whether the review
+ * threads Merge Mentor started were resolved. Kept separate from
+ * {@link PlatformAdapter} because it is only needed for outcome statistics.
+ */
+export interface BotThreadReader {
+  /**
+   * Lists the inline review threads on a PR that were started by Merge Mentor.
+   * General (PR-level) comments have no resolution state and are not included.
+   * @param prNumber - The PR number
+   */
+  getBotThreadStates(prNumber: number): Promise<BotThreadState[]>;
 }
 
 /** An existing bot comment on a PR. */

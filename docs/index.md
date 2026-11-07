@@ -59,6 +59,7 @@ Merge Mentor provides several subcommands to review, fix, and manage your develo
 - **[plan](./plan.md)**: Generates a phased implementation plan for an Azure DevOps work item, grounded in the local repository.
 - **[eval](./eval.md)**: Runs the Golden-PR evaluation harness against a test corpus.
 - **[stats](./stats.md)**: Reports how many PRs Merge Mentor has reviewed and how many comments it has posted, queried live from your repository.
+- **[outcomes](./outcomes.md)**: Shows what became of the review threads Merge Mentor started over the last 12 months (resolved or left open), read-only, with results saved as a JSON cache.
 - **[ui](./ui.md)**: Launches the local web dashboard for interactive reviews.
 
 ---

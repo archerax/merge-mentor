@@ -13,6 +13,14 @@ import { displayDescribeResults, executeDescribe } from "./commands/describe.js"
 import { executeDoctorCommand } from "./commands/doctor.js";
 import { executeEval } from "./commands/eval.js";
 import { executeFixCommand } from "./commands/fix.js";
+import {
+  DEFAULT_OUTCOMES_PR_LIMIT,
+  DEFAULT_OUTCOMES_WINDOW,
+  executeOutcomesCommand,
+  parseOutcomesSince,
+  parsePrNumber,
+  type OutcomesOptions,
+} from "./commands/outcomes.js";
 import { executePBIReview } from "./commands/pbi.js";
 import { executePlan } from "./commands/plan.js";
 import { executePrdReview } from "./commands/prd.js";
@@ -628,6 +636,50 @@ program
   .action(async (options: StatsOptions) => {
     try {
       await executeStatsCommand(options);
+      process.exit(0);
+    } catch (error) {
+      consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// Review outcome statistics command
+program
+  .command("outcomes")
+  .description(
+    "Show what became of the review threads Merge Mentor started over the last 12 months (read-only)"
+  )
+  .optionsGroup("General Options")
+  .option(
+    "--since <date|Nd|Nm|Ny>",
+    `Only scan PRs active since a date (2026-01-31) or window (30d, 6m, 1y). Default: ${DEFAULT_OUTCOMES_WINDOW}`,
+    (value: string) => parseOutcomesSince(value)
+  )
+  .option(
+    "--limit <number>",
+    `Maximum number of PRs to scan (default: ${DEFAULT_OUTCOMES_PR_LIMIT})`,
+    parseLimit
+  )
+  .option("--pr <number>", "Scan a single PR (it must be inside the window)", parsePrNumber)
+  .option("--refresh", "Ignore previously saved results and rescan every PR", false)
+  .option("--json", "Output statistics as JSON", false)
+  .option("--platform <platform>", "Platform (github or azure). Env: MM_PLATFORM")
+  .option(
+    "--temp-path <path>",
+    "Base path for temporary files (cache, diffs, logs, repos, etc.). Env: MM_TEMP_PATH"
+  )
+  .optionsGroup("GitHub Configuration")
+  .option("--github-token <token>", "GitHub personal access token. Env: MM_GITHUB_TOKEN")
+  .option("--github-repo-owner <owner>", "GitHub repository owner. Env: MM_GITHUB_REPO_OWNER")
+  .option("--github-repo-name <name>", "GitHub repository name. Env: MM_GITHUB_REPO_NAME")
+  .optionsGroup("Azure DevOps Configuration")
+  .option("--azure-token <token>", "Azure DevOps personal access token. Env: MM_AZURE_TOKEN")
+  .option("--azure-org <org>", "Azure DevOps organization. Env: MM_AZURE_ORG")
+  .option("--azure-project <project>", "Azure DevOps project. Env: MM_AZURE_PROJECT")
+  .option("--azure-repo <repo>", "Azure DevOps repository. Env: MM_AZURE_REPO")
+  .action(async (options: OutcomesOptions) => {
+    try {
+      await executeOutcomesCommand(options);
       process.exit(0);
     } catch (error) {
       consoleOutputWriter.error(`\n❌ Error: ${(error as Error).message}\n`);

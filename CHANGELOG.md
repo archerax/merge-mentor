@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Outcome tracking**: `merge-mentor outcomes` scans every PR from the last 12
+  months and shows what became of the inline review threads Merge Mentor
+  started: resolved, left open on a merged or closed PR, or still in flight. It
+  gives the resolution rate and breaks the totals down by category, severity and
+  month. It is read-only and display-only; nothing it finds changes how reviews
+  are done. Results are saved to `.mergementor/outcomes/outcomes.json`, which
+  also acts as a cache so unchanged, long-closed PRs are not scanned again
+  (`--refresh` rescans everything, `--pr` checks one PR, `--json` prints JSON).
+  The web dashboard has a matching **Outcomes** page that shows the saved
+  results and can start a scan. See `docs/outcomes.md`.
 - **Easier-to-act-on PRD / FRD reports**: a report with more than a handful of
   issues now opens with **Fix these first** (the blockers, then the most
   important major issues), **Where the issues are** (a table of the weakest

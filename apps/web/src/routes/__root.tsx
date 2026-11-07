@@ -21,6 +21,7 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   IconBrandGithub,
   IconChartBar,
+  IconChecklist,
   IconFileDescription,
   IconFileText,
   IconGitPullRequest,
@@ -56,6 +57,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "/prd", label: "PRD Review", icon: IconFileDescription },
   { to: "/reports", label: "Reports", icon: IconFileText },
   { to: "/stats", label: "Stats", icon: IconChartBar },
+  { to: "/outcomes", label: "Outcomes", icon: IconChecklist },
   { to: "/audit", label: "Audit Log", icon: IconHistory },
   { to: "/config", label: "Configuration", icon: IconSettings },
 ];

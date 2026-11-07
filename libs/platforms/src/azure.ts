@@ -2,6 +2,8 @@ import { Readable } from "node:stream";
 
 import type { Config } from "@merge-mentor/config/config.js";
 import type {
+  BotThreadReader,
+  BotThreadState,
   ExistingComment,
   ListPullRequestsOptions,
   FileStatus,
@@ -54,6 +56,7 @@ const AzureThreadStatus = {
 /** Azure DevOps pull request status values used in search criteria and results. */
 const AzurePullRequestStatus = {
   ACTIVE: 1,
+  COMPLETED: 3,
   ALL: 4,
 } as const;
 
@@ -68,7 +71,7 @@ const AzureCommentType = {
 /**
  * Platform adapter for Azure DevOps pull requests.
  */
-export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
+export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister, BotThreadReader {
   private readonly connection: azdev.WebApi;
   private readonly project: string;
   private readonly repoName: string;
@@ -717,6 +720,37 @@ export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
   }
 
   /**
+   * Lists the inline comment threads Merge Mentor started, with their resolved state.
+   * Threads that are not attached to a file (such as the review summary) are skipped.
+   * @param prNumber - The PR number
+   * @returns One entry per bot-started inline thread
+   */
+  async getBotThreadStates(prNumber: number): Promise<BotThreadState[]> {
+    const gitApi = await withRateLimitHandling(() => this.connection.getGitApi());
+    const threads = await withRateLimitHandling(() =>
+      gitApi.getThreads(this.repoName, prNumber, this.project)
+    );
+
+    const states: BotThreadState[] = [];
+    for (const thread of threads || []) {
+      const first = thread.comments?.[0];
+      const path = thread.threadContext?.filePath;
+      if (!path || !first?.content?.includes(this.botIdentifier)) continue;
+      const line = thread.threadContext?.rightFileStart?.line;
+      const created = first.publishedDate ?? thread.publishedDate;
+      states.push({
+        path,
+        ...(line === undefined ? {} : { line }),
+        body: first.content,
+        isResolved:
+          thread.status !== AzureThreadStatus.ACTIVE && thread.status !== AzureThreadStatus.PENDING,
+        ...(created ? { createdAt: new Date(created).toISOString() } : {}),
+      });
+    }
+    return states;
+  }
+
+  /**
    * Lists pull requests (active, completed, and abandoned), newest first.
    *
    * Azure DevOps can only filter by creation or closing time, so `since` bounds
@@ -757,6 +791,8 @@ export class AzureDevOpsAdapter implements PlatformAdapter, PullRequestLister {
                   : ("closed" as const),
               // Azure has no update time, so this is the creation date (see PullRequestSummary).
               updatedAt: (pr.creationDate ?? new Date(0)).toISOString(),
+              merged: pr.status === AzurePullRequestStatus.COMPLETED,
+              ...(pr.closedDate ? { closedAt: new Date(pr.closedDate).toISOString() } : {}),
             },
           ]
     );

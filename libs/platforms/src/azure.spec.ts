@@ -687,12 +687,15 @@ describe("AzureDevOpsAdapter", () => {
           title: "Active one",
           state: "open",
           updatedAt: new Date("2026-03-05").toISOString(),
+          merged: false,
         },
         {
           number: 4,
           title: "Done",
           state: "closed",
           updatedAt: new Date("2026-03-01").toISOString(),
+          merged: true,
+          closedAt: new Date("2026-03-04").toISOString(),
         },
       ]);
       expect(mockGitApiInstance.getPullRequests).toHaveBeenCalledWith(
@@ -722,6 +725,58 @@ describe("AzureDevOpsAdapter", () => {
       });
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("getBotThreadStates", () => {
+    it("returns inline bot threads with their resolved state and skips everything else", async () => {
+      mockGitApiInstance.getThreads.mockResolvedValue([
+        {
+          id: 1,
+          comments: [
+            { content: "<!-- merge-mentor -->\nOpen", publishedDate: new Date("2026-03-01") },
+          ],
+          threadContext: { filePath: "/src/a.ts", rightFileStart: { line: 10 } },
+          status: 1,
+        },
+        {
+          id: 2,
+          comments: [{ content: "<!-- merge-mentor -->\nFixed" }],
+          publishedDate: new Date("2026-03-02"),
+          threadContext: { filePath: "/src/b.ts" },
+          status: 2,
+        },
+        { id: 3, comments: [{ content: "<!-- merge-mentor -->\nSummary" }], status: 1 },
+        {
+          id: 4,
+          comments: [{ content: "human comment" }],
+          threadContext: { filePath: "/src/c.ts" },
+          status: 1,
+        },
+      ]);
+
+      const result = await new AzureDevOpsAdapter(createTestConfig()).getBotThreadStates(7);
+
+      expect(result).toEqual([
+        {
+          path: "/src/a.ts",
+          line: 10,
+          body: "<!-- merge-mentor -->\nOpen",
+          isResolved: false,
+          createdAt: new Date("2026-03-01").toISOString(),
+        },
+        {
+          path: "/src/b.ts",
+          body: "<!-- merge-mentor -->\nFixed",
+          isResolved: true,
+          createdAt: new Date("2026-03-02").toISOString(),
+        },
+      ]);
+    });
+
+    it("returns nothing when the PR has no threads", async () => {
+      mockGitApiInstance.getThreads.mockResolvedValue(null);
+      expect(await new AzureDevOpsAdapter(createTestConfig()).getBotThreadStates(7)).toEqual([]);
     });
   });
 

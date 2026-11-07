@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as ConfigRouteImport } from './routes/config'
+import { Route as OutcomesRouteImport } from './routes/outcomes'
 import { Route as PbiRouteImport } from './routes/pbi'
 import { Route as PrdRouteImport } from './routes/prd'
 import { Route as ProjectRouteImport } from './routes/project'
@@ -40,6 +41,11 @@ const AuditRoute = AuditRouteImport.update({
 const ConfigRoute = ConfigRouteImport.update({
   id: '/config',
   path: '/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OutcomesRoute = OutcomesRouteImport.update({
+  id: '/outcomes',
+  path: '/outcomes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PbiRoute = PbiRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
+  '/outcomes': typeof OutcomesRoute
   '/pbi': typeof PbiRoute
   '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
+  '/outcomes': typeof OutcomesRoute
   '/pbi': typeof PbiRoute
   '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/config': typeof ConfigRoute
+  '/outcomes': typeof OutcomesRoute
   '/pbi': typeof PbiRoute
   '/prd': typeof PrdRoute
   '/project': typeof ProjectRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/config'
+    | '/outcomes'
     | '/pbi'
     | '/prd'
     | '/project'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/config'
+    | '/outcomes'
     | '/pbi'
     | '/prd'
     | '/project'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/config'
+    | '/outcomes'
     | '/pbi'
     | '/prd'
     | '/project'
@@ -235,6 +247,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
   ConfigRoute: typeof ConfigRoute
+  OutcomesRoute: typeof OutcomesRoute
   PbiRoute: typeof PbiRoute
   PrdRoute: typeof PrdRoute
   ProjectRoute: typeof ProjectRoute
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof ConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/outcomes': {
+      id: '/outcomes'
+      path: '/outcomes'
+      fullPath: '/outcomes'
+      preLoaderRoute: typeof OutcomesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pbi': {
@@ -379,6 +399,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
   ConfigRoute: ConfigRoute,
+  OutcomesRoute: OutcomesRoute,
   PbiRoute: PbiRoute,
   PrdRoute: PrdRoute,
   ProjectRoute: ProjectRoute,
@@ -397,3 +418,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

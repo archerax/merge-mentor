@@ -39,6 +39,26 @@ vi.mock("@octokit/rest", () => ({
   },
 }));
 
+const botThreadNode = (
+  over: Record<string, unknown>,
+  author = "merge-mentor[bot]",
+  body = "<!-- merge-mentor -->\nx"
+) => ({
+  isResolved: false,
+  path: "src/a.ts",
+  line: 4,
+  originalLine: 3,
+  comments: { nodes: [{ createdAt: "2026-03-01T00:00:00Z", body, author: { login: author } }] },
+  ...over,
+});
+const botThreadPage = (nodes: unknown[], endCursor: string | null = null) => ({
+  repository: {
+    pullRequest: {
+      reviewThreads: { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes },
+    },
+  },
+});
+
 function graphqlThreads(nodes: unknown[]) {
   return { repository: { pullRequest: { reviewThreads: { nodes } } } };
 }
@@ -278,8 +298,20 @@ describe("GitHubAdapter", () => {
       const result = await new GitHubAdapter(createTestConfig()).listPullRequests({ limit: 10 });
 
       expect(result).toEqual([
-        { number: 2, title: "PR 2", state: "open", updatedAt: "2026-03-02T00:00:00Z" },
-        { number: 1, title: "PR 1", state: "closed", updatedAt: "2026-03-01T00:00:00Z" },
+        {
+          number: 2,
+          title: "PR 2",
+          state: "open",
+          updatedAt: "2026-03-02T00:00:00Z",
+          merged: false,
+        },
+        {
+          number: 1,
+          title: "PR 1",
+          state: "closed",
+          updatedAt: "2026-03-01T00:00:00Z",
+          merged: false,
+        },
       ]);
       expect(list).toHaveBeenCalledWith(
         expect.objectContaining({ state: "all", sort: "updated", direction: "desc", page: 1 })
@@ -344,6 +376,60 @@ describe("GitHubAdapter", () => {
 
       expect(result).toEqual([]);
       expect(list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getBotThreadStates", () => {
+    it("returns bot-started threads with resolution, ignoring other authors and unmarked comments", async () => {
+      mockOctokitInstance.graphql.mockResolvedValueOnce(
+        botThreadPage([
+          botThreadNode({ isResolved: true }),
+          botThreadNode({ line: null }, "merge-mentor[bot]"),
+          botThreadNode({}, "someone"),
+          botThreadNode({}, "merge-mentor[bot]", "no marker"),
+          botThreadNode({ path: undefined }),
+        ])
+      );
+
+      const result = await new GitHubAdapter(createTestConfig()).getBotThreadStates(9);
+
+      expect(result).toEqual([
+        {
+          path: "src/a.ts",
+          line: 4,
+          body: "<!-- merge-mentor -->\nx",
+          isResolved: true,
+          createdAt: "2026-03-01T00:00:00Z",
+        },
+        {
+          path: "src/a.ts",
+          line: 3,
+          body: "<!-- merge-mentor -->\nx",
+          isResolved: false,
+          createdAt: "2026-03-01T00:00:00Z",
+        },
+      ]);
+    });
+
+    it("follows pagination cursors", async () => {
+      mockOctokitInstance.graphql
+        .mockResolvedValueOnce(botThreadPage([botThreadNode({ path: "a.ts" })], "CURSOR"))
+        .mockResolvedValueOnce(botThreadPage([botThreadNode({ path: "b.ts" })]));
+
+      const result = await new GitHubAdapter(createTestConfig()).getBotThreadStates(9);
+
+      expect(result.map((t) => t.path)).toEqual(["a.ts", "b.ts"]);
+      expect(mockOctokitInstance.graphql).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ cursor: "CURSOR" })
+      );
+    });
+
+    it("propagates API failures so the scan can report the PR as unreadable", async () => {
+      mockOctokitInstance.graphql.mockRejectedValueOnce(new Error("rate limited"));
+      await expect(new GitHubAdapter(createTestConfig()).getBotThreadStates(9)).rejects.toThrow(
+        /rate limited/
+      );
     });
   });
 

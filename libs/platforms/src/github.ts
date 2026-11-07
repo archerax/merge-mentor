@@ -1,5 +1,7 @@
 import type { Config } from "@merge-mentor/config/config.js";
 import type {
+  BotThreadReader,
+  BotThreadState,
   ExistingComment,
   ListPullRequestsOptions,
   FileStatus,
@@ -35,7 +37,7 @@ const TRUSTED_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
 /**
  * Platform adapter for GitHub pull requests.
  */
-export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
+export class GitHubAdapter implements PlatformAdapter, PullRequestLister, BotThreadReader {
   private readonly octokit: Octokit;
   private readonly owner: string;
   private readonly repo: string;
@@ -283,6 +285,101 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
   }
 
   /**
+   * Lists the inline review threads Merge Mentor started, with their resolved state.
+   * Uses GraphQL because the REST API does not expose thread resolution.
+   * @param prNumber - The PR number
+   * @returns One entry per bot-started review thread
+   */
+  async getBotThreadStates(prNumber: number): Promise<BotThreadState[]> {
+    const query = `
+      query BotThreads($owner: String!, $repo: String!, $pr: Int!, $cursor: String) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $pr) {
+            reviewThreads(first: 100, after: $cursor) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                isResolved
+                path
+                line
+                originalLine
+                comments(first: 1) {
+                  nodes {
+                    createdAt
+                    body
+                    author {
+                      login
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    interface ThreadsResponse {
+      repository?: {
+        pullRequest?: {
+          reviewThreads?: {
+            pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+            nodes?: Array<{
+              isResolved: boolean;
+              path?: string;
+              line?: number | null;
+              originalLine?: number | null;
+              comments?: {
+                nodes?: Array<{
+                  createdAt?: string;
+                  body?: string;
+                  author?: { login?: string } | null;
+                }>;
+              };
+            }>;
+          };
+        };
+      };
+    }
+
+    const botLogin = await this.resolveBotLogin();
+    const states: BotThreadState[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const after: string | null = cursor;
+      const response = (await withRateLimitHandling(() =>
+        this.octokit.graphql(query, {
+          owner: this.owner,
+          repo: this.repo,
+          pr: prNumber,
+          cursor: after,
+        })
+      )) as ThreadsResponse;
+
+      const threads = response?.repository?.pullRequest?.reviewThreads;
+      for (const thread of threads?.nodes ?? []) {
+        const first = thread.comments?.nodes?.[0];
+        if (!thread.path || !first) continue;
+        if (!this.isOwnBotComment(first.body, first.author?.login, botLogin)) continue;
+        const line = thread.line ?? thread.originalLine ?? undefined;
+        states.push({
+          path: thread.path,
+          ...(line === undefined ? {} : { line }),
+          body: first.body ?? "",
+          isResolved: thread.isResolved,
+          ...(first.createdAt ? { createdAt: first.createdAt } : {}),
+        });
+      }
+      cursor = threads?.pageInfo?.hasNextPage ? (threads.pageInfo.endCursor ?? null) : null;
+    } while (cursor);
+
+    return states;
+  }
+
+  /**
    * Lists pull requests (open and closed), most recently updated first.
    * @param options - Lower bound on last update and maximum number of PRs
    * @returns PR summaries, stopping once PRs older than `since` are reached
@@ -316,6 +413,8 @@ export class GitHubAdapter implements PlatformAdapter, PullRequestLister {
           title: pr.title,
           state: pr.state === "open" ? "open" : "closed",
           updatedAt: pr.updated_at,
+          merged: pr.merged_at != null,
+          ...(pr.closed_at ? { closedAt: pr.closed_at } : {}),
         });
         if (pulls.length >= options.limit) return pulls;
       }
