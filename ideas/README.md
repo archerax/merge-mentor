@@ -16,3 +16,4 @@ custom rules. It respects the repository's `AGENTS.md` instead.
 | [outcome-tracking-plan.md](./outcome-tracking-plan.md)                                       | Proposed (revised)     | Display-only: 12-month scan, JSON cache, CLI + dashboard. No learning yet          |
 | [repo-intelligence-and-team-coaching-plan.md](./repo-intelligence-and-team-coaching-plan.md) | Proposed (earlier)     | Generated `AGENTS.md` rules conflict with the decision above; see note in the plan |
 | [dashboard-review-history-plan.md](./dashboard-review-history-plan.md)                       | Proposed               | Depends on outcome tracking                                                        |
+| [web-ui-state-management-plan.md](./web-ui-state-management-plan.md)                         | Proposed               | Adds TanStack Query for server data; extends Zustand for persisted UI state        |
