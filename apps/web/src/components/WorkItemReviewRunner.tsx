@@ -27,6 +27,7 @@ import { ProgressTimeline } from "./review/ProgressTimeline.js";
 import { SEVERITY_COLORS, SeveritySummary } from "./review/SeveritySummary.js";
 import { TechnicalLog } from "./review/TechnicalLog.js";
 import { useReviewStream } from "./review/useReviewStream.js";
+import { RunErrorAlert } from "./RunErrorAlert.js";
 
 const DIMENSION_LABELS: Record<string, string> = {
   completeness: "Completeness",
@@ -163,9 +164,7 @@ export function WorkItemReviewRunner<TSummary extends PostableSummary>({
       </Card>
 
       {(error ?? formError) && (
-        <Alert title="Review failed" color="red">
-          {error ?? formError}
-        </Alert>
+        <RunErrorAlert title="Review failed" message={(error ?? formError) as string} />
       )}
 
       {runInputError && (

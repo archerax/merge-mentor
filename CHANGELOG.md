@@ -95,6 +95,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data loads. When a page throws while loading, every route now shows the same
   error message with a **Try again** button that reloads its data; pages that
   explain their own failures (Outcomes) keep their inline message.
+- **Web dashboard home page**: the headline and introduction now cover
+  requirements documents and project plans as well as pull requests, and the
+  home page has cards for **Stats** and **Outcomes**.
+- **Web dashboard run errors**: a failed review now scrolls into view instead of
+  appearing below the fold, and an error caused by a missing setting links to
+  the **Configuration** page, on the PR, PBI, project and PRD review pages.
 
 ## [4.4.0] - 2026-11-06
 
