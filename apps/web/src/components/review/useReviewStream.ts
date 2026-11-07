@@ -1,6 +1,8 @@
 import type { ReviewPhaseId, ReviewProgressEvent } from "@merge-mentor/core/review/progress.js";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { runInputOf, runQuery } from "../../queries/reviewRuns.js";
 import type { ReviewStreamEvent, ReviewSummary } from "../../server/review.types.js";
 
 /** High-level lifecycle of a streamed review run. */
@@ -49,6 +51,12 @@ export interface UseReviewStreamOptions {
   readonly runId?: string;
   /** Called with the new run id so the caller can persist it in the URL. */
   readonly onRunCreated?: (runId: string) => void;
+}
+
+/** A run started by this hook, and the input it was started with. */
+interface StartedRun {
+  readonly runId: string | null;
+  readonly input: unknown;
 }
 
 /** Full observable state of a streamed review run. */
@@ -234,7 +242,8 @@ export function useReviewStream<TResult = ReviewSummary>(
   const [error, setError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [runInput, setRunInput] = useState<unknown | null>(null);
+  // Input of a run started here; `runId` is filled in once the server creates it.
+  const [startedRun, setStartedRun] = useState<StartedRun | null>(null);
 
   const nextEntryId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -428,28 +437,23 @@ export function useReviewStream<TResult = ReviewSummary>(
     [endpoint, readStream, resetState]
   );
 
-  /** Recovers the original input from a run manifest, for post-comments on resume. */
-  const recoverInput = useCallback(async (id: string): Promise<void> => {
-    try {
-      const response = await fetch(`/api/review/runs/${encodeURIComponent(id)}`);
-      if (!response.ok) return;
-      const snapshot = (await response.json()) as { manifest?: { input?: unknown } };
-      setRunInput(snapshot.manifest?.input ?? null);
-    } catch {
-      // Resume still works without the input; only post-comments need it.
-    }
-  }, []);
+  // A run started here already knows its input; any other run (one resumed from
+  // the URL) recovers it from the run's manifest, for post-comments on resume.
+  const startedHere =
+    startedRun !== null && (startedRun.runId === null || startedRun.runId === runId);
+  const lookup = useQuery({
+    ...runQuery(runId ?? ""),
+    enabled: runId !== undefined && runId !== "" && !startedHere,
+  });
+  const runInput = startedHere ? startedRun.input : runInputOf(lookup.data);
 
   // Resume on mount when the URL carries a run id.
   useEffect(() => {
     if (!runId || attachedRunRef.current === runId) return;
-    void (async () => {
-      await recoverInput(runId);
-      await attach(runId, { reset: true });
-    })().catch(() => {
+    attach(runId, { reset: true }).catch(() => {
       // `attach` reports its own failures through state; nothing to surface here.
     });
-  }, [runId, recoverInput, attach]);
+  }, [runId, attach]);
 
   const run = useCallback(
     async (input: unknown, request?: ReviewRunRequest) => {
@@ -457,7 +461,7 @@ export function useReviewStream<TResult = ReviewSummary>(
       const controller = new AbortController();
       abortRef.current = controller;
 
-      setRunInput(input);
+      setStartedRun({ runId: null, input });
       resetState();
       setStatus("running");
 
@@ -485,6 +489,7 @@ export function useReviewStream<TResult = ReviewSummary>(
           throw new Error("Review request did not return a run id.");
         }
 
+        setStartedRun({ runId: data.runId, input });
         onRunCreatedRef.current?.(data.runId);
         await attach(data.runId, { reset: false });
       } catch (caught) {

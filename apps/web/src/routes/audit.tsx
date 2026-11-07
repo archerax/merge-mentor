@@ -1,17 +1,18 @@
 import { Alert, Code, Stack } from "@mantine/core";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AuditLogTable } from "../components/AuditLogTable.js";
 import { PageHeader } from "../components/PageHeader.js";
-import { getAuditEvents } from "../server/audit.functions.js";
+import { auditQuery } from "../queries/audit.js";
 
 export const Route = createFileRoute("/audit")({
-  loader: () => getAuditEvents(),
+  loader: ({ context }) => context.queryClient.ensureQueryData(auditQuery),
   component: AuditLogPage,
 });
 
 function AuditLogPage() {
-  const entries = Route.useLoaderData();
+  const { data: entries } = useSuspenseQuery(auditQuery);
 
   return (
     <Stack gap="lg">

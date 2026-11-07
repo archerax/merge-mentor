@@ -1,9 +1,8 @@
-import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrdReviewSummary } from "../server/prd.types.js";
+import { renderWithQuery } from "../test/renderWithQuery.test-helper.js";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...rest }: { children?: ReactNode }) => <a {...rest}>{children}</a>,
@@ -12,7 +11,7 @@ vi.mock("@tanstack/react-router", () => ({
 const { PrdBreakdownPanel } = await import("./PrdBreakdownPanel.js");
 
 function renderHtml(ui: ReactNode): string {
-  return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
+  return renderWithQuery(ui).html;
 }
 
 function review(verdict: "ready" | "needs-work" | "not-ready"): PrdReviewSummary {

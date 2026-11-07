@@ -61,6 +61,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (every 2 seconds, and not while the browser tab is in the background), instead
   of reloading the whole page's data. A scan that cannot be started now shows an
   error instead of failing silently.
+- **Web UI Configuration page**: saving now refreshes the data on the other
+  pages (stats, outcomes, the AI status) as well, so they reflect the new
+  settings the next time you look at them. A save that cannot reach the server
+  now shows an error instead of failing silently; the saved and invalid-value
+  messages are unchanged.
+- **Web UI Audit Log, Configuration and Stats pages**: the Audit Log and
+  Configuration pages reuse data loaded less than 30 seconds ago (including
+  data loaded when you hover a link) instead of requesting it again, and all
+  three pages refresh their data when you come back to the browser tab.
+- **Web UI review runs**: opening a review run from its link starts showing its
+  progress straight away instead of first waiting for the run's details, which
+  are only needed to post comments.
 
 ## [4.4.0] - 2026-11-06
 

@@ -1,10 +1,9 @@
-import { MantineProvider } from "@mantine/core";
 import type { PrdReviewReport } from "@merge-mentor/core/review/prd/prdReport.js";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrdReviewSummary } from "../server/prd.types.js";
+import { renderWithQuery } from "../test/renderWithQuery.test-helper.js";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -27,7 +26,7 @@ const { checkPickedFile, formatFileSize, PrdReviewResult, PrdReviewRunner } =
   await import("./PrdReviewRunner.js");
 
 function renderHtml(ui: ReactNode): string {
-  return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
+  return renderWithQuery(ui).html;
 }
 
 function buildSummary(overrides: Partial<PrdReviewReport> = {}): PrdReviewSummary {

@@ -1,17 +1,18 @@
 import { Alert, Code, Stack } from "@mantine/core";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ConfigViewer } from "../components/ConfigViewer.js";
 import { PageHeader } from "../components/PageHeader.js";
-import { getConfig } from "../server/config.functions.js";
+import { configQuery } from "../queries/config.js";
 
 export const Route = createFileRoute("/config")({
-  loader: () => getConfig(),
+  loader: ({ context }) => context.queryClient.ensureQueryData(configQuery),
   component: ConfigPage,
 });
 
 function ConfigPage() {
-  const view = Route.useLoaderData();
+  const { data: view } = useSuspenseQuery(configQuery);
 
   return (
     <Stack gap="lg">

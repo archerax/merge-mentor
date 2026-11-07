@@ -8,10 +8,12 @@ import {
   Table,
   Text,
 } from "@mantine/core";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { PageHeader } from "../components/PageHeader.js";
-import { getLiveStats } from "../server/stats.functions.js";
+import { statsQuery } from "../queries/stats.js";
+import type { LiveStatsResult } from "../server/stats.functions.js";
 
 const WINDOWS = [7, 30, 90] as const;
 const DEFAULT_DAYS = 30;
@@ -21,9 +23,7 @@ export const Route = createFileRoute("/stats")({
     days: WINDOWS.find((days) => days === Number(search.days)) ?? DEFAULT_DAYS,
   }),
   loaderDeps: ({ search }) => ({ days: search.days }),
-  staleTime: 60_000,
-  preloadStaleTime: 60_000,
-  loader: ({ deps }) => getLiveStats({ data: { days: deps.days } }),
+  loader: ({ deps, context }) => context.queryClient.ensureQueryData(statsQuery(deps.days)),
   component: StatsPage,
 });
 
@@ -46,8 +46,8 @@ function StatTile({ label, value, hint }: { label: string; value: number; hint?:
 }
 
 function StatsPage() {
-  const result = Route.useLoaderData();
   const { days } = Route.useSearch();
+  const { data: result } = useSuspenseQuery(statsQuery(days));
   const navigate = useNavigate({ from: "/stats" });
 
   return (
@@ -85,7 +85,7 @@ function LiveStats({
   stats,
   days,
 }: {
-  stats: Extract<Awaited<ReturnType<typeof getLiveStats>>, { ok: true }>["stats"];
+  stats: Extract<LiveStatsResult, { ok: true }>["stats"];
   days: number;
 }) {
   return (

@@ -1,13 +1,12 @@
-import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { PendingCommentView } from "../../server/review.types.js";
+import { renderWithQuery } from "../../test/renderWithQuery.test-helper.js";
 import { PostCommentsAction } from "./PostCommentsAction.js";
 
 function renderHtml(ui: ReactNode): string {
-  return renderToStaticMarkup(<MantineProvider>{ui}</MantineProvider>);
+  return renderWithQuery(ui).html;
 }
 
 const target = { prUrl: "https://github.com/acme/widgets/pull/7" };

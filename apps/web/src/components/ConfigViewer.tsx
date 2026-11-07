@@ -14,10 +14,10 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useRouter } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { saveConfig } from "../server/config.functions.js";
+import { saveConfigMutation } from "../queries/config.js";
 import type { ConfigFieldError, ConfigFieldView, ConfigView } from "../server/config.types.js";
 import { isFieldVisible } from "./configVisibility.js";
 
@@ -25,16 +25,19 @@ interface ConfigViewerProps {
   readonly view: ConfigView;
 }
 
-type SaveStatus = "idle" | "saving" | "saved";
-
 const ADVANCED_STORAGE_KEY = "merge-mentor:config:show-advanced";
 
+const NO_ERRORS: readonly ConfigFieldError[] = [];
+
 export function ConfigViewer({ view }: ConfigViewerProps) {
-  const router = useRouter();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [cleared, setCleared] = useState<readonly string[]>([]);
-  const [errors, setErrors] = useState<readonly ConfigFieldError[]>([]);
-  const [status, setStatus] = useState<SaveStatus>("idle");
+  const saveMutation = useMutation(saveConfigMutation);
+  const saving = saveMutation.isPending;
+  const saved = saveMutation.data?.ok === true;
+  const errors: readonly ConfigFieldError[] =
+    saveMutation.data?.ok === false ? saveMutation.data.errors : NO_ERRORS;
+  const saveError = saveMutation.error?.message ?? null;
   const [activeTab, setActiveTab] = useState<string | null>(view.sections[0]?.title ?? null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -108,8 +111,7 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
       return next;
     });
     setCleared((previous) => previous.filter((item) => item !== envVar));
-    setErrors([]);
-    setStatus("idle");
+    saveMutation.reset();
   }
 
   function toggleClear(envVar: string) {
@@ -121,37 +123,28 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
     setCleared((previous) =>
       previous.includes(envVar) ? previous.filter((item) => item !== envVar) : [...previous, envVar]
     );
-    setErrors([]);
-    setStatus("idle");
+    saveMutation.reset();
   }
 
-  async function save() {
-    setStatus("saving");
-    setErrors([]);
-
+  function save() {
     const edits = [
       ...Object.entries(draft).map(([envVar, value]) => ({ envVar, value })),
       ...cleared.map((envVar) => ({ envVar, value: "" })),
     ];
 
-    const result = await saveConfig({ data: { edits } });
-    if (!result.ok) {
-      setErrors(result.errors);
-      setStatus("idle");
-      return;
-    }
-
-    setDraft({});
-    setCleared([]);
-    setStatus("saved");
-    await router.invalidate();
+    saveMutation.mutate(edits, {
+      onSuccess: (result) => {
+        if (!result.ok) return;
+        setDraft({});
+        setCleared([]);
+      },
+    });
   }
 
   function reset() {
     setDraft({});
     setCleared([]);
-    setErrors([]);
-    setStatus("idle");
+    saveMutation.reset();
   }
 
   return (
@@ -180,7 +173,13 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
         </Alert>
       )}
 
-      {status === "saved" && (
+      {saveError !== null && (
+        <Alert title="Configuration could not be saved" color="red">
+          {saveError}
+        </Alert>
+      )}
+
+      {saved && (
         <Alert title="Configuration saved" color="green">
           Your changes were written to the project <Code>.env</Code> file.
         </Alert>
@@ -270,10 +269,10 @@ export function ConfigViewer({ view }: ConfigViewerProps) {
               : "No unsaved changes"}
           </Text>
           <Group>
-            <Button variant="default" onClick={reset} disabled={!dirty || status === "saving"}>
+            <Button variant="default" onClick={reset} disabled={!dirty || saving}>
               Discard changes
             </Button>
-            <Button onClick={save} loading={status === "saving"} disabled={!dirty}>
+            <Button onClick={save} loading={saving} disabled={!dirty}>
               Save changes
             </Button>
           </Group>
