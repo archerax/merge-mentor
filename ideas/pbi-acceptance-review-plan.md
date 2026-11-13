@@ -84,8 +84,12 @@ Traversal rules:
   (default 3) and a **visited set** keyed by `(org, workItemId)` to prevent
   cycles. The three shapes fall out of the same loop instead of being
   special-cased.
-- Include Tasks and also, optionally, Bugs under the PBI; ignore other types
-  unless configured.
+- Traverse Tasks **and Bugs** under the PBI (and any tasks reached via remote
+  links); ignore other work item types.
+- **All completed PRs reached by any path are pooled** and assessed together as
+  the delivery of the PBI. A PBI is normally split into tasks, so no single PR
+  is expected to satisfy every criterion; a criterion is judged against the
+  combined evidence from all of them.
 - Deduplicate PRs. **Only completed (merged) PRs count as delivered**, because
   the goal is to verify the PBI is done. Active, draft and abandoned PRs are
   excluded from evidence but listed in the report as "linked, not completed"
@@ -169,12 +173,12 @@ Dry run is the default, consistent with the rest of the tool. Two destinations:
 
 Each acceptance criterion gets one of two outcomes:
 
-- **Met**, with supporting evidence the reader can follow. Every Met verdict
+- **Likely met**, with supporting evidence the reader can follow. Every Met verdict
   must cite where it was seen, for example:
   _"AC2: Button text updated: PR 12334, `Button.js`, line 123."_
   Evidence is PR number (linked), file path and line, plus a one-line
-  explanation. A criterion with no citable evidence cannot be reported as Met.
-- **Unable to determine whether this has been met.** Used whenever the code
+  explanation. A criterion with no citable evidence cannot be reported as Likely met.
+- **No evidence found that this has been met.** Used whenever the code
   does not give enough certainty: no matching change found, the criterion is
   not verifiable from code (performance, UX, sign-off), or some links could not
   be followed. This is _not_ a claim that the criterion is unmet, and the
@@ -184,7 +188,7 @@ Each acceptance criterion gets one of two outcomes:
 The report header shows the PBI, the PRs considered (and how each was
 reached), PRs excluded as not completed, unresolved links, and the work item
 revision the criteria were read from. The overall status is "all criteria met"
-only when every criterion is Met; otherwise it lists how many remain
+only when every criterion is Likely met; otherwise it lists how many remain
 undetermined.
 
 ### Architecture sketch
@@ -223,25 +227,25 @@ PRs) can follow later and belongs in the platform parity plan.
 - Credentials: single-org backwards compatibility; multi-org resolution; token
   never appears in logs, caches, config viewer or error messages.
 - Engine: AC splitting for bullets, numbered lists, Given/When/Then and prose;
-  every Met verdict carries a valid citation (PR, file, line exists in the
-  diff; hallucinated citations are rejected and downgraded to "Unable to
-  determine"); "Unable to determine" when links are unresolved.
+  every Likely met verdict carries a valid citation (PR, file, line exists in the
+  diff; hallucinated citations are rejected and downgraded to "No evidence
+  found"); "No evidence found" when links are unresolved.
 - Only completed PRs are used; active/abandoned PRs are listed, not assessed.
 - Eval corpus: PBIs with known AC and diffs that clearly meet, partially meet,
-  and miss them, to measure false "Met" rates (the costly failure mode).
+  and miss them, to measure false "Likely met" rates (the costly failure mode).
 - Adapter contract tests extended for the new resolver interface.
 
 ## Risks
 
-- **False confidence.** A "Met" verdict on code that does not work is worse
+- **False confidence.** A "Likely met" verdict on code that does not work is worse
   than no verdict. Mitigate with mandatory, validated citations, a
-  conservative default to "Unable to determine", and explicit "static review,
+  conservative default to "No evidence found", and explicit "static review,
   not a test run" framing.
 - **Cost and context size.** A PBI with many tasks/PRs can exceed context.
   Mitigate by summarizing per PR first, then assessing criteria against
   summaries plus targeted file excerpts; surface a cost estimate in dry run.
 - **Non-code criteria.** Many AC (performance, UX, "stakeholder approves") are
-  not verifiable from a diff; these are reported as "Unable to determine".
+  not verifiable from a diff; these are reported as "No evidence found".
 - **Credential sprawl.** More long-lived PATs raise the blast radius; keep to
   read-only scopes and document rotation.
 - **Link hygiene.** Teams that don't link work consistently will get
@@ -258,14 +262,14 @@ PRs) can follow later and belongs in the platform parity plan.
 - Report goes on the PR(s) or in the web UI (not on the PBI).
 - Per-org tokens via an env-var suffix (`MM_AZURE_TOKEN_<ORG>`).
 - Azure DevOps only.
-- Two outcomes: Met (with cited evidence) or Unable to determine.
+- Two outcomes only: "Likely met" (with cited evidence) or "No evidence found". A positive "Not met" is too hard to establish from code and is out of scope.
+- All completed PRs, whether linked directly or via tasks, bugs or remote tasks, are pooled into one PBI-level assessment.
+- Bugs are traversed along with Tasks.
+- Starting from a PR (`--pr`) is out of scope here and will get its own plan.
 
 ## Open Questions
 
-- Which PR gets the comment when a PBI has several delivery PRs: all of them
-  (each with the full PBI report), or only the most recently completed one?
-- Should there be a third outcome for criteria the code positively
-  contradicts ("Not met"), or is "Unable to determine" enough for v1?
-- Should the command also be usable from a PR (`pbi-verify --pr 123`, "does
-  this PR complete its linked PBI?") for CI, or PBI-first only?
-- Should work item types beyond Task (e.g. Bug) be traversed by default?
+- With `--write`, the single PBI-level report is posted on the delivery PRs.
+  Should it go on every contributing PR, or only on the most recently
+  completed one to avoid repeating the same long comment across many PRs? The
+  web UI always shows the one report in full.
