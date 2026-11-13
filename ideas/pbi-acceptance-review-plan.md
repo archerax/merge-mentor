@@ -29,17 +29,18 @@ criterion, and reports a per-criterion verdict.
 
 ## Proposal
 
-### New command: `merge-mentor pbi-verify` (working name)
+### New command: `merge-mentor pbi-verify`
+
+Decision: this is its own mode/command, separate from `pbi` (the inputs, cost
+and outputs differ from the backlog-quality review).
 
 ```bash
 merge-mentor pbi-verify 1024                       # dry run, console report
-merge-mentor pbi-verify 1024 --write               # post report (see Output)
+merge-mentor pbi-verify 1024 --write               # post report to the PR(s)
 merge-mentor pbi-verify --url https://dev.azure.com/org-a/proj/_workitems/edit/1024
 ```
 
-Alternative: a `--verify` mode on the existing `pbi` command. A separate
-command is proposed because the inputs, cost and outputs differ from the
-backlog-quality review (see Open Questions).
+Scope decision: **Azure DevOps only** for now.
 
 ### Pipeline
 
@@ -85,14 +86,20 @@ Traversal rules:
   special-cased.
 - Include Tasks and also, optionally, Bugs under the PBI; ignore other types
   unless configured.
-- Deduplicate PRs; record abandoned/draft PRs but exclude them from evidence
-  by default (only completed PRs count as "delivered"; see Open Questions).
+- Deduplicate PRs. **Only completed (merged) PRs count as delivered**, because
+  the goal is to verify the PBI is done. Active, draft and abandoned PRs are
+  excluded from evidence but listed in the report as "linked, not completed"
+  so a user can see why expected work is missing.
 - If a link cannot be followed (no credentials for the target org, 403, 404),
   **do not fail the run**. Record it as an _unresolved link_ and surface it
   prominently in the report, because missing PRs make a "not met" verdict
   unreliable.
 - A PR may be linked to several PBIs. Only the diff relevant to _this_ PBI's
   criteria is assessed, but the whole PR is available as context.
+
+The PBI and the code may be in the same org or in different orgs, depending on
+the project. Same-org setups only need shapes A and B; the Remote Related link
+(shape C) is only used when the code lives in another org.
 
 > **To verify during implementation:** the exact reference name and payload of
 > the Remote Related link (target org/project identification, and whether the
@@ -120,9 +127,13 @@ Proposed config shape:
 }
 ```
 
-And an env-var convention for CI where no config file exists, e.g.
-`MM_AZURE_TOKEN__ORG_WORK=...` (per-org suffix), alongside the existing
-`MM_AZURE_TOKEN` which remains the token for `MM_AZURE_ORG`.
+And a per-org env-var convention with the org name as a suffix, which works in
+CI with no config file: `MM_AZURE_TOKEN_<ORG>`, e.g. `MM_AZURE_TOKEN_MYORG`.
+The existing `MM_AZURE_TOKEN` remains the token for `MM_AZURE_ORG`. (Proposed
+name keeps the existing `MM_` prefix instead of `ADO_PAT_`.) The org name is
+upper-cased and any character other than letters/digits becomes `_`, so org
+`my-org` reads `MM_AZURE_TOKEN_MY_ORG`; `doctor` should warn if two orgs
+normalize to the same suffix.
 
 Design points:
 
@@ -148,23 +159,33 @@ Design points:
 
 ### Output
 
-Two destinations, selected by flags (dry run is the default, consistent with
-the rest of the tool):
+Dry run is the default, consistent with the rest of the tool. Two destinations:
 
-- **Console / web UI:** a table of criteria with verdict, confidence, evidence
-  (file + line references with PR links), and gaps. The dashboard gets a
-  "PBI verification" view.
-- **`--write`:** post the report as a comment on the **PBI** (always
-  available) and optionally on each delivery **PR** (`--comment-on-prs`).
-  Repeat runs update the existing bot comment rather than adding a new one,
-  following the pattern already used by `postPBIComment(id, body, commentId)`.
+- **Console / web UI:** the full report. The dashboard gets a "PBI
+  verification" view.
+- **`--write`:** post the report as a comment on the delivery **PR(s)**.
+  Repeat runs update the existing bot comment instead of adding a new one.
+  (Nothing is posted on the PBI.)
 
-Verdict per criterion: `Met`, `Partially met`, `Not evidenced`, `Cannot
-determine` (e.g. needs runtime/manual verification, or unresolved links).
-**"Not evidenced" means "no evidence found in the code", not "proven absent"**;
-wording in the report must make this clear. Overall status is derived
-(all Met / any Partial / any Not evidenced / incomplete due to unresolved
-links).
+Each acceptance criterion gets one of two outcomes:
+
+- **Met**, with supporting evidence the reader can follow. Every Met verdict
+  must cite where it was seen, for example:
+  _"AC2: Button text updated: PR 12334, `Button.js`, line 123."_
+  Evidence is PR number (linked), file path and line, plus a one-line
+  explanation. A criterion with no citable evidence cannot be reported as Met.
+- **Unable to determine whether this has been met.** Used whenever the code
+  does not give enough certainty: no matching change found, the criterion is
+  not verifiable from code (performance, UX, sign-off), or some links could not
+  be followed. This is _not_ a claim that the criterion is unmet, and the
+  report wording says so. When links were unresolved, the report names the
+  unresolved links as a likely reason.
+
+The report header shows the PBI, the PRs considered (and how each was
+reached), PRs excluded as not completed, unresolved links, and the work item
+revision the criteria were read from. The overall status is "all criteria met"
+only when every criterion is Met; otherwise it lists how many remain
+undetermined.
 
 ### Architecture sketch
 
@@ -172,16 +193,14 @@ links).
 | ------------------- | --------------------------------------------------------------------------------------- |
 | `libs/config`       | Multi-org Azure credential model; env + file resolution; validation                     |
 | `libs/platforms`    | `AzureConnectionPool`; cross-org work item/PR fetch; PBI→PR traversal                    |
-| `libs/domain`       | New optional interface, e.g. `PBIDeliveryResolver` (`resolveDeliveryPRs(pbiId)`), so the `PlatformAdapter` stays small; `AcceptanceCriterion`, `CriterionVerdict` types |
-| `libs/core`         | `pbiVerifyEngine` (AC splitting, evidence prompts, verdict aggregation)                 |
+| `libs/domain`       | New optional interface, e.g. `PBIDeliveryResolver` (`resolveDeliveryPRs(pbiId)`), so the `PlatformAdapter` stays small; `AcceptanceCriterion`, `CriterionVerdict`, `EvidenceCitation` types |
+| `libs/core`         | `pbiVerifyEngine` (AC splitting, evidence prompts, evidence validation, aggregation)                 |
 | `apps/cli`          | New command + options; reuse CI detection and `--write` semantics                       |
 | `apps/web`          | Verification result view; mask multiple tokens                                          |
 | `docs`              | `docs/pbi-verify.md`; update `configuration.md`, `doctor.md`, `index.md`                 |
 
-GitHub: GitHub issues link to PRs via closing references and timeline
-cross-references, and have no Tasks or cross-org remote links. Phase 1 is
-**Azure DevOps only**; a simple GitHub variant (issue → linked PRs) can follow
-and is tracked in the platform parity plan.
+GitHub is out of scope for now. A simple variant (issue → closing-referenced
+PRs) can follow later and belongs in the platform parity plan.
 
 ## Phasing
 
@@ -194,7 +213,7 @@ and is tracked in the platform parity plan.
    protection and unresolved-link reporting. Reusable on its own (e.g. a
    `--list-prs` debug flag).
 4. **Verification engine + console output.**
-5. **`--write` to PBI/PR comments and the dashboard view.**
+5. **`--write` to PR comments and the dashboard view.**
 6. **Docs, eval corpus cases, mutation/coverage.**
 
 ## Tests
@@ -204,7 +223,10 @@ and is tracked in the platform parity plan.
 - Credentials: single-org backwards compatibility; multi-org resolution; token
   never appears in logs, caches, config viewer or error messages.
 - Engine: AC splitting for bullets, numbered lists, Given/When/Then and prose;
-  verdict aggregation; "cannot determine" when links are unresolved.
+  every Met verdict carries a valid citation (PR, file, line exists in the
+  diff; hallucinated citations are rejected and downgraded to "Unable to
+  determine"); "Unable to determine" when links are unresolved.
+- Only completed PRs are used; active/abandoned PRs are listed, not assessed.
 - Eval corpus: PBIs with known AC and diffs that clearly meet, partially meet,
   and miss them, to measure false "Met" rates (the costly failure mode).
 - Adapter contract tests extended for the new resolver interface.
@@ -212,13 +234,14 @@ and is tracked in the platform parity plan.
 ## Risks
 
 - **False confidence.** A "Met" verdict on code that does not work is worse
-  than no verdict. Mitigate with evidence citations on every verdict, a
-  conservative default, and explicit "static review, not a test run" framing.
+  than no verdict. Mitigate with mandatory, validated citations, a
+  conservative default to "Unable to determine", and explicit "static review,
+  not a test run" framing.
 - **Cost and context size.** A PBI with many tasks/PRs can exceed context.
   Mitigate by summarizing per PR first, then assessing criteria against
   summaries plus targeted file excerpts; surface a cost estimate in dry run.
 - **Non-code criteria.** Many AC (performance, UX, "stakeholder approves") are
-  not verifiable from a diff; these must be reported as `Cannot determine`.
+  not verifiable from a diff; these are reported as "Unable to determine".
 - **Credential sprawl.** More long-lived PATs raise the blast radius; keep to
   read-only scopes and document rotation.
 - **Link hygiene.** Teams that don't link work consistently will get
@@ -226,8 +249,23 @@ and is tracked in the platform parity plan.
 - **Stale AC.** AC may have been edited after the PR merged; report the work
   item revision/time the criteria were read.
 
+## Decisions Made
+
+- Separate `pbi-verify` command.
+- Only completed/merged PRs count as delivered.
+- PBIs and code may be in the same or different orgs; remote related links are
+  used for the cross-org case.
+- Report goes on the PR(s) or in the web UI (not on the PBI).
+- Per-org tokens via an env-var suffix (`MM_AZURE_TOKEN_<ORG>`).
+- Azure DevOps only.
+- Two outcomes: Met (with cited evidence) or Unable to determine.
+
 ## Open Questions
 
-See the questions raised alongside this draft. Key ones: new command vs `pbi`
-mode, which PR states count as delivered, how remote orgs are identified, where
-the report is posted, and CI/PR-triggered usage.
+- Which PR gets the comment when a PBI has several delivery PRs: all of them
+  (each with the full PBI report), or only the most recently completed one?
+- Should there be a third outcome for criteria the code positively
+  contradicts ("Not met"), or is "Unable to determine" enough for v1?
+- Should the command also be usable from a PR (`pbi-verify --pr 123`, "does
+  this PR complete its linked PBI?") for CI, or PBI-first only?
+- Should work item types beyond Task (e.g. Bug) be traversed by default?
