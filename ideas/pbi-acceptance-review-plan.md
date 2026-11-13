@@ -36,7 +36,7 @@ and outputs differ from the backlog-quality review).
 
 ```bash
 merge-mentor pbi-verify 1024                       # dry run, console report
-merge-mentor pbi-verify 1024 --write               # post report to the PR(s)
+merge-mentor pbi-verify 1024 --write               # post report as a comment on the PBI
 merge-mentor pbi-verify --url https://dev.azure.com/org-a/proj/_workitems/edit/1024
 ```
 
@@ -159,7 +159,8 @@ Design points:
 - **Web dashboard.** The config viewer (`apps/web/src/server/config.*`) must
   mask every org token, not only the single current one.
 - **Least privilege.** Read-only scopes for remote orgs. Only the org that
-  receives the report needs write scope.
+  holds the PBI (where the comment is posted) needs write scope (Work Items
+  read & write).
 
 ### Output
 
@@ -167,9 +168,11 @@ Dry run is the default, consistent with the rest of the tool. Two destinations:
 
 - **Console / web UI:** the full report. The dashboard gets a "PBI
   verification" view.
-- **`--write`:** post the report as a comment on the delivery **PR(s)**.
+- **`--write`:** post the report as a comment on the **PBI**, next to the
+  acceptance criteria it assesses, using the existing `postPBIComment`.
   Repeat runs update the existing bot comment instead of adding a new one.
-  (Nothing is posted on the PBI.)
+  Nothing is posted on the PRs. The PBI's org is the only one that needs write
+  access; the PBI's token must have it even when the code is in another org.
 
 Each acceptance criterion gets one of two outcomes:
 
@@ -217,7 +220,7 @@ PRs) can follow later and belongs in the platform parity plan.
    protection and unresolved-link reporting. Reusable on its own (e.g. a
    `--list-prs` debug flag).
 4. **Verification engine + console output.**
-5. **`--write` to PR comments and the dashboard view.**
+5. **`--write` to a PBI comment and the dashboard view.**
 6. **Docs, eval corpus cases, mutation/coverage.**
 
 ## Tests
@@ -259,7 +262,7 @@ PRs) can follow later and belongs in the platform parity plan.
 - Only completed/merged PRs count as delivered.
 - PBIs and code may be in the same or different orgs; remote related links are
   used for the cross-org case.
-- Report goes on the PR(s) or in the web UI (not on the PBI).
+- Report goes on the PBI (where the acceptance criteria are) with `--write`, or in the web UI. Nothing is posted on PRs.
 - Per-org tokens via an env-var suffix (`MM_AZURE_TOKEN_<ORG>`).
 - Azure DevOps only.
 - Two outcomes only: "Likely met" (with cited evidence) or "No evidence found". A positive "Not met" is too hard to establish from code and is out of scope.
@@ -269,7 +272,4 @@ PRs) can follow later and belongs in the platform parity plan.
 
 ## Open Questions
 
-- With `--write`, the single PBI-level report is posted on the delivery PRs.
-  Should it go on every contributing PR, or only on the most recently
-  completed one to avoid repeating the same long comment across many PRs? The
-  web UI always shows the one report in full.
+None outstanding. Next step is the Remote Related link spike (see Phasing).
