@@ -16,4 +16,5 @@ custom rules. It respects the repository's `AGENTS.md` instead.
 | [outcome-tracking-plan.md](./outcome-tracking-plan.md)                                       | Proposed (revised)     | Display-only: 12-month scan, JSON cache, CLI + dashboard. No learning yet          |
 | [repo-intelligence-and-team-coaching-plan.md](./repo-intelligence-and-team-coaching-plan.md) | Proposed (earlier)     | Generated `AGENTS.md` rules conflict with the decision above; see note in the plan |
 | [dashboard-review-history-plan.md](./dashboard-review-history-plan.md)                       | Proposed               | Depends on outcome tracking                                                        |
+| [pbi-acceptance-review-plan.md](./pbi-acceptance-review-plan.md)                             | Proposed (draft)       | PBI → PRs traversal incl. cross-org remote links; needs multi-org ADO credentials  |
 | [web-ui-state-management-plan.md](./web-ui-state-management-plan.md)                         | Implemented            | Conventions in `apps/web/README.md`                                                |
