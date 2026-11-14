@@ -192,7 +192,7 @@ importers:
         version: 9.0.0
       dotenv:
         specifier: ^18.0.9
-        version: 18.0.9
+        version: 18.0.10
       isomorphic-git:
         specifier: ^1.44.10
         version: 1.44.10
@@ -316,7 +316,7 @@ importers:
         version: 1.169.4(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sugarss@5.0.2(postcss@8.5.32))(yaml@2.9.1))
       dotenv:
         specifier: ^18.0.9
-        version: 18.0.9
+        version: 18.0.10
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -2528,8 +2528,8 @@ packages:
   dingbat-to-unicode@1.0.2:
     resolution: {integrity: sha512-R0bRerYzy/EZP6QzD3Hkl6JjUDA1Mnn+pd928w0nWjPzihnbAR6dcjGJGiRyznj5E4S1duEKzWrTqw02DPcdzg==}
 
-  dotenv@18.0.9:
-    resolution: {integrity: sha512-3fVOW4cB02R066PUSwn8O4TJyz9NckQl7F81blIbaq9jKBm2tSmOKky7ZHIXzGvkVPXCSn6jkpziBPZdGFs8Tw==}
+  dotenv@18.0.10:
+    resolution: {integrity: sha512-89FAA1xchzK2mxVWdr5F/0rldwiueXs6zJM86rO66EzekR1iBdiXRthyG+m5GvkJaFH3C2LESzamTkgndmLT2A==}
     engines: {node: '>=12'}
     hasBin: true
 
@@ -5924,7 +5924,7 @@ snapshots:
 
   dingbat-to-unicode@1.0.2: {}
 
-  dotenv@18.0.9: {}
+  dotenv@18.0.10: {}
 
   duck@0.1.12:
     dependencies:
