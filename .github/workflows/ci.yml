@@ -26,7 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macos-latest removed to reduce GitHub Actions minutes (macOS runners bill at a higher rate).
+        os: [ubuntu-latest, windows-latest]
         node: [22, 24]
 
     steps:
